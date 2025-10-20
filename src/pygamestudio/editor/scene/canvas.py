@@ -80,6 +80,12 @@ class PygameWidget(QWidget):
     def __emit_selected_object_info(self):
         pass
 
+    def add_button(self):
+        pass
+
+    def add_sprite(self):
+        pass
+
     def paintEvent(self, event):
         painter = QPainter(self)
         img = self.__convert_pygame_surface_to_qimage(self.__surface)
