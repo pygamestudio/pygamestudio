@@ -19,15 +19,18 @@ class GridGraphicsView(QGraphicsView):
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate)
         self.setRenderHint(QPainter.RenderHint.Antialiasing|QPainter.RenderHint.TextAntialiasing|QPainter.RenderHint.SmoothPixmapTransform)
-       
-    def __on_mid_button_pressed(self, event):
+
+    def is_dragging(self):
+        return self.__is_dragging
+
+    def __on_mouse_mid_button_pressed(self, event):
         self.__is_dragging = True
         self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
 
         press_event = QMouseEvent(QEvent.Type.MouseButtonPress, event.position(), event.globalPosition(), Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, event.modifiers())
         super().mousePressEvent(press_event)
 
-    def __on_mid_button_released(self, event):
+    def __on_mouse_mid_button_released(self, event):
         self.setDragMode(QGraphicsView.DragMode.NoDrag)
         self.__is_dragging = False
 
@@ -48,19 +51,17 @@ class GridGraphicsView(QGraphicsView):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.MiddleButton:
-            self.__on_mid_button_pressed(event)
-        
+            self.__on_mouse_mid_button_pressed(event)
         return super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.MiddleButton:
-            self.__on_mid_button_released(event)
-
+            self.__on_mouse_mid_button_released(event)
         return super().mouseReleaseEvent(event)
 
     def wheelEvent(self, event):
         if self.__is_dragging:
-            return super().wheelEvent(event)
+            return
         
         self.__zoom(event)
 

@@ -1,10 +1,12 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout
 from grid import GridGraphicsView, GridGraphicsScene
+from canvas import PygameWidget
 
 
 class SceneWindow(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.__pygame_widget = PygameWidget()
         self.__grid_scene = GridGraphicsScene()
         self.__grid_view = GridGraphicsView(self.__grid_scene, self)
 
@@ -16,8 +18,9 @@ class SceneWindow(QWidget):
         self.__set_layout()
 
     def __set_widget(self):
-        self.setWindowTitle("Scene Window")
-        self.setGeometry(200, 200, 800, 600)
+        self.__grid_scene.addWidget(self.__pygame_widget)
+        self.__pygame_widget.set_scene(self.__grid_scene)
+        self.__pygame_widget.move(-self.__pygame_widget.width()//2, -self.__pygame_widget.height()//2)
 
     def __set_signal(self):
         pass
