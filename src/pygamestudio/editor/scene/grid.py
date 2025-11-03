@@ -7,7 +7,7 @@ import math
 class GridGraphicsView(QGraphicsView):
     def __init__(self, scene, parent=None):
         super().__init__(parent)
-        self.__zoom_limit = [0.5, 5]
+        self.__zoom_limit = [0.2, 5]
         self.__zoom_factor = 1.05
         self.__current_scale = 1.0
         self.__previous_scale = 1.0
@@ -43,8 +43,8 @@ class GridGraphicsView(QGraphicsView):
         self.__current_scale *= zoom_factor
 
         if self.__current_scale < self.__zoom_limit[0] or self.__current_scale > self.__zoom_limit[1]:
-            zoom_factor = 1.0
             self.__current_scale = self.__previous_scale
+            zoom_factor = 1.0
 
         self.__previous_scale = self.__current_scale
         self.scale(zoom_factor, zoom_factor)
