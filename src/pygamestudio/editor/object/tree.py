@@ -1,14 +1,21 @@
-from PySide6.QtWidgets import QTreeWidget
+from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QIcon
 
-from menu import ObjectManagerMenu
+from pygamestudio.editor.object.menu import ContextMenu
+from pygamestudio.editor.object.data import *
+import uuid
+import copy
 
 
 class ObjectTreeWidget(QTreeWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.__object_manager_menu = ObjectManagerMenu()
-
+        self.__expanded_items = []
+        self.__clipboard_items = []
+        self.__is_cut_action = False
+        self.__riight_clicked_item = None
+        self.__context_menu = ContextMenu('', self)
         self.__setup()
 
     def __setup(self):
@@ -16,32 +23,222 @@ class ObjectTreeWidget(QTreeWidget):
         self.__set_signal()
 
     def __set_widget(self):
-        self.setHeaderLabel('Object')
+        self.setHeaderLabel('Scene')
+        self.setAcceptDrops(True)
+        self.setDragEnabled(True)
+        self.setDropIndicatorShown(True)
+        self.setDefaultDropAction(Qt.DropAction.MoveAction)
+        self.setDragDropMode(QTreeWidget.DragDropMode.InternalMove)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.setSelectionMode(QTreeWidget.SelectionMode.ExtendedSelection)
 
     def __set_signal(self):
         self.customContextMenuRequested.connect(self.__show_context_menu)
         self.itemSelectionChanged.connect(self.__on_item_selection_changed)
         self.itemChanged.connect(self.__on_item_changed)
+        self.itemExpanded.connect(self.__on_item_expanded)
+        self.itemCollapsed.connect(self.__on_item_collapsed)
+
+        self.__context_menu.create_signal.connect(self.__create_item)
+        self.__context_menu.cut_signal.connect(self.__cut_item)
+        self.__context_menu.copy_signal.connect(self.__copy_item)
+        self.__context_menu.paste_signal.connect(self.__paste_item)
+        self.__context_menu.delete_signal.connect(self.__delete_item)
+        self.__context_menu.rename_signal.connect(self.__rename_item)
 
     def __show_context_menu(self, pos):
         item = self.itemAt(pos)
+        self.__riight_clicked_item = item
         global_pos = self.mapToGlobal(pos)
-
         is_right_click_on_item = True if item else False
-        self.__object_manager_menu.show(global_pos, is_right_click_on_item)
+        self.__context_menu.show(global_pos, is_right_click_on_item)
+        
+    def __on_item_changed(self, item, column):
+        item_data = item.data(column, Qt.ItemDataRole.UserRole)
+        if not item_data:
+            return
 
-    def __on_item_changed(self):
-        ...
+        # update the name value
+        item_data['name'] = item.text(column)
+
+    def __on_item_expanded(self, item):
+        item_data = item.data(0, Qt.ItemDataRole.UserRole)
+        item_data['isExpanded'] = item.isExpanded()
+        item.setData(0, Qt.ItemDataRole.UserRole, item_data)
+
+    def __on_item_collapsed(self, item):
+        item_data = item.data(0, Qt.ItemDataRole.UserRole)
+        item_data['isExpanded'] = item.isExpanded()
+        item.setData(0, Qt.ItemDataRole.UserRole, item_data)
 
     def __on_item_selection_changed(self):
         ...
 
-    def __rename_item(self, item):
+    def __create_item(self, item_type):
+        if item_type == 'RECT':
+            item_data = self.__create_rect()
+        elif item_type == 'TEXT':
+            item_data = self.__create_text()
+        elif item_type == 'CIRCLE':
+            item_data = self.__create_circle()
+
+        # update uuid
+        item_id = str(uuid.uuid4())
+        item_data['uuid'] = item_id
+
+        # create item and set its properties
+        item = QTreeWidgetItem()
+        self.__set_new_item_properties(item, item_data)
+        self.__add_new_item_to_tree_widget(item)
+        
+    def __create_rect(self):
+        item_data = copy.deepcopy(DEFAULT_RECT_ITEM_DATA)
+        return item_data
+
+    def __create_text(self):
+        item_data = copy.deepcopy(DEFAULT_TEXT_ITEM_DATA)
+        return item_data
+    
+    def __create_circle(self):
+        item_data = copy.deepcopy(DEFAULT_CIRCLE_ITEM_DATA)
+        return item_data
+
+    def __cut_item(self):
         ...
 
-    def __move_to_group(self, item):
-        ...
+    def __copy_item(self):
+        selected_items = self.selectedItems()
+        if not selected_items:
+            return
+        
+        self.__clipboard_items = []
+        self.__is_cut_action = False
+            
+        for item in selected_items:
+            copied_item = self.__deep_copy_item(item)
+            self.__clipboard_items.append(copied_item)
+
+        print(self.__clipboard_items)
+
+    def __paste_item(self):
+        if not self.__clipboard_items:
+            return
+
+        # Where to paste the items
+        current_item = self.currentItem()
+        parent_item = current_item if current_item else None
+
+        for item in self.__clipboard_items:
+            new_item = self.__deep_copy_item(item)
+            if parent_item:
+                parent_item.addChild(new_item)
+                parent_item.setExpanded(True)
+            else:
+                self.addTopLevelItem(new_item)
+
+            self.__restore_expanded_items(new_item)
+                
+        if self.__is_cut_action:
+            self.__clipboard_items = []
+            self.__is_cut_action = False
+
+            # for item in self.sle
+
+    def __deep_copy_item(self, item):
+        """Copy item and its children"""
+        new_item = QTreeWidgetItem()
+        
+        new_item.setText(0, item.text(0))
+        new_item.setIcon(0, item.icon(0))
+        new_item.setData(0, Qt.ItemDataRole.UserRole, item.data(0, Qt.ItemDataRole.UserRole))
+
+        for i in range(item.childCount()):
+            child_item = item.child(i)
+            new_child_item = self.__deep_copy_item(child_item)
+            new_item.addChild(new_child_item)
+        
+        return new_item
+
+    def __delete_item(self):
+        selected_items = self.selectedItems()
+        if not selected_items:
+            return
+
+        # Detele deepest items first.
+        selected_items.sort(key=lambda x: self.__get_item_depth(x), reverse=True)
+        for item in selected_items:
+            parent = item.parent()
+            if parent:
+                parent.removeChild(item)
+            else:
+                index = self.indexOfTopLevelItem(item)
+                if index >= 0:
+                    self.takeTopLevelItem(index)
+    
+        del selected_items
+        self.clearSelection()
+
+    def __get_item_depth(self, item):
+        depth = 0
+        current = item
+        while current.parent() is not None:
+            depth += 1
+            current = current.parent()
+        return depth
+    
+    def __rename_item(self):
+        self.editItem(self.__riight_clicked_item)
+    
+    def __set_new_item_properties(self, item, item_data):
+        item.setText(0, item_data['name'])
+        item.setIcon(0, QIcon(item_data['icon']))
+        item.setData(0, Qt.ItemDataRole.UserRole, item_data)
+        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+
+    def __add_new_item_to_tree_widget(self, item):
+        # Add it as the top level item if there is no right clicked item.
+        if not self.__riight_clicked_item:
+            self.addTopLevelItem(item)
+            return
+        
+        self.__riight_clicked_item.addChild(item)
+        self.__riight_clicked_item.setExpanded(True)
+
+    def __restore_expanded_items(self, parent_item):
+        parent_item_data = parent_item.data(0, Qt.ItemDataRole.UserRole)
+        if not parent_item_data['isExpanded']:
+            return
+        parent_item.setExpanded(True)
+                
+        for i in range(parent_item.childCount()):
+            item = parent_item.child(i)
+            item_data = item.data(0, Qt.ItemDataRole.UserRole)
+            
+            if item_data['isExpanded']:
+                item.setExpanded(True)
+
+                if item.childCount() > 0:
+                    self.__restore_expanded_items(item)
+
+    def get_clipboard_items(self):
+        return self.__clipboard_items
+
+    def dropEvent(self, event):
+        # Must get the drag items and target item before super().dropEvent(event)
+        source_items = self.selectedItems()
+
+        target_item = self.itemAt(event.pos())
+        if target_item:
+            target_item.setExpanded(True)
+
+        super().dropEvent(event)
+
+        # Keep the expanded or collapsed state
+        for item in source_items:
+            self.__restore_expanded_items(item)
+    
+    def keyPressEvent(self, event):
+        return super().keyPressEvent(event)
 
 
 if __name__ == "__main__":

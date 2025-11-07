@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout
-from grid import GridGraphicsView, GridGraphicsScene
-from canvas import PygameWidget
+from pygamestudio.editor.scene.grid import GridGraphicsView, GridGraphicsScene
+from pygamestudio.editor.scene.canvas import PygameWidget
 
 
 class SceneWindow(QWidget):
