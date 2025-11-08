@@ -1,9 +1,10 @@
-from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import QApplication, QTreeWidget, QTreeWidgetItem
+from PySide6.QtCore import Qt, QTimeLine
+from PySide6.QtGui import QIcon, QColor
 
 from pygamestudio.editor.object.menu import ContextMenu
 from pygamestudio.editor.object.data import *
+from pygamestudio.editor.object.type import *
 import uuid
 import copy
 
@@ -11,9 +12,10 @@ import copy
 class ObjectTreeWidget(QTreeWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.__expanded_items = []
         self.__clipboard_items = []
         self.__is_cut_action = False
+        self.__items_to_delete_by_cut = []
+
         self.__riight_clicked_item = None
         self.__context_menu = ContextMenu('', self)
         self.__setup()
@@ -40,11 +42,12 @@ class ObjectTreeWidget(QTreeWidget):
         self.itemCollapsed.connect(self.__on_item_collapsed)
 
         self.__context_menu.create_signal.connect(self.__create_item)
-        self.__context_menu.cut_signal.connect(self.__cut_item)
-        self.__context_menu.copy_signal.connect(self.__copy_item)
-        self.__context_menu.paste_signal.connect(self.__paste_item)
-        self.__context_menu.delete_signal.connect(self.__delete_item)
+        self.__context_menu.cut_signal.connect(self.__cut_items)
+        self.__context_menu.copy_signal.connect(self.__copy_items)
+        self.__context_menu.paste_signal.connect(self.__paste_items)
+        self.__context_menu.delete_signal.connect(self.__delete_items)
         self.__context_menu.rename_signal.connect(self.__rename_item)
+        self.__context_menu.copy_uuid_signal.connect(self.__copy_item_uuid)
 
     def __show_context_menu(self, pos):
         item = self.itemAt(pos)
@@ -75,18 +78,18 @@ class ObjectTreeWidget(QTreeWidget):
         ...
 
     def __create_item(self, item_type):
-        if item_type == 'RECT':
+        if item_type == ITEM_RECT:
             item_data = self.__create_rect()
-        elif item_type == 'TEXT':
+        elif item_type == ITEM_TEXT:
             item_data = self.__create_text()
-        elif item_type == 'CIRCLE':
+        elif item_type == ITEM_CIRCLE:
             item_data = self.__create_circle()
 
-        # update uuid
+        # Update the uuid value.
         item_id = str(uuid.uuid4())
         item_data['uuid'] = item_id
 
-        # create item and set its properties
+        # Set the properties of this new item.
         item = QTreeWidgetItem()
         self.__set_new_item_properties(item, item_data)
         self.__add_new_item_to_tree_widget(item)
@@ -103,10 +106,21 @@ class ObjectTreeWidget(QTreeWidget):
         item_data = copy.deepcopy(DEFAULT_CIRCLE_ITEM_DATA)
         return item_data
 
-    def __cut_item(self):
-        ...
+    def __cut_items(self):
+        selected_items = self.selectedItems()
+        if not selected_items:
+            return
+        
+        self.__clipboard_items = []
+        self.__is_cut_action = True
+        self.__items_to_delete_by_cut = selected_items
+            
+        for item in selected_items:
+            self.__hightlight_item(item)
+            copied_item = self.__deep_copy_item(item)
+            self.__clipboard_items.append(copied_item)
 
-    def __copy_item(self):
+    def __copy_items(self):
         selected_items = self.selectedItems()
         if not selected_items:
             return
@@ -115,18 +129,16 @@ class ObjectTreeWidget(QTreeWidget):
         self.__is_cut_action = False
             
         for item in selected_items:
+            self.__hightlight_item(item)
             copied_item = self.__deep_copy_item(item)
             self.__clipboard_items.append(copied_item)
 
-        print(self.__clipboard_items)
-
-    def __paste_item(self):
+    def __paste_items(self):
         if not self.__clipboard_items:
             return
 
-        # Where to paste the items
-        current_item = self.currentItem()
-        parent_item = current_item if current_item else None
+        selected_items = self.selectedItems()
+        parent_item = selected_items[0] if selected_items else None
 
         for item in self.__clipboard_items:
             new_item = self.__deep_copy_item(item)
@@ -142,7 +154,8 @@ class ObjectTreeWidget(QTreeWidget):
             self.__clipboard_items = []
             self.__is_cut_action = False
 
-            # for item in self.sle
+            self.__delete_items(self.__items_to_delete_by_cut)
+            self.__items_to_delete_by_cut = []
 
     def __deep_copy_item(self, item):
         """Copy item and its children"""
@@ -159,14 +172,14 @@ class ObjectTreeWidget(QTreeWidget):
         
         return new_item
 
-    def __delete_item(self):
-        selected_items = self.selectedItems()
-        if not selected_items:
+    def __delete_items(self, items=None):
+        items_to_delete = items if items else self.selectedItems()
+        if not items_to_delete:
             return
 
-        # Detele deepest items first.
-        selected_items.sort(key=lambda x: self.__get_item_depth(x), reverse=True)
-        for item in selected_items:
+        # Detele the deepest items first.
+        items_to_delete.sort(key=lambda x: self.__get_item_depth(x), reverse=True)
+        for item in items_to_delete:
             parent = item.parent()
             if parent:
                 parent.removeChild(item)
@@ -175,7 +188,7 @@ class ObjectTreeWidget(QTreeWidget):
                 if index >= 0:
                     self.takeTopLevelItem(index)
     
-        del selected_items
+        del items_to_delete
         self.clearSelection()
 
     def __get_item_depth(self, item):
@@ -188,6 +201,10 @@ class ObjectTreeWidget(QTreeWidget):
     
     def __rename_item(self):
         self.editItem(self.__riight_clicked_item)
+
+    def __copy_item_uuid(self):
+        item_data = self.__riight_clicked_item.data(0, Qt.ItemDataRole.UserRole)
+        QApplication.clipboard().setText(item_data['uuid'])
     
     def __set_new_item_properties(self, item, item_data):
         item.setText(0, item_data['name'])
@@ -220,6 +237,41 @@ class ObjectTreeWidget(QTreeWidget):
                 if item.childCount() > 0:
                     self.__restore_expanded_items(item)
 
+    def __hightlight_item(self, item):
+        """Highlight item for some actions, e.g., copy action."""
+        original_fg = item.foreground(0)
+
+        timeline = QTimeLine(1500, self)
+        timeline.setFrameRange(0, 100)        
+        
+        def update_frame(frame):
+            # progress: 0 -> 1 -> 0
+            progress = frame / 100.0
+            if progress > 0.5:
+                value = -20
+            else:
+                value = 20
+            
+            fg_color = item.foreground(0).color()
+            r = fg_color.red()
+            g = fg_color.green() + value
+            b = fg_color.blue() + value
+
+            # Limit the result to [0, 255].
+            # r = max(0, min(r, 255))
+            g = max(0, min(g, 255))
+            b = max(0, min(b, 255))
+
+            item.setForeground(0, QColor(r, g, b, 255))
+        
+        def animation_finished():
+            item.setForeground(0, original_fg)
+            timeline.deleteLater()
+        
+        timeline.frameChanged.connect(update_frame)
+        timeline.finished.connect(animation_finished)
+        timeline.start()
+
     def get_clipboard_items(self):
         return self.__clipboard_items
 
@@ -238,7 +290,26 @@ class ObjectTreeWidget(QTreeWidget):
             self.__restore_expanded_items(item)
     
     def keyPressEvent(self, event):
-        return super().keyPressEvent(event)
+        if event.modifiers() == Qt.Modifier.CTRL:
+            if event.key() == Qt.Key.Key_X:
+                self.__cut_items()
+                event.accept()
+                return
+            elif event.key() == Qt.Key.Key_C:
+                self.__copy_items()
+                event.accept()
+                return
+            elif event.key() == Qt.Key.Key_V:
+                self.__paste_items()
+                event.accept()
+                return
+            
+        elif event.key() == Qt.Key.Key_Delete:
+            self.__delete_items()
+            event.accept()
+            return
+        
+        super().keyPressEvent(event)
 
 
 if __name__ == "__main__":

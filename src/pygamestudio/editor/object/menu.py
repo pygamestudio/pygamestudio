@@ -1,10 +1,11 @@
 from PySide6.QtWidgets import QApplication, QMenu
 from PySide6.QtGui import QAction
 from PySide6.QtCore import Signal
+from pygamestudio.editor.object.type import *
 
 
 class ContextMenu(QMenu):
-    create_signal = Signal(str)
+    create_signal = Signal(int)
     cut_signal = Signal()
     copy_signal = Signal()
     paste_signal = Signal()
@@ -35,9 +36,9 @@ class ContextMenu(QMenu):
         copy_action = QAction('复制', self)
         paste_action = QAction('粘贴', self)
 
-        create_text_action.triggered.connect(lambda: self.create_signal.emit('TEXT'))
-        create_rect_action.triggered.connect(lambda: self.create_signal.emit('RECT'))
-        create_circle_action.triggered.connect(lambda: self.create_signal.emit('CIRCLE'))
+        create_text_action.triggered.connect(lambda: self.create_signal.emit(ITEM_TEXT))
+        create_rect_action.triggered.connect(lambda: self.create_signal.emit(ITEM_RECT))
+        create_circle_action.triggered.connect(lambda: self.create_signal.emit(ITEM_CIRCLE))
         cut_action.triggered.connect(self.cut_signal.emit)
         copy_action.triggered.connect(self.copy_signal.emit)
         paste_action.triggered.connect(self.paste_signal.emit)
