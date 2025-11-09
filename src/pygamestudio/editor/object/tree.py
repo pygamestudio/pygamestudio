@@ -1,7 +1,8 @@
-from PySide6.QtWidgets import QApplication, QTreeWidget, QTreeWidgetItem
+from PySide6.QtWidgets import QApplication, QTreeWidget, QTreeWidgetItem, QAbstractItemView, QHeaderView
 from PySide6.QtCore import Qt, QTimeLine
 from PySide6.QtGui import QIcon, QColor
 
+from pygamestudio.editor.object.delegate import ObjectTreeWidgetDelegate
 from pygamestudio.editor.object.menu import ContextMenu
 from pygamestudio.editor.object.data import *
 from pygamestudio.editor.object.type import *
@@ -12,6 +13,8 @@ import copy
 class ObjectTreeWidget(QTreeWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.__delegate = ObjectTreeWidgetDelegate(self)
+        
         self.__clipboard_items = []
         self.__is_cut_action = False
         self.__items_to_delete_by_cut = []
@@ -25,7 +28,13 @@ class ObjectTreeWidget(QTreeWidget):
         self.__set_signal()
 
     def __set_widget(self):
-        self.setHeaderLabel('Scene')
+        self.setItemDelegate(self.__delegate)
+        
+        self.setColumnCount(2)
+        self.header().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        
+        self.setMouseTracking(True)
+        self.setHeaderHidden(True)
         self.setAcceptDrops(True)
         self.setDragEnabled(True)
         self.setDropIndicatorShown(True)
@@ -33,6 +42,8 @@ class ObjectTreeWidget(QTreeWidget):
         self.setDragDropMode(QTreeWidget.DragDropMode.InternalMove)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.setSelectionMode(QTreeWidget.SelectionMode.ExtendedSelection)
+        self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+
 
     def __set_signal(self):
         self.customContextMenuRequested.connect(self.__show_context_menu)
@@ -61,9 +72,9 @@ class ObjectTreeWidget(QTreeWidget):
         if not item_data:
             return
 
-        # update the name value
+        # Update the name value.
         item_data['name'] = item.text(column)
-
+        
     def __on_item_expanded(self, item):
         item_data = item.data(0, Qt.ItemDataRole.UserRole)
         item_data['isExpanded'] = item.isExpanded()
@@ -212,6 +223,10 @@ class ObjectTreeWidget(QTreeWidget):
         item.setData(0, Qt.ItemDataRole.UserRole, item_data)
         item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
 
+        # Check whether the parent item is visibl or not.
+        if self.__riight_clicked_item and not self.__riight_clicked_item.data(0, Qt.ItemDataRole.UserRole).get('isVisible'):
+            item.setForeground(0,  QColor(150, 150, 150))
+
     def __add_new_item_to_tree_widget(self, item):
         # Add it as the top level item if there is no right clicked item.
         if not self.__riight_clicked_item:
@@ -271,7 +286,37 @@ class ObjectTreeWidget(QTreeWidget):
         timeline.frameChanged.connect(update_frame)
         timeline.finished.connect(animation_finished)
         timeline.start()
+    
+    def __update_item_visibility_appearance(self, item, is_visible):
+        if is_visible and self.is_item_ancestor_visible(item):
+            item.setForeground(0, QColor(0, 0, 0))            
+        else:
+            item.setForeground(0, QColor(150, 150, 150))
+        self.viewport().update()
 
+    def __update_children_visibility_appearance(self, parent_item, is_visible):
+        # The value of item_data['isVisible'] should not be influenced by item's parent.
+        for i in range(parent_item.childCount()):
+            item = parent_item.child(i)
+            self.__update_item_visibility_appearance(item, is_visible)
+            self.__update_children_visibility_appearance(item, is_visible)
+
+    def toggle_item_visibility(self, item):
+        item_data = item.data(0, Qt.ItemDataRole.UserRole)
+        item_data['isVisible'] = not item_data.get('isVisible')
+        item.setData(0, Qt.ItemDataRole.UserRole, item_data)
+        
+        self.__update_item_visibility_appearance(item, item_data.get('isVisible'))
+        self.__update_children_visibility_appearance(item, item_data.get('isVisible'))
+
+    def is_item_ancestor_visible(self, item):
+        current = item.parent()
+        while current:
+            if not current.data(0, Qt.ItemDataRole.UserRole).get('isVisible'):
+                return False
+            current = current.parent()
+        return True
+    
     def get_clipboard_items(self):
         return self.__clipboard_items
 
