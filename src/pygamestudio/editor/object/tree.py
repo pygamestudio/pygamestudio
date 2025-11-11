@@ -19,6 +19,7 @@ class ObjectTreeWidget(QTreeWidget):
         self.__is_cut_action = False
         self.__items_to_delete_by_cut = []
 
+        self.__root_item = None
         self.__riight_clicked_item = None
         self.__context_menu = ContextMenu('', self)
         self.__setup()
@@ -26,6 +27,7 @@ class ObjectTreeWidget(QTreeWidget):
     def __setup(self):
         self.__set_widget()
         self.__set_signal()
+        self.__set_root_item()
 
     def __set_widget(self):
         self.setItemDelegate(self.__delegate)
@@ -33,10 +35,10 @@ class ObjectTreeWidget(QTreeWidget):
         self.setColumnCount(2)
         self.header().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         
-        self.setMouseTracking(True)
-        self.setHeaderHidden(True)
         self.setAcceptDrops(True)
         self.setDragEnabled(True)
+        self.setHeaderHidden(True)
+        self.setMouseTracking(True)
         self.setDropIndicatorShown(True)
         self.setDefaultDropAction(Qt.DropAction.MoveAction)
         self.setDragDropMode(QTreeWidget.DragDropMode.InternalMove)
@@ -44,10 +46,8 @@ class ObjectTreeWidget(QTreeWidget):
         self.setSelectionMode(QTreeWidget.SelectionMode.ExtendedSelection)
         self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
 
-
     def __set_signal(self):
         self.customContextMenuRequested.connect(self.__show_context_menu)
-        self.itemSelectionChanged.connect(self.__on_item_selection_changed)
         self.itemChanged.connect(self.__on_item_changed)
         self.itemExpanded.connect(self.__on_item_expanded)
         self.itemCollapsed.connect(self.__on_item_collapsed)
@@ -60,12 +60,23 @@ class ObjectTreeWidget(QTreeWidget):
         self.__context_menu.rename_signal.connect(self.__rename_item)
         self.__context_menu.copy_uuid_signal.connect(self.__copy_item_uuid)
 
+    def __set_root_item(self):
+        item_data = copy.deepcopy(DEFAULT_ROOT_ITEM_DATA)
+        self.__root_item = QTreeWidgetItem()
+        self.__root_item.setText(0, item_data['name'])
+        self.__root_item.setIcon(0, QIcon(item_data['icon']))
+        self.__root_item.setData(0, Qt.ItemDataRole.UserRole, item_data)
+        self.__root_item.setFlags(self.__root_item.flags() & ~Qt.ItemFlag.ItemIsDragEnabled)
+        
+        self.addTopLevelItem(self.__root_item)
+
     def __show_context_menu(self, pos):
         item = self.itemAt(pos)
         self.__riight_clicked_item = item
         global_pos = self.mapToGlobal(pos)
-        is_right_click_on_item = True if item else False
-        self.__context_menu.show(global_pos, is_right_click_on_item)
+        
+        item_type = item.data(0, Qt.ItemDataRole.UserRole).get('type') if item else None
+        self.__context_menu.show(global_pos, item_type)
         
     def __on_item_changed(self, item, column):
         item_data = item.data(column, Qt.ItemDataRole.UserRole)
@@ -84,9 +95,6 @@ class ObjectTreeWidget(QTreeWidget):
         item_data = item.data(0, Qt.ItemDataRole.UserRole)
         item_data['isExpanded'] = item.isExpanded()
         item.setData(0, Qt.ItemDataRole.UserRole, item_data)
-
-    def __on_item_selection_changed(self):
-        ...
 
     def __create_item(self, item_type):
         if item_type == ITEM_RECT:
@@ -127,6 +135,8 @@ class ObjectTreeWidget(QTreeWidget):
         self.__items_to_delete_by_cut = selected_items
             
         for item in selected_items:
+            if item == self.__root_item:
+                continue
             self.__hightlight_item(item)
             copied_item = self.__deep_copy_item(item)
             self.__clipboard_items.append(copied_item)
@@ -140,6 +150,8 @@ class ObjectTreeWidget(QTreeWidget):
         self.__is_cut_action = False
             
         for item in selected_items:
+            if item == self.__root_item:
+                continue
             self.__hightlight_item(item)
             copied_item = self.__deep_copy_item(item)
             self.__clipboard_items.append(copied_item)
@@ -157,7 +169,8 @@ class ObjectTreeWidget(QTreeWidget):
                 parent_item.addChild(new_item)
                 parent_item.setExpanded(True)
             else:
-                self.addTopLevelItem(new_item)
+                self.__root_item.addChild(new_item)
+                self.__root_item.setExpanded(True)
 
             self.__restore_expanded_items(new_item)
                 
@@ -172,10 +185,12 @@ class ObjectTreeWidget(QTreeWidget):
         """Copy item and its children"""
         new_item = QTreeWidgetItem()
         
+        new_item.setFlags(item.flags())
         new_item.setText(0, item.text(0))
         new_item.setIcon(0, item.icon(0))
+        new_item.setForeground(0, item.foreground(0))
         new_item.setData(0, Qt.ItemDataRole.UserRole, item.data(0, Qt.ItemDataRole.UserRole))
-
+        
         for i in range(item.childCount()):
             child_item = item.child(i)
             new_child_item = self.__deep_copy_item(child_item)
@@ -191,6 +206,9 @@ class ObjectTreeWidget(QTreeWidget):
         # Detele the deepest items first.
         items_to_delete.sort(key=lambda x: self.__get_item_depth(x), reverse=True)
         for item in items_to_delete:
+            if item == self.__root_item:
+                continue
+            
             parent = item.parent()
             if parent:
                 parent.removeChild(item)
@@ -230,7 +248,9 @@ class ObjectTreeWidget(QTreeWidget):
     def __add_new_item_to_tree_widget(self, item):
         # Add it as the top level item if there is no right clicked item.
         if not self.__riight_clicked_item:
-            self.addTopLevelItem(item)
+            self.__root_item.addChild(item)
+            self.__root_item.setExpanded(True)
+            self.scrollToItem(item)
             return
         
         self.__riight_clicked_item.addChild(item)
@@ -255,6 +275,9 @@ class ObjectTreeWidget(QTreeWidget):
     def __hightlight_item(self, item):
         """Highlight item for some actions, e.g., copy action."""
         original_fg = item.foreground(0)
+        original_r = original_fg.color().red()
+        original_g = original_fg.color().green()
+        original_b = original_fg.color().blue()
 
         timeline = QTimeLine(1500, self)
         timeline.setFrameRange(0, 100)        
@@ -262,10 +285,11 @@ class ObjectTreeWidget(QTreeWidget):
         def update_frame(frame):
             # progress: 0 -> 1 -> 0
             progress = frame / 100.0
+            
             if progress > 0.5:
-                value = -20
+                value = -(255-original_r) * progress
             else:
-                value = 20
+                value = (255-original_r) * progress
             
             fg_color = item.foreground(0).color()
             r = fg_color.red()
@@ -273,9 +297,9 @@ class ObjectTreeWidget(QTreeWidget):
             b = fg_color.blue() + value
 
             # Limit the result to [0, 255].
-            # r = max(0, min(r, 255))
-            g = max(0, min(g, 255))
-            b = max(0, min(b, 255))
+            r = max(original_g, min(r, 255))
+            g = max(original_g, min(g, 255))
+            b = max(original_b, min(b, 255))
 
             item.setForeground(0, QColor(r, g, b, 255))
         
@@ -288,18 +312,19 @@ class ObjectTreeWidget(QTreeWidget):
         timeline.start()
     
     def __update_item_visibility_appearance(self, item, is_visible):
-        if is_visible and self.is_item_ancestor_visible(item):
+        if is_visible and self.is_ancestor_item_visible(item):
             item.setForeground(0, QColor(0, 0, 0))            
         else:
             item.setForeground(0, QColor(150, 150, 150))
         self.viewport().update()
 
-    def __update_children_visibility_appearance(self, parent_item, is_visible):
+    def __update_children_visibility_appearance(self, parent_item):
         # The value of item_data['isVisible'] should not be influenced by item's parent.
         for i in range(parent_item.childCount()):
             item = parent_item.child(i)
-            self.__update_item_visibility_appearance(item, is_visible)
-            self.__update_children_visibility_appearance(item, is_visible)
+            item_data = item.data(0, Qt.ItemDataRole.UserRole)
+            self.__update_item_visibility_appearance(item, item_data.get('isVisible'))
+            self.__update_children_visibility_appearance(item)
 
     def toggle_item_visibility(self, item):
         item_data = item.data(0, Qt.ItemDataRole.UserRole)
@@ -307,9 +332,9 @@ class ObjectTreeWidget(QTreeWidget):
         item.setData(0, Qt.ItemDataRole.UserRole, item_data)
         
         self.__update_item_visibility_appearance(item, item_data.get('isVisible'))
-        self.__update_children_visibility_appearance(item, item_data.get('isVisible'))
+        self.__update_children_visibility_appearance(item)
 
-    def is_item_ancestor_visible(self, item):
+    def is_ancestor_item_visible(self, item):
         current = item.parent()
         while current:
             if not current.data(0, Qt.ItemDataRole.UserRole).get('isVisible'):
@@ -321,21 +346,32 @@ class ObjectTreeWidget(QTreeWidget):
         return self.__clipboard_items
 
     def dropEvent(self, event):
-        # Must get the drag items and target item before super().dropEvent(event)
+        # Rewirte the drop event. The logic is like cut and paste.
         source_items = self.selectedItems()
+        parent_item = self.itemAt(event.pos())
 
-        target_item = self.itemAt(event.pos())
-        if target_item:
-            target_item.setExpanded(True)
-
-        super().dropEvent(event)
-
-        # Keep the expanded or collapsed state
+        drop_items = []
         for item in source_items:
-            self.__restore_expanded_items(item)
-    
+            if item == self.__root_item:
+                continue
+            copied_item = self.__deep_copy_item(item)
+            drop_items.append(copied_item)
+        
+        for item in drop_items:
+            new_item = self.__deep_copy_item(item)
+            if parent_item:
+                parent_item.addChild(new_item)
+                parent_item.setExpanded(True)
+            else:
+                self.__root_item.addChild(new_item)
+                self.__root_item.setExpanded(True)
+            self.__restore_expanded_items(new_item)
+
+        self.__delete_items(source_items)
+
+
     def keyPressEvent(self, event):
-        if event.modifiers() == Qt.Modifier.CTRL:
+        if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
             if event.key() == Qt.Key.Key_X:
                 self.__cut_items()
                 event.accept()

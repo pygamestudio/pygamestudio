@@ -1,6 +1,17 @@
 from pygamestudio.common.utils.path import RES_PATH
 from pygamestudio.editor.object.type import *
 
+
+DEFAULT_ROOT_ITEM_DATA = {
+    'uuid': '',
+    'name': 'Scene',
+    'type': ITEM_ROOT,
+    'icon': str(RES_PATH/'images/item.png'),
+    'isVisible': True,
+    'isSelected': False,
+    'isExpanded': False,
+}
+
 DEFAULT_RECT_ITEM_DATA = {
     'uuid': '',
     'name': 'Rect',

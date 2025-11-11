@@ -28,13 +28,16 @@ class ContextMenu(QMenu):
     def __set_signal(self):
         ...
 
-    def __add_basic_actions(self):
+    def __add_actions(self, item_type):
         create_text_action = QAction('文本', self)
         create_rect_action = QAction('矩形', self)
         create_circle_action = QAction('圆形', self)
         cut_action = QAction('剪切', self)
         copy_action = QAction('复制', self)
         paste_action = QAction('粘贴', self)
+        delete_action = QAction('删除', self)
+        rename_action = QAction('重命名', self)
+        copy_uuid_action = QAction('复制UUID', self)
 
         create_text_action.triggered.connect(lambda: self.create_signal.emit(ITEM_TEXT))
         create_rect_action.triggered.connect(lambda: self.create_signal.emit(ITEM_RECT))
@@ -42,33 +45,38 @@ class ContextMenu(QMenu):
         cut_action.triggered.connect(self.cut_signal.emit)
         copy_action.triggered.connect(self.copy_signal.emit)
         paste_action.triggered.connect(self.paste_signal.emit)
-        
-        create_menu = QMenu(title='创建')
-        self.addMenu(create_menu)
-        
-        create_menu.addAction(create_text_action)
-        create_menu.addAction(create_rect_action)
-        create_menu.addAction(create_circle_action)        
-        self.addSeparator()
-        self.addAction(cut_action)
-        self.addAction(copy_action)
-        self.addAction(paste_action)
-        self.__set_paste_action_status(paste_action)
-
-    def __add_actions_for_item(self):
-        delete_action = QAction('删除', self)
-        rename_action = QAction('重命名', self)
-        copy_uuid_action = QAction('复制UUID', self)
-
         delete_action.triggered.connect(self.delete_signal.emit)
         rename_action.triggered.connect(self.rename_signal.emit)
         copy_uuid_action.triggered.connect(self.copy_uuid_signal.emit)
+        
+        create_menu = QMenu(title='创建')
+        self.addMenu(create_menu)
+        create_menu.addAction(create_text_action)
+        create_menu.addAction(create_rect_action)
+        create_menu.addAction(create_circle_action)  
 
-        self.addSeparator()
-        self.addAction(delete_action)
-        self.addAction(rename_action)
-        self.addSeparator()
-        self.addAction(copy_uuid_action)
+        # Right click on the blank area.
+        if item_type is None:
+            self.addAction(paste_action)
+
+        # Right click on the root item.
+        elif item_type == ITEM_ROOT:
+            self.addAction(paste_action)
+            self.addAction(copy_uuid_action)
+
+        # Right click on the regular item.
+        else:
+            self.addSeparator()
+            self.addAction(cut_action)
+            self.addAction(copy_action)
+            self.addAction(paste_action)
+            self.addSeparator()
+            self.addAction(delete_action)
+            self.addAction(rename_action)
+            self.addSeparator()
+            self.addAction(copy_uuid_action)
+
+        self.__set_paste_action_status(paste_action)
 
     def __set_paste_action_status(self, paste_action):
         if self.__parent.get_clipboard_items():
@@ -76,9 +84,7 @@ class ContextMenu(QMenu):
         else:
             paste_action.setEnabled(False)
         
-    def show(self, pos, is_right_click_on_item):
+    def show(self, pos, item_type):
         self.clear()
-        self.__add_basic_actions()
-        if is_right_click_on_item:
-            self.__add_actions_for_item()
+        self.__add_actions(item_type)
         self.exec(pos)

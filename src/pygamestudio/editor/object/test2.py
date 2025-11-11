@@ -1,279 +1,146 @@
-from PySide6.QtWidgets import (QTreeWidget, QTreeWidgetItem, QStyledItemDelegate, 
-                              QApplication, QMainWindow, QVBoxLayout, QWidget)
-from PySide6.QtGui import QPainter, QColor, QPen, QBrush, QMouseEvent
-from PySide6.QtCore import Qt, QRect, QModelIndex, QSize
+from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem, QApplication, QMainWindow, QVBoxLayout, QWidget
+from PySide6.QtCore import Qt
+import sys
 
-class EyeIconDelegate(QStyledItemDelegate):
-    def __init__(self, tree_widget):
-        super().__init__(tree_widget)
-        self.tree_widget = tree_widget
-        self.icon_size = QSize(16, 16)
-        self.hovered_index = None  # 记录当前悬停的item索引
-    
-    def paint(self, painter, option, index):
-        """绘制委托"""
-        if index.column() == 1:  # 只在第二列绘制眼睛图标
-            # 绘制默认背景
-            super().paint(painter, option, index)
-            
-            # 获取item和可见状态
-            item = self.tree_widget.itemFromIndex(index)
-            if item:
-                # 获取item自身的可见状态（不考虑父级）
-                item_own_visible = item.data(0, Qt.UserRole + 1)
-                # 检查是否悬停
-                is_hovered = index == self.hovered_index
-                self.draw_eye_icon(painter, option.rect, item_own_visible, is_hovered)
-        else:
-            super().paint(painter, option, index)
-    
-    def draw_eye_icon(self, painter, rect, is_visible, is_hovered):
-        """绘制眼睛图标（带悬停效果）"""
-        painter.save()
-        painter.setRenderHint(QPainter.Antialiasing)
-        
-        # 计算图标位置（居中）
-        icon_rect = QRect(0, 0, self.icon_size.width(), self.icon_size.height())
-        icon_rect.moveCenter(rect.center())
-        
-        # 悬停效果：稍微放大和改变颜色
-        if is_hovered:
-            # 轻微放大效果
-            icon_rect.adjust(-1, -1, 1, 1)
-            
-        if is_visible:
-            # 绘制睁眼图标
-            self.draw_open_eye(painter, icon_rect, is_hovered)
-        else:
-            # 绘制闭眼图标
-            self.draw_closed_eye(painter, icon_rect, is_hovered)
-        
-        painter.restore()
-    
-    def draw_open_eye(self, painter, rect, is_hovered):
-        """绘制睁眼图标（带悬停效果）"""
-        if is_hovered:
-            # 悬停状态：更深的颜色和轮廓
-            eye_color = QColor(40, 40, 40)
-            bg_color = QColor(220, 220, 220)
-            pupil_color = QColor(20, 20, 20)
-            outline_width = 2.0
-        else:
-            # 正常状态
-            eye_color = QColor(80, 80, 80)
-            bg_color = QColor(240, 240, 240)
-            pupil_color = QColor(60, 60, 60)
-            outline_width = 1.5
-        
-        # 眼睛轮廓
-        painter.setPen(QPen(eye_color, outline_width))
-        painter.setBrush(QBrush(bg_color))
-        painter.drawEllipse(rect.x() + 2, rect.y() + 4, 12, 8)
-        
-        # 眼球
-        painter.setBrush(QBrush(pupil_color))
-        painter.drawEllipse(rect.x() + 6, rect.y() + 6, 4, 4)
-        
-        # 高光
-        painter.setBrush(QBrush(QColor(255, 255, 255)))
-        painter.drawEllipse(rect.x() + 7, rect.y() + 7, 1, 1)
-        
-        # 悬停时添加外圈光晕效果
-        if is_hovered:
-            painter.setPen(QPen(QColor(100, 150, 255, 80), 3))
-            painter.setBrush(Qt.NoBrush)
-            painter.drawEllipse(rect.x() + 1, rect.y() + 3, 14, 10)
-    
-    def draw_closed_eye(self, painter, rect, is_hovered):
-        """绘制闭眼图标（带悬停效果）"""
-        if is_hovered:
-            # 悬停状态：更深的颜色
-            eye_color = QColor(120, 120, 120)
-            line_width = 2.5
-            lash_color = QColor(100, 100, 100)
-        else:
-            # 正常状态
-            eye_color = QColor(150, 150, 150)
-            line_width = 2.0
-            lash_color = QColor(120, 120, 120)
-        
-        # 绘制一条横线表示闭眼
-        painter.setPen(QPen(eye_color, line_width))
-        painter.drawLine(rect.x() + 3, rect.y() + 8, 
-                        rect.x() + 13, rect.y() + 8)
-        
-        # 睫毛效果
-        painter.setPen(QPen(lash_color, 1))
-        # 上睫毛
-        painter.drawLine(rect.x() + 4, rect.y() + 6, rect.x() + 4, rect.y() + 5)
-        painter.drawLine(rect.x() + 8, rect.y() + 5, rect.x() + 8, rect.y() + 4)
-        painter.drawLine(rect.x() + 12, rect.y() + 6, rect.x() + 12, rect.y() + 5)
-        
-        # 悬停时添加外圈光晕效果
-        if is_hovered:
-            painter.setPen(QPen(QColor(255, 100, 100, 80), 3))
-            painter.setBrush(Qt.NoBrush)
-            painter.drawEllipse(rect.x() + 1, rect.y() + 3, 14, 10)
-    
-    def editorEvent(self, event, model, option, index):
-        """处理鼠标事件"""
-        if index.column() == 1:
-            if event.type() == QMouseEvent.MouseMove:
-                # 鼠标移动事件：更新悬停状态
-                old_hovered = self.hovered_index
-                if self.is_click_on_icon(event.pos(), option.rect):
-                    self.hovered_index = index
-                else:
-                    self.hovered_index = None
-                
-                # 如果悬停状态改变，触发重绘
-                if old_hovered != self.hovered_index:
-                    self.tree_widget.viewport().update()
-                return True
-                
-            elif (event.type() == QMouseEvent.MouseButtonRelease and 
-                  event.button() == Qt.LeftButton):
-                
-                # 检查点击是否在图标区域内
-                item = self.tree_widget.itemFromIndex(index)
-                if item and self.is_click_on_icon(event.pos(), option.rect):
-                    self.tree_widget.toggle_item_visibility(item)
-                    return True  # 事件已处理
-        
-        # 清除悬停状态
-        self.hovered_index = None
-        return super().editorEvent(event, model, option, index)
-    
-    def is_click_on_icon(self, click_pos, cell_rect):
-        """检查点击是否在图标区域内"""
-        icon_rect = QRect(0, 0, self.icon_size.width(), self.icon_size.height())
-        icon_rect.moveCenter(cell_rect.center())
-        # 稍微扩大点击区域，提升用户体验
-        icon_rect.adjust(-2, -2, 2, 2)
-        return icon_rect.contains(click_pos)
-
-class EyeTreeWidget(QTreeWidget):
+class SingleRootTreeWidget(QTreeWidget):
     def __init__(self):
         super().__init__()
-        self.setColumnCount(2)
-        self.setHeaderLabels(["项目名称", "可见性"])
+        self.root_item = None
+        self.setDragDropMode(QTreeWidget.InternalMove)
+        self.setSelectionMode(QTreeWidget.SingleSelection)
         
-        # 设置列宽
-        self.setColumnWidth(0, 200)
-        self.setColumnWidth(1, 60)
-        
-        # 设置鼠标跟踪
-        self.setMouseTracking(True)
-        
-        # 设置自定义委托
-        self.delegate = EyeIconDelegate(self)
-        self.setItemDelegate(self.delegate)
-        
-        # 初始化数据
-        self.setup_data()
-        
-        # 连接信号
-        self.itemExpanded.connect(self.on_item_expanded_collapsed)
-        self.itemCollapsed.connect(self.on_item_expanded_collapsed)
+    def setRootItem(self, root_item):
+        """设置唯一的根节点"""
+        self.root_item = root_item
+        # 根节点不可拖拽
+        root_item.setFlags(root_item.flags() & ~Qt.ItemIsDragEnabled)
+        self.addTopLevelItem(root_item)
+        root_item.setExpanded(True)
     
-    def mouseMoveEvent(self, event):
-        """处理鼠标移动事件，确保悬停效果正常工作"""
-        super().mouseMoveEvent(event)
-        # 触发委托的鼠标移动事件处理
-        index = self.indexAt(event.pos())
-        if index.isValid():
-            # 创建一个鼠标事件传递给委托
-            self.delegate.editorEvent(event, self.model(), 
-                                    self.visualRect(index), index)
+    def addItem(self, text, parent=None):
+        """添加项目到指定父节点，默认为根节点"""
+        if parent is None:
+            parent = self.root_item
+        item = QTreeWidgetItem([text])
+        parent.addChild(item)
+        return item
     
-    def leaveEvent(self, event):
-        """鼠标离开控件时清除所有悬停状态"""
-        self.delegate.hovered_index = None
-        self.viewport().update()
-        super().leaveEvent(event)
-    
-    def setup_data(self):
-        """初始化示例数据"""
-        items_data = [
-            "背景图层",
-            "文本标题", 
-            "图片内容",
-            "装饰元素",
-            "水印图层"
-        ]
+    def dragMoveEvent(self, event):
+        """控制拖拽移动事件"""
+        # 如果拖拽的是根节点，拒绝拖拽
+        if self.currentItem() == self.root_item:
+            event.ignore()
+            return
         
-        for name in items_data:
-            item = QTreeWidgetItem([name, ""])
-            item.setData(0, Qt.UserRole + 1, True)
-            self.addTopLevelItem(item)
+        # 检查是否尝试拖拽到顶层（根节点之外）
+        pos = event.position().toPoint()
+        target_item = self.itemAt(pos)
+        
+        # 如果目标位置是None（空白区域）或根节点，允许拖拽
+        if target_item is None or target_item == self.root_item:
+            event.accept()
+        else:
+            # 其他情况正常处理
+            super().dragMoveEvent(event)
+    
+    def dropEvent(self, event):
+        """处理拖放事件"""
+        pos = event.position().toPoint()
+        target_item = self.itemAt(pos)
+        dragged_items = self.selectedItems()
+        
+        # 如果没有选中项目，正常处理
+        if not dragged_items:
+            super().dropEvent(event)
+            return
             
-            # 添加一些子项示例
-            for i in range(2):
-                child = QTreeWidgetItem([f"{name} - 子项 {i+1}", ""])
-                child.setData(0, Qt.UserRole + 1, True)
-                item.addChild(child)
+        dragged_item = dragged_items[0]
+        
+        # 如果拖拽的是根节点，拒绝
+        if dragged_item == self.root_item:
+            event.ignore()
+            return
+        
+        # 如果目标位置是None（空白区域）或根节点，强制放到根节点下
+        if target_item is None or target_item == self.root_item:
+            self._moveItemToRoot(dragged_item)
+            event.accept()
+        else:
+            # 其他情况正常处理
+            super().dropEvent(event)
+    
+    def _moveItemToRoot(self, item):
+        """将项目移动到根节点下"""
+        # 如果项目已经在根节点下，不做任何操作
+        if item.parent() == self.root_item:
+            return
             
-            item.setExpanded(True)
-    
-    def toggle_item_visibility(self, item):
-        """切换item的可见性"""
-        current_visible = item.data(0, Qt.UserRole + 1)
-        new_visible = not current_visible
+        # 从原位置移除
+        if item.parent():
+            item.parent().removeChild(item)
+        else:
+            # 如果是顶层项目（除了根节点）
+            index = self.indexOfTopLevelItem(item)
+            if index >= 0:
+                self.takeTopLevelItem(index)
         
-        item.setData(0, Qt.UserRole + 1, new_visible)
-        self.update_all_items_appearance()
-        
-        print(f"{item.text(0)} 自身状态: {'显示' if new_visible else '隐藏'}")
-    
-    def is_item_effectively_visible(self, item):
-        """计算item的实际显示状态（考虑父级链）"""
-        current = item
-        while current:
-            if not current.data(0, Qt.UserRole + 1):
-                return False
-            current = current.parent()
-        return True
-    
-    def update_all_items_appearance(self):
-        """更新所有item的显示外观"""
-        def update_item_recursive(item):
-            if item:
-                effectively_visible = self.is_item_effectively_visible(item)
-                
-                if effectively_visible:
-                    item.setForeground(0, QColor(0, 0, 0))
-                    item.setBackground(0, QColor(255, 255, 255))
-                else:
-                    item.setForeground(0, QColor(150, 150, 150))
-                    item.setBackground(0, QColor(245, 245, 245))
-                
-                for i in range(item.childCount()):
-                    update_item_recursive(item.child(i))
-        
-        for i in range(self.topLevelItemCount()):
-            update_item_recursive(self.topLevelItem(i))
-        
-        self.viewport().update()
-    
-    def on_item_expanded_collapsed(self, item):
-        """当item展开或收缩时更新显示"""
-        self.viewport().update()
+        # 添加到根节点下
+        self.root_item.addChild(item)
+        self.root_item.setExpanded(True)
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("树形控件 - 带悬停反馈的眼睛图标")
-        self.setGeometry(100, 100, 400, 400)
+        self.setWindowTitle("单根节点树控件")
+        self.setGeometry(100, 100, 600, 400)
         
+        # 创建中央部件
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        
         layout = QVBoxLayout(central_widget)
-        self.tree_widget = EyeTreeWidget()
-        layout.addWidget(self.tree_widget)
+        
+        # 创建树控件
+        self.tree = SingleRootTreeWidget()
+        self.tree.setColumnCount(2)
+        self.tree.setHeaderLabels(["名称", "值"])
+        
+        # 设置根节点
+        root_item = QTreeWidgetItem(["根节点", "root"])
+        self.tree.setRootItem(root_item)
+        
+        # 添加一些初始数据
+        self._setupInitialData()
+        
+        layout.addWidget(self.tree)
+    
+    def _setupInitialData(self):
+        """设置初始数据"""
+        # 添加一些子节点
+        category1 = self.tree.addItem("分类1")
+        category2 = self.tree.addItem("分类2")
+        
+        # 在分类1下添加项目
+        self.tree.addItem("项目1-1", category1)
+        self.tree.addItem("项目1-2", category1)
+        
+        # 在分类2下添加项目
+        self.tree.addItem("项目2-1", category2)
+        self.tree.addItem("项目2-2", category2)
+        
+        # 添加一些独立的项目
+        self.tree.addItem("独立项目1")
+        self.tree.addItem("独立项目2")
+        
+        # 展开所有
+        self.tree.root_item.setExpanded(True)
 
-if __name__ == "__main__":
-    app = QApplication([])
+def main():
+    app = QApplication(sys.argv)
+    
     window = MainWindow()
     window.show()
-    app.exec()
+    
+    sys.exit(app.exec())
+
+if __name__ == "__main__":
+    main()
