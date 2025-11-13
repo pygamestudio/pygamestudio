@@ -9,7 +9,7 @@ DEFAULT_ROOT_ITEM_DATA = {
     'icon': str(RES_PATH/'images/item.png'),
     'isVisible': True,
     'isSelected': False,
-    'isExpanded': False,
+    'isExpanded': True,
 }
 
 DEFAULT_RECT_ITEM_DATA = {
@@ -21,7 +21,7 @@ DEFAULT_RECT_ITEM_DATA = {
     'color': (255, 255, 255),
     'isVisible': True,
     'isSelected': False,
-    'isExpanded': False,
+    'isExpanded': True,
 }
 
 DEFAULT_TEXT_ITEM_DATA = {
@@ -34,7 +34,7 @@ DEFAULT_TEXT_ITEM_DATA = {
     'color': (255, 255, 255),
     'isVisible': True,
     'isSelected': False,
-    'isExpanded': False,
+    'isExpanded': True,
 }
 
 DEFAULT_CIRCLE_ITEM_DATA = {
@@ -47,5 +47,5 @@ DEFAULT_CIRCLE_ITEM_DATA = {
     'color': (255, 255, 255),
     'isVisible': True,
     'isSelected': False,
-    'isExpanded': False,
+    'isExpanded': True,
 }

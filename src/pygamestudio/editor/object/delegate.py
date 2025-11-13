@@ -61,12 +61,14 @@ class ObjectTreeWidgetDelegate(QStyledItemDelegate):
             super().paint(painter, option, index)
 
     def editorEvent(self, event, model, option, index):
+        # Toggle item's visibility.
         if event.type() == QMouseEvent.Type.MouseButtonPress and event.button() == Qt.MouseButton.LeftButton and index.column() == 1:
             item = self.__parent.itemFromIndex(index)
             if item and self.__is_click_on_eye_pixmap(event.pos(), option.rect):
                 self.__parent.toggle_item_visibility(item)
                 return True
-            
+
+        # Increate hovered item's size.
         elif event.type() == QMouseEvent.Type.MouseMove and index.column() == 1:
             old_hovered_index = self.__hovered_index
             if self.__is_click_on_eye_pixmap(event.pos(), option.rect):
@@ -77,6 +79,10 @@ class ObjectTreeWidgetDelegate(QStyledItemDelegate):
             # If mouse hovers on a different index, then repaint.
             if old_hovered_index != self.__hovered_index:
                 self.__parent.viewport().update()
+            return True
+        
+        # Prevent the expand and collapse event when toggling item's visibility.
+        elif event.type() == QMouseEvent.Type.MouseButtonDblClick and event.button() == Qt.MouseButton.LeftButton and index.column() == 1 and self.__is_click_on_eye_pixmap(event.pos(), option.rect):
             return True
 
         return super().editorEvent(event, model, option, index)

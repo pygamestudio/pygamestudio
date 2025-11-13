@@ -1,9 +1,10 @@
 from PySide6.QtWidgets import QApplication, QTreeWidget, QTreeWidgetItem, QAbstractItemView, QHeaderView
 from PySide6.QtCore import Qt, QTimeLine
-from PySide6.QtGui import QIcon, QColor
+from PySide6.QtGui import QIcon, QColor, QUndoStack
 
 from pygamestudio.editor.object.delegate import ObjectTreeWidgetDelegate
 from pygamestudio.editor.object.menu import ContextMenu
+from pygamestudio.editor.object.command import *
 from pygamestudio.editor.object.data import *
 from pygamestudio.editor.object.type import *
 import uuid
@@ -13,6 +14,10 @@ import copy
 class ObjectTreeWidget(QTreeWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        # 这个undo stack最终要从MainWindo中获取
+        # 这样耦合性太高了
+        self.__undo_stack = QUndoStack(self)
+        
         self.__delegate = ObjectTreeWidgetDelegate(self)
         
         self.__clipboard_items = []
@@ -20,7 +25,7 @@ class ObjectTreeWidget(QTreeWidget):
         self.__items_to_delete_by_cut = []
 
         self.__root_item = None
-        self.__riight_clicked_item = None
+        self.__right_clicked_item = None
         self.__context_menu = ContextMenu('', self)
         self.__setup()
 
@@ -61,6 +66,7 @@ class ObjectTreeWidget(QTreeWidget):
         self.__context_menu.copy_uuid_signal.connect(self.__copy_item_uuid)
 
     def __set_root_item(self):
+        """The root item will exist at start and forever."""
         item_data = copy.deepcopy(DEFAULT_ROOT_ITEM_DATA)
         self.__root_item = QTreeWidgetItem()
         self.__root_item.setText(0, item_data['name'])
@@ -72,7 +78,7 @@ class ObjectTreeWidget(QTreeWidget):
 
     def __show_context_menu(self, pos):
         item = self.itemAt(pos)
-        self.__riight_clicked_item = item
+        self.__right_clicked_item = item
         global_pos = self.mapToGlobal(pos)
         
         item_type = item.data(0, Qt.ItemDataRole.UserRole).get('type') if item else None
@@ -82,19 +88,43 @@ class ObjectTreeWidget(QTreeWidget):
         item_data = item.data(column, Qt.ItemDataRole.UserRole)
         if not item_data:
             return
-
-        # Update the name value.
-        item_data['name'] = item.text(column)
         
+        composite = CompositeCommand('Modify item data')
+
+        # Push a rename command.
+        old_text = item_data['name']
+        new_text = item.text(column)
+        if old_text != new_text:
+            key = 'name'
+            item_data['name'] = new_text 
+            composite.add_command(ModifyItemDataCommand(self, item, key, old_text, new_text, 'Renamed'))
+        
+        item.setData(0, Qt.ItemDataRole.UserRole, item_data)
+        self.__undo_stack.push(composite)
+
     def __on_item_expanded(self, item):
         item_data = item.data(0, Qt.ItemDataRole.UserRole)
-        item_data['isExpanded'] = item.isExpanded()
-        item.setData(0, Qt.ItemDataRole.UserRole, item_data)
+
+        # Push an expand command and update the item data.
+        if item_data['isExpanded'] == False:
+            key = 'isExpanded'
+            description = 'Expanded item' 
+            self.__undo_stack.push(ModifyItemDataCommand(self, item, key, False, True, description))
+            
+            item_data['isExpanded'] = True
+            item.setData(0, Qt.ItemDataRole.UserRole, item_data)
 
     def __on_item_collapsed(self, item):
         item_data = item.data(0, Qt.ItemDataRole.UserRole)
-        item_data['isExpanded'] = item.isExpanded()
-        item.setData(0, Qt.ItemDataRole.UserRole, item_data)
+
+        # Push a collapse command and update the item data.
+        if item_data['isExpanded'] == True:
+            key = 'isExpanded'
+            description = 'Collapsed item'
+            self.__undo_stack.push(ModifyItemDataCommand(self, item, key, True, False, description))
+            
+            item_data['isExpanded'] = False
+            item.setData(0, Qt.ItemDataRole.UserRole, item_data)
 
     def __create_item(self, item_type):
         if item_type == ITEM_RECT:
@@ -161,25 +191,29 @@ class ObjectTreeWidget(QTreeWidget):
             return
 
         selected_items = self.selectedItems()
-        parent_item = selected_items[0] if selected_items else None
+        parent_item = selected_items[0] if selected_items else self.__root_item
+
+        self.__undo_stack.beginMacro('Paste')
+        composite_command = CompositeCommand('Added item')
 
         for item in self.__clipboard_items:
             new_item = self.__deep_copy_item(item)
-            if parent_item:
-                parent_item.addChild(new_item)
-                parent_item.setExpanded(True)
-            else:
-                self.__root_item.addChild(new_item)
-                self.__root_item.setExpanded(True)
-
+            parent_item.addChild(new_item)
+            parent_item.setExpanded(True)
             self.__restore_expanded_items(new_item)
-                
+
+            composite_command.add_command(AddItemCommand(self, parent_item, new_item, parent_item.childCount()-1))
+
+        self.__undo_stack.push(composite_command)
+
         if self.__is_cut_action:
             self.__clipboard_items = []
             self.__is_cut_action = False
 
             self.__delete_items(self.__items_to_delete_by_cut)
             self.__items_to_delete_by_cut = []
+
+        self.__undo_stack.endMacro()
 
     def __deep_copy_item(self, item):
         """Copy item and its children"""
@@ -203,22 +237,21 @@ class ObjectTreeWidget(QTreeWidget):
         if not items_to_delete:
             return
 
+        composite_command = CompositeCommand('Delete item')
+
         # Detele the deepest items first.
         items_to_delete.sort(key=lambda x: self.__get_item_depth(x), reverse=True)
         for item in items_to_delete:
             if item == self.__root_item:
                 continue
-            
+
+            composite_command.add_command(DeleteItemCommand(self, item))
             parent = item.parent()
-            if parent:
-                parent.removeChild(item)
-            else:
-                index = self.indexOfTopLevelItem(item)
-                if index >= 0:
-                    self.takeTopLevelItem(index)
-    
+            parent.removeChild(item)
+
         del items_to_delete
         self.clearSelection()
+        self.__undo_stack.push(composite_command)
 
     def __get_item_depth(self, item):
         depth = 0
@@ -229,10 +262,10 @@ class ObjectTreeWidget(QTreeWidget):
         return depth
     
     def __rename_item(self):
-        self.editItem(self.__riight_clicked_item)
+        self.editItem(self.__right_clicked_item)
 
     def __copy_item_uuid(self):
-        item_data = self.__riight_clicked_item.data(0, Qt.ItemDataRole.UserRole)
+        item_data = self.__right_clicked_item.data(0, Qt.ItemDataRole.UserRole)
         QApplication.clipboard().setText(item_data['uuid'])
     
     def __set_new_item_properties(self, item, item_data):
@@ -242,19 +275,17 @@ class ObjectTreeWidget(QTreeWidget):
         item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
 
         # Check whether the parent item is visibl or not.
-        if self.__riight_clicked_item and not self.__riight_clicked_item.data(0, Qt.ItemDataRole.UserRole).get('isVisible'):
+        if self.__right_clicked_item and not self.__right_clicked_item.data(0, Qt.ItemDataRole.UserRole).get('isVisible'):
             item.setForeground(0,  QColor(150, 150, 150))
 
     def __add_new_item_to_tree_widget(self, item):
-        # Add it as the top level item if there is no right clicked item.
-        if not self.__riight_clicked_item:
-            self.__root_item.addChild(item)
-            self.__root_item.setExpanded(True)
-            self.scrollToItem(item)
-            return
-        
-        self.__riight_clicked_item.addChild(item)
-        self.__riight_clicked_item.setExpanded(True)
+        parent_item = self.__right_clicked_item if self.__right_clicked_item else self.__root_item
+        parent_item.addChild(item)
+        parent_item.setExpanded(True)
+        self.scrollToItem(item)
+
+        add_item_command = AddItemCommand(self, parent_item, item, parent_item.childCount()-1)
+        self.__undo_stack.push(add_item_command)
 
     def __restore_expanded_items(self, parent_item):
         parent_item_data = parent_item.data(0, Qt.ItemDataRole.UserRole)
@@ -312,11 +343,18 @@ class ObjectTreeWidget(QTreeWidget):
         timeline.start()
     
     def __update_item_visibility_appearance(self, item, is_visible):
+        key = 'foreground'
+        old_color = item.foreground(0).color()
+
         if is_visible and self.is_ancestor_item_visible(item):
-            item.setForeground(0, QColor(0, 0, 0))            
+            item.setForeground(0, QColor(0, 0, 0))     
+            new_color = item.foreground(0).color()       
         else:
             item.setForeground(0, QColor(150, 150, 150))
-        self.viewport().update()
+            new_color = item.foreground(0).color()  
+
+        if old_color.value() != new_color.value():
+            self.__undo_stack.push(ModifyItemDataCommand(self, item, key, old_color, new_color, 'Modified foreground color'))
 
     def __update_children_visibility_appearance(self, parent_item):
         # The value of item_data['isVisible'] should not be influenced by item's parent.
@@ -328,11 +366,18 @@ class ObjectTreeWidget(QTreeWidget):
 
     def toggle_item_visibility(self, item):
         item_data = item.data(0, Qt.ItemDataRole.UserRole)
+
+        self.__undo_stack.beginMacro('Toggle item visibility')
+        key = 'isVisible'
+        modify_item_data_command = ModifyItemDataCommand(self, item, key, item_data['isVisible'], not item_data['isVisible'], 'Toggled item visibility')
+
         item_data['isVisible'] = not item_data.get('isVisible')
         item.setData(0, Qt.ItemDataRole.UserRole, item_data)
-        
         self.__update_item_visibility_appearance(item, item_data.get('isVisible'))
         self.__update_children_visibility_appearance(item)
+
+        self.__undo_stack.push(modify_item_data_command)
+        self.__undo_stack.endMacro()
 
     def is_ancestor_item_visible(self, item):
         current = item.parent()
@@ -349,6 +394,8 @@ class ObjectTreeWidget(QTreeWidget):
         # Rewirte the drop event. The logic is like cut and paste.
         source_items = self.selectedItems()
         parent_item = self.itemAt(event.pos())
+        if not parent_item:
+            parent_item  = self.__root_item
 
         drop_items = []
         for item in source_items:
@@ -357,18 +404,20 @@ class ObjectTreeWidget(QTreeWidget):
             copied_item = self.__deep_copy_item(item)
             drop_items.append(copied_item)
         
+        self.__undo_stack.beginMacro('Paste')
+        composite_command = CompositeCommand('Added item')
+
         for item in drop_items:
             new_item = self.__deep_copy_item(item)
-            if parent_item:
-                parent_item.addChild(new_item)
-                parent_item.setExpanded(True)
-            else:
-                self.__root_item.addChild(new_item)
-                self.__root_item.setExpanded(True)
+            parent_item.addChild(new_item)
+            parent_item.setExpanded(True)
             self.__restore_expanded_items(new_item)
+            composite_command.add_command(AddItemCommand(self, parent_item, new_item, parent_item.childCount()-1))
+
+        self.__undo_stack.push(composite_command)
 
         self.__delete_items(source_items)
-
+        self.__undo_stack.endMacro()
 
     def keyPressEvent(self, event):
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
@@ -384,7 +433,17 @@ class ObjectTreeWidget(QTreeWidget):
                 self.__paste_items()
                 event.accept()
                 return
-            
+            elif event.key() == Qt.Key.Key_Z and self.__undo_stack.canUndo():
+                self.__undo_stack.undo()
+                print(self.__undo_stack.index())
+                print('撤销')
+
+        elif event.modifiers() == (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier):
+            if event.key() == Qt.Key.Key_Z and self.__undo_stack.canRedo():
+                print('重做')
+                self.__undo_stack.redo()
+                print(self.__undo_stack.index())
+        
         elif event.key() == Qt.Key.Key_Delete:
             self.__delete_items()
             event.accept()
