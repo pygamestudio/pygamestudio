@@ -1,0 +1,112 @@
+{
+    "data": {
+        "foregroundColor": [
+            0,
+            0,
+            0,
+            255
+        ],
+        "icon": "D:\\Github\\pygamestudio\\src\\pygamestudio\\resources\\images\\item.png",
+        "isExpanded": true,
+        "isSelected": false,
+        "isVisible": true,
+        "name": "Scene",
+        "type": 0,
+        "uuid": "fc2921e2-2008-408c-98cd-754fc83deb8c"
+    },
+    "children": [
+        {
+            "data": {
+                "color": [
+                    255,
+                    255,
+                    255
+                ],
+                "foregoundColor": [
+                    0,
+                    0,
+                    0,
+                    255
+                ],
+                "foregroundColor": [
+                    0,
+                    0,
+                    0,
+                    255
+                ],
+                "icon": "D:\\Github\\pygamestudio\\src\\pygamestudio\\resources\\images\\item.png",
+                "isExpanded": true,
+                "isSelected": false,
+                "isVisible": true,
+                "name": "Rect",
+                "rect": [
+                    50,
+                    50,
+                    100,
+                    80
+                ],
+                "type": 2,
+                "uuid": "8cef9470-dff8-4437-9b79-a9de6aae68e2"
+            },
+            "children": []
+        },
+        {
+            "data": {
+                "color": [
+                    255,
+                    255,
+                    255
+                ],
+                "foregroundColor": [
+                    150,
+                    150,
+                    150,
+                    255
+                ],
+                "icon": "D:\\Github\\pygamestudio\\src\\pygamestudio\\resources\\images\\item.png",
+                "isExpanded": true,
+                "isSelected": false,
+                "isVisible": false,
+                "name": "Rect",
+                "rect": [
+                    50,
+                    50,
+                    100,
+                    80
+                ],
+                "type": 2,
+                "uuid": "c575ad0a-bfdd-46d3-bc94-ef68200c3d3c"
+            },
+            "children": [
+                {
+                    "data": {
+                        "center": [
+                            0,
+                            0
+                        ],
+                        "color": [
+                            255,
+                            255,
+                            255
+                        ],
+                        "foregroundColor": [
+                            150,
+                            150,
+                            150,
+                            255
+                        ],
+                        "icon": "D:\\Github\\pygamestudio\\src\\pygamestudio\\resources\\images\\item.png",
+                        "isExpanded": true,
+                        "isSelected": false,
+                        "isVisible": true,
+                        "name": "Circle",
+                        "radius": 50,
+                        "type": 3,
+                        "uuid": "8946aad4-6b6c-4987-97e6-a6c40cb971a5"
+                    },
+                    "children": []
+                }
+            ]
+        }
+    ]
+}

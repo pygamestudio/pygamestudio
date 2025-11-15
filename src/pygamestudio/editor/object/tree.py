@@ -34,6 +34,12 @@ class ObjectTreeWidget(QTreeWidget):
         self.__set_signal()
         self.__set_root_item()
 
+        # 测试用
+        # import json
+        # with open('a.json', 'r', encoding='utf-8') as f:
+        #     tree_dict = json.load(f)
+        #     self.dict_to_tree(tree_dict)
+
     def __set_widget(self):
         self.setItemDelegate(self.__delegate)
         
@@ -68,6 +74,9 @@ class ObjectTreeWidget(QTreeWidget):
     def __set_root_item(self):
         """The root item will exist at start and forever."""
         item_data = copy.deepcopy(DEFAULT_ROOT_ITEM_DATA)
+        item_id = str(uuid.uuid4())
+        item_data['uuid'] = item_id
+
         self.__root_item = QTreeWidgetItem()
         self.__root_item.setText(0, item_data['name'])
         self.__root_item.setIcon(0, QIcon(item_data['icon']))
@@ -78,7 +87,7 @@ class ObjectTreeWidget(QTreeWidget):
 
     def __show_context_menu(self, pos):
         item = self.itemAt(pos)
-        self.__right_clicked_item = item
+        self.__right_clicked_item = item if item else self.__root_item
         global_pos = self.mapToGlobal(pos)
         
         item_type = item.data(0, Qt.ItemDataRole.UserRole).get('type') if item else None
@@ -98,6 +107,12 @@ class ObjectTreeWidget(QTreeWidget):
             key = 'name'
             item_data['name'] = new_text 
             composite.add_command(ModifyItemDataCommand(self, item, key, old_text, new_text, 'Renamed'))
+            
+            # 测试用
+            if item_data['name'] == 'save':
+                import json
+                with open('a.json', 'w', encoding='utf-8') as f:
+                    f.write(json.dumps(self.tree_to_dict(), indent=4))
         
         item.setData(0, Qt.ItemDataRole.UserRole, item_data)
         self.__undo_stack.push(composite)
@@ -111,8 +126,7 @@ class ObjectTreeWidget(QTreeWidget):
             description = 'Expanded item' 
             self.__undo_stack.push(ModifyItemDataCommand(self, item, key, False, True, description))
             
-            item_data['isExpanded'] = True
-            item.setData(0, Qt.ItemDataRole.UserRole, item_data)
+            self.__update_item_data(item, key, True)
 
     def __on_item_collapsed(self, item):
         item_data = item.data(0, Qt.ItemDataRole.UserRole)
@@ -122,9 +136,8 @@ class ObjectTreeWidget(QTreeWidget):
             key = 'isExpanded'
             description = 'Collapsed item'
             self.__undo_stack.push(ModifyItemDataCommand(self, item, key, True, False, description))
-            
-            item_data['isExpanded'] = False
-            item.setData(0, Qt.ItemDataRole.UserRole, item_data)
+
+            self.__update_item_data(item, key, False)
 
     def __create_item(self, item_type):
         if item_type == ITEM_RECT:
@@ -274,9 +287,13 @@ class ObjectTreeWidget(QTreeWidget):
         item.setData(0, Qt.ItemDataRole.UserRole, item_data)
         item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
 
-        # Check whether the parent item is visibl or not.
-        if self.__right_clicked_item and not self.__right_clicked_item.data(0, Qt.ItemDataRole.UserRole).get('isVisible'):
-            item.setForeground(0,  QColor(150, 150, 150))
+        # # Check whether the ancestor item is visible or not.
+        # self.__right_clicked_item is itemAt(pos) or self.__root_item (see __show_context_menu())
+        assert self.__right_clicked_item is not None, 'Right clicked item not found!'
+        if not self.__right_clicked_item.data(0, Qt.ItemDataRole.UserRole).get('isVisible') or not self.is_ancestor_item_visible(self.__right_clicked_item):
+            color = QColor(150, 150, 150)
+            item.setForeground(0,  color)
+            self.__update_item_data(item, 'foregroundColor', color.getRgb())
 
     def __add_new_item_to_tree_widget(self, item):
         parent_item = self.__right_clicked_item if self.__right_clicked_item else self.__root_item
@@ -343,18 +360,19 @@ class ObjectTreeWidget(QTreeWidget):
         timeline.start()
     
     def __update_item_visibility_appearance(self, item, is_visible):
-        key = 'foreground'
+        key = 'foregroundColor'
         old_color = item.foreground(0).color()
 
         if is_visible and self.is_ancestor_item_visible(item):
             item.setForeground(0, QColor(0, 0, 0))     
-            new_color = item.foreground(0).color()       
         else:
             item.setForeground(0, QColor(150, 150, 150))
-            new_color = item.foreground(0).color()  
-
+        
+        new_color = item.foreground(0).color()       
         if old_color.value() != new_color.value():
             self.__undo_stack.push(ModifyItemDataCommand(self, item, key, old_color, new_color, 'Modified foreground color'))
+        
+        self.__update_item_data(item, key, new_color.getRgb())
 
     def __update_children_visibility_appearance(self, parent_item):
         # The value of item_data['isVisible'] should not be influenced by item's parent.
@@ -364,16 +382,22 @@ class ObjectTreeWidget(QTreeWidget):
             self.__update_item_visibility_appearance(item, item_data.get('isVisible'))
             self.__update_children_visibility_appearance(item)
 
+    def __update_item_data(self, item, key, value):
+        item_data = item.data(0, Qt.ItemDataRole.UserRole)
+        item_data[key] = value
+        item.setData(0, Qt.ItemDataRole.UserRole, item_data)
+
     def toggle_item_visibility(self, item):
         item_data = item.data(0, Qt.ItemDataRole.UserRole)
+        old_is_visible = item_data['isVisible']
+        new_is_visible = not item_data['isVisible']
 
-        self.__undo_stack.beginMacro('Toggle item visibility')
         key = 'isVisible'
-        modify_item_data_command = ModifyItemDataCommand(self, item, key, item_data['isVisible'], not item_data['isVisible'], 'Toggled item visibility')
+        self.__undo_stack.beginMacro('Toggled item visibility')
+        modify_item_data_command = ModifyItemDataCommand(self, item, key, old_is_visible, new_is_visible, 'Toggled item visibility')
 
-        item_data['isVisible'] = not item_data.get('isVisible')
-        item.setData(0, Qt.ItemDataRole.UserRole, item_data)
-        self.__update_item_visibility_appearance(item, item_data.get('isVisible'))
+        self.__update_item_data(item, key, new_is_visible)
+        self.__update_item_visibility_appearance(item, new_is_visible)
         self.__update_children_visibility_appearance(item)
 
         self.__undo_stack.push(modify_item_data_command)
@@ -389,6 +413,50 @@ class ObjectTreeWidget(QTreeWidget):
     
     def get_clipboard_items(self):
         return self.__clipboard_items
+    
+    def tree_to_dict(self):
+        def item_to_dict(item):
+            item_dict = {
+                'data': item.data(0, Qt.ItemDataRole.UserRole),
+                'children': []
+            }
+
+            for i in range(item.childCount()):
+                child_item = item.child(i)
+                item_dict['children'].append(item_to_dict(child_item))
+            
+            return item_dict
+     
+        tree_dict = item_to_dict(self.__root_item)
+        return tree_dict
+
+    def dict_to_tree(self, tree_dict):
+        def dict_to_item(item_dict, parent=None):
+            item_data = item_dict['data']
+
+            item = QTreeWidgetItem()
+            if not parent:
+                self.__root_item = item
+                self.addTopLevelItem(item)
+                self.__root_item.setFlags(self.__root_item.flags() & ~Qt.ItemFlag.ItemIsDragEnabled)
+            else:
+                parent.addChild(item)
+                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+
+            item.setText(0, item_data['name'])
+            item.setIcon(0, QIcon(item_data['icon']))
+            item.setExpanded(item_data['isExpanded'])
+            item.setForeground(0, QColor(*item_data['foregroundColor']))
+            item.setData(0, Qt.ItemDataRole.UserRole, item_data)
+        
+            for child_item_dict in item_dict['children']:
+                dict_to_item(child_item_dict, item)
+
+            return item
+    
+        self.blockSignals(True)
+        dict_to_item(tree_dict, None)
+        self.blockSignals(False)
 
     def dropEvent(self, event):
         # Rewirte the drop event. The logic is like cut and paste.

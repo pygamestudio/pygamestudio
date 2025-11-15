@@ -10,6 +10,7 @@ DEFAULT_ROOT_ITEM_DATA = {
     'isVisible': True,
     'isSelected': False,
     'isExpanded': True,
+    'foregroundColor': (0, 0, 0, 255)
 }
 
 DEFAULT_RECT_ITEM_DATA = {
@@ -22,6 +23,7 @@ DEFAULT_RECT_ITEM_DATA = {
     'isVisible': True,
     'isSelected': False,
     'isExpanded': True,
+    'foregroundColor': (0, 0, 0, 255) 
 }
 
 DEFAULT_TEXT_ITEM_DATA = {
@@ -35,6 +37,7 @@ DEFAULT_TEXT_ITEM_DATA = {
     'isVisible': True,
     'isSelected': False,
     'isExpanded': True,
+    'foregroundColor': (0, 0, 0, 255) 
 }
 
 DEFAULT_CIRCLE_ITEM_DATA = {
@@ -48,4 +51,5 @@ DEFAULT_CIRCLE_ITEM_DATA = {
     'isVisible': True,
     'isSelected': False,
     'isExpanded': True,
+    'foregroundColor': (0, 0, 0, 255) 
 }
