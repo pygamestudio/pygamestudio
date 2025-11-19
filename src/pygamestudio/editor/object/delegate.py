@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QStyledItemDelegate, QStyleOptionButton, QStyle
+from PySide6.QtWidgets import QStyledItemDelegate, QStyleOptionButton, QStyle,QStyleOptionViewItem
 from PySide6.QtCore import QRect, QSize, Qt
 from PySide6.QtGui import QIcon, QMouseEvent, QPixmap, QPainter, QBrush, QColor, QPen
 from pygamestudio.common.utils.path import RES_PATH
@@ -42,6 +42,11 @@ class ObjectTreeWidgetDelegate(QStyledItemDelegate):
         pixmap_rect.moveCenter(cell_rect.center())
         pixmap_rect.moveRight(cell_rect.right()-int(self.__pixmap_size.width()/5))
         return pixmap_rect.contains(pos)
+    
+    def sizeHint(self, option, index):
+        if self.__parent.match_items_after_search and index not in self.__parent.match_items_after_search:
+            return QSize(0, 0)
+        return super().sizeHint(option, index)
 
     def paint(self, painter, option, index):
         if index.column() == 1:
@@ -53,7 +58,7 @@ class ObjectTreeWidgetDelegate(QStyledItemDelegate):
                 return
             
             is_hovered = index == self.__hovered_index
-            is_item_visible = item.data(0, Qt.ItemDataRole.UserRole).get('isVisible')
+            is_item_visible = item.data(0, Qt.ItemDataRole.UserRole).get('isVisibleOnScene')
             is_ancestor_visible = self.__parent.is_ancestor_item_visible(item)
             self.__draw_eye_pixmap(painter, option.rect, is_hovered, is_item_visible, is_ancestor_visible)
 
@@ -65,7 +70,7 @@ class ObjectTreeWidgetDelegate(QStyledItemDelegate):
         if event.type() == QMouseEvent.Type.MouseButtonPress and event.button() == Qt.MouseButton.LeftButton and index.column() == 1:
             item = self.__parent.itemFromIndex(index)
             if item and self.__is_click_on_eye_pixmap(event.pos(), option.rect):
-                self.__parent.toggle_item_visibility(item)
+                self.__parent.toggle_item_visibility_on_scene(item)
                 return True
 
         # Increate hovered item's size.

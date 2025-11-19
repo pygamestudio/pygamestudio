@@ -1,10 +1,12 @@
 from PySide6.QtWidgets import QApplication, QTreeWidget, QTreeWidgetItem, QAbstractItemView, QHeaderView
-from PySide6.QtCore import Qt, QTimeLine
+from PySide6.QtCore import Qt, QTimeLine, QSize, Signal
 from PySide6.QtGui import QIcon, QColor, QUndoStack
 
 from pygamestudio.editor.object.delegate import ObjectTreeWidgetDelegate
 from pygamestudio.editor.object.menu import ContextMenu
 from pygamestudio.editor.object.command import *
+
+from pygamestudio.editor.object.search import SEARCH_BY_NAME, SEARCH_BY_UUID
 from pygamestudio.editor.object.data import *
 from pygamestudio.editor.object.type import *
 import uuid
@@ -12,6 +14,8 @@ import copy
 
 
 class ObjectTreeWidget(QTreeWidget):
+    trigger_search_signal = Signal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
         # 这个undo stack最终要从MainWindo中获取
@@ -23,6 +27,12 @@ class ObjectTreeWidget(QTreeWidget):
         self.__clipboard_items = []
         self.__is_cut_action = False
         self.__items_to_delete_by_cut = []
+
+        self.__search_text = ''
+        self.__search_type = ''
+        self.__is_searching = False
+        self.match_items_after_search = []
+        self.__original_indentation = self.indentation()
 
         self.__root_item = None
         self.__right_clicked_item = None
@@ -108,11 +118,13 @@ class ObjectTreeWidget(QTreeWidget):
             item_data['name'] = new_text 
             composite.add_command(ModifyItemDataCommand(self, item, key, old_text, new_text, 'Renamed'))
             
-            # 测试用
-            if item_data['name'] == 'save':
-                import json
-                with open('a.json', 'w', encoding='utf-8') as f:
-                    f.write(json.dumps(self.tree_to_dict(), indent=4))
+            if self.__is_searching:
+                self.search_items(self.__search_text, self.__search_type)
+            # # 测试用
+            # if item_data['name'] == 'save':
+            #     import json
+            #     with open('a.json', 'w', encoding='utf-8') as f:
+            #         f.write(json.dumps(self.tree_to_dict(), indent=4))
         
         item.setData(0, Qt.ItemDataRole.UserRole, item_data)
         self.__undo_stack.push(composite)
@@ -126,8 +138,6 @@ class ObjectTreeWidget(QTreeWidget):
             description = 'Expanded item' 
             self.__undo_stack.push(ModifyItemDataCommand(self, item, key, False, True, description))
             
-            self.__update_item_data(item, key, True)
-
     def __on_item_collapsed(self, item):
         item_data = item.data(0, Qt.ItemDataRole.UserRole)
 
@@ -136,8 +146,6 @@ class ObjectTreeWidget(QTreeWidget):
             key = 'isExpanded'
             description = 'Collapsed item'
             self.__undo_stack.push(ModifyItemDataCommand(self, item, key, True, False, description))
-
-            self.__update_item_data(item, key, False)
 
     def __create_item(self, item_type):
         if item_type == ITEM_RECT:
@@ -155,6 +163,10 @@ class ObjectTreeWidget(QTreeWidget):
         item = QTreeWidgetItem()
         self.__set_new_item_properties(item, item_data)
         self.__add_new_item_to_tree_widget(item)
+
+        # If it is druing search, search again after creating a new item.
+        if self.__is_searching:
+            self.search_items(self.__search_text, self.__search_type)
         
     def __create_rect(self):
         item_data = copy.deepcopy(DEFAULT_RECT_ITEM_DATA)
@@ -228,7 +240,7 @@ class ObjectTreeWidget(QTreeWidget):
 
         self.__undo_stack.endMacro()
 
-    def __deep_copy_item(self, item):
+    def __deep_copy_item(self, item, is_copy_child=True):
         """Copy item and its children"""
         new_item = QTreeWidgetItem()
         
@@ -238,10 +250,11 @@ class ObjectTreeWidget(QTreeWidget):
         new_item.setForeground(0, item.foreground(0))
         new_item.setData(0, Qt.ItemDataRole.UserRole, item.data(0, Qt.ItemDataRole.UserRole))
         
-        for i in range(item.childCount()):
-            child_item = item.child(i)
-            new_child_item = self.__deep_copy_item(child_item)
-            new_item.addChild(new_child_item)
+        if is_copy_child:
+            for i in range(item.childCount()):
+                child_item = item.child(i)
+                new_child_item = self.__deep_copy_item(child_item)
+                new_item.addChild(new_child_item)
         
         return new_item
 
@@ -284,16 +297,17 @@ class ObjectTreeWidget(QTreeWidget):
     def __set_new_item_properties(self, item, item_data):
         item.setText(0, item_data['name'])
         item.setIcon(0, QIcon(item_data['icon']))
-        item.setData(0, Qt.ItemDataRole.UserRole, item_data)
         item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
 
         # # Check whether the ancestor item is visible or not.
         # self.__right_clicked_item is itemAt(pos) or self.__root_item (see __show_context_menu())
         assert self.__right_clicked_item is not None, 'Right clicked item not found!'
-        if not self.__right_clicked_item.data(0, Qt.ItemDataRole.UserRole).get('isVisible') or not self.is_ancestor_item_visible(self.__right_clicked_item):
+        if not self.__right_clicked_item.data(0, Qt.ItemDataRole.UserRole).get('isVisibleOnScene') or not self.is_ancestor_item_visible(self.__right_clicked_item):
             color = QColor(150, 150, 150)
             item.setForeground(0,  color)
-            self.__update_item_data(item, 'foregroundColor', color.getRgb())
+            item_data['foregroundColor'] = color.getRgb()
+        
+        item.setData(0, Qt.ItemDataRole.UserRole, item_data)
 
     def __add_new_item_to_tree_widget(self, item):
         parent_item = self.__right_clicked_item if self.__right_clicked_item else self.__root_item
@@ -367,36 +381,49 @@ class ObjectTreeWidget(QTreeWidget):
             item.setForeground(0, QColor(0, 0, 0))     
         else:
             item.setForeground(0, QColor(150, 150, 150))
-        
+
         new_color = item.foreground(0).color()       
         if old_color.value() != new_color.value():
             self.__undo_stack.push(ModifyItemDataCommand(self, item, key, old_color, new_color, 'Modified foreground color'))
-        
-        self.__update_item_data(item, key, new_color.getRgb())
 
     def __update_children_visibility_appearance(self, parent_item):
-        # The value of item_data['isVisible'] should not be influenced by item's parent.
+        # The value of item_data['isVisibleOnScene'] should not be influenced by item's parent.
         for i in range(parent_item.childCount()):
             item = parent_item.child(i)
             item_data = item.data(0, Qt.ItemDataRole.UserRole)
-            self.__update_item_visibility_appearance(item, item_data.get('isVisible'))
+            self.__update_item_visibility_appearance(item, item_data.get('isVisibleOnScene'))
             self.__update_children_visibility_appearance(item)
 
-    def __update_item_data(self, item, key, value):
+    def __find_match_items(self, search_text, search_type):
+        def match_item(item):
+            item_data = item.data(0, Qt.ItemDataRole.UserRole)
+            item_name = item_data['name'].lower()
+            item_uuid = item_data['uuid'].lower()
+            if search_type == SEARCH_BY_NAME and search_text in item_name or search_type == SEARCH_BY_UUID and search_text in item_uuid:
+                index = self.indexFromItem(item)
+                self.match_items_after_search.append(index)
+
+                # The size hint event only triggers at the creation of an item, 
+                # so we need to trigger it actively to reset the size of unmatched items.
+                self.__delegate.sizeHintChanged.emit(index)
+
+            for i in range(item.childCount()):
+                match_item(item.child(i))
+
+        match_item(self.__root_item)
+
+    def __clear_match_items(self):
+        self.match_items_after_search = []
+
+    def toggle_item_visibility_on_scene(self, item):
         item_data = item.data(0, Qt.ItemDataRole.UserRole)
-        item_data[key] = value
-        item.setData(0, Qt.ItemDataRole.UserRole, item_data)
+        old_is_visible = item_data['isVisibleOnScene']
+        new_is_visible = not item_data['isVisibleOnScene']
 
-    def toggle_item_visibility(self, item):
-        item_data = item.data(0, Qt.ItemDataRole.UserRole)
-        old_is_visible = item_data['isVisible']
-        new_is_visible = not item_data['isVisible']
+        key = 'isVisibleOnScene'
+        self.__undo_stack.beginMacro('Toggled item visibility on the scene')
+        modify_item_data_command = ModifyItemDataCommand(self, item, key, old_is_visible, new_is_visible, 'Toggled item visibility on the scene')
 
-        key = 'isVisible'
-        self.__undo_stack.beginMacro('Toggled item visibility')
-        modify_item_data_command = ModifyItemDataCommand(self, item, key, old_is_visible, new_is_visible, 'Toggled item visibility')
-
-        self.__update_item_data(item, key, new_is_visible)
         self.__update_item_visibility_appearance(item, new_is_visible)
         self.__update_children_visibility_appearance(item)
 
@@ -406,7 +433,7 @@ class ObjectTreeWidget(QTreeWidget):
     def is_ancestor_item_visible(self, item):
         current = item.parent()
         while current:
-            if not current.data(0, Qt.ItemDataRole.UserRole).get('isVisible'):
+            if not current.data(0, Qt.ItemDataRole.UserRole).get('isVisibleOnScene'):
                 return False
             current = current.parent()
         return True
@@ -457,6 +484,24 @@ class ObjectTreeWidget(QTreeWidget):
         self.blockSignals(True)
         dict_to_item(tree_dict, None)
         self.blockSignals(False)
+
+    def search_items(self, search_text, search_type):
+        self.__search_text = search_text
+        self.__search_type = search_type
+        self.__clear_match_items()
+
+        if not search_text:
+            # Trigger the size hint event to update the view.
+            self.__delegate.sizeHintChanged.emit(self.indexFromItem(self.__root_item))
+            self.setIndentation(self.__original_indentation)
+            self.setRootIsDecorated(True)
+            self.__is_searching = False
+            return
+        
+        self.__is_searching = True
+        self.setIndentation(0)
+        self.setRootIsDecorated(False)
+        self.__find_match_items(search_text, search_type)
 
     def dropEvent(self, event):
         # Rewirte the drop event. The logic is like cut and paste.

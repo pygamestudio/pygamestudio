@@ -83,16 +83,24 @@ class ModifyItemDataCommand(QUndoCommand):
         self.__tree_widget.blockSignals(False)
 
     def __apply_value(self, value):
+        item_data = self.__item.data(0, Qt.ItemDataRole.UserRole)
+
         if self.__key == 'name':
             self.__item.setText(0,value)
+            item_data[self.__key] = value
                 
-        elif self.__key == 'isVisible':
+        elif self.__key == 'isVisibleOnScene':
             # The delegate will update the item foreground.
             self.__tree_widget.viewport().update()
+            item_data[self.__key] = value
 
-        elif self.__key == 'foreground':
-            self.__item.setForeground(0, value.getRgb())
+        elif self.__key == 'foregroundColor':
+            self.__item.setForeground(0, value)
             self.__tree_widget.viewport().update()
+            item_data[self.__key] = value.getRgb()
 
         elif self.__key == 'isExpanded':
             self.__item.setExpanded(value)
+            item_data[self.__key] = value
+
+        self.__item.setData(0, Qt.ItemDataRole.UserRole, item_data)
