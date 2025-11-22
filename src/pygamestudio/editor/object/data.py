@@ -7,7 +7,7 @@ DEFAULT_ROOT_ITEM_DATA = {
     'name': 'Scene',
     'type': ITEM_ROOT,
     'icon': str(RES_PATH/'images/item.png'),
-    'isVisibleOnScene': True,
+    'isVisible': True,
     'isSelected': False,
     'isExpanded': True,
     'foregroundColor': (0, 0, 0, 255)
@@ -20,7 +20,7 @@ DEFAULT_RECT_ITEM_DATA = {
     'icon': str(RES_PATH/'images/item.png'),
     'rect': (50, 50, 100, 80),
     'color': (255, 255, 255),
-    'isVisibleOnScene': True,
+    'isVisible': True,
     'isSelected': False,
     'isExpanded': True,
     'foregroundColor': (0, 0, 0, 255) 
@@ -34,7 +34,7 @@ DEFAULT_TEXT_ITEM_DATA = {
     'text': 'text',
     'pos': (0, 0),
     'color': (255, 255, 255),
-    'isVisibleOnScene': True,
+    'isVisible': True,
     'isSelected': False,
     'isExpanded': True,
     'foregroundColor': (0, 0, 0, 255) 
@@ -48,7 +48,7 @@ DEFAULT_CIRCLE_ITEM_DATA = {
     'center': (0, 0),
     'radius': 50,
     'color': (255, 255, 255),
-    'isVisibleOnScene': True,
+    'isVisible': True,
     'isSelected': False,
     'isExpanded': True,
     'foregroundColor': (0, 0, 0, 255) 

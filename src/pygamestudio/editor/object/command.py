@@ -89,7 +89,7 @@ class ModifyItemDataCommand(QUndoCommand):
             self.__item.setText(0,value)
             item_data[self.__key] = value
                 
-        elif self.__key == 'isVisibleOnScene':
+        elif self.__key == 'isVisible':
             # The delegate will update the item foreground.
             self.__tree_widget.viewport().update()
             item_data[self.__key] = value

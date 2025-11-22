@@ -1,0 +1,5 @@
+ITEM_FOLDER = 'folder'
+ITEM_SCENE = '.scene'
+ITEM_SCRIPT = '.py'
+ITEM_TXT = '.txt'
+ITEM_JSON = '.json'

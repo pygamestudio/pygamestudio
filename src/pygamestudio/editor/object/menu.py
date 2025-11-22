@@ -11,22 +11,12 @@ class ContextMenu(QMenu):
     paste_signal = Signal()
     delete_signal = Signal()
     rename_signal = Signal()
+    duplicate_signal = Signal()
     copy_uuid_signal = Signal()
 
     def __init__(self, title='', parent=None):
         super().__init__(title, parent)
         self.__parent = parent
-        self.__setup()
-
-    def __setup(self):
-       self.__set_widget()
-       self.__set_signal()
-
-    def __set_widget(self):
-        ...
-
-    def __set_signal(self):
-        ...
 
     def __add_actions(self, item_type):
         create_text_action = QAction('文本', self)
@@ -37,6 +27,7 @@ class ContextMenu(QMenu):
         paste_action = QAction('粘贴', self)
         delete_action = QAction('删除', self)
         rename_action = QAction('重命名', self)
+        duplicate_action = QAction('生成副本', self)
         copy_uuid_action = QAction('复制UUID', self)
 
         create_text_action.triggered.connect(lambda: self.create_signal.emit(ITEM_TEXT))
@@ -47,8 +38,10 @@ class ContextMenu(QMenu):
         paste_action.triggered.connect(self.paste_signal.emit)
         delete_action.triggered.connect(self.delete_signal.emit)
         rename_action.triggered.connect(self.rename_signal.emit)
+        duplicate_action.triggered.connect(self.duplicate_signal.emit)
         copy_uuid_action.triggered.connect(self.copy_uuid_signal.emit)
         
+        # Create actions are for all item types.
         create_menu = QMenu(title='创建')
         self.addMenu(create_menu)
         create_menu.addAction(create_text_action)
@@ -69,6 +62,7 @@ class ContextMenu(QMenu):
             self.addSeparator()
             self.addAction(cut_action)
             self.addAction(copy_action)
+            self.addAction(duplicate_action)
             self.addAction(paste_action)
             self.addSeparator()
             self.addAction(delete_action)

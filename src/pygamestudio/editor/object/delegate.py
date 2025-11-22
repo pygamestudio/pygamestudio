@@ -58,7 +58,7 @@ class ObjectTreeWidgetDelegate(QStyledItemDelegate):
                 return
             
             is_hovered = index == self.__hovered_index
-            is_item_visible = item.data(0, Qt.ItemDataRole.UserRole).get('isVisibleOnScene')
+            is_item_visible = item.data(0, Qt.ItemDataRole.UserRole).get('isVisible')
             is_ancestor_visible = self.__parent.is_ancestor_item_visible(item)
             self.__draw_eye_pixmap(painter, option.rect, is_hovered, is_item_visible, is_ancestor_visible)
 
