@@ -23,7 +23,7 @@ class ContextMenu(QMenu):
         super().__init__(title, parent)
         self.__parent = parent
 
-    def __add_actions(self, item_type):
+    def __add_actions(self, item_type, is_root_item=False):
         edit_action = QAction('编辑', self)
         create_folder_action = QAction('文件夹', self)
         create_script_action = QAction('脚本', self)
@@ -58,9 +58,9 @@ class ContextMenu(QMenu):
         copy_uuid_action.triggered.connect(self.copy_uuid_signal.emit)
         copy_path_action.triggered.connect(self.copy_path_signal.emit)
         copy_name_action.triggered.connect(self.copy_name_signal.emit)
-        open_in_terminal_action.triggered.emit(self.open_in_terminal_signal.emit)
-        open_externally_action.triggered.emit(self.open_externally_signal.emit)
-        show_in_explorer_action.triggered.emit(self.show_in_explorer_signal.emit)
+        open_in_terminal_action.triggered.connect(self.open_in_terminal_signal.emit)
+        open_externally_action.triggered.connect(self.open_externally_signal.emit)
+        show_in_explorer_action.triggered.connect(self.show_in_explorer_signal.emit)
         
         create_menu = QMenu(title='创建')
         text_file_sub_menu = QMenu(title='文本文件')
@@ -75,7 +75,7 @@ class ContextMenu(QMenu):
         create_menu.addMenu(text_file_sub_menu)
 
         # Right click on the blank area.
-        if item_type is None:
+        if item_type is None or is_root_item:
             self.addSeparator()
             self.addAction(paste_action)
             self.addSeparator()
@@ -89,12 +89,13 @@ class ContextMenu(QMenu):
             self.addAction(copy_action)
             self.addAction(duplicate_action)
             self.addAction(paste_action)
-            self.addSeparator()
-            self.addAction(delete_action)
             self.addAction(rename_action)
 
             self.addSeparator()
-            copy_menu = QMenu(title='复制路径|名称|UUID')
+            self.addAction(delete_action)
+
+            self.addSeparator()
+            copy_menu = QMenu(title='复制路径 | 名称 | UUID')
             copy_menu.addAction(copy_path_action)
             copy_menu.addAction(copy_name_action)
             copy_menu.addAction(copy_uuid_action)
@@ -106,8 +107,8 @@ class ContextMenu(QMenu):
 
         # Right click on the specific file item.
         if item_type != None and item_type != ITEM_FOLDER:
-            self.insertAction(create_menu, edit_action)
-            self.insertSeparator(create_menu)
+            self.insertAction(create_menu.menuAction(), edit_action)
+            self.insertSeparator(create_menu.menuAction())
             self.insertAction(show_in_explorer_action, open_externally_action)
         
         self.__set_paste_action_status(paste_action)
@@ -118,7 +119,7 @@ class ContextMenu(QMenu):
         else:
             paste_action.setEnabled(False)
         
-    def show(self, pos, item_type):
+    def show(self, pos, item_type, is_root_item):
         self.clear()
-        self.__add_actions(item_type)
+        self.__add_actions(item_type, is_root_item)
         self.exec(pos)

@@ -94,10 +94,10 @@ class ModifyItemDataCommand(QUndoCommand):
             self.__tree_widget.viewport().update()
             item_data[self.__key] = value
 
-        elif self.__key == 'foregroundColor':
-            self.__item.setForeground(0, value)
-            self.__tree_widget.viewport().update()
-            item_data[self.__key] = value.getRgb()
+        # elif self.__key == 'foregroundColor':
+        #     self.__item.setForeground(0, value)
+        #     self.__tree_widget.viewport().update()
+        #     item_data[self.__key] = value.getRgb()
 
         elif self.__key == 'isExpanded':
             self.__item.setExpanded(value)

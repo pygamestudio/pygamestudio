@@ -37,6 +37,13 @@ class ObjectTreeWidgetDelegate(QStyledItemDelegate):
 
         painter.restore()
 
+    def __draw_index_foreground(self, index, is_item_visible, is_ancestor_visible):
+        item = self.__parent.itemFromIndex(index)
+        if is_item_visible and is_ancestor_visible:
+            item.setForeground(0, QColor(0, 0, 0))
+        else:
+            item.setForeground(0, QColor(150, 150, 150))
+
     def __is_click_on_eye_pixmap(self, pos, cell_rect):
         pixmap_rect = QRect(0, 0, self.__pixmap_size.width(), self.__pixmap_size.height())
         pixmap_rect.moveCenter(cell_rect.center())
@@ -61,6 +68,7 @@ class ObjectTreeWidgetDelegate(QStyledItemDelegate):
             is_item_visible = item.data(0, Qt.ItemDataRole.UserRole).get('isVisible')
             is_ancestor_visible = self.__parent.is_ancestor_item_visible(item)
             self.__draw_eye_pixmap(painter, option.rect, is_hovered, is_item_visible, is_ancestor_visible)
+            self.__draw_index_foreground(index, is_item_visible, is_ancestor_visible)
 
         else:
             super().paint(painter, option, index)

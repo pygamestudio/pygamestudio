@@ -6,7 +6,6 @@ from pygamestudio.editor.object.delegate import ObjectTreeWidgetDelegate
 from pygamestudio.editor.object.menu import ContextMenu
 from pygamestudio.editor.object.command import *
 
-from pygamestudio.editor.object.search import SEARCH_BY_NAME, SEARCH_BY_UUID
 from pygamestudio.editor.object.data import *
 from pygamestudio.editor.object.type import *
 import uuid
@@ -29,7 +28,6 @@ class ObjectTreeWidget(QTreeWidget):
         self.__items_to_delete_by_cut = []
 
         self.__search_text = ''
-        self.__search_type = ''
         self.__is_searching = False
         self.match_items_after_search = []
         self.__original_indentation = self.indentation()
@@ -79,6 +77,7 @@ class ObjectTreeWidget(QTreeWidget):
         self.__context_menu.paste_signal.connect(self.__paste_items)
         self.__context_menu.delete_signal.connect(self.__delete_items)
         self.__context_menu.rename_signal.connect(self.__rename_item)
+        self.__context_menu.duplicate_signal.connect(self.__duplicate_items)
         self.__context_menu.copy_uuid_signal.connect(self.__copy_item_uuid)
 
     def __set_root_item(self):
@@ -108,26 +107,23 @@ class ObjectTreeWidget(QTreeWidget):
         if not item_data:
             return
         
-        composite = CompositeCommand('Modify item data')
-
         # Push a rename command.
-        old_text = item_data['name']
-        new_text = item.text(column)
-        if old_text != new_text:
+        old_name = item_data['name']
+        new_name = item.text(column)
+        if old_name != new_name:
             key = 'name'
-            item_data['name'] = new_text 
-            composite.add_command(ModifyItemDataCommand(self, item, key, old_text, new_text, 'Renamed'))
+            # item_data['name'] = new_name 
+            self.__undo_stack.push(ModifyItemDataCommand(self, item, key, old_name, new_name, 'Renamed'))
             
             if self.__is_searching:
-                self.search_items(self.__search_text, self.__search_type)
+                self.search_items(self.__search_text)
             # # 测试用
             # if item_data['name'] == 'save':
             #     import json
             #     with open('a.json', 'w', encoding='utf-8') as f:
             #         f.write(json.dumps(self.tree_to_dict(), indent=4))
         
-        item.setData(0, Qt.ItemDataRole.UserRole, item_data)
-        self.__undo_stack.push(composite)
+            # item.setData(0, Qt.ItemDataRole.UserRole, item_data)
 
     def __on_item_expanded(self, item):
         item_data = item.data(0, Qt.ItemDataRole.UserRole)
@@ -173,7 +169,7 @@ class ObjectTreeWidget(QTreeWidget):
 
         # If it is druing search, search again after creating a new item.
         if self.__is_searching:
-            self.search_items(self.__search_text, self.__search_type)
+            self.search_items(self.__search_text)
         
     def __create_rect(self):
         item_data = copy.deepcopy(DEFAULT_RECT_ITEM_DATA)
@@ -223,7 +219,7 @@ class ObjectTreeWidget(QTreeWidget):
             return
 
         selected_items = self.selectedItems()
-        parent_item = selected_items[0] if selected_items else self.__root_item
+        parent_item = selected_items[-1] if selected_items else self.__root_item
 
         self.__undo_stack.beginMacro('Paste')
         composite_command = CompositeCommand('Added item')
@@ -233,7 +229,6 @@ class ObjectTreeWidget(QTreeWidget):
             parent_item.addChild(new_item)
             parent_item.setExpanded(True)
             self.__restore_expanded_items(new_item)
-
             composite_command.add_command(AddItemCommand(self, parent_item, new_item, parent_item.childCount()-1))
 
         self.__undo_stack.push(composite_command)
@@ -247,6 +242,23 @@ class ObjectTreeWidget(QTreeWidget):
 
         self.__undo_stack.endMacro()
 
+    def __duplicate_items(self):
+        selected_items = self.selectedItems()
+        if not selected_items:
+            return
+        
+        composite_command = CompositeCommand('Added item')
+
+        for item in selected_items:
+            if item == self.__root_item:
+                continue
+            new_item = self.__deep_copy_item(item)
+            parent_item = item.parent()
+            parent_item.addChild(new_item)
+            composite_command.add_command(AddItemCommand(self, parent_item, new_item, parent_item.childCount()-1))
+
+        self.__undo_stack.push(composite_command)
+
     def __deep_copy_item(self, item, is_copy_child=True):
         """Copy item and its children"""
         new_item = QTreeWidgetItem()
@@ -254,9 +266,9 @@ class ObjectTreeWidget(QTreeWidget):
         new_item.setFlags(item.flags())
         new_item.setText(0, item.text(0))
         new_item.setIcon(0, item.icon(0))
-        new_item.setForeground(0, item.foreground(0))
+        # new_item.setForeground(0, item.foreground(0))
         new_item.setData(0, Qt.ItemDataRole.UserRole, item.data(0, Qt.ItemDataRole.UserRole))
-        
+
         if is_copy_child:
             for i in range(item.childCount()):
                 child_item = item.child(i)
@@ -308,10 +320,10 @@ class ObjectTreeWidget(QTreeWidget):
         item.setIcon(0, QIcon(item_data['icon']))
         item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
 
-        if not parent_item.data(0, Qt.ItemDataRole.UserRole).get('isVisible') or not self.is_ancestor_item_visible(parent_item):
-            color = QColor(150, 150, 150)
-            item.setForeground(0,  color)
-            item_data['foregroundColor'] = color.getRgb()
+        # if not parent_item.data(0, Qt.ItemDataRole.UserRole).get('isVisible') or not self.is_ancestor_item_visible(parent_item):
+        #     color = QColor(150, 150, 150)
+        #     item.setForeground(0,  color)
+        #     item_data['foregroundColor'] = color.getRgb()
         
         item.setData(0, Qt.ItemDataRole.UserRole, item_data)
 
@@ -378,33 +390,33 @@ class ObjectTreeWidget(QTreeWidget):
         timeline.finished.connect(animation_finished)
         timeline.start()
     
-    def __update_item_visibility_appearance(self, item, is_visible):
-        key = 'foregroundColor'
-        old_color = item.foreground(0).color()
+    # def __update_item_visibility_appearance(self, item, is_visible):
+    #     key = 'foregroundColor'
+    #     old_color = item.foreground(0).color()
 
-        if is_visible and self.is_ancestor_item_visible(item):
-            item.setForeground(0, QColor(0, 0, 0))     
-        else:
-            item.setForeground(0, QColor(150, 150, 150))
+    #     if is_visible and self.is_ancestor_item_visible(item):
+    #         item.setForeground(0, QColor(0, 0, 0))     
+    #     else:
+    #         item.setForeground(0, QColor(150, 150, 150))
         
-        new_color = item.foreground(0).color()       
-        if old_color.value() != new_color.value():
-            self.__undo_stack.push(ModifyItemDataCommand(self, item, key, old_color, new_color, 'Modified foreground color'))
+    #     new_color = item.foreground(0).color()       
+    #     if old_color.value() != new_color.value():
+    #         self.__undo_stack.push(ModifyItemDataCommand(self, item, key, old_color, new_color, 'Modified foreground color'))
 
-    def __update_children_visibility_appearance(self, parent_item):
-        # The value of item_data['isVisible'] should not be influenced by item's parent.
-        for i in range(parent_item.childCount()):
-            item = parent_item.child(i)
-            item_data = item.data(0, Qt.ItemDataRole.UserRole)
-            self.__update_item_visibility_appearance(item, item_data.get('isVisible'))
-            self.__update_children_visibility_appearance(item)
+    # def __update_children_visibility_appearance(self, parent_item):
+    #     # The value of item_data['isVisible'] should not be influenced by item's parent.
+    #     for i in range(parent_item.childCount()):
+    #         item = parent_item.child(i)
+    #         item_data = item.data(0, Qt.ItemDataRole.UserRole)
+    #         self.__update_item_visibility_appearance(item, item_data.get('isVisible'))
+    #         self.__update_children_visibility_appearance(item)
 
-    def __find_match_items(self, search_text, search_type):
+    def __find_match_items(self, search_text):
         def match_item(item):
             item_data = item.data(0, Qt.ItemDataRole.UserRole)
             item_name = item_data['name'].lower()
             item_uuid = item_data['uuid'].lower()
-            if search_type == SEARCH_BY_NAME and search_text in item_name or search_type == SEARCH_BY_UUID and search_text in item_uuid:
+            if search_text in item_name or search_text in item_uuid:
                 index = self.indexFromItem(item)
                 self.match_items_after_search.append(index)
 
@@ -426,14 +438,14 @@ class ObjectTreeWidget(QTreeWidget):
         new_is_visible = not item_data['isVisible']
 
         key = 'isVisible'
-        self.__undo_stack.beginMacro('Toggled item visibility on the scene')
+        # self.__undo_stack.beginMacro('Toggled item visibility on the scene')
         modify_item_data_command = ModifyItemDataCommand(self, item, key, old_is_visible, new_is_visible, 'Toggled item visibility on the scene')
         self.__undo_stack.push(modify_item_data_command)
 
-        self.__update_item_visibility_appearance(item, new_is_visible)
-        self.__update_children_visibility_appearance(item)
+        # self.__update_item_visibility_appearance(item, new_is_visible)
+        # self.__update_children_visibility_appearance(item)
 
-        self.__undo_stack.endMacro()
+        # self.__undo_stack.endMacro()
 
     def is_ancestor_item_visible(self, item):
         current = item.parent()
@@ -478,7 +490,7 @@ class ObjectTreeWidget(QTreeWidget):
             item.setText(0, item_data['name'])
             item.setIcon(0, QIcon(item_data['icon']))
             item.setExpanded(item_data['isExpanded'])
-            item.setForeground(0, QColor(*item_data['foregroundColor']))
+            # item.setForeground(0, QColor(*item_data['foregroundColor']))
             item.setData(0, Qt.ItemDataRole.UserRole, item_data)
         
             for child_item_dict in item_dict['children']:
@@ -490,9 +502,8 @@ class ObjectTreeWidget(QTreeWidget):
         dict_to_item(tree_dict, None)
         self.blockSignals(False)
 
-    def search_items(self, search_text, search_type):
+    def search_items(self, search_text):
         self.__search_text = search_text
-        self.__search_type = search_type
         self.__clear_match_items()
 
         if not search_text:
@@ -506,7 +517,7 @@ class ObjectTreeWidget(QTreeWidget):
         self.__is_searching = True
         self.setIndentation(0)
         self.setRootIsDecorated(False)
-        self.__find_match_items(search_text, search_type)
+        self.__find_match_items(search_text)
 
     def expand_or_collapse_all(self):
         current_item = self.currentItem()
