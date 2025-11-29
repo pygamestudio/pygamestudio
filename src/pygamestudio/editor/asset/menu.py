@@ -5,7 +5,7 @@ from pygamestudio.editor.asset.type import *
 
 
 class ContextMenu(QMenu):
-    create_signal = Signal(int)
+    create_signal = Signal(str)
     cut_signal = Signal()
     copy_signal = Signal()
     paste_signal = Signal()

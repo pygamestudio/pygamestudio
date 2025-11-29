@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QApplication, QTreeWidget, QTreeWidgetItem, QAbstractItemView, QHeaderView, QInputDialog
+from PySide6.QtWidgets import QApplication, QTreeWidget, QMessageBox, QTreeWidgetItem, QAbstractItemView, QHeaderView, QInputDialog
 from PySide6.QtCore import Qt, QTimeLine, QSize, Signal
 from PySide6.QtGui import QIcon, QColor, QUndoStack
 
@@ -59,13 +59,15 @@ class AssetTreeWidget(QTreeWidget):
         self.itemCollapsed.connect(self.__on_item_collapsed)
 
         self.__context_menu.create_signal.connect(self.__create_item)
-        # self.__context_menu.cut_signal.connect(self.__cut_items)
-        # self.__context_menu.copy_signal.connect(self.__copy_items)
-        # self.__context_menu.paste_signal.connect(self.__paste_items)
-        # self.__context_menu.delete_signal.connect(self.__delete_items)
+        self.__context_menu.cut_signal.connect(self.__cut_items)
+        self.__context_menu.copy_signal.connect(self.__copy_items)
+        self.__context_menu.paste_signal.connect(self.__paste_items)
+        self.__context_menu.delete_signal.connect(self.__delete_items)
         self.__context_menu.rename_signal.connect(self.__rename_item)
-        # self.__context_menu.duplicate_signal.connect(self.__duplicate_items)
-        # self.__context_menu.copy_uuid_signal.connect(self.__copy_item_uuid)
+        self.__context_menu.duplicate_signal.connect(self.__duplicate_items)
+        self.__context_menu.copy_uuid_signal.connect(self.__copy_item_uuid)
+        self.__context_menu.copy_path_signal.connect(self.__copy_item_path)
+        self.__context_menu.copy_name_signal.connect(self.__copy_item_name)
 
     def __show_context_menu(self, pos):
         item = self.itemAt(pos)
@@ -83,27 +85,30 @@ class AssetTreeWidget(QTreeWidget):
         # Push a rename command.
         old_name = item_data['name']
         new_name = item.text(column)
-        print(old_name)
-        print(new_name)
         if old_name != new_name:
-            key = 'name'
-            # item_data['name'] = new_text 
-            self.__undo_stack.push(ModifyItemDataCommand(self, item, key, old_name, new_name, 'Renamed'))
+            parent_item = item.parent()
+            parent_item_path = Path(parent_item.data(0, Qt.ItemDataRole.UserRole).get('path'))
+            
+            old_item_path = Path(item_data['path'])
+            new_item_path = parent_item_path / new_name
+            old_item_path.rename(new_item_path)
+
+            item.setText(0, new_name)
+            item_data['name'] = new_name
+            item_data['path'] = str(new_item_path)
+            item.setData(0, Qt.ItemDataRole.UserRole, item_data)
             
             # if self.__is_searching:
             #     self.search_items(self.__search_text)
-        
-            # item.setData(0, Qt.ItemDataRole.UserRole, item_data)
 
     def __on_item_expanded(self, item):
         item_data = item.data(0, Qt.ItemDataRole.UserRole)
 
         # Push an expand command and update the item data.
         if item_data['isExpanded'] == False:
-            key = 'isExpanded'
-            description = 'Expanded item' 
-            self.__undo_stack.push(ModifyItemDataCommand(self, item, key, False, True, description))
-            
+            item.setExpanded(True)
+            item_data['isExpanded'] = True
+            item.setData(0, Qt.ItemDataRole.UserRole, item_data)
             self.__load_subdirectories(item)
 
     def __on_item_collapsed(self, item):
@@ -111,15 +116,17 @@ class AssetTreeWidget(QTreeWidget):
 
         # Push a collapse command and update the item data.
         if item_data['isExpanded'] == True:
-            key = 'isExpanded'
-            description = 'Collapsed item'
-            self.__undo_stack.push(ModifyItemDataCommand(self, item, key, True, False, description))
+            item.setExpanded(False)
+            item_data['isExpanded'] = False
+            item.setData(0, Qt.ItemDataRole.UserRole, item_data)
+            self.__load_subdirectories(item)
 
     def __set_root_item(self):
         item_data = copy.deepcopy(DEFAULT_FOLDER_ITEM_DATA)
         item_id = str(uuid.uuid4())
         item_data['uuid'] = item_id
         item_data['isRootItem'] = True
+        item_data['isExpanded'] = True
         item_data['name'] = self.__initial_path.name
         item_data['path'] = str(self.__initial_path)
 
@@ -130,6 +137,7 @@ class AssetTreeWidget(QTreeWidget):
         self.__root_item.setFlags(self.__root_item.flags() & ~Qt.ItemFlag.ItemIsDragEnabled)
         
         self.addTopLevelItem(self.__root_item)
+        self.__root_item.setExpanded(True)
 
     def __load_file_system(self):
         self.clear()
@@ -158,7 +166,6 @@ class AssetTreeWidget(QTreeWidget):
 
     def __load_subdirectories(self, item):
         # 要放在__on_item_expanded槽函数中
-
         # Remove the placeholder item.
         if item.childCount() == 1 and item.child(0).text(0) == '正在加载...':
             item.takeChild(0)
@@ -185,11 +192,13 @@ class AssetTreeWidget(QTreeWidget):
 
             child_item = QTreeWidgetItem()
             child_item.setText(0, entry.name)
+            child_item.setIcon(0, QIcon(item_data['icon']))
             child_item.setData(0, Qt.ItemDataRole.UserRole, item_data)
             child_item.setFlags(child_item.flags() | Qt.ItemFlag.ItemIsEditable)
             item.addChild(child_item)
 
-            if entry.is_dir():
+            # If the folder is not empty, add a placeholder item to show the expand triangle.
+            if entry.is_dir() and any(entry.iterdir()):
                 self.__add_placeholder(child_item)
 
     def __refresh_tree(self):
@@ -208,7 +217,7 @@ class AssetTreeWidget(QTreeWidget):
         
         return parent_item if parent_item else self.__root_item
 
-    def __create_item(self, item_type):        
+    def __create_item(self, item_type):
         if item_type == ITEM_FOLDER:
             self.__create_folder()
         else:
@@ -225,18 +234,12 @@ class AssetTreeWidget(QTreeWidget):
         parent_item_path = Path(parent_item.data(0, Qt.ItemDataRole.UserRole).get('path'))
 
         # Make sure the created folder name is different.
-        suffix = 0
-        new_folder_name = item_data['name']
-        new_folder_path = parent_item_path / new_folder_name
-        while new_folder_path.exists():
-            suffix += 1
-            new_folder_name = f"{item_data['name']}-{suffix}"
-            new_folder_path = parent_item_path / new_folder_name
-        
-        new_folder_path.mkdir(exist_ok=False)
+        folder_name, folder_path = self.__get_unique_path(item_data['name'], parent_item_path)
+        folder_path.mkdir(exist_ok=False)
 
-        item_data['name'] = new_folder_name
+        item_data['name'] = folder_name
         item_data['uuid'] = str(uuid.uuid4())
+        item_data['path'] = str(folder_path)
 
         item = QTreeWidgetItem()
         item.setText(0, item_data['name'])
@@ -244,11 +247,11 @@ class AssetTreeWidget(QTreeWidget):
         item.setData(0, Qt.ItemDataRole.UserRole, item_data)
         item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
 
-        parent_item.addChild(item)
+        index = self.__get_insert_index_by_name(parent_item, item_data['name'])
+        parent_item.insertChild(index, item)
         parent_item.setExpanded(True)
+        self.setCurrentItem(item)
         self.scrollToItem(item)
-
-        self.__add_placeholder(item)
 
     def __create_file(self, item_type):
         if item_type == ITEM_SCENE:
@@ -264,18 +267,12 @@ class AssetTreeWidget(QTreeWidget):
         parent_item_path = Path(parent_item.data(0, Qt.ItemDataRole.UserRole).get('path'))
 
         # Make sure the created file name is different.
-        suffix = 0
-        new_file_name = item_data['name']
-        new_file_path = parent_item_path / new_file_name
-        while new_file_path.exists():
-            suffix += 1
-            new_file_name = f"{item_data['name']}-{suffix}"
-            new_file_path = parent_item_path / new_file_name
+        file_name, file_path = self.__get_unique_path(item_data['name'], parent_item_path)
+        file_path.touch(exist_ok=False)
 
-        new_file_path.touch(exist_ok=False)
-
-        item_data['name'] = new_file_name
+        item_data['name'] = file_name
         item_data['uuid'] = str(uuid.uuid4())
+        item_data['path'] = str(file_path)
 
         item = QTreeWidgetItem()
         item.setText(0, item_data['name'])
@@ -283,16 +280,284 @@ class AssetTreeWidget(QTreeWidget):
         item.setData(0, Qt.ItemDataRole.UserRole, item_data)
         item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
 
-        parent_item.addChild(item)
+        index = self.__get_insert_index_by_name(parent_item, item_data['name'])
+        parent_item.insertChild(index, item)
         parent_item.setExpanded(True)
+        self.setCurrentItem(item)
         self.scrollToItem(item)
-    
+
     def __rename_item(self):
         self.editItem(self.currentItem())
 
+    def __delete_items(self, items=None, need_to_confirm=True):
+        selected_items = items if items else self.selectedItems()
+        if not selected_items:
+            return
+        
+        def is_to_delete(item, selected_items):
+            """
+            Check if the item needs to be deleted (no ancestor in the selected items list).
+            E.g., if a file-type item has a folder-type ancestor item, we only need to delete the folder item as the file in the folder will be deleted together.
+            """
+            current = item
+            while current.parent() and current.parent() != self.__root_item:
+                if current.parent() in selected_items:
+                    return False
+                current = current.parent()
+            return True
+        
+        items_to_delete = [item for item in selected_items if is_to_delete(item, selected_items)]
+
+        reply = QMessageBox.StandardButton.Yes
+        if need_to_confirm:
+            item_names = [item.text(0) for item in items_to_delete]
+            content = '确定要删除这 {} 个项目吗？此操作不可撤销。\n{}'.format(str(len(items_to_delete)), ('\n').join(item_names))
+            reply = QMessageBox.question(self, '请确认...', content, QMessageBox.Yes | QMessageBox.No)
+            
+        if reply == QMessageBox.StandardButton.No:
+            return
+        
+        for item in items_to_delete:
+            if item == self.__root_item:
+                continue
+
+            parent = item.parent()
+            parent.removeChild(item)
+            item_path = Path(item.data(0, Qt.ItemDataRole.UserRole).get('path'))
+            if item_path.exists():
+                shutil.rmtree(item_path) if item_path.is_dir() else item_path.unlink()                
+
+        del items_to_delete
+        self.clearSelection()
+
+    def __cut_items(self):
+        selected_items = self.selectedItems()
+        if not selected_items:
+            return
+        
+        def is_to_cut(item, selected_items):
+            """
+            Check if the item needs to be cut (no ancestor in the selected items list).
+            E.g., if a file-type item has a folder-type ancestor item, we only need to cut the folder item as the file in the folder will be cut together.
+            """
+            current = item
+            while current.parent() and current.parent() != self.__root_item:
+                if current.parent() in selected_items:
+                    return False
+                current = current.parent()
+            return True
+        
+        self.__clipboard_items = []
+        self.__is_cut_action = True
+        self.__items_to_delete_by_cut = selected_items
+            
+        for item in selected_items:
+            if item == self.__root_item:
+                continue
+            self.__hightlight_item(item)
+            if is_to_cut(item, selected_items):
+                copied_item = self.__deep_copy_item(item)
+                self.__clipboard_items.append(copied_item)
+
+    def __copy_items(self):
+        selected_items = self.selectedItems()
+        if not selected_items:
+            return
+        
+        def is_to_copy(item, selected_items):
+            """
+            Check if the item needs to be copied (no ancestor in the selected items list).
+            E.g., if a file-type item has a folder-type ancestor item, we only need to copy the folder item as the file in the folder will be copied together.
+            """
+            current = item
+            while current.parent() and current.parent() != self.__root_item:
+                if current.parent() in selected_items:
+                    return False
+                current = current.parent()
+            return True
+        
+        self.__clipboard_items = []
+        self.__is_cut_action = False
+            
+        for item in selected_items:
+            if item == self.__root_item:
+                continue
+            self.__hightlight_item(item)
+            if is_to_copy(item, selected_items):
+                copied_item = self.__deep_copy_item(item)
+                self.__clipboard_items.append(copied_item)
+    
+    def __deep_copy_item(self, item, is_copy_child=True):
+        """Copy item and its children"""
+        new_item = QTreeWidgetItem()
+        
+        new_item.setFlags(item.flags())
+        new_item.setText(0, item.text(0))
+        new_item.setIcon(0, item.icon(0))
+        new_item.setData(0, Qt.ItemDataRole.UserRole, item.data(0, Qt.ItemDataRole.UserRole))
+
+        if is_copy_child:
+            for i in range(item.childCount()):
+                child_item = item.child(i)
+                new_child_item = self.__deep_copy_item(child_item)
+                new_item.addChild(new_child_item)
+        
+        return new_item
+    
+    def __paste_items(self):
+        if not self.__clipboard_items:
+            return
+
+        parent_item = self.__get_parent_for_new_item()
+
+        for item in self.__clipboard_items:
+            new_item = self.__deep_copy_item(item)
+            item_data = new_item.data(0, Qt.ItemDataRole.UserRole)
+            source_path = Path(item_data['path'])
+            parent_item_path = Path(parent_item.data(0, Qt.ItemDataRole.UserRole).get('path'))
+            target_name, target_path = self.__get_unique_path(item_data['name'], parent_item_path)
+            
+            if self.__is_cut_action:
+                shutil.move(source_path, target_path)
+            else:
+                shutil.copytree(source_path, target_path) if source_path.is_dir() else shutil.copy2(source_path, target_path)
+                
+            item_data['name'] = target_name
+            item_data['path'] = str(target_path)
+            new_item.setText(0, target_name)
+            new_item.setData(0, Qt.ItemDataRole.UserRole, item_data)
+
+            index = self.__get_insert_index_by_name(parent_item, target_name)        
+            parent_item.insertChild(index, new_item)
+            parent_item.setExpanded(True)
+            self.scrollToItem(new_item)
+
+            self.__restore_expanded_items(new_item)
+           
+        if self.__is_cut_action:
+            self.__delete_items(self.__items_to_delete_by_cut, False)
+            self.__items_to_delete_by_cut = []
+            self.__clipboard_items = []
+            self.__is_cut_action = False
+
+    def __restore_expanded_items(self, parent_item):
+        parent_item_data = parent_item.data(0, Qt.ItemDataRole.UserRole)
+        if not parent_item_data['isExpanded']:
+            return
+        parent_item.setExpanded(True)
+                
+        for i in range(parent_item.childCount()):
+            item = parent_item.child(i)
+            item_data = item.data(0, Qt.ItemDataRole.UserRole)
+            
+            if item_data['isExpanded']:
+                item.setExpanded(True)
+
+                if item.childCount() > 0:
+                    self.__restore_expanded_items(item)
+
+    def __hightlight_item(self, item):
+        """Highlight item for some actions, e.g., copy action."""
+        original_fg = item.foreground(0)
+        original_r = original_fg.color().red()
+        original_g = original_fg.color().green()
+        original_b = original_fg.color().blue()
+
+        timeline = QTimeLine(1500, self)
+        timeline.setFrameRange(0, 100)        
+        
+        def update_frame(frame):
+            # progress: 0 -> 1 -> 0
+            progress = frame / 100.0
+            
+            if progress > 0.5:
+                value = -(255-original_r) * progress
+            else:
+                value = (255-original_r) * progress
+            
+            fg_color = item.foreground(0).color()
+            r = fg_color.red()
+            g = fg_color.green() + value
+            b = fg_color.blue() + value
+
+            # Limit the result to [0, 255].
+            r = max(original_g, min(r, 255))
+            g = max(original_g, min(g, 255))
+            b = max(original_b, min(b, 255))
+
+            item.setForeground(0, QColor(r, g, b, 255))
+        
+        def animation_finished():
+            item.setForeground(0, original_fg)
+            timeline.deleteLater()
+        
+        timeline.frameChanged.connect(update_frame)
+        timeline.finished.connect(animation_finished)
+        timeline.start()
+
+    def __get_insert_index_by_name(self, parent_item, new_item_name):
+        for i in range(parent_item.childCount()):
+            item = parent_item.child(i)
+            item_name = item.text(0)
+            if item_name > new_item_name:
+                return i
+        return parent_item.childCount()
+    
+    def __get_unique_path(self, name, parent_item_path):
+        num = 0
+        new_name = name
+        new_path = parent_item_path / new_name
+        while new_path.exists():
+            num += 1
+            stem = Path(name).stem
+            suffix = Path(name).suffix
+            new_name = f"{stem}-{num}{suffix}"
+            new_path = parent_item_path / new_name
+        return new_name, new_path
+    
+    def __duplicate_items(self):
+        selected_items = self.selectedItems()
+        if not selected_items:
+            return
+        
+        for item in selected_items:
+            if item == self.__root_item:
+                continue
+            new_item = self.__deep_copy_item(item)
+            parent_item = item.parent()
+
+            item_data = new_item.data(0, Qt.ItemDataRole.UserRole)
+            source_path = Path(item_data['path'])
+            parent_item_path = Path(parent_item.data(0, Qt.ItemDataRole.UserRole).get('path'))
+            target_name, target_path = self.__get_unique_path(item_data['name'], parent_item_path)
+            shutil.copytree(source_path, target_path) if source_path.is_dir() else shutil.copy2(source_path, target_path)
+                
+            item_data['name'] = target_name
+            item_data['path'] = str(target_path)
+            new_item.setText(0, target_name)
+            new_item.setData(0, Qt.ItemDataRole.UserRole, item_data)
+
+            index = self.__get_insert_index_by_name(parent_item, target_name)        
+            parent_item.insertChild(index, new_item)
+            parent_item.setExpanded(True)
+            self.scrollToItem(new_item)
+
+            self.__restore_expanded_items(new_item)
+    
+    def __copy_item_uuid(self):
+        item_data = self.currentItem().data(0, Qt.ItemDataRole.UserRole)
+        QApplication.clipboard().setText(item_data['uuid'])
+
+    def __copy_item_path(self):
+        item_data = self.currentItem().data(0, Qt.ItemDataRole.UserRole)
+        QApplication.clipboard().setText(item_data['path'])
+
+    def __copy_item_name(self):
+        item_data = self.currentItem().data(0, Qt.ItemDataRole.UserRole)
+        QApplication.clipboard().setText(item_data['name'])
+
     def get_clipboard_items(self):
         return self.__clipboard_items
-    
     
     def keyPressEvent(self, event):
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
@@ -308,16 +573,6 @@ class AssetTreeWidget(QTreeWidget):
                 self.__paste_items()
                 event.accept()
                 return
-            elif event.key() == Qt.Key.Key_Z and self.__undo_stack.canUndo():
-                self.__undo_stack.undo()
-                print(self.__undo_stack.index())
-                print('撤销')
-
-        elif event.modifiers() == (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier):
-            if event.key() == Qt.Key.Key_Z and self.__undo_stack.canRedo():
-                print('重做')
-                self.__undo_stack.redo()
-                print(self.__undo_stack.index())
         
         elif event.key() == Qt.Key.Key_Delete:
             self.__delete_items()

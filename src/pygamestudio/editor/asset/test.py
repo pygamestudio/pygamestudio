@@ -312,6 +312,7 @@ class ResourceExplorer(QMainWindow):
             except Exception as e:
                 QMessageBox.critical(self, "错误", f"无法创建文件夹: {str(e)}")
     
+    # 1
     def create_new_file(self):
         """创建新文件"""
         parent_item = self.get_parent_for_new_item()
@@ -343,6 +344,7 @@ class ResourceExplorer(QMainWindow):
             except Exception as e:
                 QMessageBox.critical(self, "错误", f"无法创建文件: {str(e)}")
     
+    # 1
     def rename_item(self, item):
         """重命名项目"""
         old_name = item.text(0)

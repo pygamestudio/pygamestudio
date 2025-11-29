@@ -34,6 +34,8 @@ class AddItemCommand(QUndoCommand):
         self.__tree_widget.setCurrentItem(self.__item)
         isExpanded = self.__item.data(0, Qt.ItemDataRole.UserRole).get('isExpanded')
         self.__item.setExpanded(isExpanded)
+        self.__parent_item.setExpanded(True)
+        self.__tree_widget.scrollToItem(self.__item)
         self.__tree_widget.blockSignals(False)
         
     def undo(self):

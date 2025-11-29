@@ -8,13 +8,13 @@ DEFAULT_FOLDER_ITEM_DATA = {
     'type': ITEM_FOLDER,
     'path': '',
     'icon': str(RES_PATH/'images/folder.png'),
-    'isExpanded': True,
+    'isExpanded': False,
     'isRootItem': False,
 }
 
 DEFAULT_FILE_SCENE_ITEM_DATA = {
     'uuid': '',
-    'name': 'new scene',
+    'name': 'new.scene',
     'type': ITEM_SCENE,
     'path': '',
     'icon': str(RES_PATH/'images/scene.png'),
@@ -23,7 +23,7 @@ DEFAULT_FILE_SCENE_ITEM_DATA = {
 
 DEFAULT_FILE_SCRIPT_ITEM_DATA = {
     'uuid': '',
-    'name': 'new py',
+    'name': 'new.py',
     'type': ITEM_SCRIPT,
     'path': '',
     'icon': str(RES_PATH/'images/py.png'),
@@ -32,7 +32,7 @@ DEFAULT_FILE_SCRIPT_ITEM_DATA = {
 
 DEFAULT_FILE_TXT_ITEM_DATA = {
     'uuid': '',
-    'name': 'new txt',
+    'name': 'new.txt',
     'type': ITEM_TXT,
     'path': '',
     'icon': str(RES_PATH/'images/txt.png'),
@@ -41,7 +41,7 @@ DEFAULT_FILE_TXT_ITEM_DATA = {
 
 DEFAULT_FILE_JSON_ITEM_DATA = {
     'uuid': '',
-    'name': 'new json',
+    'name': 'new.json',
     'type': ITEM_SCRIPT,
     'path': '',
     'icon': str(RES_PATH/'images/json.png'),
@@ -53,6 +53,6 @@ DEFAULT_OTHER_FILE_ITEM_DATA = {
     'name': 'file',
     'type': ITEM_OTHER,
     'path': '',
-    'icon': str(RES_PATH/'images/other.png'),
+    'icon': str(RES_PATH/'images/other_file.png'),
     'isExpanded': False,
 }

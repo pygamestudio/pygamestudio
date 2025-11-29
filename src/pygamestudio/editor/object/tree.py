@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QApplication, QTreeWidget, QTreeWidgetItem, QAbstractItemView, QHeaderView
+from PySide6.QtWidgets import QApplication, QTreeWidget, QMessageBox, QTreeWidgetItem, QAbstractItemView, QHeaderView
 from PySide6.QtCore import Qt, QTimeLine, QSize, Signal
 from PySide6.QtGui import QIcon, QColor, QUndoStack
 
@@ -234,11 +234,10 @@ class ObjectTreeWidget(QTreeWidget):
         self.__undo_stack.push(composite_command)
 
         if self.__is_cut_action:
+            self.__delete_items(self.__items_to_delete_by_cut, False)
+            self.__items_to_delete_by_cut = []
             self.__clipboard_items = []
             self.__is_cut_action = False
-
-            self.__delete_items(self.__items_to_delete_by_cut)
-            self.__items_to_delete_by_cut = []
 
         self.__undo_stack.endMacro()
 
@@ -277,11 +276,19 @@ class ObjectTreeWidget(QTreeWidget):
         
         return new_item
 
-    def __delete_items(self, items=None):
+    def __delete_items(self, items=None, need_to_confirm=True):
         items_to_delete = items if items else self.selectedItems()
         if not items_to_delete:
             return
 
+        reply = QMessageBox.StandardButton.Yes
+        if need_to_confirm:
+            content = '是否要删除当前选中对象?'
+            reply = QMessageBox.question(self, '请确认...', content, QMessageBox.Yes | QMessageBox.No)
+            
+        if reply == QMessageBox.StandardButton.No:
+            return
+        
         composite_command = CompositeCommand('Delete item')
 
         # Detele the deepest items first.
@@ -291,8 +298,8 @@ class ObjectTreeWidget(QTreeWidget):
                 continue
 
             composite_command.add_command(DeleteItemCommand(self, item))
-            parent = item.parent()
-            parent.removeChild(item)
+            # parent = item.parent()
+            # parent.removeChild(item)
 
         del items_to_delete
         self.clearSelection()
@@ -328,11 +335,11 @@ class ObjectTreeWidget(QTreeWidget):
         item.setData(0, Qt.ItemDataRole.UserRole, item_data)
 
     def __add_new_item_to_tree_widget(self, parent_item, item):
-        parent_item.addChild(item)
-        parent_item.setExpanded(True)
-        self.scrollToItem(item)
+        # parent_item.addChild(item)
+        # parent_item.setExpanded(True)
+        # self.scrollToItem(item)
 
-        add_item_command = AddItemCommand(self, parent_item, item, parent_item.childCount()-1)
+        add_item_command = AddItemCommand(self, parent_item, item, parent_item.childCount())
         self.__undo_stack.push(add_item_command)
 
     def __restore_expanded_items(self, parent_item):
@@ -572,7 +579,7 @@ class ObjectTreeWidget(QTreeWidget):
 
         self.__undo_stack.push(composite_command)
 
-        self.__delete_items(source_items)
+        self.__delete_items(source_items, False)
         self.__undo_stack.endMacro()
 
     def keyPressEvent(self, event):
