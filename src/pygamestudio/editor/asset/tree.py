@@ -5,14 +5,17 @@ from PySide6.QtGui import QIcon, QColor, QUndoStack
 from pygamestudio.editor.asset.menu import ContextMenu
 from pygamestudio.editor.asset.command import *
 
-
+from pygamestudio.editor.asset.delegate import AssetTreeWidgetDelegate
 from pygamestudio.editor.asset.search import SEARCH_BY_NAME, SEARCH_BY_UUID
 from pygamestudio.editor.asset.data import *
 from pygamestudio.editor.asset.type import *
 from pathlib import Path
+import subprocess
+import platform
 import shutil
 import uuid
 import copy
+import os
 
 
 
@@ -23,6 +26,8 @@ class AssetTreeWidget(QTreeWidget):
         super().__init__(parent)
         self.__undo_stack = QUndoStack(self)
 
+        self.__delegate = AssetTreeWidgetDelegate(self)
+
         self.__initial_path = Path('C:/Users/louis/Desktop/demo')
         
         self.__clipboard_items = []
@@ -31,6 +36,8 @@ class AssetTreeWidget(QTreeWidget):
 
         self.__root_item = None
         self.__context_menu = ContextMenu('', self)
+
+        self.__hover_item_in_drag_move = None
 
 
         self.__set_up()
@@ -41,10 +48,11 @@ class AssetTreeWidget(QTreeWidget):
         self.__load_file_system()
 
     def __set_widget(self):
+        self.setItemDelegate(self.__delegate)
         self.setAcceptDrops(True)
         self.setDragEnabled(True)
         self.setHeaderHidden(True)
-        self.setMouseTracking(True)
+        # self.setMouseTracking(True)
         self.setDropIndicatorShown(True)
         self.setDefaultDropAction(Qt.DropAction.MoveAction)
         self.setDragDropMode(QTreeWidget.DragDropMode.InternalMove)
@@ -68,6 +76,9 @@ class AssetTreeWidget(QTreeWidget):
         self.__context_menu.copy_uuid_signal.connect(self.__copy_item_uuid)
         self.__context_menu.copy_path_signal.connect(self.__copy_item_path)
         self.__context_menu.copy_name_signal.connect(self.__copy_item_name)
+        self.__context_menu.open_in_terminal_signal.connect(self.__open_in_terminal)
+        self.__context_menu.open_externally_signal.connect(self.__open_externally)
+        self.__context_menu.show_in_explorer_signal.connect(self.__show_in_explorer)
 
     def __show_context_menu(self, pos):
         item = self.itemAt(pos)
@@ -82,24 +93,33 @@ class AssetTreeWidget(QTreeWidget):
         if not item_data:
             return
         
-        # Push a rename command.
+        parent_item = item.parent()
+        parent_item_path = Path(parent_item.data(0, Qt.ItemDataRole.UserRole).get('path'))
+
         old_name = item_data['name']
         new_name = item.text(column)
-        if old_name != new_name:
-            parent_item = item.parent()
-            parent_item_path = Path(parent_item.data(0, Qt.ItemDataRole.UserRole).get('path'))
-            
-            old_item_path = Path(item_data['path'])
-            new_item_path = parent_item_path / new_name
-            old_item_path.rename(new_item_path)
+        old_item_path = Path(item_data['path'])
+        new_item_path = parent_item_path / new_name
 
-            item.setText(0, new_name)
-            item_data['name'] = new_name
-            item_data['path'] = str(new_item_path)
-            item.setData(0, Qt.ItemDataRole.UserRole, item_data)
-            
-            # if self.__is_searching:
-            #     self.search_items(self.__search_text)
+        if old_name == new_name or not new_name.strip() or not new_item_path.suffix:
+            item.setText(0, old_name)
+            return
+
+        # Can't change the suffix.
+        if old_item_path.suffix != new_item_path.suffix:
+            item.setText(0, old_name)
+            QMessageBox.information(self, '不可操作', '无法在编辑器中修改文件后缀名！')
+            return
+
+        old_item_path.rename(new_item_path)
+
+        item.setText(0, new_name)
+        item_data['name'] = new_name
+        item_data['path'] = str(new_item_path)
+        item.setData(0, Qt.ItemDataRole.UserRole, item_data)
+        
+        # if self.__is_searching:
+        #     self.search_items(self.__search_text)
 
     def __on_item_expanded(self, item):
         item_data = item.data(0, Qt.ItemDataRole.UserRole)
@@ -164,8 +184,18 @@ class AssetTreeWidget(QTreeWidget):
         else:
             return copy.deepcopy(DEFAULT_OTHER_FILE_ITEM_DATA)
 
+    def __iter_sorted(self, path):
+        # Get all folders and sort them.
+        directories = [d for d in path.iterdir() if d.is_dir()]
+        directories.sort(key=lambda x: x.name.lower())
+        
+        # Get all files and sort them.
+        files = [f for f in path.iterdir() if f.is_file()]
+        files.sort(key=lambda x: x.name.lower())
+        
+        return directories + files
+    
     def __load_subdirectories(self, item):
-        # 要放在__on_item_expanded槽函数中
         # Remove the placeholder item.
         if item.childCount() == 1 and item.child(0).text(0) == '正在加载...':
             item.takeChild(0)
@@ -173,11 +203,11 @@ class AssetTreeWidget(QTreeWidget):
         item_data = item.data(0, Qt.ItemDataRole.UserRole)
         folder_path = Path(item_data['path'])
         
-        for entry in folder_path.iterdir():
+        for entry in self.__iter_sorted(folder_path):
             exists = False
             for i in range(item.childCount()):
-                child = item.child(i)
-                if child.data(0, Qt.ItemDataRole.UserRole).get('path') == str(entry):
+                child_item = item.child(i)
+                if child_item.data(0, Qt.ItemDataRole.UserRole).get('path') == str(entry):
                     exists = True
                     break
         
@@ -231,6 +261,7 @@ class AssetTreeWidget(QTreeWidget):
         item_data = copy.deepcopy(DEFAULT_FOLDER_ITEM_DATA)
 
         parent_item = self.__get_parent_for_new_item()
+        parent_item.setExpanded(True)
         parent_item_path = Path(parent_item.data(0, Qt.ItemDataRole.UserRole).get('path'))
 
         # Make sure the created folder name is different.
@@ -247,10 +278,9 @@ class AssetTreeWidget(QTreeWidget):
         item.setData(0, Qt.ItemDataRole.UserRole, item_data)
         item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
 
-        index = self.__get_insert_index_by_name(parent_item, item_data['name'])
+        index = self.__get_insert_index_by_name(parent_item, item_data['name'], item_data['type'])
         parent_item.insertChild(index, item)
-        parent_item.setExpanded(True)
-        self.setCurrentItem(item)
+        self.__hightlight_item(item)
         self.scrollToItem(item)
 
     def __create_file(self, item_type):
@@ -264,6 +294,7 @@ class AssetTreeWidget(QTreeWidget):
             item_data = copy.deepcopy(DEFAULT_FILE_JSON_ITEM_DATA)
 
         parent_item = self.__get_parent_for_new_item()
+        parent_item.setExpanded(True)
         parent_item_path = Path(parent_item.data(0, Qt.ItemDataRole.UserRole).get('path'))
 
         # Make sure the created file name is different.
@@ -280,10 +311,9 @@ class AssetTreeWidget(QTreeWidget):
         item.setData(0, Qt.ItemDataRole.UserRole, item_data)
         item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
 
-        index = self.__get_insert_index_by_name(parent_item, item_data['name'])
+        index = self.__get_insert_index_by_name(parent_item, item_data['name'], item_data['type'])
         parent_item.insertChild(index, item)
-        parent_item.setExpanded(True)
-        self.setCurrentItem(item)
+        self.__hightlight_item(item)
         self.scrollToItem(item)
 
     def __rename_item(self):
@@ -409,6 +439,7 @@ class AssetTreeWidget(QTreeWidget):
             return
 
         parent_item = self.__get_parent_for_new_item()
+        parent_item.setExpanded(True)
 
         for item in self.__clipboard_items:
             new_item = self.__deep_copy_item(item)
@@ -427,9 +458,9 @@ class AssetTreeWidget(QTreeWidget):
             new_item.setText(0, target_name)
             new_item.setData(0, Qt.ItemDataRole.UserRole, item_data)
 
-            index = self.__get_insert_index_by_name(parent_item, target_name)        
+            index = self.__get_insert_index_by_name(parent_item, target_name, item_data['type'])        
             parent_item.insertChild(index, new_item)
-            parent_item.setExpanded(True)
+            self.__hightlight_item(new_item)
             self.scrollToItem(new_item)
 
             self.__restore_expanded_items(new_item)
@@ -495,13 +526,40 @@ class AssetTreeWidget(QTreeWidget):
         timeline.finished.connect(animation_finished)
         timeline.start()
 
-    def __get_insert_index_by_name(self, parent_item, new_item_name):
+    def __get_insert_index_by_name(self, parent_item, new_item_name, new_item_type):
+        directory_item_names = []
         for i in range(parent_item.childCount()):
             item = parent_item.child(i)
+            if item.text(0) == '正在加载...':
+                continue
             item_name = item.text(0)
-            if item_name > new_item_name:
-                return i
-        return parent_item.childCount()
+            item_type = item.data(0, Qt.ItemDataRole.UserRole)['type']
+            if item_type == ITEM_FOLDER:
+                directory_item_names.append(item_name)
+
+        file_item_names = []
+        for i in range(parent_item.childCount()):
+            item = parent_item.child(i)
+            if item.text(0) == '正在加载...':
+                continue
+            item_name = item.text(0)
+            item_type = item.data(0, Qt.ItemDataRole.UserRole)['type']
+            if item_type != ITEM_FOLDER:
+                file_item_names.append(item_name)
+
+        if new_item_type == ITEM_FOLDER:
+            for i, name in enumerate(directory_item_names):
+                if name.lower() > new_item_name.lower():
+                    return i
+            
+            return len(directory_item_names)
+
+        else:
+            for i, name in enumerate(file_item_names):
+                if name.lower() > new_item_name.lower():
+                    return i+len(directory_item_names)
+                
+            return len(file_item_names)+len(directory_item_names)
     
     def __get_unique_path(self, name, parent_item_path):
         num = 0
@@ -525,6 +583,7 @@ class AssetTreeWidget(QTreeWidget):
                 continue
             new_item = self.__deep_copy_item(item)
             parent_item = item.parent()
+            parent_item.setExpanded(True)
 
             item_data = new_item.data(0, Qt.ItemDataRole.UserRole)
             source_path = Path(item_data['path'])
@@ -537,9 +596,9 @@ class AssetTreeWidget(QTreeWidget):
             new_item.setText(0, target_name)
             new_item.setData(0, Qt.ItemDataRole.UserRole, item_data)
 
-            index = self.__get_insert_index_by_name(parent_item, target_name)        
+            index = self.__get_insert_index_by_name(parent_item, target_name, item_data['type'])        
             parent_item.insertChild(index, new_item)
-            parent_item.setExpanded(True)
+            self.__hightlight_item(new_item)
             self.scrollToItem(new_item)
 
             self.__restore_expanded_items(new_item)
@@ -556,8 +615,155 @@ class AssetTreeWidget(QTreeWidget):
         item_data = self.currentItem().data(0, Qt.ItemDataRole.UserRole)
         QApplication.clipboard().setText(item_data['name'])
 
+    def __open_in_terminal(self):
+        selected_items = self.selectedItems()
+        target_item = selected_items[-1] if selected_items else self.__root_item
+        target_item_path = Path(target_item.data(0, Qt.ItemDataRole.UserRole)['path'])
+        if not target_item_path.is_dir():
+            target_item_path = target_item_path.parent
+
+        system = platform.system()
+        if system == 'Windows':
+            subprocess.Popen(f'start cmd /k "cd /d {target_item_path}"', shell=True)
+        elif system == 'Darwin':
+            subprocess.Popen(['open', '-a', 'Terminal', target_item_path])
+        elif system == 'Linux':
+            try:
+                subprocess.Popen(['gnome-terminal', '--working-directory', target_item_path])
+            except:
+                QMessageBox.information(self, '提示', '不支持的操作系统')
+        else:
+            QMessageBox.information(self, '提示', '不支持的操作系统')
+
+    def __open_externally(self):
+        """Open with VS Code by default. If it's not installed, open with txt."""
+        selected_items = self.selectedItems()
+        target_item = selected_items[-1] if selected_items else self.__root_item
+        target_item_path = target_item.data(0, Qt.ItemDataRole.UserRole)['path']
+
+        # VS Code's install path should be configured in the settings. If not, open the file with txt.
+        system = platform.system()
+        if system == 'Windows':
+            subprocess.Popen(['notepad', target_item_path])
+            # subprocess.Popen(['code', target_item_path])
+        elif system == 'Darwin':
+            subprocess.Popen(['open', '-a', 'TextEdit', target_item_path])
+            # subprocess.Popen(['open', '-a', 'Visual Studio Code', target_item_path])
+
+        elif system == 'Linux':
+            # subprocess.Popen(['code', target_item_path])
+            try:
+                subprocess.Popen(['gedit', target_item_path])
+                print("使用gedit打开")
+            except FileNotFoundError:
+                subprocess.Popen(['xdg-open', target_item_path])
+        else:
+            QMessageBox.information(self, '提示', '不支持的操作系统')
+            
+    def __show_in_explorer(self):
+        selected_items = self.selectedItems()
+        target_item = selected_items[-1] if selected_items else self.__root_item
+        target_item_path = target_item.data(0, Qt.ItemDataRole.UserRole)['path']
+    
+        system = platform.system()
+        if system == 'Windows':
+            subprocess.run(['explorer', target_item_path])
+        elif system == 'Darwin':
+            subprocess.run(['open', target_item_path])
+        elif system == 'Linux':
+            subprocess.run(["xdg-open", target_item_path])
+        else:
+            QMessageBox.information(self, '提示', '不支持的操作系统')
+
     def get_clipboard_items(self):
         return self.__clipboard_items
+    
+    def get_hover_item_in_drag_move(self):
+        return self.__hover_item_in_drag_move
+    
+    def dragEnterEvent(self, event):
+        event.acceptProposedAction()
+
+    def dragMoveEvent(self, event):
+        self.__hover_item_in_drag_move = self.itemAt(event.pos())
+
+        # Trigger deletegate's paint event.
+        self.viewport().update()
+        return super().dragMoveEvent(event)
+    
+    def dropEvent(self, event):
+        self.__hover_item_in_drag_move = None
+        self.viewport().update()
+
+        parent_item = self.itemAt(event.pos())
+        if not parent_item:
+            parent_item  = self.__root_item
+        elif parent_item and parent_item != self.__root_item and parent_item.data(0, Qt.ItemDataRole.UserRole)['type'] != ITEM_FOLDER:
+            parent_item = parent_item.parent()
+    
+        parent_item_path = Path(parent_item.data(0, Qt.ItemDataRole.UserRole)['path'])
+        parent_item.setExpanded(True)
+
+        urls = event.mimeData().urls()
+        if urls:
+            # parent_item.setExpanded(True)
+
+            for url in urls:
+                source_path = Path(url.toLocalFile())
+                _, target_path = self.__get_unique_path(source_path.name, parent_item_path)
+                shutil.copytree(source_path, target_path) if source_path.is_dir() else shutil.copy2(source_path, target_path)
+
+                item_data = self.__get_item_data_by_path(target_path)
+                item_id = str(uuid.uuid4())
+                item_data['uuid'] = item_id
+                item_data['name'] = target_path.name
+                item_data['path'] = str(target_path)
+
+                item = QTreeWidgetItem()
+                item.setText(0, target_path.name)
+                item.setIcon(0, QIcon(item_data['icon']))
+                item.setData(0, Qt.ItemDataRole.UserRole, item_data)
+                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+                
+                index = self.__get_insert_index_by_name(parent_item, item_data['name'], item_data['type'])        
+                parent_item.insertChild(index, item)
+                self.__hightlight_item(item)
+                self.scrollToItem(item)
+
+                # If the folder is not empty, add a placeholder item to show the expand triangle.
+                if source_path.is_dir() and any(source_path.iterdir()):
+                    self.__add_placeholder(item)
+
+        else:
+            source_items = self.selectedItems()
+            source_item_filtered = [item for item in source_items if item != self.__root_item and item.parent() != parent_item]
+            
+            if not source_item_filtered:
+                event.ignore()
+                return
+
+            for item in source_item_filtered:
+                new_item = self.__deep_copy_item(item)
+                item_data = new_item.data(0, Qt.ItemDataRole.UserRole)
+                source_path = Path(item_data['path'])
+                parent_item_path = Path(parent_item.data(0, Qt.ItemDataRole.UserRole).get('path'))
+                target_name, target_path = self.__get_unique_path(item_data['name'], parent_item_path)
+                
+                shutil.move(source_path, target_path)
+                    
+                item_data['name'] = target_name
+                item_data['path'] = str(target_path)
+                new_item.setText(0, target_name)
+                new_item.setData(0, Qt.ItemDataRole.UserRole, item_data)
+
+                index = self.__get_insert_index_by_name(parent_item, target_name, item_data['type'])        
+                parent_item.insertChild(index, new_item)
+                self.__hightlight_item(new_item)
+                self.scrollToItem(new_item)
+
+                self.__restore_expanded_items(new_item)
+
+            self.__delete_items(source_item_filtered, False)
     
     def keyPressEvent(self, event):
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:

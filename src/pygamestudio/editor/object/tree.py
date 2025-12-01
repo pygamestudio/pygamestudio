@@ -555,22 +555,28 @@ class ObjectTreeWidget(QTreeWidget):
 
     def dropEvent(self, event):
         # Rewirte the drop event. The logic is like cut and paste.
-        source_items = self.selectedItems()
         parent_item = self.itemAt(event.pos())
         if not parent_item:
             parent_item  = self.__root_item
 
-        drop_items = []
-        for item in source_items:
-            if item == self.__root_item:
-                continue
-            copied_item = self.__deep_copy_item(item)
-            drop_items.append(copied_item)
+        source_items = self.selectedItems()
+        source_item_filtered = [item for item in source_items if item != self.__root_item and item.parent() != parent_item]
+
+        if not source_item_filtered:
+            event.ignore()
+            return
+
+        # drop_items = []
+        # for item in source_items:
+        #     if item == self.__root_item:
+        #         continue
+        #     copied_item = self.__deep_copy_item(item)
+        #     drop_items.append(copied_item)
         
         self.__undo_stack.beginMacro('Paste')
         composite_command = CompositeCommand('Added item')
 
-        for item in drop_items:
+        for item in source_item_filtered:
             new_item = self.__deep_copy_item(item)
             parent_item.addChild(new_item)
             parent_item.setExpanded(True)
@@ -579,7 +585,7 @@ class ObjectTreeWidget(QTreeWidget):
 
         self.__undo_stack.push(composite_command)
 
-        self.__delete_items(source_items, False)
+        self.__delete_items(source_item_filtered, False)
         self.__undo_stack.endMacro()
 
     def keyPressEvent(self, event):
