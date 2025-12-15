@@ -21,9 +21,9 @@ class ContextMenu(QMenu):
 
     def __init__(self, title='', parent=None):
         super().__init__(title, parent)
-        self.__parent = parent
+        self.__tree_view = parent
 
-    def __add_actions(self, item_type, is_root_item=False):
+    def __add_actions(self, index_type):
         edit_action = QAction('编辑', self)
         create_folder_action = QAction('文件夹', self)
         create_script_action = QAction('脚本', self)
@@ -44,11 +44,11 @@ class ContextMenu(QMenu):
         show_in_explorer_action = QAction('在文件管理器中显示', self)
 
         edit_action.triggered.connect(self.open_externally_signal.emit)
-        create_folder_action.triggered.connect(lambda: self.create_signal.emit(ITEM_FOLDER))
-        create_script_action.triggered.connect(lambda: self.create_signal.emit(ITEM_SCRIPT))
-        create_scene_action.triggered.connect(lambda: self.create_signal.emit(ITEM_SCENE))
-        create_txt_action.triggered.connect(lambda: self.create_signal.emit(ITEM_TXT))
-        create_json_action.triggered.connect(lambda: self.create_signal.emit(ITEM_JSON))
+        create_folder_action.triggered.connect(lambda: self.create_signal.emit(INDEX_FOLDER))
+        create_script_action.triggered.connect(lambda: self.create_signal.emit(INDEX_SCRIPT))
+        create_scene_action.triggered.connect(lambda: self.create_signal.emit(INDEX_SCENE))
+        create_txt_action.triggered.connect(lambda: self.create_signal.emit(INDEX_TXT))
+        create_json_action.triggered.connect(lambda: self.create_signal.emit(INDEX_JSON))
         cut_action.triggered.connect(self.cut_signal.emit)
         copy_action.triggered.connect(self.copy_signal.emit)
         paste_action.triggered.connect(self.paste_signal.emit)
@@ -65,7 +65,7 @@ class ContextMenu(QMenu):
         create_menu = QMenu(title='创建')
         text_file_sub_menu = QMenu(title='文本文件')
 
-        # Create actions are for all item types.
+        # Create actions are for all index types.
         self.addMenu(create_menu)
         create_menu.addAction(create_folder_action)
         create_menu.addAction(create_script_action)
@@ -75,14 +75,14 @@ class ContextMenu(QMenu):
         create_menu.addMenu(text_file_sub_menu)
 
         # Right click on the blank area.
-        if item_type is None or is_root_item:
+        if index_type == INDEX_INVALID:
             self.addSeparator()
             self.addAction(paste_action)
             self.addSeparator()
             self.addAction(open_in_terminal_action)
             self.addAction(show_in_explorer_action)
 
-        # Right click on the folder or file item.
+        # Right click on the folder or file index.
         else:
             self.addSeparator()
             self.addAction(cut_action)
@@ -105,8 +105,8 @@ class ContextMenu(QMenu):
             self.addAction(open_in_terminal_action)
             self.addAction(show_in_explorer_action)
 
-        # Right click on the specific file item.
-        if item_type != None and item_type != ITEM_FOLDER:
+        # Right click on the specific file index.
+        if index_type == INDEX_FILE:
             self.insertAction(create_menu.menuAction(), edit_action)
             self.insertSeparator(create_menu.menuAction())
             self.insertAction(show_in_explorer_action, open_externally_action)
@@ -114,12 +114,12 @@ class ContextMenu(QMenu):
         self.__set_paste_action_status(paste_action)
 
     def __set_paste_action_status(self, paste_action):
-        if self.__parent.get_clipboard_items():
+        if self.__tree_view.get_clipboard_content():
             paste_action.setEnabled(True)
         else:
             paste_action.setEnabled(False)
         
-    def show(self, pos, item_type, is_root_item):
+    def show(self, pos, index_type):
         self.clear()
-        self.__add_actions(item_type, is_root_item)
+        self.__add_actions(index_type)
         self.exec(pos)

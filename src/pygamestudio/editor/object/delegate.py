@@ -51,7 +51,7 @@ class ObjectTreeWidgetDelegate(QStyledItemDelegate):
         return pixmap_rect.contains(pos)
     
     def sizeHint(self, option, index):
-        if self.__parent.match_items_after_search and index not in self.__parent.match_items_after_search:
+        if self.__parent.get_match_items() and index not in self.__parent.get_match_items():
             return QSize(0, 0)
         return super().sizeHint(option, index)
 

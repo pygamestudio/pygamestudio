@@ -29,7 +29,7 @@ class ObjectTreeWidget(QTreeWidget):
 
         self.__search_text = ''
         self.__is_searching = False
-        self.match_items_after_search = []
+        self.__match_items_after_search = []
         self.__original_indentation = self.indentation()
 
         self.__root_item = None
@@ -358,6 +358,21 @@ class ObjectTreeWidget(QTreeWidget):
                 if item.childCount() > 0:
                     self.__restore_expanded_items(item)
 
+    def __restore_collapsed_items(self, parent_item):
+        parent_item_data = parent_item.data(0, Qt.ItemDataRole.UserRole)
+        if not parent_item_data['isExpanded']:
+            parent_item.setExpanded(False)
+                
+        for i in range(parent_item.childCount()):
+            item = parent_item.child(i)
+            item_data = item.data(0, Qt.ItemDataRole.UserRole)
+            
+            if not item_data['isExpanded']:
+                item.setExpanded(False)
+
+            if item.childCount() > 0:
+                self.__restore_collapsed_items(item)
+
     def __hightlight_item(self, item):
         """Highlight item for some actions, e.g., copy action."""
         original_fg = item.foreground(0)
@@ -419,13 +434,17 @@ class ObjectTreeWidget(QTreeWidget):
     #         self.__update_children_visibility_appearance(item)
 
     def __find_match_items(self, search_text):
+        self.blockSignals(True)
+        self.expandAll()
+        self.blockSignals(False)
+    
         def match_item(item):
             item_data = item.data(0, Qt.ItemDataRole.UserRole)
             item_name = item_data['name'].lower()
             item_uuid = item_data['uuid'].lower()
             if search_text in item_name or search_text in item_uuid:
                 index = self.indexFromItem(item)
-                self.match_items_after_search.append(index)
+                self.__match_items_after_search.append(index)
 
                 # The size hint event only triggers at the creation of an item, 
                 # so we need to trigger it actively to reset the size of unmatched items.
@@ -437,8 +456,11 @@ class ObjectTreeWidget(QTreeWidget):
         match_item(self.__root_item)
 
     def __clear_match_items(self):
-        self.match_items_after_search = []
+        self.__match_items_after_search = []
 
+    def get_match_items(self):
+        return self.__match_items_after_search
+    
     def toggle_item_visibility_on_scene(self, item):
         item_data = item.data(0, Qt.ItemDataRole.UserRole)
         old_is_visible = item_data['isVisible']
@@ -519,6 +541,7 @@ class ObjectTreeWidget(QTreeWidget):
             self.setIndentation(self.__original_indentation)
             self.setRootIsDecorated(True)
             self.__is_searching = False
+            self.__restore_collapsed_items(self.__root_item)
             return
         
         self.__is_searching = True

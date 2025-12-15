@@ -1,1 +1,4 @@
-print('  '.strip() == True)
+a = [1]
+b = a
+a = []
+print(b)

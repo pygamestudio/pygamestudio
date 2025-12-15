@@ -4,7 +4,7 @@ sys.path.insert(0, 'D:\\Github\\pygamestudio\\src')
 # print(os.path.join(os.path.dirname(__file__)))
 
 from pygamestudio.editor.object.window import ObjectManagerWindow
-from pygamestudio.editor.asset.tree import AssetTreeWidget
+from pygamestudio.editor.asset.window import AssetWindow
 
 from PySide6.QtWidgets import QApplication
 import sys
@@ -14,8 +14,8 @@ app = QApplication(sys.argv)
 # # 设置应用程序样式
 # # app.setStyle("Fusion")
 
-# window = ObjectManagerWindow()
-window = AssetTreeWidget()
+window = AssetWindow()
+# window = AssetTreeView()
 window.show()
 
 sys.exit(app.exec())

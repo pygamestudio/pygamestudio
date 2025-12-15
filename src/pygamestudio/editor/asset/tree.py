@@ -1,12 +1,12 @@
-from PySide6.QtWidgets import QApplication, QTreeWidget, QMessageBox, QTreeWidgetItem, QAbstractItemView, QHeaderView, QInputDialog
-from PySide6.QtCore import Qt, QTimeLine, QSize, Signal
-from PySide6.QtGui import QIcon, QColor, QUndoStack
+from PySide6.QtWidgets import *
+from PySide6.QtCore import *
+from PySide6.QtGui import *
 
 from pygamestudio.editor.asset.menu import ContextMenu
 from pygamestudio.editor.asset.command import *
+from pygamestudio.editor.asset.model import *
 
 from pygamestudio.editor.asset.delegate import AssetTreeWidgetDelegate
-from pygamestudio.editor.asset.search import SEARCH_BY_NAME, SEARCH_BY_UUID
 from pygamestudio.editor.asset.data import *
 from pygamestudio.editor.asset.type import *
 from pathlib import Path
@@ -19,40 +19,52 @@ import os
 
 
 
-class AssetTreeWidget(QTreeWidget):
+class AssetTreeView(QTreeView):
     trigger_search_signal = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.__undo_stack = QUndoStack(self)
-
+        self.__proxy_model = AssetSortFilterProxyModel(self)
         self.__delegate = AssetTreeWidgetDelegate(self)
-
-        self.__initial_path = Path('C:/Users/louis/Desktop/demo')
-        
-        self.__clipboard_items = []
-        self.__is_cut_action = False
-        self.__items_to_delete_by_cut = []
-
-        self.__root_item = None
+        self.__file_model = AssetFileSystemModel(self)
         self.__context_menu = ContextMenu('', self)
 
-        self.__hover_item_in_drag_move = None
+        self.__root_path = 'C:/Users/louis/Desktop/demo'    # 项目配置文件
+        self.__sort_type = SORT_BY_NAME_ASC     # 项目配置文件
+        self.__clipboard_content = []
+        self.__is_cut = False
+        self.__expand_state = {}
+
+        self.__highlight_indexes_paths = []
 
 
         self.__set_up()
-    
+
     def __set_up(self):
         self.__set_widget()
         self.__set_signal()
-        self.__load_file_system()
 
     def __set_widget(self):
+        self.__file_model.setReadOnly(False)
+        self.__file_model.setRootPath(self.__root_path)
+        self.__file_model.setFilter(QDir.Filter.Dirs | QDir.Filter.Files | QDir.Filter.NoDotAndDotDot)
+        
+        self.__proxy_model.setFilterKeyColumn(0)
+        self.__proxy_model.setDynamicSortFilter(True)
+        self.__proxy_model.setSourceModel(self.__file_model)
+        self.__proxy_model.setRecursiveFilteringEnabled(True)
+        self.__proxy_model.sort(0, Qt.SortOrder.AscendingOrder)  # 项目配置文件
+        self.__proxy_model.setFilterCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        
+        self.setModel(self.__proxy_model)
+        self.setRootIndex(self.__proxy_model.mapFromSource(self.__file_model.index(self.__root_path)))
+        for i in range(1, self.__file_model.columnCount()):
+            self.hideColumn(i)
+        
         self.setItemDelegate(self.__delegate)
         self.setAcceptDrops(True)
         self.setDragEnabled(True)
         self.setHeaderHidden(True)
-        # self.setMouseTracking(True)
         self.setDropIndicatorShown(True)
         self.setDefaultDropAction(Qt.DropAction.MoveAction)
         self.setDragDropMode(QTreeWidget.DragDropMode.InternalMove)
@@ -62,505 +74,202 @@ class AssetTreeWidget(QTreeWidget):
 
     def __set_signal(self):
         self.customContextMenuRequested.connect(self.__show_context_menu)
-        self.itemChanged.connect(self.__on_item_changed)
-        self.itemExpanded.connect(self.__on_item_expanded)
-        self.itemCollapsed.connect(self.__on_item_collapsed)
 
-        self.__context_menu.create_signal.connect(self.__create_item)
-        self.__context_menu.cut_signal.connect(self.__cut_items)
-        self.__context_menu.copy_signal.connect(self.__copy_items)
-        self.__context_menu.paste_signal.connect(self.__paste_items)
-        self.__context_menu.delete_signal.connect(self.__delete_items)
-        self.__context_menu.rename_signal.connect(self.__rename_item)
-        self.__context_menu.duplicate_signal.connect(self.__duplicate_items)
-        self.__context_menu.copy_uuid_signal.connect(self.__copy_item_uuid)
-        self.__context_menu.copy_path_signal.connect(self.__copy_item_path)
-        self.__context_menu.copy_name_signal.connect(self.__copy_item_name)
+        self.__context_menu.create_signal.connect(self.__create)
+        self.__context_menu.cut_signal.connect(self.__cut)
+        self.__context_menu.copy_signal.connect(self.__copy)
+        self.__context_menu.paste_signal.connect(self.__paste)
+        self.__context_menu.delete_signal.connect(self.__delete)
+        self.__context_menu.rename_signal.connect(self.__rename)
+        self.__context_menu.duplicate_signal.connect(self.__duplicate)
+        # self.__context_menu.copy_uuid_signal.connect(self.__copy_item_uuid)
+        self.__context_menu.copy_path_signal.connect(self.__copy_path)
+        self.__context_menu.copy_name_signal.connect(self.__copy_name)
         self.__context_menu.open_in_terminal_signal.connect(self.__open_in_terminal)
         self.__context_menu.open_externally_signal.connect(self.__open_externally)
         self.__context_menu.show_in_explorer_signal.connect(self.__show_in_explorer)
 
     def __show_context_menu(self, pos):
-        item = self.itemAt(pos)
+        index = self.indexAt(pos)
         global_pos = self.mapToGlobal(pos)
-        
-        item_type = item.data(0, Qt.ItemDataRole.UserRole).get('type') if item else None
-        is_root_item = item.data(0, Qt.ItemDataRole.UserRole).get('isRootItem') if item else True
-        self.__context_menu.show(global_pos, item_type, is_root_item)
 
-    def __on_item_changed(self, item, column):
-        item_data = item.data(column, Qt.ItemDataRole.UserRole)
-        if not item_data:
-            return
-        
-        parent_item = item.parent()
-        parent_item_path = Path(parent_item.data(0, Qt.ItemDataRole.UserRole).get('path'))
-
-        old_name = item_data['name']
-        new_name = item.text(column)
-        old_item_path = Path(item_data['path'])
-        new_item_path = parent_item_path / new_name
-
-        if old_name == new_name or not new_name.strip() or not new_item_path.suffix:
-            item.setText(0, old_name)
-            return
-
-        # Can't change the suffix.
-        if old_item_path.suffix != new_item_path.suffix:
-            item.setText(0, old_name)
-            QMessageBox.information(self, '不可操作', '无法在编辑器中修改文件后缀名！')
-            return
-
-        old_item_path.rename(new_item_path)
-
-        item.setText(0, new_name)
-        item_data['name'] = new_name
-        item_data['path'] = str(new_item_path)
-        item.setData(0, Qt.ItemDataRole.UserRole, item_data)
-        
-        # if self.__is_searching:
-        #     self.search_items(self.__search_text)
-
-    def __on_item_expanded(self, item):
-        item_data = item.data(0, Qt.ItemDataRole.UserRole)
-
-        # Push an expand command and update the item data.
-        if item_data['isExpanded'] == False:
-            item.setExpanded(True)
-            item_data['isExpanded'] = True
-            item.setData(0, Qt.ItemDataRole.UserRole, item_data)
-            self.__load_subdirectories(item)
-
-    def __on_item_collapsed(self, item):
-        item_data = item.data(0, Qt.ItemDataRole.UserRole)
-
-        # Push a collapse command and update the item data.
-        if item_data['isExpanded'] == True:
-            item.setExpanded(False)
-            item_data['isExpanded'] = False
-            item.setData(0, Qt.ItemDataRole.UserRole, item_data)
-            self.__load_subdirectories(item)
-
-    def __set_root_item(self):
-        item_data = copy.deepcopy(DEFAULT_FOLDER_ITEM_DATA)
-        item_id = str(uuid.uuid4())
-        item_data['uuid'] = item_id
-        item_data['isRootItem'] = True
-        item_data['isExpanded'] = True
-        item_data['name'] = self.__initial_path.name
-        item_data['path'] = str(self.__initial_path)
-
-        self.__root_item = QTreeWidgetItem()
-        self.__root_item.setText(0, item_data['name'])
-        self.__root_item.setIcon(0, QIcon(item_data['icon']))
-        self.__root_item.setData(0, Qt.ItemDataRole.UserRole, item_data)
-        self.__root_item.setFlags(self.__root_item.flags() & ~Qt.ItemFlag.ItemIsDragEnabled)
-        
-        self.addTopLevelItem(self.__root_item)
-        self.__root_item.setExpanded(True)
-
-    def __load_file_system(self):
-        self.clear()
-        self.__set_root_item()
-        self.__add_placeholder(self.__root_item)
-        self.__load_subdirectories(self.__root_item)
-
-    def __add_placeholder(self, item):
-        placeholder = QTreeWidgetItem()
-        placeholder.setText(0, '正在加载...')
-        item.addChild(placeholder)
-
-    def __get_item_data_by_path(self, path):
-        if path.is_dir():
-            return copy.deepcopy(DEFAULT_FOLDER_ITEM_DATA)
-        elif path.suffix.lower() == ITEM_SCENE:
-            return copy.deepcopy(DEFAULT_FILE_SCENE_ITEM_DATA)
-        elif path.suffix.lower() == ITEM_SCRIPT:
-            return copy.deepcopy(DEFAULT_FILE_SCRIPT_ITEM_DATA)
-        elif path.suffix.lower() == ITEM_TXT:
-            return copy.deepcopy(DEFAULT_FILE_TXT_ITEM_DATA)
-        elif path.suffix.lower() == ITEM_JSON:
-            return copy.deepcopy(DEFAULT_FILE_JSON_ITEM_DATA)
+        if not index.isValid():
+            index_type = INDEX_INVALID
+        elif self.__file_model.isDir(self.__proxy_model.mapToSource(index)):
+            index_type = INDEX_FOLDER
         else:
-            return copy.deepcopy(DEFAULT_OTHER_FILE_ITEM_DATA)
+            index_type = INDEX_FILE
 
-    def __iter_sorted(self, path):
-        # Get all folders and sort them.
-        directories = [d for d in path.iterdir() if d.is_dir()]
-        directories.sort(key=lambda x: x.name.lower())
+        self.__context_menu.show(global_pos, index_type)
+
+    def __get_parent_index_for_creation(self):
+        selected_indexes = self.selectedIndexes()
+        if not selected_indexes:
+            return self.rootIndex()
         
-        # Get all files and sort them.
-        files = [f for f in path.iterdir() if f.is_file()]
-        files.sort(key=lambda x: x.name.lower())
+        parent_index = selected_indexes[-1]
         
-        return directories + files
+        if not self.__file_model.isDir(self.__proxy_model.mapToSource(parent_index)):
+            parent_index = parent_index.parent()
+        
+        return parent_index
     
-    def __load_subdirectories(self, item):
-        # Remove the placeholder item.
-        if item.childCount() == 1 and item.child(0).text(0) == '正在加载...':
-            item.takeChild(0)
+    def create(self, index_type):
+        return self.__create(index_type)
+    
+    def __create(self, index_type):
+        self.__highlight_indexes_paths = []
 
-        item_data = item.data(0, Qt.ItemDataRole.UserRole)
-        folder_path = Path(item_data['path'])
-        
-        for entry in self.__iter_sorted(folder_path):
-            exists = False
-            for i in range(item.childCount()):
-                child_item = item.child(i)
-                if child_item.data(0, Qt.ItemDataRole.UserRole).get('path') == str(entry):
-                    exists = True
-                    break
-        
-            if exists:
-                continue
-            
-            item_data = self.__get_item_data_by_path(entry)
-            item_id = str(uuid.uuid4())
-            item_data['uuid'] = item_id
-            item_data['name'] = entry.name
-            item_data['path'] = str(entry)
-
-            child_item = QTreeWidgetItem()
-            child_item.setText(0, entry.name)
-            child_item.setIcon(0, QIcon(item_data['icon']))
-            child_item.setData(0, Qt.ItemDataRole.UserRole, item_data)
-            child_item.setFlags(child_item.flags() | Qt.ItemFlag.ItemIsEditable)
-            item.addChild(child_item)
-
-            # If the folder is not empty, add a placeholder item to show the expand triangle.
-            if entry.is_dir() and any(entry.iterdir()):
-                self.__add_placeholder(child_item)
-
-    def __refresh_tree(self):
-        self.load_file_system()
-
-    def __get_parent_for_new_item(self):
-        selected_items = self.selectedItems()
-        if not selected_items:
-            return self.__root_item
-        
-        parent_item = selected_items[-1]
-        parent_item_path = Path(parent_item.data(0, Qt.ItemDataRole.UserRole).get('path'))
-        
-        if not parent_item_path.is_dir():
-            parent_item = parent_item.parent()
-        
-        return parent_item if parent_item else self.__root_item
-
-    def __create_item(self, item_type):
-        if item_type == ITEM_FOLDER:
+        if index_type == INDEX_FOLDER:
             self.__create_folder()
         else:
-            self.__create_file(item_type)
-
-        # # If it is druing search, search again after creating a new item.
-        # if self.__is_searching:
-        #     self.search_items(self.__search_text, self.__search_type)
+            self.__create_file(index_type)
 
     def __create_folder(self):
-        item_data = copy.deepcopy(DEFAULT_FOLDER_ITEM_DATA)
+        parent_index = self.__get_parent_index_for_creation()
+        self.setExpanded(parent_index, True)
+        parent_path = Path(self.__file_model.filePath(self.__proxy_model.mapToSource(parent_index)))
 
-        parent_item = self.__get_parent_for_new_item()
-        parent_item.setExpanded(True)
-        parent_item_path = Path(parent_item.data(0, Qt.ItemDataRole.UserRole).get('path'))
+        # Make sure the created folder name does not exist in the current directory.
+        new_folder_name = INDEX_FOLDER
+        folder_path = self.__get_unique_path(new_folder_name, parent_path)
+        folder_path.mkdir()
+        QTimer().singleShot(0.5, lambda:self.scrollTo(self.__proxy_model.mapFromSource(self.__file_model.index(str(folder_path)))))
 
-        # Make sure the created folder name is different.
-        folder_name, folder_path = self.__get_unique_path(item_data['name'], parent_item_path)
-        folder_path.mkdir(exist_ok=False)
+        self.__highlight_indexes_paths.append(folder_path)
 
-        item_data['name'] = folder_name
-        item_data['uuid'] = str(uuid.uuid4())
-        item_data['path'] = str(folder_path)
+    def __create_file(self, index_type):
+        parent_index = self.__get_parent_index_for_creation()
+        self.setExpanded(parent_index, True)
+        parent_path = Path(self.__file_model.filePath(self.__proxy_model.mapToSource(parent_index)))
 
-        item = QTreeWidgetItem()
-        item.setText(0, item_data['name'])
-        item.setIcon(0, QIcon(item_data['icon']))
-        item.setData(0, Qt.ItemDataRole.UserRole, item_data)
-        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+        # Make sure the created file name does not exist in the current directory.
+        new_file_name = index_type
+        file_path = self.__get_unique_path(new_file_name, parent_path)
+        file_path.touch()
 
-        index = self.__get_insert_index_by_name(parent_item, item_data['name'], item_data['type'])
-        parent_item.insertChild(index, item)
-        self.__hightlight_item(item)
-        self.scrollToItem(item)
+        QTimer().singleShot(0.5, lambda:self.scrollTo(self.__proxy_model.mapFromSource(self.__file_model.index(str(file_path)))))
+        self.__highlight_indexes_paths.append(file_path)
 
-    def __create_file(self, item_type):
-        if item_type == ITEM_SCENE:
-            item_data = copy.deepcopy(DEFAULT_FILE_SCENE_ITEM_DATA)
-        elif item_type == ITEM_SCRIPT:
-            item_data = copy.deepcopy(DEFAULT_FILE_SCRIPT_ITEM_DATA)
-        elif item_type == ITEM_TXT:
-            item_data = copy.deepcopy(DEFAULT_FILE_TXT_ITEM_DATA)
-        elif item_type == ITEM_JSON:
-            item_data = copy.deepcopy(DEFAULT_FILE_JSON_ITEM_DATA)
-
-        parent_item = self.__get_parent_for_new_item()
-        parent_item.setExpanded(True)
-        parent_item_path = Path(parent_item.data(0, Qt.ItemDataRole.UserRole).get('path'))
-
-        # Make sure the created file name is different.
-        file_name, file_path = self.__get_unique_path(item_data['name'], parent_item_path)
-        file_path.touch(exist_ok=False)
-
-        item_data['name'] = file_name
-        item_data['uuid'] = str(uuid.uuid4())
-        item_data['path'] = str(file_path)
-
-        item = QTreeWidgetItem()
-        item.setText(0, item_data['name'])
-        item.setIcon(0, QIcon(item_data['icon']))
-        item.setData(0, Qt.ItemDataRole.UserRole, item_data)
-        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
-
-        index = self.__get_insert_index_by_name(parent_item, item_data['name'], item_data['type'])
-        parent_item.insertChild(index, item)
-        self.__hightlight_item(item)
-        self.scrollToItem(item)
-
-    def __rename_item(self):
-        self.editItem(self.currentItem())
-
-    def __delete_items(self, items=None, need_to_confirm=True):
-        selected_items = items if items else self.selectedItems()
-        if not selected_items:
+    def __delete(self):
+        selected_indexes = self.selectedIndexes()
+        if not selected_indexes:
             return
         
-        def is_to_delete(item, selected_items):
+        def is_to_delete(index, selected_indexes):
             """
-            Check if the item needs to be deleted (no ancestor in the selected items list).
-            E.g., if a file-type item has a folder-type ancestor item, we only need to delete the folder item as the file in the folder will be deleted together.
+            Check if the index needs to be deleted (no ancestor in the selected indexes).
+            E.g., if a file-type index has a folder-type ancestor index, we only need to delete the folder index as the file in the folder will be deleted together.
             """
-            current = item
-            while current.parent() and current.parent() != self.__root_item:
-                if current.parent() in selected_items:
+            current = index
+            while current.parent() and current.parent() != self.rootIndex():
+                if current.parent() in selected_indexes:
                     return False
                 current = current.parent()
             return True
         
-        items_to_delete = [item for item in selected_items if is_to_delete(item, selected_items)]
+        indexes_to_delete = [index for index in selected_indexes if is_to_delete(index, selected_indexes)]
+        index_names = [index.data(Qt.ItemDataRole.DisplayRole) for index in indexes_to_delete]
 
-        reply = QMessageBox.StandardButton.Yes
-        if need_to_confirm:
-            item_names = [item.text(0) for item in items_to_delete]
-            content = '确定要删除这 {} 个项目吗？此操作不可撤销。\n{}'.format(str(len(items_to_delete)), ('\n').join(item_names))
-            reply = QMessageBox.question(self, '请确认...', content, QMessageBox.Yes | QMessageBox.No)
-            
+        content = '确定要删除这 {} 个项目吗？此操作不可撤销。\n{}'.format(str(len(indexes_to_delete)), ('\n').join(index_names))
+        reply = QMessageBox.question(self, '请确认...', content, QMessageBox.Yes | QMessageBox.No)
+
         if reply == QMessageBox.StandardButton.No:
             return
         
-        for item in items_to_delete:
-            if item == self.__root_item:
-                continue
+        for index in indexes_to_delete:
+            index_path = Path(self.__file_model.filePath(self.__proxy_model.mapToSource(index)))
+            if index_path.exists():
+                shutil.rmtree(index_path) if index_path.is_dir() else index_path.unlink()
 
-            parent = item.parent()
-            parent.removeChild(item)
-            item_path = Path(item.data(0, Qt.ItemDataRole.UserRole).get('path'))
-            if item_path.exists():
-                shutil.rmtree(item_path) if item_path.is_dir() else item_path.unlink()                
-
-        del items_to_delete
-        self.clearSelection()
-
-    def __cut_items(self):
-        selected_items = self.selectedItems()
-        if not selected_items:
+    def __cut(self):
+        selected_indexes = self.selectedIndexes()
+        if not selected_indexes:
             return
-        
-        def is_to_cut(item, selected_items):
-            """
-            Check if the item needs to be cut (no ancestor in the selected items list).
-            E.g., if a file-type item has a folder-type ancestor item, we only need to cut the folder item as the file in the folder will be cut together.
-            """
-            current = item
-            while current.parent() and current.parent() != self.__root_item:
-                if current.parent() in selected_items:
-                    return False
-                current = current.parent()
-            return True
-        
-        self.__clipboard_items = []
-        self.__is_cut_action = True
-        self.__items_to_delete_by_cut = selected_items
-            
-        for item in selected_items:
-            if item == self.__root_item:
-                continue
-            self.__hightlight_item(item)
-            if is_to_cut(item, selected_items):
-                copied_item = self.__deep_copy_item(item)
-                self.__clipboard_items.append(copied_item)
-
-    def __copy_items(self):
-        selected_items = self.selectedItems()
-        if not selected_items:
-            return
-        
-        def is_to_copy(item, selected_items):
-            """
-            Check if the item needs to be copied (no ancestor in the selected items list).
-            E.g., if a file-type item has a folder-type ancestor item, we only need to copy the folder item as the file in the folder will be copied together.
-            """
-            current = item
-            while current.parent() and current.parent() != self.__root_item:
-                if current.parent() in selected_items:
-                    return False
-                current = current.parent()
-            return True
-        
-        self.__clipboard_items = []
-        self.__is_cut_action = False
-            
-        for item in selected_items:
-            if item == self.__root_item:
-                continue
-            self.__hightlight_item(item)
-            if is_to_copy(item, selected_items):
-                copied_item = self.__deep_copy_item(item)
-                self.__clipboard_items.append(copied_item)
-    
-    def __deep_copy_item(self, item, is_copy_child=True):
-        """Copy item and its children"""
-        new_item = QTreeWidgetItem()
-        
-        new_item.setFlags(item.flags())
-        new_item.setText(0, item.text(0))
-        new_item.setIcon(0, item.icon(0))
-        new_item.setData(0, Qt.ItemDataRole.UserRole, item.data(0, Qt.ItemDataRole.UserRole))
-
-        if is_copy_child:
-            for i in range(item.childCount()):
-                child_item = item.child(i)
-                new_child_item = self.__deep_copy_item(child_item)
-                new_item.addChild(new_child_item)
-        
-        return new_item
-    
-    def __paste_items(self):
-        if not self.__clipboard_items:
-            return
-
-        parent_item = self.__get_parent_for_new_item()
-        parent_item.setExpanded(True)
-
-        for item in self.__clipboard_items:
-            new_item = self.__deep_copy_item(item)
-            item_data = new_item.data(0, Qt.ItemDataRole.UserRole)
-            source_path = Path(item_data['path'])
-            parent_item_path = Path(parent_item.data(0, Qt.ItemDataRole.UserRole).get('path'))
-            target_name, target_path = self.__get_unique_path(item_data['name'], parent_item_path)
-            
-            if self.__is_cut_action:
-                shutil.move(source_path, target_path)
-            else:
-                shutil.copytree(source_path, target_path) if source_path.is_dir() else shutil.copy2(source_path, target_path)
                 
-            item_data['name'] = target_name
-            item_data['path'] = str(target_path)
-            new_item.setText(0, target_name)
-            new_item.setData(0, Qt.ItemDataRole.UserRole, item_data)
+        self.__is_cut = True
+        self.__clipboard_content = []
+        QApplication.clipboard().clear()
 
-            index = self.__get_insert_index_by_name(parent_item, target_name, item_data['type'])        
-            parent_item.insertChild(index, new_item)
-            self.__hightlight_item(new_item)
-            self.scrollToItem(new_item)
+        for index in selected_indexes:
+            self.__clipboard_content.append(Path(self.__file_model.filePath(self.__proxy_model.mapToSource(index))))
+        
+        # To show transparent effet when keys Ctrl+X are pressed.
+        self.viewport().update()
 
-            self.__restore_expanded_items(new_item)
-           
-        if self.__is_cut_action:
-            self.__delete_items(self.__items_to_delete_by_cut, False)
-            self.__items_to_delete_by_cut = []
-            self.__clipboard_items = []
-            self.__is_cut_action = False
-
-    def __restore_expanded_items(self, parent_item):
-        parent_item_data = parent_item.data(0, Qt.ItemDataRole.UserRole)
-        if not parent_item_data['isExpanded']:
+    def __copy(self):
+        selected_indexes = self.selectedIndexes()
+        if not selected_indexes:
             return
-        parent_item.setExpanded(True)
-                
-        for i in range(parent_item.childCount()):
-            item = parent_item.child(i)
-            item_data = item.data(0, Qt.ItemDataRole.UserRole)
-            
-            if item_data['isExpanded']:
-                item.setExpanded(True)
-
-                if item.childCount() > 0:
-                    self.__restore_expanded_items(item)
-
-    def __hightlight_item(self, item):
-        """Highlight item for some actions, e.g., copy action."""
-        original_fg = item.foreground(0)
-        original_r = original_fg.color().red()
-        original_g = original_fg.color().green()
-        original_b = original_fg.color().blue()
-
-        timeline = QTimeLine(1500, self)
-        timeline.setFrameRange(0, 100)        
         
-        def update_frame(frame):
-            # progress: 0 -> 1 -> 0
-            progress = frame / 100.0
+        self.__is_cut = False
+        self.__clipboard_content = []
+        QApplication.clipboard().clear()
             
-            if progress > 0.5:
-                value = -(255-original_r) * progress
-            else:
-                value = (255-original_r) * progress
-            
-            fg_color = item.foreground(0).color()
-            r = fg_color.red()
-            g = fg_color.green() + value
-            b = fg_color.blue() + value
+        for index in selected_indexes:
+            self.__clipboard_content.append(Path(self.__file_model.filePath(self.__proxy_model.mapToSource(index))))
 
-            # Limit the result to [0, 255].
-            r = max(original_g, min(r, 255))
-            g = max(original_g, min(g, 255))
-            b = max(original_b, min(b, 255))
+        # To remove transparent effet.
+        self.viewport().update()
 
-            item.setForeground(0, QColor(r, g, b, 255))
+    def __paste(self):
+        if not self.__clipboard_content:
+            return
         
-        def animation_finished():
-            item.setForeground(0, original_fg)
-            timeline.deleteLater()
-        
-        timeline.frameChanged.connect(update_frame)
-        timeline.finished.connect(animation_finished)
-        timeline.start()
-
-    def __get_insert_index_by_name(self, parent_item, new_item_name, new_item_type):
-        directory_item_names = []
-        for i in range(parent_item.childCount()):
-            item = parent_item.child(i)
-            if item.text(0) == '正在加载...':
-                continue
-            item_name = item.text(0)
-            item_type = item.data(0, Qt.ItemDataRole.UserRole)['type']
-            if item_type == ITEM_FOLDER:
-                directory_item_names.append(item_name)
-
-        file_item_names = []
-        for i in range(parent_item.childCount()):
-            item = parent_item.child(i)
-            if item.text(0) == '正在加载...':
-                continue
-            item_name = item.text(0)
-            item_type = item.data(0, Qt.ItemDataRole.UserRole)['type']
-            if item_type != ITEM_FOLDER:
-                file_item_names.append(item_name)
-
-        if new_item_type == ITEM_FOLDER:
-            for i, name in enumerate(directory_item_names):
-                if name.lower() > new_item_name.lower():
-                    return i
-            
-            return len(directory_item_names)
-
+        if not self.__is_cut:
+            self.__paste_for_copy()
         else:
-            for i, name in enumerate(file_item_names):
-                if name.lower() > new_item_name.lower():
-                    return i+len(directory_item_names)
-                
-            return len(file_item_names)+len(directory_item_names)
-    
+            self.__paste_for_cut()
+
+    def __paste_for_copy(self):
+        self.__highlight_indexes_paths = []
+
+        parent_index = self.__get_parent_index_for_creation()
+        parent_path = Path(self.__file_model.filePath(self.__proxy_model.mapToSource(parent_index)))
+        self.setExpanded(parent_index, True)
+
+        for source_path in self.__clipboard_content:
+            target_path = self.__get_unique_path(source_path.name, parent_path)
+            shutil.copytree(source_path, target_path) if source_path.is_dir() else shutil.copy2(source_path, target_path)
+            self.__highlight_indexes_paths.append(target_path)
+
+    def __paste_for_cut(self):
+        self.__highlight_indexes_paths = []
+
+        parent_index = self.__get_parent_index_for_creation()
+        parent_path = Path(self.__file_model.filePath(self.__proxy_model.mapToSource(parent_index)))
+        self.setExpanded(parent_index, True)
+        self.__is_cut = False
+
+        repetitive_assets_paths = []
+        for source_path in self.__clipboard_content:
+            target_path = parent_path / source_path.name
+            if source_path == target_path:
+                continue
+            elif target_path.exists():
+                repetitive_assets_paths.append((source_path, target_path))
+            else:
+                shutil.move(source_path, target_path)
+                self.__highlight_indexes_paths.append(target_path)
+
+        if not repetitive_assets_paths:
+            return
+        
+        repetitive_asset_names = [ele[0].name for ele in repetitive_assets_paths]
+        content = '有以下重复资源，是否覆盖？\n{}'.format(('\n').join(repetitive_asset_names))
+        reply = QMessageBox.question(self, '请确认...', content, QMessageBox.Yes | QMessageBox.No)
+
+        if reply == QMessageBox.StandardButton.Yes:
+            for ele in repetitive_assets_paths:
+                source_path = ele[0]
+                target_path = ele[1]
+                shutil.copytree(source_path, target_path, dirs_exist_ok=True) if source_path.is_dir() else shutil.copy2(source_path, target_path)
+                shutil.rmtree(source_path) if source_path.is_dir() else source_path.unlink()
+                self.__highlight_indexes_paths.append(target_path)
+
+    def __rename(self):
+        self.edit(self.currentIndex())
+
     def __get_unique_path(self, name, parent_item_path):
         num = 0
         new_name = name
@@ -571,65 +280,43 @@ class AssetTreeWidget(QTreeWidget):
             suffix = Path(name).suffix
             new_name = f"{stem}-{num}{suffix}"
             new_path = parent_item_path / new_name
-        return new_name, new_path
+        return new_path
     
-    def __duplicate_items(self):
-        selected_items = self.selectedItems()
-        if not selected_items:
+    def __duplicate(self):
+        selected_indexes = self.selectedIndexes()
+        if not selected_indexes:
             return
         
-        for item in selected_items:
-            if item == self.__root_item:
-                continue
-            new_item = self.__deep_copy_item(item)
-            parent_item = item.parent()
-            parent_item.setExpanded(True)
-
-            item_data = new_item.data(0, Qt.ItemDataRole.UserRole)
-            source_path = Path(item_data['path'])
-            parent_item_path = Path(parent_item.data(0, Qt.ItemDataRole.UserRole).get('path'))
-            target_name, target_path = self.__get_unique_path(item_data['name'], parent_item_path)
+        for index in selected_indexes:
+            index = self.__proxy_model.mapToSource(index)
+            index_name = self.__file_model.fileName(index)
+            source_path = Path(self.__file_model.filePath(index))
+            parent_path = Path(self.__file_model.filePath(index.parent()))
+            target_path = self.__get_unique_path(index_name, parent_path)
             shutil.copytree(source_path, target_path) if source_path.is_dir() else shutil.copy2(source_path, target_path)
-                
-            item_data['name'] = target_name
-            item_data['path'] = str(target_path)
-            new_item.setText(0, target_name)
-            new_item.setData(0, Qt.ItemDataRole.UserRole, item_data)
 
-            index = self.__get_insert_index_by_name(parent_item, target_name, item_data['type'])        
-            parent_item.insertChild(index, new_item)
-            self.__hightlight_item(new_item)
-            self.scrollToItem(new_item)
+    def __copy_path(self):
+        index_path = self.__file_model.filePath(self.__proxy_model.mapToSource(self.currentIndex()))
+        QApplication.clipboard().setText(index_path)
 
-            self.__restore_expanded_items(new_item)
-    
-    def __copy_item_uuid(self):
-        item_data = self.currentItem().data(0, Qt.ItemDataRole.UserRole)
-        QApplication.clipboard().setText(item_data['uuid'])
-
-    def __copy_item_path(self):
-        item_data = self.currentItem().data(0, Qt.ItemDataRole.UserRole)
-        QApplication.clipboard().setText(item_data['path'])
-
-    def __copy_item_name(self):
-        item_data = self.currentItem().data(0, Qt.ItemDataRole.UserRole)
-        QApplication.clipboard().setText(item_data['name'])
+    def __copy_name(self):
+        index_name = self.currentIndex().data(Qt.ItemDataRole.DisplayRole)
+        QApplication.clipboard().setText(index_name)
 
     def __open_in_terminal(self):
-        selected_items = self.selectedItems()
-        target_item = selected_items[-1] if selected_items else self.__root_item
-        target_item_path = Path(target_item.data(0, Qt.ItemDataRole.UserRole)['path'])
-        if not target_item_path.is_dir():
-            target_item_path = target_item_path.parent
+        selected_indexes = self.selectedIndexes()
+        target_path = Path(self.__file_model.filePath(self.__proxy_model.mapToSource(selected_indexes[-1]))) if selected_indexes else Path(self.__file_model.filePath(self.__proxy_model.mapToSource(self.rootIndex())))
+        if not target_path.is_dir():
+            target_path = target_path.parent
 
         system = platform.system()
         if system == 'Windows':
-            subprocess.Popen(f'start cmd /k "cd /d {target_item_path}"', shell=True)
+            subprocess.Popen(f'start cmd /k "cd /d {target_path}"', shell=True)
         elif system == 'Darwin':
-            subprocess.Popen(['open', '-a', 'Terminal', target_item_path])
+            subprocess.Popen(['open', '-a', 'Terminal', target_path])
         elif system == 'Linux':
             try:
-                subprocess.Popen(['gnome-terminal', '--working-directory', target_item_path])
+                subprocess.Popen(['gnome-terminal', '--working-directory', target_path])
             except:
                 QMessageBox.information(self, '提示', '不支持的操作系统')
         else:
@@ -637,152 +324,187 @@ class AssetTreeWidget(QTreeWidget):
 
     def __open_externally(self):
         """Open with VS Code by default. If it's not installed, open with txt."""
-        selected_items = self.selectedItems()
-        target_item = selected_items[-1] if selected_items else self.__root_item
-        target_item_path = target_item.data(0, Qt.ItemDataRole.UserRole)['path']
+        selected_indexes = self.selectedIndexes()
+        target_path = Path(self.__file_model.filePath(self.__proxy_model.mapToSource(selected_indexes[-1]))) if selected_indexes else Path(self.__file_model.filePath(self.__proxy_model.mapToSource(self.rootIndex())))
 
         # VS Code's install path should be configured in the settings. If not, open the file with txt.
         system = platform.system()
         if system == 'Windows':
-            subprocess.Popen(['notepad', target_item_path])
+            subprocess.Popen(['notepad', target_path])
             # subprocess.Popen(['code', target_item_path])
         elif system == 'Darwin':
-            subprocess.Popen(['open', '-a', 'TextEdit', target_item_path])
+            subprocess.Popen(['open', '-a', 'TextEdit', target_path])
             # subprocess.Popen(['open', '-a', 'Visual Studio Code', target_item_path])
 
         elif system == 'Linux':
             # subprocess.Popen(['code', target_item_path])
             try:
-                subprocess.Popen(['gedit', target_item_path])
-                print("使用gedit打开")
+                subprocess.Popen(['gedit', target_path])
             except FileNotFoundError:
-                subprocess.Popen(['xdg-open', target_item_path])
+                subprocess.Popen(['xdg-open', target_path])
         else:
             QMessageBox.information(self, '提示', '不支持的操作系统')
-            
+
     def __show_in_explorer(self):
-        selected_items = self.selectedItems()
-        target_item = selected_items[-1] if selected_items else self.__root_item
-        target_item_path = target_item.data(0, Qt.ItemDataRole.UserRole)['path']
-    
+        selected_indexes = self.selectedIndexes()
+        target_path = Path(self.__file_model.filePath(self.__proxy_model.mapToSource(selected_indexes[-1]))) if selected_indexes else Path(self.__file_model.filePath(self.__proxy_model.mapToSource(self.rootIndex())))
+
         system = platform.system()
         if system == 'Windows':
-            subprocess.run(['explorer', target_item_path])
+            subprocess.Popen(['explorer', '/select,', target_path])
         elif system == 'Darwin':
-            subprocess.run(['open', target_item_path])
+            subprocess.Popen(['open', target_path])
         elif system == 'Linux':
-            subprocess.run(["xdg-open", target_item_path])
+            subprocess.Popen(["xdg-open", target_path])
         else:
             QMessageBox.information(self, '提示', '不支持的操作系统')
 
-    def get_clipboard_items(self):
-        return self.__clipboard_items
+    def __drop_indexes(self, parent_path, source_paths, is_internal_drag):
+        repetitive_assets_paths = []
+        for source_path in source_paths:
+            target_path = parent_path / source_path.name
+            if source_path == target_path:
+                continue
+            elif target_path.exists():
+                repetitive_assets_paths.append((source_path, target_path))
+            else:
+                if is_internal_drag:
+                    shutil.move(source_path, target_path)
+                else:
+                    shutil.copytree(source_path, target_path, dirs_exist_ok=True) if source_path.is_dir() else shutil.copy2(source_path, target_path)
+
+        if not repetitive_assets_paths:
+            return
+        
+        repetitive_asset_names = [ele[0].name for ele in repetitive_assets_paths]
+        content = '有以下重复资源，是否覆盖？\n{}'.format(('\n').join(repetitive_asset_names))
+        reply = QMessageBox.question(self, '请确认...', content, QMessageBox.Yes | QMessageBox.No)
+
+        if reply == QMessageBox.StandardButton.Yes:
+            for ele in repetitive_assets_paths:
+                source_path = ele[0]
+                target_path = ele[1]
+                shutil.copytree(source_path, target_path, dirs_exist_ok=True) if source_path.is_dir() else shutil.copy2(source_path, target_path)
+                if is_internal_drag:
+                    shutil.rmtree(source_path) if source_path.is_dir() else source_path.unlink()
+
+    def __expand_all_indexes(self, index_path):
+        if index_path in self.__expand_state.keys():
+            return
+        
+        parent_index = self.__proxy_model.mapFromSource(self.__file_model.index(index_path))
+        self.__expand_state[index_path] = self.isExpanded(parent_index)
+        self.setExpanded(parent_index, True)
+
+        child_count = self.__proxy_model.rowCount(parent_index)
+        if child_count <= 0:
+            return
+        
+        for i in range(child_count):
+            index = self.__proxy_model.mapToSource(self.__proxy_model.index(i, 0, parent_index))
+            if self.__file_model.isDir(index):
+                self.__expand_all_indexes(self.__file_model.filePath(index))
+
+    def __restore_indexes_expand_state(self):
+        for index_path in self.__expand_state.keys():
+            if not Path(index_path).exists():
+                continue
+
+            proxy_index = self.__proxy_model.mapFromSource(self.__file_model.index(index_path))
+            self.setExpanded(proxy_index, self.__expand_state[index_path])
+        self.__expand_state.clear()
+
+    def search(self, keyword):
+        return self.__search(keyword)
     
-    def get_hover_item_in_drag_move(self):
-        return self.__hover_item_in_drag_move
+    def __search(self, keyword):
+        self.__proxy_model.setFilterRegularExpression(QRegularExpression())
+        self.setRootIndex(self.__proxy_model.mapFromSource(self.__file_model.index(self.__root_path)))
+        
+        self.__file_model.directoryLoaded.connect(self.__expand_all_indexes)
+        self.__expand_all_indexes(self.__root_path)
+
+        if not keyword:
+            self.__file_model.directoryLoaded.disconnect(self.__expand_all_indexes)
+            self.__restore_indexes_expand_state()
+            return
+        
+        regex = QRegularExpression(keyword)
+        self.__proxy_model.setFilterRegularExpression(regex)
+
+    def get_highlight_indexes_paths(self):
+        return self.__highlight_indexes_paths
     
+    def refresh(self):
+        self.__file_model.setRootPath(self.__root_path)
+        self.setRootIndex(self.__proxy_model.mapFromSource(self.__file_model.index(self.__root_path)))
+
+    def is_cut(self):
+        return self.__is_cut
+    
+    def get_file_system_model(self):
+        return self.__file_model
+    
+    def get_sort_filter_proxy_model(self):
+        return self.__proxy_model
+    
+    def get_clipboard_content(self):
+        return self.__clipboard_content
+    
+    def get_sort_type(self):
+        return self.__sort_type
+    
+    def set_sort_type(self, sort_type):
+        self.__sort_type = sort_type
+        self.__proxy_model.invalidate()
+
     def dragEnterEvent(self, event):
-        event.acceptProposedAction()
+        if event.source() != None and event.source() != self:
+            event.ignore()
+            return
+        
+        if event.mimeData().hasUrls():
+            event.accept()
 
-    def dragMoveEvent(self, event):
-        self.__hover_item_in_drag_move = self.itemAt(event.pos())
-
-        # Trigger deletegate's paint event.
-        self.viewport().update()
-        return super().dragMoveEvent(event)
-    
-    def dropEvent(self, event):
-        self.__hover_item_in_drag_move = None
-        self.viewport().update()
-
-        parent_item = self.itemAt(event.pos())
-        if not parent_item:
-            parent_item  = self.__root_item
-        elif parent_item and parent_item != self.__root_item and parent_item.data(0, Qt.ItemDataRole.UserRole)['type'] != ITEM_FOLDER:
-            parent_item = parent_item.parent()
-    
-        parent_item_path = Path(parent_item.data(0, Qt.ItemDataRole.UserRole)['path'])
-        parent_item.setExpanded(True)
-
+    def dropEvent(self, event):   
+        parent_index = self.indexAt(event.pos())
+        if not parent_index.isValid():
+            parent_index = self.rootIndex()
+        elif not self.__file_model.isDir(self.__proxy_model.mapToSource(parent_index)):
+            parent_index = parent_index.parent()
+        parent_path = Path(self.__file_model.filePath(self.__proxy_model.mapToSource(parent_index)))
+        
         urls = event.mimeData().urls()
-        if urls:
-            # parent_item.setExpanded(True)
+        source_paths = [Path(url.toLocalFile()) for url in urls]
+        self.__drop_indexes(parent_path, source_paths, event.source()==self)
 
-            for url in urls:
-                source_path = Path(url.toLocalFile())
-                _, target_path = self.__get_unique_path(source_path.name, parent_item_path)
-                shutil.copytree(source_path, target_path) if source_path.is_dir() else shutil.copy2(source_path, target_path)
-
-                item_data = self.__get_item_data_by_path(target_path)
-                item_id = str(uuid.uuid4())
-                item_data['uuid'] = item_id
-                item_data['name'] = target_path.name
-                item_data['path'] = str(target_path)
-
-                item = QTreeWidgetItem()
-                item.setText(0, target_path.name)
-                item.setIcon(0, QIcon(item_data['icon']))
-                item.setData(0, Qt.ItemDataRole.UserRole, item_data)
-                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
-                
-                index = self.__get_insert_index_by_name(parent_item, item_data['name'], item_data['type'])        
-                parent_item.insertChild(index, item)
-                self.__hightlight_item(item)
-                self.scrollToItem(item)
-
-                # If the folder is not empty, add a placeholder item to show the expand triangle.
-                if source_path.is_dir() and any(source_path.iterdir()):
-                    self.__add_placeholder(item)
-
-        else:
-            source_items = self.selectedItems()
-            source_item_filtered = [item for item in source_items if item != self.__root_item and item.parent() != parent_item]
-            
-            if not source_item_filtered:
-                event.ignore()
-                return
-
-            for item in source_item_filtered:
-                new_item = self.__deep_copy_item(item)
-                item_data = new_item.data(0, Qt.ItemDataRole.UserRole)
-                source_path = Path(item_data['path'])
-                parent_item_path = Path(parent_item.data(0, Qt.ItemDataRole.UserRole).get('path'))
-                target_name, target_path = self.__get_unique_path(item_data['name'], parent_item_path)
-                
-                shutil.move(source_path, target_path)
-                    
-                item_data['name'] = target_name
-                item_data['path'] = str(target_path)
-                new_item.setText(0, target_name)
-                new_item.setData(0, Qt.ItemDataRole.UserRole, item_data)
-
-                index = self.__get_insert_index_by_name(parent_item, target_name, item_data['type'])        
-                parent_item.insertChild(index, new_item)
-                self.__hightlight_item(new_item)
-                self.scrollToItem(new_item)
-
-                self.__restore_expanded_items(new_item)
-
-            self.__delete_items(source_item_filtered, False)
-    
     def keyPressEvent(self, event):
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
             if event.key() == Qt.Key.Key_X:
-                self.__cut_items()
+                self.__cut()
                 event.accept()
                 return
             elif event.key() == Qt.Key.Key_C:
-                self.__copy_items()
+                self.__copy()
                 event.accept()
                 return
             elif event.key() == Qt.Key.Key_V:
-                self.__paste_items()
+                self.__paste()
                 event.accept()
                 return
         
         elif event.key() == Qt.Key.Key_Delete:
-            self.__delete_items()
+            self.__delete()
             event.accept()
             return
         
         super().keyPressEvent(event)
+
+
+if __name__ == '__main__':
+    app = QApplication([])
+    window = AssetTreeView()
+    window.show()
+    import sys
+    sys.exit(app.exec())
+

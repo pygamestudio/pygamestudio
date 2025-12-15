@@ -5,12 +5,8 @@ from PySide6.QtGui import QIcon
 from pygamestudio.common.utils.path import RES_PATH
 
 
-SEARCH_BY_NAME = 0
-SEARCH_BY_UUID = 1
-
-
 class SearchLineEdit(QLineEdit):
-    search_signal = Signal(str, int)
+    search_signal = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -34,7 +30,7 @@ class SearchLineEdit(QLineEdit):
         """)
 
     def __set_signal(self):
-        self.textChanged.connect(lambda: self.search_signal.emit(self.text().strip().lower(), SEARCH_BY_NAME))
+        self.textChanged.connect(lambda: self.search_signal.emit(self.text().strip().lower()))
 
     def __set_layout(self):
         h_layout = QHBoxLayout(self)

@@ -1,6 +1,17 @@
-ITEM_FOLDER = 'folder'
-ITEM_SCENE = '.scene'
-ITEM_SCRIPT = '.py'
-ITEM_TXT = '.txt'
-ITEM_JSON = '.json'
-ITEM_OTHER = 'other file types'
+INDEX_INVALID = None
+INDEX_FOLDER = 'folder'
+INDEX_FILE = 'file'
+INDEX_SCENE = 'new.scene'
+INDEX_SCRIPT = 'new.py'
+INDEX_TXT = 'new.txt'
+INDEX_JSON = 'new.json'
+
+
+SORT_BY_NAME_ASC = 1
+SORT_BY_NAME_DESC = 2
+SORT_BY_TYPE_ASC = 3
+SORT_BY_TYPE_DESC = 4
+SORT_BY_SIZE_ASC = 5
+SORT_BY_SIZE_DESC = 6
+SORT_BY_TIME_ASC = 7
+SORT_BY_TIME_DESC = 8
