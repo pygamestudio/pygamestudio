@@ -65,7 +65,34 @@ class AssetTreeView(QTreeView):
         self.setSelectionMode(QTreeWidget.SelectionMode.ExtendedSelection)
         self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
 
+        self.setStyleSheet("""
+        QTreeView {
+            border: none !important;
+            outline: none !important;
+            background-color: transparent;
+        } 
+                                              
+        QTreeView::item:hover {
+            background-color: #e5f3ff;
+        }
+                           
+        QTreeView::item:selected {
+            background-color: #cce8ff;
+        }
+
+        QTreeView::item:selected:active {
+            background-color: #cce8ff;
+            color: black;
+        }
+
+        QTreeView::item:selected:!active {
+            background-color: #d9d9d9;
+            color: black;
+        }
+        """)
+    
     def __set_signal(self):
+        self.selectionModel().selectionChanged.connect(self.__clear_highlight_items)
         self.customContextMenuRequested.connect(self.__show_context_menu)
 
         self.__context_menu.create_signal.connect(self.__create)
@@ -127,7 +154,7 @@ class AssetTreeView(QTreeView):
         new_folder_name = INDEX_FOLDER
         folder_path = self.__get_unique_path(new_folder_name, parent_path)
         folder_path.mkdir()
-        QTimer().singleShot(0.5, lambda:self.scrollTo(self.__proxy_model.mapFromSource(self.__file_model.index(str(folder_path)))))
+        QTimer().singleShot(10, lambda:self.scrollTo(self.__proxy_model.mapFromSource(self.__file_model.index(str(folder_path)))))
 
         self.__highlight_indexes_paths.append(folder_path)
 
@@ -141,7 +168,7 @@ class AssetTreeView(QTreeView):
         file_path = self.__get_unique_path(new_file_name, parent_path)
         file_path.touch()
 
-        QTimer().singleShot(0.5, lambda:self.scrollTo(self.__proxy_model.mapFromSource(self.__file_model.index(str(file_path)))))
+        QTimer().singleShot(10, lambda:self.scrollTo(self.__proxy_model.mapFromSource(self.__file_model.index(str(file_path)))))
         self.__highlight_indexes_paths.append(file_path)
 
     def __delete(self):
@@ -427,16 +454,14 @@ class AssetTreeView(QTreeView):
         
         regex = QRegularExpression(keyword)
         self.__proxy_model.setFilterRegularExpression(regex)
-
-    def get_highlight_indexes_paths(self):
-        return self.__highlight_indexes_paths
     
+    def __clear_highlight_items(self):
+        self.__highlight_indexes_paths = []
+        self.viewport().update()
+
     def refresh(self):
         self.__file_model.setRootPath(self.__root_path)
         self.setRootIndex(self.__proxy_model.mapFromSource(self.__file_model.index(self.__root_path)))
-
-    def is_cut(self):
-        return self.__is_cut
     
     def get_file_system_model(self):
         return self.__file_model
@@ -453,6 +478,28 @@ class AssetTreeView(QTreeView):
     def set_sort_type(self, sort_type):
         self.__sort_type = sort_type
         self.__proxy_model.invalidate()
+
+    def drawRow(self, painter, options, index):
+        index_path = Path(self.__file_model.filePath(self.__proxy_model.mapToSource(index)))
+
+        painter.save()
+        if self.__is_cut:
+            if index_path in self.__clipboard_content:
+                painter.setOpacity(0.5)
+        
+        if index_path in self.__highlight_indexes_paths:
+            painter.setPen(QPen(QColor(229, 243, 255, 255)))
+            painter.setBrush(QColor(229, 243, 255, 255))
+            painter.drawRect(options.rect)
+
+        super().drawRow(painter, options, index)
+        painter.restore()
+
+    def mousePressEvent(self, event):
+        super().mousePressEvent(event)
+        index = self.indexAt(event.pos())
+        if not index.isValid():
+            self.__clear_highlight_items()
 
     def dragEnterEvent(self, event):
         if event.source() != None and event.source() != self:

@@ -14,8 +14,8 @@ app = QApplication(sys.argv)
 # # 设置应用程序样式
 # # app.setStyle("Fusion")
 
-# window = AssetWindow()
-window = ObjectWindow()
+window = AssetWindow()
+# window = ObjectWindow()
 # window = AssetTreeView()
 window.show()
 

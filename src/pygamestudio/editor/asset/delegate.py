@@ -22,19 +22,19 @@ class AssetTreeWidgetDelegate(QStyledItemDelegate):
                         
         return editor
 
-    def paint(self, painter, option, index):
-        clipboard_content = self.__tree_view.get_clipboard_content()
-        index_path = Path(self.__file_model.filePath(self.__proxy_model.mapToSource(index)))
+    # def paint(self, painter, option, index):
+    #     clipboard_content = self.__tree_view.get_clipboard_content()
+    #     index_path = Path(self.__file_model.filePath(self.__proxy_model.mapToSource(index)))
 
-        painter.setOpacity(1)
-        if self.__tree_view.is_cut():
-            if index_path in clipboard_content:
-                painter.setOpacity(0.5)
+    #     painter.setOpacity(1)
+    #     if self.__tree_view.is_cut():
+    #         if index_path in clipboard_content:
+    #             painter.setOpacity(0.5)
         
-        if index_path in self.__tree_view.get_highlight_indexes_paths():
-            painter.setPen(QPen(QColor(0, 255, 255, 100)))
-            painter.setBrush(QColor(0, 255, 255, 100))
-            painter.drawRect(option.rect)
+    #     if index_path in self.__tree_view.get_highlight_indexes_paths():
+    #         painter.setPen(QPen(QColor(0, 255, 255, 100)))
+    #         painter.setBrush(QColor(0, 255, 255, 100))
+    #         painter.drawRect(option.rect)
 
-        return super().paint(painter, option, index)
+    #     return super().paint(painter, option, index)
 
