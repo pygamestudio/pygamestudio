@@ -6,9 +6,11 @@ from pathlib import Path
 
 
 class AssetTreeWidgetDelegate(QStyledItemDelegate):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.__tree_view = parent
+    def __init__(self, tree_view=None, proxy_model=None, file_model=None):
+        super().__init__(tree_view)
+        self.__tree_view = tree_view
+        self.__proxy_model = proxy_model
+        self.__file_model = file_model
 
     def createEditor(self, parent, option, index):
         editor = super().createEditor(parent, option, index)
@@ -22,10 +24,7 @@ class AssetTreeWidgetDelegate(QStyledItemDelegate):
 
     def paint(self, painter, option, index):
         clipboard_content = self.__tree_view.get_clipboard_content()
-        proxy_model = self.__tree_view.get_sort_filter_proxy_model()
-        file_model = self.__tree_view.get_file_system_model()
-
-        index_path = Path(file_model.filePath(proxy_model.mapToSource(index)))
+        index_path = Path(self.__file_model.filePath(self.__proxy_model.mapToSource(index)))
 
         painter.setOpacity(1)
         if self.__tree_view.is_cut():

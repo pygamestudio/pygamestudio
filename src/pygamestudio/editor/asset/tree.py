@@ -7,27 +7,21 @@ from pygamestudio.editor.asset.command import *
 from pygamestudio.editor.asset.model import *
 
 from pygamestudio.editor.asset.delegate import AssetTreeWidgetDelegate
-from pygamestudio.editor.asset.data import *
 from pygamestudio.editor.asset.type import *
 from pathlib import Path
 import subprocess
 import platform
 import shutil
-import uuid
-import copy
-import os
 
 
 
 class AssetTreeView(QTreeView):
-    trigger_search_signal = Signal()
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self.__proxy_model = AssetSortFilterProxyModel(self)
-        self.__delegate = AssetTreeWidgetDelegate(self)
         self.__file_model = AssetFileSystemModel(self)
         self.__context_menu = ContextMenu('', self)
+        self.__delegate = AssetTreeWidgetDelegate(self, self.__proxy_model, self.__file_model)
 
         self.__root_path = 'C:/Users/louis/Desktop/demo'    # 项目配置文件
         self.__sort_type = SORT_BY_NAME_ASC     # 项目配置文件
@@ -36,7 +30,6 @@ class AssetTreeView(QTreeView):
         self.__expand_state = {}
 
         self.__highlight_indexes_paths = []
-
 
         self.__set_up()
 
@@ -287,6 +280,8 @@ class AssetTreeView(QTreeView):
         if not selected_indexes:
             return
         
+        self.__highlight_indexes_paths = []
+        
         for index in selected_indexes:
             index = self.__proxy_model.mapToSource(index)
             index_name = self.__file_model.fileName(index)
@@ -294,6 +289,7 @@ class AssetTreeView(QTreeView):
             parent_path = Path(self.__file_model.filePath(index.parent()))
             target_path = self.__get_unique_path(index_name, parent_path)
             shutil.copytree(source_path, target_path) if source_path.is_dir() else shutil.copy2(source_path, target_path)
+            self.__highlight_indexes_paths.append(target_path)
 
     def __copy_path(self):
         index_path = self.__file_model.filePath(self.__proxy_model.mapToSource(self.currentIndex()))

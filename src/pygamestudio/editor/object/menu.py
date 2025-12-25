@@ -13,6 +13,8 @@ class ContextMenu(QMenu):
     rename_signal = Signal()
     duplicate_signal = Signal()
     copy_uuid_signal = Signal()
+    copy_path_signal = Signal()
+    copy_name_signal = Signal()
 
     def __init__(self, title='', parent=None):
         super().__init__(title, parent)
@@ -29,6 +31,8 @@ class ContextMenu(QMenu):
         rename_action = QAction('重命名', self)
         duplicate_action = QAction('生成副本', self)
         copy_uuid_action = QAction('复制UUID', self)
+        copy_path_action = QAction('复制路径', self)
+        copy_name_action = QAction('复制名称', self)
 
         create_text_action.triggered.connect(lambda: self.create_signal.emit(ITEM_TEXT))
         create_rect_action.triggered.connect(lambda: self.create_signal.emit(ITEM_RECT))
@@ -40,7 +44,9 @@ class ContextMenu(QMenu):
         rename_action.triggered.connect(self.rename_signal.emit)
         duplicate_action.triggered.connect(self.duplicate_signal.emit)
         copy_uuid_action.triggered.connect(self.copy_uuid_signal.emit)
-        
+        copy_path_action.triggered.connect(self.copy_path_signal.emit)
+        copy_name_action.triggered.connect(self.copy_name_signal.emit)
+
         # Create actions are for all item types.
         create_menu = QMenu(title='创建')
         self.addMenu(create_menu)
@@ -55,7 +61,12 @@ class ContextMenu(QMenu):
         # Right click on the root item.
         elif item_type == ITEM_ROOT:
             self.addAction(paste_action)
-            self.addAction(copy_uuid_action)
+            self.addSeparator()
+            copy_menu = QMenu(title='复制路径 | 名称 | UUID')
+            copy_menu.addAction(copy_path_action)
+            copy_menu.addAction(copy_name_action)
+            copy_menu.addAction(copy_uuid_action)
+            self.addMenu(copy_menu)
 
         # Right click on the regular item.
         else:
@@ -68,7 +79,11 @@ class ContextMenu(QMenu):
             self.addAction(delete_action)
             self.addAction(rename_action)
             self.addSeparator()
-            self.addAction(copy_uuid_action)
+            copy_menu = QMenu(title='复制路径 | 名称 | UUID')
+            copy_menu.addAction(copy_path_action)
+            copy_menu.addAction(copy_name_action)
+            copy_menu.addAction(copy_uuid_action)
+            self.addMenu(copy_menu)
 
         self.__set_paste_action_status(paste_action)
 
