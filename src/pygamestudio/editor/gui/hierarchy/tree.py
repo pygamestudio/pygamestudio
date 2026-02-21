@@ -118,6 +118,8 @@ class HierarchyTreeView(QTreeView):
         self._object_manager.object_deleted.connect(self._on_object_deleted)
         self._object_manager.object_cut.connect(self._on_object_cut)
         self._object_manager.object_copied.connect(self._on_object_copied)
+        self._object_manager.object_showed.connect(self._on_object_showed)
+        self._object_manager.object_hidden.connect(self._on_object_hidden)
 
     def _add_scene_item(self):
         """The scene objecct will exist at start and forever."""
@@ -137,6 +139,7 @@ class HierarchyTreeView(QTreeView):
         item = self._get_matched_item(object_uuid)
         index = self._proxy_model.mapFromSource(self._standard_model.indexFromItem(item))
         self.selectionModel().select(index, QItemSelectionModel.SelectionFlag.Select)
+        self.viewport().update()
         self.selectionModel().blockSignals(False)
 
     def _on_object_deselected(self, object_uuid):
@@ -326,7 +329,13 @@ class HierarchyTreeView(QTreeView):
     
     def _rename(self):
         self.edit(self.currentIndex())
-        
+
+    def _on_object_showed(self):
+        self.viewport().update()
+
+    def _on_object_hidden(self):
+        self.viewport().update()
+
     def _copy_uuid(self):
         item = self._standard_model.itemFromIndex(self._proxy_model.mapToSource(self.currentIndex()))
         item_uuid = item.data(Qt.ItemDataRole.UserRole+1)

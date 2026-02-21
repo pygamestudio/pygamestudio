@@ -46,9 +46,11 @@ class PygameWidget(QWidget):
         self._object_manager.object_deleted.connect(self._on_object_deleted)
         self._object_manager.object_selected.connect(self._on_object_selected)
         self._object_manager.object_deselected.connect(self._on_object_deselected)
+        self._object_manager.object_moved.connect(self._on_object_moved)
+        self._object_manager.object_resized.connect(self._on_object_resized)
         self._object_manager.object_showed.connect(self._on_object_showed)
         self._object_manager.object_hidden.connect(self._on_object_hidden)
-
+        self._object_manager.object_color_changed.connect(self._on_object_color_changed)
         # self._update_screen_timer.timeout.connect(self._update_scene)
         ...
 
@@ -61,9 +63,9 @@ class PygameWidget(QWidget):
         self._update_scene()
 
     def _delete(self):
-        # 找出所有选中的is_selected为True的对象，然后调用object_manager.delete()
-        selected_uuid_list = self._object_manager.get_all_selected_object_uuid()
-        self._object_manager.delete(selected_uuid_list)
+        # 找出所有选中的is_selected为True的对s象，然后调用object_manager.delete()
+        selected_uuids = self._object_manager.get_selected_objects_uuids()
+        self._object_manager.delete(selected_uuids)
 
     def _on_object_deleted(self, object_uuid):
         self._update_scene()
@@ -77,32 +79,55 @@ class PygameWidget(QWidget):
     def _on_object_moved(self, object_uuid):
         self._update_scene()
 
+    def _on_object_resized(self, object_uuid):
+        self._update_scene()
+
     def _on_object_showed(self, object_uuid):
         self._update_scene()
 
     def _on_object_hidden(self, object_uuid):
         self._update_scene()
 
+    def _on_object_color_changed(self, object_uuid):
+        self._update_scene()
+
     def _update_scene(self):
-        self._surface.fill((0, 0, 0))
-        
+        # 更新过
+        self._surface.fill((0, 0, 0)) 
+
         def _update(object_tree_struct):
             value = list(object_tree_struct.values())[0]
             obj = value['object']
             
-            if obj.type == OBJECT_SCENE:
-                if obj.is_visible and obj.is_selected:
-                    pygame.draw.rect(self._surface, (255, 255, 50), (0, 0, self._surface.width, self._surface.height), 2)
-            else:
-                # 这里要判断祖先对象是否可以见
-                if obj.is_visible:
+            if obj.is_visible:
+                if obj.type == OBJECT_SCENE:
+                    if obj.is_selected:
+                        pygame.draw.rect(self._surface, (255, 255, 50), (0, 0, self._surface.width, self._surface.height), 2)
+                else:
                     obj.draw(self._surface)
-
                     if obj.is_selected:
                         pygame.draw.rect(self._surface, (255, 255, 50), obj.get_rect(), 2)
 
-            for child_object_tree_struct in value['children']:
-                _update(child_object_tree_struct)
+                for child_object_tree_struct in value['children']:
+                    _update(child_object_tree_struct)
+                
+            # if obj.type == OBJECT_SCENE:
+            #     if obj.is_visible:
+            #         if obj.is_selected:
+            #             pygame.draw.rect(self._surface, (255, 255, 50), (0, 0, self._surface.width, self._surface.height), 2)
+                    
+            #         for child_object_tree_struct in value['children']:
+            #             _update(child_object_tree_struct)
+            # else:
+            #     # 这里要判断祖先对象是否可以见
+            #     if obj.is_visible:
+            #         obj.draw(self._surface)
+
+            #         if obj.is_selected:
+            #             pygame.draw.rect(self._surface, (255, 255, 50), obj.get_rect(), 2)
+
+            #         for child_object_tree_struct in value['children']:
+            #             _update(child_object_tree_struct)
 
         _update(self._object_manager.all_object_tree_struct)
         self.update()
@@ -124,41 +149,19 @@ class PygameWidget(QWidget):
         self._scene = scene
 
     def _on_mouse_left_button_pressed(self, event):
+        self._object_manager.undo_stack.beginMacro('Move')
         pos = event.position()
         self._mouse_x = pos.x()
         self._mouse_y = pos.y()
         self._update_object_selection(pos)
 
     def _on_mouse_move(self, event):
-        self._move_selected_object(event.position())
+        self._move_selected_objects(event.position())
 
     def _on_mouse_left_button_released(self, event):
         self._mouse_x = None
         self._mouse_y = None
-
-    def _set_selected_object(self, pos):
-        def _set(object_tree_struct, pos):
-            value = list(object_tree_struct.values())[0]
-
-            if value['object'].type != OBJECT_SCENE and value['object'].get_rect().collidepoint((pos.x(), pos.y())):
-                if not value['children']:
-                    value['object'].is_selected = True
-                    self._final_selected_object = value['object']
-                    self._object_manager.select(value['object'].uuid)
-                    return True
-                
-            for child_object_tree_struct in value['children']:
-                result = _set(child_object_tree_struct, pos)
-                if result:
-                    return True
-
-            # Clear selection if no object is selected.
-            self._object_manager.deselect_all()
-            self._final_selected_object = None
-            self._object_manager.select(self._object_manager.scene_object_uuid)
-            return False
-
-        _set(self._object_manager.all_object_tree_struct, pos)
+        self._object_manager.undo_stack.endMacro()
 
     def _update_object_selection(self, pos):
         if not self._is_ctrl_pressed:
@@ -167,37 +170,65 @@ class PygameWidget(QWidget):
         self._set_selected_object(pos)
         self._update_scene()
 
-    def _move_selected_object(self, pos):
+    def _set_selected_object(self, pos):
+        # 要在这里加上gizmo！！！！！！！！！！！！！！
+        self._final_selected_object = None
+
+        def _set(object_tree_struct, pos):
+            value = list(object_tree_struct.values())[0]
+
+            if value['object'].type != OBJECT_SCENE and value['object'].get_rect().collidepoint((pos.x(), pos.y())):
+                # value['object'].is_selected = True
+                self._final_selected_object = value['object']
+                # self._object_manager.select(value['object'].uuid)
+
+                # if not value['children']:
+                #     # self._object_manager.select(self._final_selected_object.uuid)
+                #     return True
+                
+            for child_object_tree_struct in reversed(value['children']):
+                _set(child_object_tree_struct, pos)
+                if self._final_selected_object:
+                    return
+                # result = _set(child_object_tree_struct, pos)
+                # if result:
+                #     return True
+
+            # if self._final_selected_object:
+            #     self._object_manager.select(self._final_selected_object.uuid)
+            #     return True
+            # else:
+            #     # Clear selection if no object is selected.
+            #     self._object_manager.deselect_all()
+            #     # self._final_selected_object = None
+            #     self._object_manager.select(self._object_manager.scene_object_uuid)
+            #     return False
+
+        _set(self._object_manager.all_object_tree_struct, pos)
+        if self._final_selected_object:
+            self._object_manager.select(self._final_selected_object.uuid)
+        else:
+            # Clear selection if no object is selected.
+            self._object_manager.deselect_all()
+            # self._final_selected_object = None
+            self._object_manager.select(self._object_manager.scene_object_uuid)
+
+    def _move_selected_objects(self, pos):
         if not self._final_selected_object:
             return
         
-        self._final_selected_object.x += pos.x()-self._mouse_x
-        self._final_selected_object.y += pos.y()-self._mouse_y
+        selected_objects = self._object_manager.get_objects_to_move()
+        for obj in selected_objects:
+            new_x = obj.x+pos.x()-self._mouse_x
+            new_y = obj.y+pos.y()-self._mouse_y
+            self._object_manager.move(obj.uuid, (new_x, new_y))
+            # obj.x += pos.x() - self._mouse_x
+            # obj.y += pos.y() - self._mouse_y
+        
+        # self._final_selected_object.x += pos.x()-self._mouse_x
+        # self._final_selected_object.y += pos.y()-self._mouse_y
         self._mouse_x = pos.x()
         self._mouse_y = pos.y()
-
-    def delete_by_uuid(self, uuid):
-        for obj in self._all_objects:
-            if obj.uuid == uuid:
-                self._all_objects.remove(obj)
-                break
-            
-    def select_by_uuid(self, uuid_list):
-        for obj in self._all_objects:
-            obj.is_selected = False
-
-        for uuid in uuid_list:
-            for obj in self._all_objects:
-                if obj.uuid == uuid:
-                    obj.is_selected = True
-                    break
-
-    def update_data_by_uuid(self, uuid, key, data):
-        for obj in self._all_objects:
-            if obj.uuid == uuid:
-                obj.data = data
-                setattr(obj, key, data[key])
-                break
 
     def eventFilter(self, obj, event):
         """Move game objects when QGraphicsView is not being dragged"""

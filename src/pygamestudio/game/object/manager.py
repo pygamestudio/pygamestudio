@@ -15,10 +15,12 @@ class ObjectManager(QObject):
     object_deselected = Signal(str)
     object_renamed = Signal(str, str)
     object_moved = Signal(str)
+    object_resized = Signal(str)
     object_showed = Signal(str)
     object_hidden = Signal(str)
     object_cut = Signal()
     object_copied = Signal()
+    object_color_changed = Signal(str)
 
     def __init__(self):
         super().__init__()
@@ -74,28 +76,65 @@ class ObjectManager(QObject):
         old_name = obj.name
         obj.name = new_name
 
-        # self.object_renamed.emit(object_uuid, new_name)
-
         self._undo_stack.push(UpdateKeyValueCommand(self, obj, 'name', old_name, new_name))
 
-    def move(self, object_uuid):
-        ...
+    def resize(self, object_uuid, new_size):
+        obj = self._get_object(object_uuid)
+        old_size = (obj.width, obj.height)    
+        self._undo_stack.push(UpdateKeyValueCommand(self, obj, 'size', old_size, new_size))
 
-    def get_all_selected_object_uuid(self):
-        def _get(object_tree_struct, selected_uuid_list):
-            key = list(object_tree_struct.keys())[0]
+    def get_selected_objects_uuids(self):
+        # def _get(object_tree_struct, selected_uuid_list):
+        #     key = list(object_tree_struct.keys())[0]
+        #     value = list(object_tree_struct.values())[0]
+
+        #     if value['object'].is_selected:
+        #         selected_uuid_list.append(key)
+
+        #     for child_object_tree_struct in value['children']:
+        #         _get(child_object_tree_struct, selected_uuid_list)
+        
+        # selected_uuid_list = []
+        # _get(self._all_object_tree_struct, selected_uuid_list)
+        # return selected_uuid_list
+        selected_uuids = []
+        selected_objects = self.get_selected_objects()
+        for obj in selected_objects:
+            selected_uuids.append(obj.uuid)
+            
+        return selected_uuids
+
+    def get_selected_objects(self):
+        def _get(object_tree_struct, selected_objects):
             value = list(object_tree_struct.values())[0]
 
             if value['object'].is_selected:
-                selected_uuid_list.append(key)
+                selected_objects.append(value['object'])
 
             for child_object_tree_struct in value['children']:
-                _get(child_object_tree_struct, selected_uuid_list)
+                _get(child_object_tree_struct, selected_objects)
         
-        selected_uuid_list = []
-        _get(self._all_object_tree_struct, selected_uuid_list)
-        return selected_uuid_list
+        selected_objects = []
+        _get(self._all_object_tree_struct, selected_objects)
+        return selected_objects
+    
+    def get_objects_to_move(self):
+        def _get(object_tree_struct, objects_to_move, is_parent_selected):
+            value = list(object_tree_struct.values())[0]
 
+            if is_parent_selected:
+                objects_to_move.append(value['object'])
+            elif value['object'].is_selected:
+                objects_to_move.append(value['object'])
+                is_parent_selected = True
+
+            for child_object_tree_struct in value['children']:
+                _get(child_object_tree_struct, objects_to_move, is_parent_selected)
+        
+        objects_to_move = []
+        _get(self._all_object_tree_struct, objects_to_move, False)
+        return objects_to_move
+    
     def select(self, object_uuid):
         obj = self._get_object(object_uuid)
         if not obj:
@@ -128,6 +167,11 @@ class ObjectManager(QObject):
         
         _de(self._all_object_tree_struct)
 
+    def move(self, object_uuid, new_pos):
+        obj = self._get_object(object_uuid)
+        old_pos = (obj.x, obj.y)    
+        self._undo_stack.push(UpdateKeyValueCommand(self, obj, 'pos', old_pos, new_pos))
+
     def show(self, object_uuid):
         obj = self._get_object(object_uuid)       
         self._undo_stack.push(UpdateKeyValueCommand(self, obj, 'is_visible', False, True))
@@ -143,6 +187,11 @@ class ObjectManager(QObject):
     def collapse(self, object_uuid):
         obj = self._get_object(object_uuid)
         obj.is_expanded = False
+
+    def set_color(self, object_uuid, new_color):
+        obj = self._get_object(object_uuid)
+        old_color = obj.color
+        self._undo_stack.push(UpdateKeyValueCommand(self, obj, 'color', old_color, new_color))
 
     def _get_object_tree_struct(self, object_uuid, parent_object_tree_struct=None):
         def _get(object_uuid, object_tree_struct):
@@ -518,3 +567,10 @@ class UpdateKeyValueCommand(QUndoCommand):
                 self._object_manager.object_showed.emit(self._obj.uuid)  
             else:
                 self._object_manager.object_hidden.emit(self._obj.uuid)
+        elif key == 'pos':
+            self._object_manager.object_moved.emit(self._obj.uuid)
+        elif key == 'size':
+            self._object_manager.object_resized.emit(self._obj.uuid)
+        elif key == 'color':
+            self._object_manager.object_color_changed.emit(self._obj.uuid)
+        

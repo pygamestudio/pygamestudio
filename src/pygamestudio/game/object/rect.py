@@ -10,8 +10,10 @@ class ObjectRect:
         obj_data = obj_data or {}
         self.x = obj_data.get('x', 0)
         self.y = obj_data.get('y', 0)
+        self.pos = obj_data.get('pos', (0, 0))
         self.width = obj_data.get('width', 50)
         self.height = obj_data.get('height', 50)
+        self.size = obj_data.get('size', (50, 50))
         self.icon = obj_data.get('icon', str(RES_PATH/'images/item.png'))
         self.color = obj_data.get('color', random.choice(['#ff0000', '#00ff00', '#0000ff']))
         
@@ -37,4 +39,14 @@ class ObjectRect:
 
     def __str__(self):
         return self.__dict__.copy()
+    
+    def __setattr__(self, name, value):
+        if name == 'pos':
+            self.x = value[0]
+            self.y = value[1]
+        elif name == 'size':
+            self.width = value[0]
+            self.height = value[1]
+
+        super().__setattr__(name, value)
          

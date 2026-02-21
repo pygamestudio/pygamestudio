@@ -10,6 +10,7 @@ class ObjectText:
         obj_data = obj_data or {}
         self.x = obj_data.get('x', 0)
         self.y = obj_data.get('y', 0)
+        self.pos = obj_data.get('pos', (0, 0))
         self.width = obj_data.get('width', 50)
         self.height = obj_data.get('height', 50)
         self.icon = obj_data.get('icon', str(RES_PATH/'images/item.png'))
@@ -34,4 +35,10 @@ class ObjectText:
     
     def set_data(self, data):
         self.__dict__.update(data)
-         
+    
+    def __setattr__(self, name, value):
+        if name == 'pos':
+            self.x = value[0]
+            self.y = value[1]
+
+        super().__setattr__(name, value)

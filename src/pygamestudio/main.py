@@ -28,7 +28,7 @@ object_manager = ObjectManager()
 
 hierarchy_window = HierarchyWindow(window, object_manager)
 scene_widnow = SceneWindow(window, object_manager)
-inspector_window = InspectorWindow()
+inspector_window = InspectorWindow(window, object_manager)
 
 layout = QHBoxLayout(window)
 layout.addWidget(hierarchy_window)

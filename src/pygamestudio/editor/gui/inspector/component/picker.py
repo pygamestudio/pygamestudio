@@ -2,8 +2,14 @@ from PySide6.QtWidgets import *
 
 
 class ColorPicker(QPushButton):
-    def __init__(self, color_hex='#ffffff'):
+    def __init__(self, inspector_window, color_hex='#ffffff'):
         super().__init__()
+        self._inspector_window = inspector_window
+        self.set_color(color_hex)
+
+        self.clicked.connect(self._on_color_picker_clicked)
+
+    def set_color(self, color_hex):
         self.setStyleSheet(f"""
         QPushButton {{
             background-color: {color_hex};
@@ -11,3 +17,8 @@ class ColorPicker(QPushButton):
             border-radius: 4px;
         }}
         """)
+    
+    def _on_color_picker_clicked(self):
+        color = QColorDialog.getColor()
+        if color.isValid():
+            self._inspector_window.set_color(color.name())
