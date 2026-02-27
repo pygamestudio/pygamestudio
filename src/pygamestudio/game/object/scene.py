@@ -1,12 +1,28 @@
 import uuid
+import pygame
+import random
 from pygamestudio.game.object.type import *
 from pygamestudio.common.utils.path import RES_PATH
 
 
 class ObjectScene:
-    def __init__(self, obj_data=None):
+    def __init__(self, object_manager, obj_data=None):
+        self._object_manager = object_manager
+
         obj_data = obj_data or {}
+        self.x = obj_data.get('x', 0)
+        self.y = obj_data.get('y', 0)
+        self.pos = obj_data.get('pos', (0, 0))
+        self.width = obj_data.get('width', 50)
+        self.height = obj_data.get('height', 50)
+        self.size = obj_data.get('size', (50, 50))
+        self.scale_x = obj_data.get('scale_x', 1)
+        self.scale_y = obj_data.get('scale_y', 1)
+        self.scale = obj_data.get('scale', (1, 1))
+        self.angle = obj_data.get('angle', 0)
         self.icon = obj_data.get('icon', str(RES_PATH/'images/item.png'))
+        self.color = obj_data.get('color', random.choice(["#ff00bf", "#000000", "#00eeff"]))
+        
         self.name = obj_data.get('name', 'Scene')
         self.type = obj_data.get('type', OBJECT_SCENE)
         self.uuid = obj_data.get('uuid', str(uuid.uuid4()))
@@ -14,6 +30,60 @@ class ObjectScene:
         self.is_visible = obj_data.get('is_visible', True)
         self.is_expanded = obj_data.get('is_expanded', True)
         self.is_selected = obj_data.get('is_selected', False)
+
+        self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
+        pygame.draw.rect(self.surface, self.color, self.surface.get_rect())
+
+    def draw(self, parent_surface):
+        # Here, the self.surface is the canvas surface. No need to draw it on another parent surface.
+        ...
+
+    def get_surface(self):
+        return self.surface
+    
+    def set_surface(self, surface):
+        self.surface = surface
+    
+    def get_pos(self):
+        return self.pos
+    
+    def get_world_pos(self):
+        return self.get_world_rect().topleft
+    
+    def get_rect(self):
+        return pygame.Rect(self.x, self.y, self.surface.width, self.surface.height)
+
+    def get_world_rect(self):
+        world_rect = self.get_rect()
+
+        parent_object = self._object_manager.get_parent_object(self.uuid)
+        while parent_object:
+            parent_rect = parent_object.get_rect()
+            world_rect.move_ip(parent_rect.x, parent_rect.y)
+            parent_object = self._object_manager.get_parent_object(parent_object.uuid)
+
+        return world_rect
+    
+    def check_click_collision(self, click_pos):
+        ...
+        # if not self.get_world_rect().collidepoint(click_pos):
+        #     return False
+
+        # scaled_size = (int(self.width * self.scale_x), int(self.height * self.scale_y))
+        # scaled_surface = pygame.transform.scale(self.surface, scaled_size)
+        # rotated_surface = pygame.transform.rotate(scaled_surface, self.angle)
+        # rotated_mask = pygame.mask.from_surface(rotated_surface)
+
+        # local_x = click_pos[0] - self.get_world_pos()[0]
+        # local_y = click_pos[1] - self.get_world_pos()[1]
+        # return rotated_mask.get_at((local_x, local_y))
+    
+    def update_surface(self):
+        # self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
+
+        pygame.draw.rect(self.surface, self.color, self.surface.get_rect())
+        if self.is_selected:
+            pygame.draw.rect(self.surface, (255, 255, 50), (0, 0, self.surface.width, self.surface.height), 2)
 
     def get_data(self):
         return self.__dict__.copy()

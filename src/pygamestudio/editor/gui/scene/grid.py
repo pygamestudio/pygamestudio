@@ -1,19 +1,28 @@
 from PySide6.QtWidgets import QGraphicsView, QGraphicsScene
 from PySide6.QtGui import QPen, QColor, QPainter, QMouseEvent
-from PySide6.QtCore import Qt, QLine, QEvent
+from PySide6.QtCore import Qt, QLine, QEvent, QTimer
 import math
 
 
 class GridGraphicsView(QGraphicsView):
     def __init__(self, scene, parent=None):
         super().__init__(parent)
+        self._scene = scene
         self._zoom_limit = [0.2, 5]
         self._zoom_factor = 1.05
         self._current_scale = 1.0
         self._previous_scale = 1.0
         self._is_dragging = False
+        self._setup()
+        
+    def _setup(self):
+        self._set_widget()
 
-        self.setScene(scene)
+    def _set_widget(self):
+        self.scale(0.6, 0.6)
+        self.setScene(self._scene)
+        QTimer().singleShot(0, lambda: self.centerOn(self._scene.itemsBoundingRect().center()))
+        
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)

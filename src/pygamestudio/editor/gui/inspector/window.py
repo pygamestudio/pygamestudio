@@ -30,6 +30,8 @@ class InspectorWindow(QWidget):
         self._object_manager.object_selected.connect(self._on_object_selected)
         self._object_manager.object_deselected.connect(self._on_object_deselected)
         self._object_manager.object_moved.connect(self._on_object_moved)
+        self._object_manager.object_scaled.connect(self._on_object_scaled)
+        self._object_manager.object_rotated.connect(self._on_object_rotated)
         self._object_manager.object_showed.connect(self._on_object_showed)
         self._object_manager.object_hidden.connect(self._on_object_hidden)
         self._object_manager.object_color_changed.connect(self._on_object_color_changed)
@@ -49,6 +51,17 @@ class InspectorWindow(QWidget):
         spinbox_y = self._find_widget(self._inspector_layout, 'y')
         new_pos = (spinbox_x.value(), spinbox_y.value())
         self._object_manager.move(self._object_uuid_in_inspection, new_pos)
+
+    def scale(self):
+        spinbox_scale_x = self._find_widget(self._inspector_layout, 'scale_x')
+        spinbox_scale_y = self._find_widget(self._inspector_layout, 'scale_y')
+        new_scale = (spinbox_scale_x.value(), spinbox_scale_y.value())
+        self._object_manager.scale(self._object_uuid_in_inspection, new_scale)
+
+    def rotate(self):
+        spinbox_angle = self._find_widget(self._inspector_layout, 'angle')
+        new_angle = spinbox_angle.value()
+        self._object_manager.rotate(self._object_uuid_in_inspection, new_angle)
 
     def show(self):
         self._object_manager.show(self._object_uuid_in_inspection)
@@ -95,6 +108,24 @@ class InspectorWindow(QWidget):
         spinbox_y.setValue(obj.y)
         spinbox_x.blockSignals(False)
         spinbox_y.blockSignals(False)
+
+    def _on_object_scaled(self, object_uuid):
+        obj = self._object_manager.get_object(object_uuid)
+        spinbox_scale_x = self._find_widget(self._inspector_layout, 'scale_x')
+        spinbox_scale_y = self._find_widget(self._inspector_layout, 'scale_y')
+        spinbox_scale_x.blockSignals(True)
+        spinbox_scale_y.blockSignals(True)
+        spinbox_scale_x.setValue(obj.scale_x)
+        spinbox_scale_y.setValue(obj.scale_y)
+        spinbox_scale_x.blockSignals(False)
+        spinbox_scale_y.blockSignals(False)
+
+    def _on_object_rotated(self, object_uuid):
+        obj = self._object_manager.get_object(object_uuid)
+        spinbox_angle = self._find_widget(self._inspector_layout, 'angle')
+        spinbox_angle.blockSignals(True)
+        spinbox_angle.setValue(obj.angle)
+        spinbox_angle.blockSignals(False)
 
     def _on_object_showed(self, object_uuid):
         if object_uuid != self._object_uuid_in_inspection:

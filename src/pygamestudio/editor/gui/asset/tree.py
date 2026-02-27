@@ -16,8 +16,9 @@ import shutil
 
 
 class AssetTreeView(QTreeView):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, object_manager=None):
         super().__init__(parent)
+        self._object_manager = object_manager
         self._proxy_model = AssetSortFilterProxyModel(self)
         self._file_model = AssetFileSystemModel(self)
         self._context_menu = ContextMenu('', self)
@@ -462,7 +463,7 @@ class AssetTreeView(QTreeView):
     def refresh(self):
         self._file_model.setRootPath(self._root_path)
         self.setRootIndex(self._proxy_model.mapFromSource(self._file_model.index(self._root_path)))
-    
+
     def get_file_system_model(self):
         return self._file_model
     

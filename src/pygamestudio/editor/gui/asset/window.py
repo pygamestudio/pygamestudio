@@ -5,9 +5,9 @@ from pygamestudio.editor.gui.asset.widget import *
 
 
 class AssetWindow(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, object_manager=None):
         super().__init__(parent)
-        self._asset_tree_view = AssetTreeView(self)
+        self._asset_tree_view = AssetTreeView(self, object_manager)
         self._search_line_edit = SearchLineEdit(self)
 
         self._create_asset_button = CreateAssetButton(self)

@@ -7,8 +7,8 @@ from pygamestudio.common.utils.path import RES_PATH
 
 
 class RefreshAssetButton(QPushButton):
-    def ___init___(self, parent=None):
-        super().___init___(parent)
+    def __init__(self, parent=None):
+        super().__init__(parent)
         self._set_up()
 
     def _set_up(self):

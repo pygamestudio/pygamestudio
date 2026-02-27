@@ -7,9 +7,9 @@ from pygamestudio.editor.gui.scene.canvas import PygameWidget
 class SceneWindow(QWidget):
     def __init__(self, parent=None, object_manager=None):
         super().__init__(parent)
-        self._pygame_widget = PygameWidget(self, object_manager)
         self._grid_scene = GridGraphicsScene()
         self._grid_view = GridGraphicsView(self._grid_scene, self)
+        self._pygame_widget = PygameWidget(self._grid_scene, object_manager)
 
         self._setup()
 
@@ -20,8 +20,8 @@ class SceneWindow(QWidget):
 
     def _set_widget(self):
         self._grid_scene.addWidget(self._pygame_widget)
-        self._pygame_widget.set_scene(self._grid_scene)
-        self._pygame_widget.move(-self._pygame_widget.width()//2, -self._pygame_widget.height()//2)
+        # self._pygame_widget.set_scene(self._grid_scene)
+        # self._pygame_widget.move(-self._pygame_widget.width()//2, -self._pygame_widget.height()//2)
 
     def _set_signal(self):
         ...

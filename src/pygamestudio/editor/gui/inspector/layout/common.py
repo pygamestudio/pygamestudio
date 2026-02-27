@@ -38,6 +38,28 @@ INSPECTOR_LAYOUT_COMMON_PREFIX = {
             'widget': [SizeSpinBox, SizeSpinBox]
         }
     },
+    'scale': {
+        'i18n': {
+            'zh': '缩放',
+            'en': 'Scale'
+        },
+        'component': {
+            'layout': 'horizontal',
+            'attribute': ['scale_x', 'scale_y'],
+            'widget': [ScaleSpinBox, ScaleSpinBox]
+        }
+    },
+    'angle': {
+        'i18n': {
+            'zh': '角度',
+            'en': 'Angle'
+        },
+        'component': {
+            'layout': 'horizontal',
+            'attribute': ['angle'],
+            'widget': [AngleSpinBox]
+        }
+    },
     'color': {
         'i18n': {
             'zh': '颜色',

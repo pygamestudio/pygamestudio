@@ -15,6 +15,8 @@ class ObjectManager(QObject):
     object_deselected = Signal(str)
     object_renamed = Signal(str, str)
     object_moved = Signal(str)
+    object_scaled = Signal(str)
+    object_rotated = Signal(str)
     object_resized = Signal(str)
     object_showed = Signal(str)
     object_hidden = Signal(str)
@@ -56,14 +58,14 @@ class ObjectManager(QObject):
     
     def _new_object(self, object_type, obj_data=None):
         if object_type == OBJECT_SCENE:
-            obj = ObjectScene(obj_data)
+            obj = ObjectScene(self, obj_data)
             self._scene_object_uuid = obj.uuid
         elif object_type == OBJECT_RECT:
-            obj = ObjectRect(obj_data)
+            obj = ObjectRect(self, obj_data)
         elif object_type == OBJECT_TEXT:
-            obj = ObjectText(obj_data)
+            obj = ObjectText(self, obj_data)
         elif object_type == OBJECT_CIRCLE:
-            obj = ObjectCircle(obj_data)
+            obj = ObjectCircle(self, obj_data)
 
         return obj
 
@@ -120,17 +122,18 @@ class ObjectManager(QObject):
     
     def get_objects_to_move(self):
         def _get(object_tree_struct, objects_to_move, is_parent_selected):
-            value = list(object_tree_struct.values())[0]
-
             if is_parent_selected:
-                objects_to_move.append(value['object'])
-            elif value['object'].is_selected:
+                return
+            
+            value = list(object_tree_struct.values())[0]
+        
+            if value['object'].is_selected:
                 objects_to_move.append(value['object'])
                 is_parent_selected = True
 
             for child_object_tree_struct in value['children']:
                 _get(child_object_tree_struct, objects_to_move, is_parent_selected)
-        
+            
         objects_to_move = []
         _get(self._all_object_tree_struct, objects_to_move, False)
         return objects_to_move
@@ -171,6 +174,16 @@ class ObjectManager(QObject):
         obj = self._get_object(object_uuid)
         old_pos = (obj.x, obj.y)    
         self._undo_stack.push(UpdateKeyValueCommand(self, obj, 'pos', old_pos, new_pos))
+
+    def scale(self, object_uuid, new_scale):
+        obj = self._get_object(object_uuid)
+        old_scale = (obj.scale_x, obj.scale_y)
+        self._undo_stack.push(UpdateKeyValueCommand(self, obj, 'scale', old_scale, new_scale))
+
+    def rotate(self, object_uuid, new_angle):
+        obj = self._get_object(object_uuid)
+        old_angle = obj.angle
+        self._undo_stack.push(UpdateKeyValueCommand(self, obj, 'angle', old_angle, new_angle))
 
     def show(self, object_uuid):
         obj = self._get_object(object_uuid)       
@@ -230,12 +243,33 @@ class ObjectManager(QObject):
         return _get(object_uuid, parent_object_tree_struct)
 
     def _get_parent_uuid(self, object_uuid):
+        parent_obj = self._get_parent_object(object_uuid)
+        if parent_obj:
+            return parent_obj.uuid
+        return None
+        # def _get(object_uuid, object_tree_struct):
+        #     key = list(object_tree_struct.keys())[0]
+        #     value = list(object_tree_struct.values())[0]
+
+        #     if object_uuid in [list(child_object_tree_struct.keys())[0] for child_object_tree_struct in value['children']]:
+        #         return key
+            
+        #     for child_object_tree_struct in value['children']:
+        #         result = _get(object_uuid, child_object_tree_struct)
+        #         if result:
+        #             return result
+                
+        #     return None
+        
+        # return _get(object_uuid, self._all_object_tree_struct)
+    
+    def _get_parent_object(self, object_uuid):
         def _get(object_uuid, object_tree_struct):
-            key = list(object_tree_struct.keys())[0]
+            # key = list(object_tree_struct.keys())[0]
             value = list(object_tree_struct.values())[0]
 
             if object_uuid in [list(child_object_tree_struct.keys())[0] for child_object_tree_struct in value['children']]:
-                return key
+                return value['object']
             
             for child_object_tree_struct in value['children']:
                 result = _get(object_uuid, child_object_tree_struct)
@@ -245,6 +279,9 @@ class ObjectManager(QObject):
             return None
         
         return _get(object_uuid, self._all_object_tree_struct)
+    
+    def get_parent_object(self, object_uuid):
+        return self._get_parent_object(object_uuid)
     
     def add_object_tree_struct(self, parent_uuid, object_tree_struct_to_add, inserted_pos=-1):
         return self._add_object_tree_struct(parent_uuid, object_tree_struct_to_add, inserted_pos)
@@ -571,6 +608,12 @@ class UpdateKeyValueCommand(QUndoCommand):
             self._object_manager.object_moved.emit(self._obj.uuid)
         elif key == 'size':
             self._object_manager.object_resized.emit(self._obj.uuid)
+        elif key == 'scale':
+            self._object_manager.object_scaled.emit(self._obj.uuid)
+        elif key == 'angle':
+            self._object_manager.object_rotated.emit(self._obj.uuid)
         elif key == 'color':
             self._object_manager.object_color_changed.emit(self._obj.uuid)
+
+
         

@@ -6,9 +6,9 @@ from pygamestudio.editor.gui.console.type import *
 
 
 class ConsoleWindow(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, object_manager=None):
         super().__init__(parent)
-        self._console_log_browser = ConsoleLogBrowser(self)
+        self._console_log_browser = ConsoleLogBrowser(self, object_manager)
         self._search_line_edit = SearchLineEdit(self)
 
         self._clear_btn = ClearButton(self)

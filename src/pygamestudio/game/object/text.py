@@ -6,7 +6,9 @@ from pygamestudio.common.utils.path import RES_PATH
 
 
 class ObjectText:
-    def __init__(self, obj_data=None):
+    def __init__(self, object_manager, obj_data=None):
+        self._object_manager = object_manager
+
         obj_data = obj_data or {}
         self.x = obj_data.get('x', 0)
         self.y = obj_data.get('y', 0)

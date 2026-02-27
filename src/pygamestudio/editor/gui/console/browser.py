@@ -13,8 +13,9 @@ class ConsoleLogBrowser(QTextBrowser):
     error_log_signal = Signal(str)
     warning_log_signal = Signal(str)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, object_manager=None):
         super().__init__(parent)
+        self._object_manager = object_manager
         self._context_menu = ContextMenu('', self)
         
         self._logs = []
