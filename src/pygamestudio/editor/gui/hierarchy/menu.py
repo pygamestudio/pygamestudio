@@ -1,7 +1,6 @@
 from PySide6.QtWidgets import QApplication, QMenu
 from PySide6.QtGui import QAction
 from PySide6.QtCore import Signal
-from pygamestudio.editor.gui.hierarchy.type import *
 from pygamestudio.game.object.type import *
 
 
@@ -22,9 +21,9 @@ class ContextMenu(QMenu):
         self._parent = parent
 
     def _add_actions(self, item_type):
-        add_text_action = QAction('文本', self)
+        add_line_action = QAction('直线', self)
         add_rect_action = QAction('矩形', self)
-        add_circle_action = QAction('圆形', self)
+        add_ellipse_action = QAction('椭圆', self)
         cut_action = QAction('剪切', self)
         copy_action = QAction('复制', self)
         paste_action = QAction('粘贴', self)
@@ -35,9 +34,9 @@ class ContextMenu(QMenu):
         copy_path_action = QAction('复制路径', self)
         copy_name_action = QAction('复制名称', self)
 
-        add_text_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_TEXT))
+        add_line_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_LINE))
         add_rect_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_RECT))
-        add_circle_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_CIRCLE))
+        add_ellipse_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_ELLIPSE))
         cut_action.triggered.connect(self.cut_signal.emit)
         copy_action.triggered.connect(self.copy_signal.emit)
         paste_action.triggered.connect(self.paste_signal.emit)
@@ -51,9 +50,9 @@ class ContextMenu(QMenu):
         # Create actions are for all object types.
         add_menu = QMenu(title='添加')
         self.addMenu(add_menu)
-        add_menu.addAction(add_text_action)
+        add_menu.addAction(add_line_action)
         add_menu.addAction(add_rect_action)
-        add_menu.addAction(add_circle_action)  
+        add_menu.addAction(add_ellipse_action)  
 
         # Right click on the blank area.
         if item_type is None:

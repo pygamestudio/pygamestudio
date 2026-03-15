@@ -61,17 +61,17 @@ class AddItemButton(QPushButton):
 
     def _show_context_menu(self, pos):
         menu = QMenu()
-        add_text_action = QAction('文本', self)
+        add_line_action = QAction('直线', self)
         add_rect_action = QAction('矩形', self)
-        add_circle_action = QAction('圆形', self)
+        add_ellipse_action = QAction('椭圆', self)
 
-        add_text_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_TEXT))
+        add_line_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_LINE))
         add_rect_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_RECT))
-        add_circle_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_CIRCLE))
+        add_ellipse_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_ELLIPSE))
 
-        menu.addAction(add_text_action)
+        menu.addAction(add_line_action)
         menu.addAction(add_rect_action)
-        menu.addAction(add_circle_action)
+        menu.addAction(add_ellipse_action)
 
         menu.exec(self.mapToGlobal(pos))
 

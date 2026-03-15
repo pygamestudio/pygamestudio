@@ -3,7 +3,7 @@ from PySide6.QtCore import *
 
 
 class VisibilityCheckBox(QCheckBox):
-    def __init__(self, inspector_window, is_checked=True):
+    def __init__(self, inspector_window, attr, is_checked=True):
         super().__init__()
         self._inspector_window = inspector_window
         self.setChecked(is_checked)

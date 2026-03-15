@@ -31,12 +31,19 @@ class HierarchyTreeView(QTreeView):
         self._context_menu = ContextMenu('', self)
         self._setup()
 
-        QTimer().singleShot(1000, lambda:self._add(OBJECT_RECT))
+        # QTimer().singleShot(1000, lambda:self._add(OBJECT_RECT))
+        # QTimer().singleShot(2000, lambda: self._object_manager.load('D:/Github/pygamestudio/src/pygamestudio/aaa.json'))
+        from pygamestudio.common.utils.project import get_project_config
+        from pathlib import Path
+        import os
+        scene_file = get_project_config()['asset']['scene']
+        
+        QTimer().singleShot(2000, lambda: self._object_manager.load(''))
 
     def _setup(self):
         self._set_widget()
         self._set_signal()
-        self._add_scene_item()
+        # self._add_scene_item()
         
         # # 测试用
         # import json
@@ -325,7 +332,10 @@ class HierarchyTreeView(QTreeView):
     
     def _on_object_deleted(self, object_uuid):
         matched_item = self._get_matched_item(object_uuid)
-        matched_item.parent().takeRow(matched_item.row())
+        if matched_item == self._scene_item:
+            self._standard_model.clear()
+        else:
+            matched_item.parent().takeRow(matched_item.row())
     
     def _rename(self):
         self.edit(self.currentIndex())
@@ -487,70 +497,16 @@ class HierarchyTreeView(QTreeView):
         
         return _get(item_uuid, self._scene_item)
 
-    # def tree_to_dict(self):
-    #     def item_to_dict(item):
-    #         item_dict = {
-    #             'data': item.data(Qt.ItemDataRole.UserRole+1),
-    #             'children': []
-    #         }
-
-    #         for i in range(item.rowCount()):
-    #             child_item = item.child(i)
-    #             item_dict['children'].append(item_to_dict(child_item))
-            
-    #         return item_dict
-     
-    #     tree_dict = item_to_dict(self._scene_item)
-    #     return tree_dict
-
-    # def dict_to_tree(self, tree_dict):
-    #     def dict_to_item(item_dict, parent=None):
-    #         item_data = item_dict['data']
-
-    #         item = QStandardItem()
-    #         if not parent:
-    #             self._scene_item = item
-    #             self._standard_model.appendRow(self._scene_item)
-    #             self._scene_item.setFlags(self._scene_item.flags() & ~Qt.ItemFlag.ItemIsDragEnabled)
-    #         else:
-    #             parent.appendRow(item)
-    #             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
-
-    #         item.setText(item_data['name'])
-    #         item.setIcon(QIcon(item_data['icon']))
-    #         item.setData(item_data, Qt.ItemDataRole.UserRole+1)
-    #         self.setExpanded(self._proxy_model.mapFromSource(self._standard_model.indexFromItem(item)), item_data['is_expanded'])
-        
-    #         for child_item_dict in item_dict['children']:
-    #             dict_to_item(child_item_dict, item)
-
-    #         return item
-    
-    #     self.blockSignals(True)
-    #     dict_to_item(tree_dict, None)
-    #     self.blockSignals(False)
-
     def drawRow(self, painter, options, index):
+        super().drawRow(painter, options, index)
+
         item = self._standard_model.itemFromIndex(self._proxy_model.mapToSource(index))
         item_uuid = item.data(Qt.ItemDataRole.UserRole+1)
 
         painter.save()
         if self._object_manager.is_cut() and item_uuid in self._object_manager.get_all_uuid_from_clipboard_content():
             painter.setOpacity(0.5)
-
-        # if item in self._highlight_items:
-        #     painter.setPen(QPen(QColor(229, 243, 255, 255)))
-        #     painter.setBrush(QColor(229, 243, 255, 255))
-        #     painter.drawRect(options.rect)
-
-        super().drawRow(painter, options, index)
         painter.restore()
-
-    # def mousePressEvent(self, event):
-    #     super().mousePressEvent(event)
-    #     index = self.indexAt(event.pos())
-    #     if not index.isValid():
-    #         self._clear_highlight_items()
 
     def dropEvent(self, event):
         # Rewirte the drop event. The logic is like cut and paste.
@@ -582,16 +538,16 @@ class HierarchyTreeView(QTreeView):
                 self._paste()
                 event.accept()
                 return
-            elif event.key() == Qt.Key.Key_Z and self._object_manager.undo_stack.canUndo():
-                self._object_manager.undo_stack.undo()
-                print(self._object_manager.undo_stack.index())
-                print('撤销')
+            # elif event.key() == Qt.Key.Key_Z and self._object_manager.undo_stack.canUndo():
+            #     self._object_manager.undo_stack.undo()
+            #     print(self._object_manager.undo_stack.index())
+            #     print('撤销')
 
-        elif event.modifiers() == (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier):
-            if event.key() == Qt.Key.Key_Z and self._object_manager.undo_stack.canRedo():
-                print('重做')
-                self._object_manager.undo_stack.redo()
-                print(self._object_manager.undo_stack.index())
+        # elif event.modifiers() == (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier):
+        #     if event.key() == Qt.Key.Key_Z and self._object_manager.undo_stack.canRedo():
+        #         print('重做')
+        #         self._object_manager.undo_stack.redo()
+        #         print(self._object_manager.undo_stack.index())
         
         elif event.key() == Qt.Key.Key_Delete:
             self._delete()

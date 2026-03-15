@@ -18,7 +18,7 @@ class EditorTitle(QWidget):
     window_closed = Signal()
     window_moved = Signal(int, int)
 
-    def __init__(self, parent=None):
+    def __init__(self):
         super().__init__()
         self._icon = QLabel()
         self._name_label = QLabel()
@@ -104,13 +104,13 @@ class EditorTitle(QWidget):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-            self._start_x = event.x()
-            self._start_y = event.y()
+            self._start_x = event.position().x()
+            self._start_y = event.position().y()
     
     def mouseMoveEvent(self, event):
         if self._start_x is not None and self._start_y is not None:
-            dis_x = event.x() - self._start_x
-            dis_y = event.y() - self._start_y
+            dis_x = event.position().x() - self._start_x
+            dis_y = event.position().y() - self._start_y
             self.window_moved.emit(dis_x, dis_y)
 
     def mouseReleaseEvent(self, event):
@@ -126,14 +126,13 @@ class EditorTitle(QWidget):
     
 
 class EditorBody(QMainWindow):
-    def __init__(self, parent=None):
+    def __init__(self, object_manager):
         super().__init__()
-        self._object_manager = ObjectManager()
-        self._scene_widnow = SceneWindow(self, self._object_manager)
-        self._asset_window = AssetWindow(self, self._object_manager)
-        self._console_window = ConsoleWindow(self, self._object_manager)
-        self._hierarchy_window = HierarchyWindow(self, self._object_manager)
-        self._inspector_window = InspectorWindow(self, self._object_manager)
+        self._scene_widnow = SceneWindow(self, object_manager)
+        self._asset_window = AssetWindow(self, object_manager)
+        self._console_window = ConsoleWindow(self, object_manager)
+        self._hierarchy_window = HierarchyWindow(self, object_manager)
+        self._inspector_window = InspectorWindow(self, object_manager)
 
         self._left_top_tab_widget = QTabWidget()
         self._left_bottom_tab_widget = QTabWidget()
@@ -195,8 +194,9 @@ class EditorBody(QMainWindow):
 class Editor(QWidget):
     def __init__(self):
         super().__init__()
-        self._editor_title = EditorTitle(self)
-        self._editor_body = EditorBody(self)
+        self._object_manager = ObjectManager()
+        self._editor_title = EditorTitle()
+        self._editor_body = EditorBody(self._object_manager)
         self._central_widget = QWidget()
 
         self._stretch_type = None
@@ -204,7 +204,7 @@ class Editor(QWidget):
         self._stretch_area_offset = 10
 
         self._setup()
-        self.move(50, 50)
+        self.move(50, 50)   # 改成屏幕居中
 
     def _setup(self):
         self._set_widget()
@@ -308,55 +308,72 @@ class Editor(QWidget):
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton and self._stretch_type:
             self._is_stretching = True
-            self._stretch_start_x = event.x()
-            self._stretch_start_y = event.y()
 
     def mouseMoveEvent(self, event):
-        self._stretch_type = self._get_stretch_type(event.x(), event.y())
+        self._stretch_type = self._get_stretch_type(event.position().x(), event.position().y())
 
         if self._is_stretching and self._stretch_type:
             if self._stretch_type == 'RIGHT':
-                self.resize(event.x(), self.height())
+                self.resize(event.position().x(), self.height())
 
             if self._stretch_type == 'LEFT':
-                if self.width()-event.x() < self.minimumWidth():
+                if self.width()-event.position().x() < self.minimumWidth():
                     self.setGeometry(self.geometry().x(), self.geometry().y(), self.minimumWidth(), self.height())
                 else:
-                    self.setGeometry(self.geometry().x()+event.x(), self.geometry().y(), self.width()-event.x(), self.height())
+                    self.setGeometry(self.geometry().x()+event.position().x(), self.geometry().y(), self.width()-event.position().x(), self.height())
 
             elif self._stretch_type == 'BOTTOM':
-                self.resize(self.width(), event.y())
+                self.resize(self.width(), event.position().y())
             
             elif self._stretch_type == 'TOP':
-                if self.height()-event.y() < self.minimumHeight():
+                if self.height()-event.position().y() < self.minimumHeight():
                     self.setGeometry(self.geometry().x(), self.geometry().y(), self.width(), self.minimumHeight())
                 else:
-                    self.setGeometry(self.geometry().x(), self.geometry().y()+event.y(), self.width(), self.height()-event.y())
+                    self.setGeometry(self.geometry().x(), self.geometry().y()+event.position().y(), self.width(), self.height()-event.position().y())
             
             elif self._stretch_type == 'BOTTOM_RIGHT':
-                self.resize(event.x(), event.y())
+                self.resize(event.position().x(), event.position().y())
             
             elif self._stretch_type == 'BOTTOM_LEFT':
-                if self.width()-event.x() < self.minimumWidth():
-                    self.setGeometry(self.geometry().x(), self.geometry().y(), self.minimumWidth(), event.y())
+                if self.width()-event.position().x() < self.minimumWidth():
+                    self.setGeometry(self.geometry().x(), self.geometry().y(), self.minimumWidth(), event.position().y())
                 else:
-                    self.setGeometry(self.geometry().x()+event.x(), self.geometry().y(), self.width()-event.x(), event.y())
+                    self.setGeometry(self.geometry().x()+event.position().x(), self.geometry().y(), self.width()-event.position().x(), event.position().y())
 
             elif self._stretch_type == 'TOP_LEFT':
-                if self.width()-event.x() < self.minimumWidth() and  self.height()-event.y() >= self.minimumHeight():
-                    self.setGeometry(self.geometry().x(), self.geometry().y()+event.y(), self.minimumWidth(), self.height()-event.y())                
-                elif self.height()-event.y() < self.minimumHeight() and self.width()-event.x() >= self.minimumWidth():
-                    self.setGeometry(self.geometry().x()+event.x(), self.geometry().y(), self.width()-event.x(), self.minimumHeight())                
-                elif self.width()-event.x() < self.minimumWidth() and self.height()-event.y() < self.minimumHeight():
+                if self.width()-event.position().x() < self.minimumWidth() and  self.height()-event.position().y() >= self.minimumHeight():
+                    self.setGeometry(self.geometry().x(), self.geometry().y()+event.position().y(), self.minimumWidth(), self.height()-event.position().y())                
+                elif self.height()-event.position().y() < self.minimumHeight() and self.width()-event.position().x() >= self.minimumWidth():
+                    self.setGeometry(self.geometry().x()+event.position().x(), self.geometry().y(), self.width()-event.position().x(), self.minimumHeight())                
+                elif self.width()-event.position().x() < self.minimumWidth() and self.height()-event.position().y() < self.minimumHeight():
                     self.setGeometry(self.geometry().x(), self.geometry().y(), self.minimumWidth(), self.minimumHeight())                
                 else:
-                    self.setGeometry(self.geometry().x()+event.x(), self.geometry().y()+event.y(), self.width()-event.x(), self.height()-event.y())                
+                    self.setGeometry(self.geometry().x()+event.position().x(), self.geometry().y()+event.position().y(), self.width()-event.position().x(), self.height()-event.position().y())                
             
             elif self._stretch_type == 'TOP_RIGHT':
-                if self.height()-event.y() < self.minimumHeight():
-                    self.setGeometry(self.geometry().x(), self.geometry().y(), event.x(), self.minimumHeight())
+                if self.height()-event.position().y() < self.minimumHeight():
+                    self.setGeometry(self.geometry().x(), self.geometry().y(), event.position().x(), self.minimumHeight())
                 else:
-                    self.setGeometry(self.geometry().x(), self.geometry().y()+event.y(), event.x(), self.height()-event.y())
+                    self.setGeometry(self.geometry().x(), self.geometry().y()+event.position().y(), event.position().x(), self.height()-event.position().y())
 
     def mouseReleaseEvent(self, event):
         self._is_stretching = False
+
+    def keyPressEvent(self, event):
+        if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+            if event.key() == Qt.Key.Key_S:
+                print('保存')
+                self._object_manager.save()
+            elif event.key() == Qt.Key.Key_Z:
+                print('撤销')
+                self._object_manager.undo_stack.undo()
+            elif event.key() == Qt.Key.Key_Y:
+                print('重做')
+                self._object_manager.undo_stack.redo()
+
+        elif event.modifiers() == (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier):
+            if event.key() == Qt.Key.Key_Z:
+                print('重做')
+                self._object_manager.undo_stack.redo()
+
+        super().keyPressEvent(event)

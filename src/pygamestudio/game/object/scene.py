@@ -1,4 +1,5 @@
 import uuid
+import json
 import pygame
 import random
 from pygamestudio.game.object.type import *
@@ -6,30 +7,32 @@ from pygamestudio.common.utils.path import RES_PATH
 
 
 class ObjectScene:
-    def __init__(self, object_manager, obj_data=None):
+    def __init__(self, object_manager, object_data={}):
         self._object_manager = object_manager
 
-        obj_data = obj_data or {}
-        self.x = obj_data.get('x', 0)
-        self.y = obj_data.get('y', 0)
-        self.pos = obj_data.get('pos', (0, 0))
-        self.width = obj_data.get('width', 50)
-        self.height = obj_data.get('height', 50)
-        self.size = obj_data.get('size', (50, 50))
-        self.scale_x = obj_data.get('scale_x', 1)
-        self.scale_y = obj_data.get('scale_y', 1)
-        self.scale = obj_data.get('scale', (1, 1))
-        self.angle = obj_data.get('angle', 0)
-        self.icon = obj_data.get('icon', str(RES_PATH/'images/item.png'))
-        self.color = obj_data.get('color', random.choice(["#ff00bf", "#000000", "#00eeff"]))
-        
-        self.name = obj_data.get('name', 'Scene')
-        self.type = obj_data.get('type', OBJECT_SCENE)
-        self.uuid = obj_data.get('uuid', str(uuid.uuid4()))
-        self.parent_uuid = obj_data.get('parent_uuid', '')
-        self.is_visible = obj_data.get('is_visible', True)
-        self.is_expanded = obj_data.get('is_expanded', True)
-        self.is_selected = obj_data.get('is_selected', False)
+        defaults = {
+            'name': 'Scene',
+            'type': OBJECT_SCENE,
+            'uuid': str(uuid.uuid4()),
+            'is_visible': True,
+            'is_expanded': True,
+            'is_selected': False,
+            'x': 0,
+            'y': 0,
+            'pos': (0, 0),
+            'width': 50, 
+            'height': 50,
+            'size': (50, 50),
+            'scale_x': 1,
+            'scale_y': 1,
+            'scale': (1, 1),
+            'angle': 0,
+            'icon': str(RES_PATH/'images/item.png'),
+            'color': random.choice(['#ff0000', '#00ff00', '#0000ff'])
+        }
+
+        for key, default_value in defaults.items():
+            setattr(self, key, object_data.get(key, default_value))
 
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
         pygame.draw.rect(self.surface, self.color, self.surface.get_rect())
@@ -90,4 +93,11 @@ class ObjectScene:
     
     def set_data(self, data):
         self.__dict__.update(data)
+
+    def to_dict(self):
+        exclude_fields = ['_is_initialized', '_object_manager', 'surface', 'icon']
+        return {
+            key: value for key, value in self.__dict__.items() 
+            if key not in exclude_fields
+        }
          

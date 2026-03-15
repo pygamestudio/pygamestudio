@@ -24,7 +24,7 @@ class AssetTreeView(QTreeView):
         self._context_menu = ContextMenu('', self)
         self._delegate = AssetTreeWidgetDelegate(self, self._proxy_model, self._file_model)
 
-        self._root_path = 'C:/Users/louis/Desktop/demo'    # 项目配置文件
+        self._root_path = 'C:/Users/louis/Desktop/pygamestudio-test'    # 项目配置文件
         self._sort_type = SORT_BY_NAME_ASC     # 项目配置文件
         self._clipboard_content = []
         self._is_cut = False
@@ -501,6 +501,18 @@ class AssetTreeView(QTreeView):
         index = self.indexAt(event.pos())
         if not index.isValid():
             self._clear_highlight_items()
+
+    def mouseDoubleClickEvent(self, event):
+        super().mouseDoubleClickEvent(event)
+        index = self.indexAt(event.pos())
+        if not index.isValid():
+            return
+        
+        index_path = Path(self._file_model.filePath(self._proxy_model.mapToSource(index)))
+        print(index_path.suffix)
+        if index_path.suffix == '.scene':
+            self._object_manager.load(index_path)
+        # print(index_path)
 
     def dragEnterEvent(self, event):
         if event.source() != None and event.source() != self:

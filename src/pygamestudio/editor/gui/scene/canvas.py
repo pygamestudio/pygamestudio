@@ -35,16 +35,20 @@ class PygameWidget(QWidget):
 
     def _set_signal(self):
         self._object_manager.object_added.connect(self._on_object_added)
-        self._object_manager.object_deleted.connect(self._on_object_deleted)
-        self._object_manager.object_selected.connect(self._on_object_selected)
-        self._object_manager.object_deselected.connect(self._on_object_deselected)
-        self._object_manager.object_moved.connect(self._on_object_moved)
-        self._object_manager.object_scaled.connect(self._on_object_scaled)
-        self._object_manager.object_rotated.connect(self._on_object_rotated)
-        self._object_manager.object_resized.connect(self._on_object_resized)
-        self._object_manager.object_showed.connect(self._on_object_showed)
-        self._object_manager.object_hidden.connect(self._on_object_hidden)
-        self._object_manager.object_color_changed.connect(self._on_object_color_changed)
+        self._object_manager.object_deleted.connect(self._update_scene)
+        self._object_manager.object_selected.connect(self._update_scene)
+        self._object_manager.object_deselected.connect(self._update_scene)
+        self._object_manager.object_moved.connect(self._update_scene)
+        self._object_manager.object_scaled.connect(self._update_scene)
+        self._object_manager.object_rotated.connect(self._update_scene)
+        self._object_manager.object_resized.connect(self._update_scene)
+        self._object_manager.object_showed.connect(self._update_scene)
+        self._object_manager.object_hidden.connect(self._update_scene)
+        self._object_manager.object_color_changed.connect(self._update_scene)
+        self._object_manager.object_rect_border_radius_changed.connect(self._update_scene)
+        self._object_manager.object_line_start_point_changed.connect(self._update_scene)
+        self._object_manager.object_line_end_point_changed.connect(self._update_scene)
+        self._object_manager.object_line_thickness_changed.connect(self._update_scene)
 
     def _set_pygame(self):
         pygame.init()
@@ -64,38 +68,13 @@ class PygameWidget(QWidget):
         # 找出所有选中的is_selected为True的对s象，然后调用object_manager.delete()
         selected_uuids = self._object_manager.get_selected_objects_uuids()
         self._object_manager.delete(selected_uuids)
-
-    def _on_object_deleted(self, object_uuid):
-        self._update_scene()
-
-    def _on_object_selected(self, object_uuid):
-        self._update_scene()
-
-    def _on_object_deselected(self, object_uuid):
-        self._update_scene()
-
-    def _on_object_moved(self, object_uuid):
-        self._update_scene()
-
-    def _on_object_rotated(self, object_uuid):
-        self._update_scene()
-
-    def _on_object_scaled(self, object_uuid):
-        self._update_scene()
-
-    def _on_object_resized(self, object_uuid):
-        self._update_scene()
-
-    def _on_object_showed(self, object_uuid):
-        self._update_scene()
-
-    def _on_object_hidden(self, object_uuid):
-        self._update_scene()
-
-    def _on_object_color_changed(self, object_uuid):
-        self._update_scene()
-
+        
     def _update_scene(self):
+        if self._object_manager.is_empty():
+            self._canvas_surface.fill((0, 0, 0))
+            self.update()
+            return
+        
         def _update(object_tree_struct, parent_surface):
             value = list(object_tree_struct.values())[0]
             obj = value['object']
@@ -136,6 +115,9 @@ class PygameWidget(QWidget):
         self._object_manager.undo_stack.endMacro()
 
     def _update_object_selection(self, pos):
+        if self._object_manager.is_empty():
+            return
+        
         if not self._is_ctrl_pressed:
             self._object_manager.deselect_all()
 
@@ -149,33 +131,13 @@ class PygameWidget(QWidget):
         def _set(object_tree_struct, pos):
             value = list(object_tree_struct.values())[0]
 
-            # if value['object'].type != OBJECT_SCENE and value['object'].get_world_rect().collidepoint((pos.x(), pos.y())):
-            if value['object'].type != OBJECT_SCENE and value['object'].check_click_collision((pos.x(), pos.y())):
-                # value['object'].is_selected = True
-                self._final_selected_object = value['object']
-                # self._object_manager.select(value['object'].uuid)
-
-                # if not value['children']:
-                #     # self._object_manager.select(self._final_selected_object.uuid)
-                #     return True
-                
             for child_object_tree_struct in reversed(value['children']):
                 _set(child_object_tree_struct, pos)
                 if self._final_selected_object:
                     return
-                # result = _set(child_object_tree_struct, pos)
-                # if result:
-                #     return True
-
-            # if self._final_selected_object:
-            #     self._object_manager.select(self._final_selected_object.uuid)
-            #     return True
-            # else:
-            #     # Clear selection if no object is selected.
-            #     self._object_manager.deselect_all()
-            #     # self._final_selected_object = None
-            #     self._object_manager.select(self._object_manager.scene_object_uuid)
-            #     return False
+                
+            if value['object'].type != OBJECT_SCENE and value['object'].check_click_collision((pos.x(), pos.y())):
+                self._final_selected_object = value['object']
 
         _set(self._object_manager.all_object_tree_struct, pos)
         if self._final_selected_object:

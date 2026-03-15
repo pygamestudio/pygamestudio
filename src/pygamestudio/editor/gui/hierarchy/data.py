@@ -1,5 +1,4 @@
 from pygamestudio.common.utils.path import RES_PATH
-from pygamestudio.editor.gui.hierarchy.type import *
 
 
 # DEFAULT_ROOT_DATA = {

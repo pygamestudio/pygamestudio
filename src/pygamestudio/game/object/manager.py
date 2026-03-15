@@ -1,3 +1,5 @@
+import os
+import json
 from PySide6.QtWidgets import *
 from PySide6.QtCore import *
 from PySide6.QtGui import *
@@ -5,10 +7,13 @@ from pygamestudio.game.object.type import *
 from pygamestudio.game.object.rect import *
 from pygamestudio.game.object.scene import *
 from pygamestudio.game.object.text import *
-from pygamestudio.game.object.circle import *
+from pygamestudio.game.object.ellipse import *
+from pygamestudio.game.object.line import *
 
 
 class ObjectManager(QObject):
+    object_saved = Signal()
+
     object_added = Signal(str, str, int)
     object_deleted = Signal(str)
     object_selected = Signal(str)
@@ -24,24 +29,41 @@ class ObjectManager(QObject):
     object_copied = Signal()
     object_color_changed = Signal(str)
 
+    object_rect_border_radius_changed = Signal(str, str)
+    object_line_start_point_changed = Signal(str)
+    object_line_end_point_changed = Signal(str)
+    object_line_thickness_changed = Signal(str)
+
     def __init__(self):
         super().__init__()
-        self._all_object_tree_struct = {}
-        self._undo_stack = QUndoStack(self)
         self._is_cut = False
+        self._scene_file_path = ''
         self._scene_object_uuid = ''
         self._clipboard_content = []
+        self._all_object_tree_struct = {}
+        self._undo_stack = QUndoStack(self)
 
     @property
     def all_object_tree_struct(self):
         return self._all_object_tree_struct
 
     @property
+    def scene_file_path(self):
+        return self._scene_file_path
+    
+    @property
     def scene_object_uuid(self):
         return self._scene_object_uuid
     
-    def add(self, parent_uuid, object_type, obj_data=None):
-        obj = self._new_object(object_type, obj_data)
+    @property
+    def undo_stack(self):
+        return self._undo_stack
+    
+    def add(self, parent_uuid, object_type, object_data={}):
+        return self._add(parent_uuid, object_type, object_data)
+    
+    def _add(self, parent_uuid, object_type, object_data={}):
+        obj = self._new_object(object_type, object_data)
 
         object_tree_struct = {
             obj.uuid: {
@@ -55,50 +77,34 @@ class ObjectManager(QObject):
         else:
             inserted_pos = -1
             self._undo_stack.push(AddObjectCommand(self, parent_uuid, object_tree_struct, inserted_pos))
-    
-    def _new_object(self, object_type, obj_data=None):
+
+    def _new_object(self, object_type, object_data={}):
         if object_type == OBJECT_SCENE:
-            obj = ObjectScene(self, obj_data)
+            obj = ObjectScene(self, object_data)
             self._scene_object_uuid = obj.uuid
         elif object_type == OBJECT_RECT:
-            obj = ObjectRect(self, obj_data)
+            obj = ObjectRect(self, object_data)
         elif object_type == OBJECT_TEXT:
-            obj = ObjectText(self, obj_data)
-        elif object_type == OBJECT_CIRCLE:
-            obj = ObjectCircle(self, obj_data)
-
+            obj = ObjectText(self, object_data)
+        elif object_type == OBJECT_ELLIPSE:
+            obj = ObjectEllipse(self, object_data)
+        elif object_type == OBJECT_LINE:
+            obj = ObjectLine(self, object_data)
         return obj
-
-    @property
-    def undo_stack(self):
-        return self._undo_stack
 
     def rename(self, object_uuid, new_name):   
         obj = self._get_object(object_uuid)     
         old_name = obj.name
         obj.name = new_name
 
-        self._undo_stack.push(UpdateKeyValueCommand(self, obj, 'name', old_name, new_name))
+        self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'name', old_name, new_name))
 
     def resize(self, object_uuid, new_size):
         obj = self._get_object(object_uuid)
         old_size = (obj.width, obj.height)    
-        self._undo_stack.push(UpdateKeyValueCommand(self, obj, 'size', old_size, new_size))
+        self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'size', old_size, new_size))
 
     def get_selected_objects_uuids(self):
-        # def _get(object_tree_struct, selected_uuid_list):
-        #     key = list(object_tree_struct.keys())[0]
-        #     value = list(object_tree_struct.values())[0]
-
-        #     if value['object'].is_selected:
-        #         selected_uuid_list.append(key)
-
-        #     for child_object_tree_struct in value['children']:
-        #         _get(child_object_tree_struct, selected_uuid_list)
-        
-        # selected_uuid_list = []
-        # _get(self._all_object_tree_struct, selected_uuid_list)
-        # return selected_uuid_list
         selected_uuids = []
         selected_objects = self.get_selected_objects()
         for obj in selected_objects:
@@ -173,25 +179,25 @@ class ObjectManager(QObject):
     def move(self, object_uuid, new_pos):
         obj = self._get_object(object_uuid)
         old_pos = (obj.x, obj.y)    
-        self._undo_stack.push(UpdateKeyValueCommand(self, obj, 'pos', old_pos, new_pos))
+        self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'pos', old_pos, new_pos))
 
     def scale(self, object_uuid, new_scale):
         obj = self._get_object(object_uuid)
         old_scale = (obj.scale_x, obj.scale_y)
-        self._undo_stack.push(UpdateKeyValueCommand(self, obj, 'scale', old_scale, new_scale))
+        self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'scale', old_scale, new_scale))
 
     def rotate(self, object_uuid, new_angle):
         obj = self._get_object(object_uuid)
         old_angle = obj.angle
-        self._undo_stack.push(UpdateKeyValueCommand(self, obj, 'angle', old_angle, new_angle))
+        self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'angle', old_angle, new_angle))
 
     def show(self, object_uuid):
         obj = self._get_object(object_uuid)       
-        self._undo_stack.push(UpdateKeyValueCommand(self, obj, 'is_visible', False, True))
+        self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'is_visible', False, True))
 
     def hide(self, object_uuid):
         obj = self._get_object(object_uuid)       
-        self._undo_stack.push(UpdateKeyValueCommand(self, obj, 'is_visible', True, False))
+        self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'is_visible', True, False))
 
     def expand(self, object_uuid):
         obj = self._get_object(object_uuid)
@@ -204,7 +210,30 @@ class ObjectManager(QObject):
     def set_color(self, object_uuid, new_color):
         obj = self._get_object(object_uuid)
         old_color = obj.color
-        self._undo_stack.push(UpdateKeyValueCommand(self, obj, 'color', old_color, new_color))
+        self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'color', old_color, new_color))
+
+    def set_border_radius(self, object_uuid, attr, new_border_radius):
+        """
+        attr can be border_top_left_radius, border_top_right_radius, border_bottom_left_radius or border_bottom_right_radius
+        """
+        obj = self._get_object(object_uuid)
+        old_border_radius = getattr(obj, attr)
+        self._undo_stack.push(UpdateAttrValueCommand(self, obj, attr, old_border_radius, new_border_radius))
+
+    def set_thickness(self, object_uuid, new_thickness):
+        obj = self._get_object(object_uuid)
+        old_thickness = obj.thickness
+        self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'thickness', old_thickness, new_thickness))
+
+    def set_start_point(self, object_uuid, new_start_point):
+        obj = self._get_object(object_uuid)
+        old_start_point = obj.start_point
+        self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'start_point', old_start_point, new_start_point))
+
+    def set_end_point(self, object_uuid, new_end_point):
+        obj = self._get_object(object_uuid)
+        old_end_point = obj.end_point
+        self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'end_point', old_end_point, new_end_point))
 
     def _get_object_tree_struct(self, object_uuid, parent_object_tree_struct=None):
         def _get(object_uuid, object_tree_struct):
@@ -247,22 +276,7 @@ class ObjectManager(QObject):
         if parent_obj:
             return parent_obj.uuid
         return None
-        # def _get(object_uuid, object_tree_struct):
-        #     key = list(object_tree_struct.keys())[0]
-        #     value = list(object_tree_struct.values())[0]
 
-        #     if object_uuid in [list(child_object_tree_struct.keys())[0] for child_object_tree_struct in value['children']]:
-        #         return key
-            
-        #     for child_object_tree_struct in value['children']:
-        #         result = _get(object_uuid, child_object_tree_struct)
-        #         if result:
-        #             return result
-                
-        #     return None
-        
-        # return _get(object_uuid, self._all_object_tree_struct)
-    
     def _get_parent_object(self, object_uuid):
         def _get(object_uuid, object_tree_struct):
             # key = list(object_tree_struct.keys())[0]
@@ -430,7 +444,6 @@ class ObjectManager(QObject):
             self._undo_stack.push(AddObjectCommand(self, parent_uuid, new_object_tree_struct, -1))
         self._undo_stack.endMacro()
 
-        # self.object_pasted_for_cut.emit(parent_uuid, [OrderedDict(d) for d in deep_copy_clipboard_content])
         self._clipboard_content.clear()
         self._is_cut = False
 
@@ -441,12 +454,9 @@ class ObjectManager(QObject):
 
         self._undo_stack.beginMacro('Copy')
         for new_object_tree_struct in self._clipboard_content:
-            # self._add_object_tree_struct(parent_uuid, new_object_tree_struct)
             self._undo_stack.push(AddObjectCommand(self, parent_uuid, new_object_tree_struct, -1))
 
         self._undo_stack.endMacro()
-
-        # self.object_pasted_for_copy.emit(parent_uuid, [OrderedDict(d) for d in self._clipboard_content])
 
     def _deep_copy_object_tree_struct(self, object_tree_struct, is_new_uuid):
         new_object_tree_struct = {}
@@ -502,6 +512,9 @@ class ObjectManager(QObject):
         self._undo_stack.endMacro()
 
     def delete(self, object_uuid_list):
+        self._delete(object_uuid_list)
+
+    def _delete(self, object_uuid_list):
         object_tree_struct_list_to_delete = []
 
         def is_to_discard(object_uuid):
@@ -531,8 +544,12 @@ class ObjectManager(QObject):
         return self._delete_object_tree_struct(object_uuid)
 
     def _delete_object_tree_struct(self, object_uuid):
+        if object_uuid == self._scene_object_uuid:
+            self._all_object_tree_struct = {}
+            self.object_deleted.emit(object_uuid)
+            return
+
         def _delete(object_uuid, object_tree_struct):
-            # key = list(object_tree_struct.keys())[0]
             value = list(object_tree_struct.values())[0]  
             for child_object_tree_struct in value['children']:
                 if object_uuid == list(child_object_tree_struct.keys())[0]:
@@ -547,6 +564,55 @@ class ObjectManager(QObject):
             return False
             
         _delete(object_uuid, self._all_object_tree_struct)
+
+    def save(self):
+        return self._save()
+    
+    def _save(self):
+        project_path = os.environ.get('PROJECT_PATH', '.')
+        if not self._scene_file_path:
+            self._scene_file_path, _ = QFileDialog.getSaveFileName(None, 'Save File', project_path, 'Files (*.scene)')
+        
+        if not self._scene_file_path:
+            return
+        
+        def _default(obj):
+            if hasattr(obj, 'to_dict'):
+                return obj.to_dict()
+            raise TypeError(f'Object of type {obj.__class__.__name__} is not JSON serializable')
+
+        with open(self._scene_file_path, 'w', encoding='utf-8') as f:
+            json.dump(self._all_object_tree_struct, f, default=_default, indent=4, ensure_ascii=False)
+    
+    def load(self, scene_file_path):
+        return self._load(scene_file_path)
+    
+    def _load(self, scene_file_path):
+        if not scene_file_path or not scene_file_path.exists():
+            self._add('', OBJECT_SCENE)
+            return
+        
+        self._delete_object_tree_struct(self._scene_object_uuid)
+        self._scene_file_path = scene_file_path
+
+        with open(scene_file_path, 'r', encoding='utf-8') as f:
+            data = json.loads(f.read())
+
+        def _l(parent_uuid, object_tree_struct):
+            key = list(object_tree_struct.keys())[0]
+            value = list(object_tree_struct.values())[0]
+
+            object_data = value['object']
+            self._add(parent_uuid, value['object']['type'], object_data)
+            children = value['children']
+            for child_object_tree_struct in children:
+                _l(key, child_object_tree_struct)
+
+        _l('', data)
+        self._undo_stack.clear()
+
+    def is_empty(self):
+        return self._all_object_tree_struct == {}
 
 
 class AddObjectCommand(QUndoCommand):
@@ -579,41 +645,46 @@ class DeleteObjectCommand(QUndoCommand):
         self._object_manager.add_object_tree_struct(self._parent_uuid, self._object_tree_struct, self._inserted_pos)
 
 
-class UpdateKeyValueCommand(QUndoCommand):
-    def __init__(self, object_manager, obj, key, old_value, new_value, descripton='Updated value'):
+class UpdateAttrValueCommand(QUndoCommand):
+    def __init__(self, object_manager, obj, attr, old_value, new_value, descripton='Updated value'):
         super().__init__(descripton)
         self._object_manager = object_manager
         self._obj = obj
-        self._key = key
+        self._attr = attr
         self._old_value = old_value
         self._new_value = new_value
 
     def redo(self):
-        setattr(self._obj, self._key, self._new_value)
-        self._emit_signal(self._key, self._new_value)
+        setattr(self._obj, self._attr, self._new_value)
+        self._emit_signal(self._attr, self._new_value)
 
     def undo(self):
-        setattr(self._obj, self._key, self._old_value)
-        self._emit_signal(self._key, self._old_value)
+        setattr(self._obj, self._attr, self._old_value)
+        self._emit_signal(self._attr, self._old_value)
 
-    def _emit_signal(self, key, value):
-        if key == 'name':
+    def _emit_signal(self, attr, value):
+        if attr == 'name':
             self._object_manager.object_renamed.emit(self._obj.uuid, value)
-        elif key == 'is_visible':
+        elif attr == 'is_visible':
             if self._new_value == True:
                 self._object_manager.object_showed.emit(self._obj.uuid)  
             else:
                 self._object_manager.object_hidden.emit(self._obj.uuid)
-        elif key == 'pos':
+        elif attr == 'pos':
             self._object_manager.object_moved.emit(self._obj.uuid)
-        elif key == 'size':
+        elif attr == 'size':
             self._object_manager.object_resized.emit(self._obj.uuid)
-        elif key == 'scale':
+        elif attr == 'scale':
             self._object_manager.object_scaled.emit(self._obj.uuid)
-        elif key == 'angle':
+        elif attr == 'angle':
             self._object_manager.object_rotated.emit(self._obj.uuid)
-        elif key == 'color':
+        elif attr == 'color':
             self._object_manager.object_color_changed.emit(self._obj.uuid)
-
-
-        
+        elif attr=='border_top_left_radius' or attr=='border_top_right_radius' or attr=='border_bottom_left_radius' or attr=='border_bottom_right_radius':
+            self._object_manager.object_rect_border_radius_changed.emit(self._obj.uuid, attr)
+        elif attr == 'start_point':
+            self._object_manager.object_line_start_point_changed.emit(self._obj.uuid)
+        elif attr == 'end_point':
+            self._object_manager.object_line_end_point_changed.emit(self._obj.uuid)
+        elif attr == 'thickness':
+            self._object_manager.object_line_thickness_changed.emit(self._obj.uuid)

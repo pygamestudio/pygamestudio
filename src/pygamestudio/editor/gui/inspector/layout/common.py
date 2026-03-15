@@ -5,37 +5,24 @@ from pygamestudio.editor.gui.inspector.component.checkbox import *
 
 
 INSPECTOR_LAYOUT_COMMON_PREFIX = {
+    'visibility': {
+        'i18n': {
+            'zh': '可见性',
+            'en': 'Visibility'
+        },
+        'component': {
+            'attribute': ['is_visible'],
+            'widget': [VisibilityCheckBox]
+        }
+    },
     'name': {
         'i18n': {
             'zh': '名称',
             'en': 'Name'
         },
         'component': {
-            'layout': 'horizontal',
             'attribute': ['name'],
             'widget': [NameLineEdit]
-        }
-    },
-    'pos': {
-        'i18n': {
-            'zh': '坐标',
-            'en': 'Pos'
-        },
-        'component': {
-            'layout': 'horizontal',
-            'attribute': ['x', 'y'],
-            'widget': [PosSpinBox, PosSpinBox]
-        }
-    },
-    'size': {
-        'i18n': {
-            'zh': '尺寸',
-            'en': 'Size'
-        },
-        'component': {
-            'layout': 'horizontal',
-            'attribute': ['width', 'height'],
-            'widget': [SizeSpinBox, SizeSpinBox]
         }
     },
     'scale': {
@@ -44,7 +31,6 @@ INSPECTOR_LAYOUT_COMMON_PREFIX = {
             'en': 'Scale'
         },
         'component': {
-            'layout': 'horizontal',
             'attribute': ['scale_x', 'scale_y'],
             'widget': [ScaleSpinBox, ScaleSpinBox]
         }
@@ -55,7 +41,6 @@ INSPECTOR_LAYOUT_COMMON_PREFIX = {
             'en': 'Angle'
         },
         'component': {
-            'layout': 'horizontal',
             'attribute': ['angle'],
             'widget': [AngleSpinBox]
         }
@@ -66,20 +51,8 @@ INSPECTOR_LAYOUT_COMMON_PREFIX = {
             'en': 'Color'
         },
         'component': {
-            'layout': 'horizontal',
             'attribute': ['color'],
             'widget': [ColorPicker]
-        }
-    },
-    'visibility': {
-        'i18n': {
-            'zh': '可见性',
-            'en': 'Visibility'
-        },
-        'component': {
-            'layout': 'horizontal',
-            'attribute': ['is_visible'],
-            'widget': [VisibilityCheckBox]
         }
     },
 }
