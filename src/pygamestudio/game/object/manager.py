@@ -37,6 +37,7 @@ class ObjectManager(QObject):
     def __init__(self):
         super().__init__()
         self._is_cut = False
+        self._project_path = ''
         self._scene_file_path = ''
         self._scene_object_uuid = ''
         self._clipboard_content = []
@@ -58,6 +59,9 @@ class ObjectManager(QObject):
     @property
     def undo_stack(self):
         return self._undo_stack
+    
+    def set_project_path(self, project_path):
+        self._project_path = project_path
     
     def add(self, parent_uuid, object_type, object_data={}):
         return self._add(parent_uuid, object_type, object_data)
@@ -569,9 +573,8 @@ class ObjectManager(QObject):
         return self._save()
     
     def _save(self):
-        project_path = os.environ.get('PROJECT_PATH', '.')
         if not self._scene_file_path:
-            self._scene_file_path, _ = QFileDialog.getSaveFileName(None, 'Save File', project_path, 'Files (*.scene)')
+            self._scene_file_path, _ = QFileDialog.getSaveFileName(None, 'Save File', self._project_path, 'Files (*.scene)')
         
         if not self._scene_file_path:
             return

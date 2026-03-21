@@ -1,18 +1,18 @@
-QWidget#editorCentralWidget {
+QWidget#windowBaseCentralWidget {
     background-color: #f2f2f2;
     border-radius: 9px;
 }
 
-QWidget#editorTitle {
+QWidget#windowTtitleBase {
     background-color: #f2f2f2;
     border-radius: 9px;
 }
 
-QLabel#editorTitleNameLabel {
+QLabel#windowTitleBaseNameLabel {
     font-weight: bold;
 }
 
-QPushButton#editorTitleMinimizeBtn, QPushButton#editorTitleMaximizeBtn, QPushButton#editorTitleCloseBtn {
+QPushButton#windowTitleBaseMinimizeBtn, QPushButton#windowTitleBaseMaximizeBtn, QPushButton#windowTitleBaseCloseBtn {
     background-color: transparent;
     border: none;
 }
