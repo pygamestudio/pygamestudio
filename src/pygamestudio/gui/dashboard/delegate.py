@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import *
 from PySide6.QtCore import *
 from PySide6.QtGui import *
+from pathlib import Path
 
 
 class DashboardDelegate(QStyledItemDelegate):
@@ -11,6 +12,8 @@ class DashboardDelegate(QStyledItemDelegate):
         self._list_view = list_view
         self._padding = 10
         self._icon_size = QSize(60, 60)
+
+        self._placeholder_text = ''
 
         self._hovered_index = None
         self._button_margin = 5
@@ -23,6 +26,10 @@ class DashboardDelegate(QStyledItemDelegate):
         project_name = index.data(self._list_view.ProjectNameRole)
         project_path = index.data(self._list_view.ProjectPathRole)
         project_date = index.data(self._list_view.ProjectDateRole)
+
+        is_project_existed = True
+        if not Path(project_path).exists():
+            is_project_existed = False
 
         icon_rect = QRect(option.rect.x() + self._padding, option.rect.y() + (option.rect.height() - self._icon_size.height()) // 2,
                     self._icon_size.width(), self._icon_size.height())
@@ -37,7 +44,12 @@ class DashboardDelegate(QStyledItemDelegate):
         name_font.setBold(True)
         name_font.setPointSize(12)
         painter.setFont(name_font)
-        painter.setPen(QColor(50, 50, 50))
+        if is_project_existed:
+            painter.setPen(QColor(50, 50, 50))
+        else:
+            painter.setPen(QColor(255, 0, 0))
+            project_name += ' (找不到项目文件)'
+
         painter.drawText(name_rect, Qt.AlignmentFlag.AlignTop, 
                          painter.fontMetrics().elidedText(project_name, Qt.TextElideMode.ElideRight, name_width))
         

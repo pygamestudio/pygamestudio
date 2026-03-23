@@ -38,7 +38,7 @@ class DashboardWindow(WindowBase):
         self._create_project_button.clicked.connect(self._dashboard_list_view.show_create_project_window)
         self._import_project_button.clicked.connect(self._dashboard_list_view.import_project)
         self._search_line_edit.textChanged.connect(self._dashboard_list_view.search)
-        self._sort_type_combobox.currentTextChanged.connect(self._dashboard_list_view.sort)
+        self._sort_type_combobox.currentIndexChanged.connect(self._dashboard_list_view.set_sort_type)
 
         self._dashboard_list_view.open_project_signal.connect(self.open_project_signal.emit)
 

@@ -65,3 +65,21 @@ def load_projects_from_dashboard_config():
         print(f"加载最近项目列表时出错: {e}")
         return []
     
+def update_project_date_in_dashboard_config(project_path, new_project_date):
+    project_list = load_projects_from_dashboard_config()
+    for i, project_data in enumerate(project_list):
+        if project_data['path'] == project_path:
+            project_list[i]['date'] = new_project_date
+            break
+            
+    save_projects_to_dashbaord_config(project_list)
+
+def update_project_name_in_dashboard_config(old_project_path, new_project_path):
+    project_list = load_projects_from_dashboard_config()
+    for i, project_data in enumerate(project_list):
+        if project_data['path'] == old_project_path:
+            project_list[i]['name'] = Path(new_project_path).name
+            project_list[i]['path'] = new_project_path
+            break
+        
+    save_projects_to_dashbaord_config(project_list)

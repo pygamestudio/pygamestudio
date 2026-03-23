@@ -59,21 +59,6 @@ class ImportProjectButton(QPushButton):
         """)
 
 
-class DeleteProjectButton(QPushButton):
-    def __init__(self):
-        super().__init__()
-
-
-class RenameProjectButton(QPushButton):
-    def __init__(self):
-        super().__init__()
-
-
-class OpenProjectButton(QPushButton):
-    def __init__(self):
-        super().__init__()
-
-
 class SortTypeComboBox(QComboBox):
     def __init__(self):
         super().__init__()
