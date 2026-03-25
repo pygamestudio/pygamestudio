@@ -2,9 +2,11 @@ from PySide6.QtWidgets import *
 from PySide6.QtCore import *
 from PySide6.QtGui import *
 import re
+from datetime import datetime
 
 from pygamestudio.gui.console.type import *
 from pygamestudio.gui.console.menu import *
+from pygamestudio.gui.console.logger import Logger
 
 
 class ConsoleLogBrowser(QTextBrowser):
@@ -44,6 +46,7 @@ class ConsoleLogBrowser(QTextBrowser):
     def _setup(self):
         self._set_widget()
         self._set_signal()
+        self._set_logger()
 
     def _set_widget(self):
         font = QFont('Consolas', 10)
@@ -57,6 +60,9 @@ class ConsoleLogBrowser(QTextBrowser):
         self.customContextMenuRequested.connect(self._show_context_menu)
         self._context_menu.select_all_signal.connect(self.selectAll)
         self._context_menu.copy_signal.connect(self._copy)
+
+    def _set_logger(self):
+        Logger.set_log_widget(self)
 
     def _add_log(self, msg, log_level):
         self._logs.append((msg, log_level))
@@ -77,6 +83,7 @@ class ConsoleLogBrowser(QTextBrowser):
         self.clear_log_signal.emit()
 
     def info(self, msg):
+        # timestamp = datetime.now().strftime("%H:%M:%S")
         log_level = INFO
         self._add_log(msg, log_level)
         self.info_log_signal.emit(log_level)

@@ -10,7 +10,7 @@ from pygamestudio.gui.inspector.window import InspectorWindow
 from pygamestudio.gui.scene.window import SceneWindow
 from pygamestudio.gui.dashboard.window import DashboardWindow
 
-from pygamestudio.gui.template.window import WindowBase
+from pygamestudio.gui.base.window import WindowBase
 
 
 class EditorBody(QMainWindow):
@@ -35,12 +35,20 @@ class EditorBody(QMainWindow):
         self._main_horizontal_splitter = QSplitter()
 
         self._central_widget = QWidget()
+
+        self._file_menu = self.menuBar().addMenu('文件')
+        self._edit_menu = self.menuBar().addMenu('编辑')
+        self._project_menu = self.menuBar().addMenu('项目')
+        self._panel_menu = self.menuBar().addMenu('面板')
+        self._help_menu = self.menuBar().addMenu('帮助')
+        
         self._setup()
 
     def _setup(self):
         self._set_widget()
         self._set_signal()
         self._set_layout()
+        self._set_menu()
 
     def _set_widget(self):
         self.resize(1420, 900)
@@ -63,6 +71,7 @@ class EditorBody(QMainWindow):
         self._main_horizontal_splitter.addWidget(self._left_vertical_splitter)
         self._main_horizontal_splitter.addWidget(self._center_vertical_splitter)
         self._main_horizontal_splitter.addWidget(self._right_vertical_splitter)
+        self._main_horizontal_splitter.setSizes([260, 900, 260])
 
         self.setCentralWidget(self._central_widget)
 
@@ -74,26 +83,48 @@ class EditorBody(QMainWindow):
         main_layout.addWidget(self._main_horizontal_splitter)
         main_layout.setContentsMargins(0, 0, 0, 0)
 
+    def _set_menu(self):
+        self._set_file_menu()
+
+    def _set_file_menu(self):
+        new_project_action = QAction('新建项目', self)
+        open_project_action = QAction('打开项目', self)
+
+        self._file_menu.addAction(new_project_action)
+        self._file_menu.addAction(open_project_action)
+
     def enterEvent(self, event):
         self.setCursor(Qt.CursorShape.ArrowCursor)
         return super().enterEvent(event)
 
 
 class Editor(WindowBase):
-    def __init__(self, object_manager):
+    
+    def __init__(self, parent, object_manager):
         super().__init__()
+        self._parent = parent
         self._object_manager = object_manager
         self._editor_body = EditorBody(object_manager)
 
         self._setup()
-        self.move(50, 50)   # 改成屏幕居中
 
     def _setup(self):
         self._set_widget()
 
     def _set_widget(self):
         self.resize(1420, 930)
+        self._center()
         self.set_window_body(self._editor_body)
+    
+    def _center(self):
+        screen = QApplication.primaryScreen()
+        screen_width = screen.availableGeometry().width()
+        screen_height = screen.availableGeometry().height()
+ 
+        pos_x = screen_width/2 - self.frameGeometry().width()/2
+        pos_y = screen_height/2 - self.frameGeometry().height()/2
+ 
+        self.move(int(pos_x), int(pos_y))
 
     def keyPressEvent(self, event):
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
@@ -113,3 +144,7 @@ class Editor(WindowBase):
                 self._object_manager.undo_stack.redo()
 
         super().keyPressEvent(event)
+
+    def closeEvent(self, event):
+        super().closeEvent(event)
+        self._parent.show_dashboard()

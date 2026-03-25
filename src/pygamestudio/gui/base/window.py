@@ -67,7 +67,7 @@ class WindowTitleBase(QWidget):
         main_h_layout.addLayout(left_h_layout)
         main_h_layout.addStretch(1)
         main_h_layout.addLayout(right_h_layout)
-        main_h_layout.setContentsMargins(5, 8, 5, 5)
+        main_h_layout.setContentsMargins(3, 3, 3, 3)
 
     def _set_object_name(self):
         self.setObjectName('windowTtitleBase')

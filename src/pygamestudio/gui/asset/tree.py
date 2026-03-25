@@ -14,7 +14,6 @@ import platform
 import shutil
 
 
-
 class AssetTreeView(QTreeView):
     def __init__(self, parent=None, object_manager=None):
         super().__init__(parent)
@@ -24,13 +23,15 @@ class AssetTreeView(QTreeView):
         self._context_menu = ContextMenu('', self)
         self._delegate = AssetTreeWidgetDelegate(self, self._proxy_model, self._file_model)
 
-        self._root_path = 'C:/Users/louis/Desktop/pygamestudio-test'    # 项目配置文件
+        self._root_path = self._object_manager.get_project_path()
         self._sort_type = SORT_BY_NAME_ASC     # 项目配置文件
         self._clipboard_content = []
         self._is_cut = False
         self._expand_state = {}
 
+        self._is_connected = False
         self._highlight_indexes_paths = []
+        self._directory_loaded_count = 0
 
         self._set_up()
 
@@ -103,7 +104,6 @@ class AssetTreeView(QTreeView):
         self._context_menu.delete_signal.connect(self._delete)
         self._context_menu.rename_signal.connect(self._rename)
         self._context_menu.duplicate_signal.connect(self._duplicate)
-        # self._context_menu.copy_uuid_signal.connect(self._copy_item_uuid)
         self._context_menu.copy_path_signal.connect(self._copy_path)
         self._context_menu.copy_name_signal.connect(self._copy_name)
         self._context_menu.open_in_terminal_signal.connect(self._open_in_terminal)
@@ -412,22 +412,28 @@ class AssetTreeView(QTreeView):
                 if is_internal_drag:
                     shutil.rmtree(source_path) if source_path.is_dir() else source_path.unlink()
 
-    def _expand_all_indexes(self, index_path):
-        if index_path in self._expand_state.keys():
-            return
-        
-        parent_index = self._proxy_model.mapFromSource(self._file_model.index(index_path))
-        self._expand_state[index_path] = self.isExpanded(parent_index)
-        self.setExpanded(parent_index, True)
+    def _save_expand_state(self):
+        def _save(parent_path):
+            proxy_parent_index = self._proxy_model.mapFromSource(self._file_model.index(parent_path))
+            child_count = self._proxy_model.rowCount(proxy_parent_index)
+            if child_count <= 0:
+                return
+            
+            for i in range(child_count):
+                proxy_child_index = self._proxy_model.index(i, 0, proxy_parent_index)
+                source_child_index = self._proxy_model.mapToSource(proxy_child_index)
+                child_path = self._file_model.filePath(source_child_index)
 
-        child_count = self._proxy_model.rowCount(parent_index)
-        if child_count <= 0:
-            return
-        
-        for i in range(child_count):
-            index = self._proxy_model.mapToSource(self._proxy_model.index(i, 0, parent_index))
-            if self._file_model.isDir(index):
-                self._expand_all_indexes(self._file_model.filePath(index))
+                if not self._file_model.isDir(source_child_index):
+                    continue
+
+                if self.isExpanded(proxy_child_index):
+                    _save(child_path)
+                    self._expand_state[child_path] = True
+                else:
+                    self._expand_state[child_path] = False
+
+        _save(self._root_path)
 
     def _restore_indexes_expand_state(self):
         for index_path in self._expand_state.keys():
@@ -436,6 +442,7 @@ class AssetTreeView(QTreeView):
 
             proxy_index = self._proxy_model.mapFromSource(self._file_model.index(index_path))
             self.setExpanded(proxy_index, self._expand_state[index_path])
+
         self._expand_state.clear()
 
     def search(self, keyword):
@@ -444,18 +451,27 @@ class AssetTreeView(QTreeView):
     def _search(self, keyword):
         self._proxy_model.setFilterRegularExpression(QRegularExpression())
         self.setRootIndex(self._proxy_model.mapFromSource(self._file_model.index(self._root_path)))
-        
-        self._file_model.directoryLoaded.connect(self._expand_all_indexes)
-        self._expand_all_indexes(self._root_path)
+        self._restore_indexes_expand_state()
 
         if not keyword:
-            self._file_model.directoryLoaded.disconnect(self._expand_all_indexes)
-            self._restore_indexes_expand_state()
             return
         
-        regex = QRegularExpression(keyword)
-        self._proxy_model.setFilterRegularExpression(regex)
-    
+        self._save_expand_state()
+        self._file_model.directoryLoaded.connect(self.expandAll)
+        self.expandAll()
+
+        QTimer.singleShot(0, lambda: self._proxy_model.setFilterRegularExpression(QRegularExpression(keyword)))
+
+    def _count_folders_rglob(self, path):
+        path_obj = Path(path)
+        
+        if not path_obj.exists():
+            return 0
+        
+        folders = [p for p in path_obj.rglob("*") if p.is_dir()]
+        
+        return len(folders)
+
     def _clear_highlight_items(self):
         self._highlight_indexes_paths = []
         self.viewport().update()
@@ -509,7 +525,6 @@ class AssetTreeView(QTreeView):
             return
         
         index_path = Path(self._file_model.filePath(self._proxy_model.mapToSource(index)))
-        print(index_path.suffix)
         if index_path.suffix == '.scene':
             self._object_manager.load(index_path)
         # print(index_path)

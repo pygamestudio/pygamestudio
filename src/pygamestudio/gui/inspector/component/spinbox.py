@@ -65,11 +65,11 @@ class PosSpinBox(SuffixSpinBox):
             self.set_suffix('Y')
 
         if attr == 'start_x' or attr == 'start_y':
-            self.valueChanged.connect(self._inspector_window.set_start_point)
+            self.valueChanged.connect(self._inspector_window.set_object_start_point)
         elif attr == 'end_x' or attr == 'end_y':
-            self.valueChanged.connect(self._inspector_window.set_end_point)
+            self.valueChanged.connect(self._inspector_window.set_object_end_point)
         else:
-            self.valueChanged.connect(self._inspector_window.move)
+            self.valueChanged.connect(self._inspector_window.move_object)
 
 
 class SizeSpinBox(SuffixSpinBox):
@@ -86,7 +86,7 @@ class SizeSpinBox(SuffixSpinBox):
         elif attr == 'height':
             self.set_suffix('H')
 
-        self.valueChanged.connect(self._inspector_window.resize)
+        self.valueChanged.connect(self._inspector_window.resize_object)
 
 
 class ScaleSpinBox(SuffixSpinBox):
@@ -103,7 +103,7 @@ class ScaleSpinBox(SuffixSpinBox):
         elif attr == 'scale_y':
             self.set_suffix('Y')
 
-        self.valueChanged.connect(self._inspector_window.scale)
+        self.valueChanged.connect(self._inspector_window.scale_object)
 
 
 class AngleSpinBox(QDoubleSpinBox):
@@ -115,7 +115,7 @@ class AngleSpinBox(QDoubleSpinBox):
         self.setValue(value)
         self.setDecimals(2)
 
-        self.valueChanged.connect(self._inspector_window.rotate)
+        self.valueChanged.connect(self._inspector_window.rotate_object)
 
 
 class ThicknessSpinBox(SuffixSpinBox):
@@ -127,7 +127,7 @@ class ThicknessSpinBox(SuffixSpinBox):
         self.setValue(value)
         self.setDecimals(0)
 
-        self.valueChanged.connect(self._inspector_window.set_thickness)
+        self.valueChanged.connect(self._inspector_window.set_object_thickness)
 
 
 class BorderRadiusSpinBox(SuffixSpinBox):
@@ -152,4 +152,4 @@ class BorderRadiusSpinBox(SuffixSpinBox):
         self.valueChanged.connect(self._on_border_radius_changed)
 
     def _on_border_radius_changed(self):
-        self._inspector_window.set_border_radius(self._attr, int(self.value()))
+        self._inspector_window.set_object_border_radius(self._attr, int(self.value()))

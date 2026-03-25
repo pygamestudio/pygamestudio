@@ -21,4 +21,4 @@ class ColorPicker(QPushButton):
     def _on_color_picker_clicked(self):
         color = QColorDialog.getColor()
         if color.isValid():
-            self._inspector_window.set_color(color.name())
+            self._inspector_window.set_object_color(color.name())

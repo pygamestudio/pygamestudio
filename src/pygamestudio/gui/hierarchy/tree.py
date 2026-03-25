@@ -30,25 +30,18 @@ class HierarchyTreeView(QTreeView):
         self._context_menu = ContextMenu('', self)
         self._setup()
 
-        # QTimer().singleShot(1000, lambda:self._add(OBJECT_RECT))
-        # QTimer().singleShot(2000, lambda: self._object_manager.load('D:/Github/pygamestudio/src/pygamestudio/aaa.json'))
-        from pygamestudio.common.utils.project import get_project_config
-        from pathlib import Path
-        import os
-        scene_file = get_project_config()['asset']['scene']
+        # # QTimer().singleShot(1000, lambda:self._add(OBJECT_RECT))
+        # # QTimer().singleShot(2000, lambda: self._object_manager.load('D:/Github/pygamestudio/src/pygamestudio/aaa.json'))
+        # from pygamestudio.common.utils.project import get_project_config
+        # from pathlib import Path
+        # import os
+        # scene_file = get_project_config()['asset']['scene']
         
-        QTimer().singleShot(2000, lambda: self._object_manager.load(''))
+        # QTimer().singleShot(2000, lambda: self._object_manager.load(''))
 
     def _setup(self):
         self._set_widget()
         self._set_signal()
-        # self._add_scene_item()
-        
-        # # 测试用
-        # import json
-        # with open('a.json', 'r', encoding='utf-8') as f:
-        #     tree_dict = json.load(f)
-        #     self.dict_to_tree(tree_dict)
 
     def _set_widget(self):
         self._standard_model.setColumnCount(1)

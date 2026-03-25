@@ -62,6 +62,9 @@ class ObjectManager(QObject):
     
     def set_project_path(self, project_path):
         self._project_path = project_path
+
+    def get_project_path(self):
+        return self._project_path
     
     def add(self, parent_uuid, object_type, object_data={}):
         return self._add(parent_uuid, object_type, object_data)

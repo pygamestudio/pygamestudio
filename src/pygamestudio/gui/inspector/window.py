@@ -48,57 +48,57 @@ class InspectorWindow(QWidget):
     def _set_layout(self):
         self._inspector_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
-    def rename(self):
+    def rename_object(self):
         lineedit = self._find_widget(self._inspector_layout, 'name')
         self._object_manager.rename(self._object_uuid_in_inspection, lineedit.text().strip())
 
-    def resize(self):
+    def resize_object(self):
         spinbox_width = self._find_widget(self._inspector_layout, 'width')
         spinbox_height = self._find_widget(self._inspector_layout, 'height')
         new_size = (spinbox_width.value(), spinbox_height.value())
         self._object_manager.resize(self._object_uuid_in_inspection, new_size)
 
-    def move(self):
+    def move_object(self):
         spinbox_x = self._find_widget(self._inspector_layout, 'x')
         spinbox_y = self._find_widget(self._inspector_layout, 'y')
         new_pos = (spinbox_x.value(), spinbox_y.value())
         self._object_manager.move(self._object_uuid_in_inspection, new_pos)
 
-    def scale(self):
+    def scale_object(self):
         spinbox_scale_x = self._find_widget(self._inspector_layout, 'scale_x')
         spinbox_scale_y = self._find_widget(self._inspector_layout, 'scale_y')
         new_scale = (spinbox_scale_x.value(), spinbox_scale_y.value())
         self._object_manager.scale(self._object_uuid_in_inspection, new_scale)
 
-    def rotate(self):
+    def rotate_object(self):
         spinbox_angle = self._find_widget(self._inspector_layout, 'angle')
         new_angle = spinbox_angle.value()
         self._object_manager.rotate(self._object_uuid_in_inspection, new_angle)
 
-    def show(self):
+    def show_object(self):
         self._object_manager.show(self._object_uuid_in_inspection)
 
-    def hide(self):
+    def hide_object(self):
         self._object_manager.hide(self._object_uuid_in_inspection)
 
-    def set_color(self, new_color):
+    def set_object_color(self, new_color):
         self._object_manager.set_color(self._object_uuid_in_inspection, new_color)
 
-    def set_border_radius(self, attr, new_border_radius):
+    def set_object_border_radius(self, attr, new_border_radius):
         self._object_manager.set_border_radius(self._object_uuid_in_inspection, attr, new_border_radius)
     
-    def set_thickness(self):
+    def set_object_thickness(self):
         spinbox_thickness = self._find_widget(self._inspector_layout, 'thickness')
         new_thickness = int(spinbox_thickness.value())
         self._object_manager.set_thickness(self._object_uuid_in_inspection, new_thickness)
 
-    def set_start_point(self):
+    def set_object_start_point(self):
         spinbox_start_x = self._find_widget(self._inspector_layout, 'start_x')
         spinbox_start_y = self._find_widget(self._inspector_layout, 'start_y')
         new_start_point = (spinbox_start_x.value(), spinbox_start_y.value())
         self._object_manager.set_start_point(self._object_uuid_in_inspection, new_start_point)
 
-    def set_end_point(self):
+    def set_object_end_point(self):
         spinbox_end_x = self._find_widget(self._inspector_layout, 'end_x')
         spinbox_end_y = self._find_widget(self._inspector_layout, 'end_y')
         new_end_point = (spinbox_end_x.value(), spinbox_end_y.value())

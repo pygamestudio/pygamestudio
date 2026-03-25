@@ -3,7 +3,7 @@ from PySide6.QtCore import *
 from PySide6.QtGui import *
 from pathlib import Path
 from pygamestudio.common.utils.path import RES_PATH
-from pygamestudio.gui.template.window import WindowBase
+from pygamestudio.gui.base.window import WindowBase
 
 
 class CreateProjectBody(QWidget):

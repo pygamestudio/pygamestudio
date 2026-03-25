@@ -12,6 +12,6 @@ class VisibilityCheckBox(QCheckBox):
     
     def _on_check_state_changed(self, check_state):
         if check_state == Qt.CheckState.Checked:
-            self._inspector_window.show()
+            self._inspector_window.show_object()
         else:
-            self._inspector_window.hide()
+            self._inspector_window.hide_object()

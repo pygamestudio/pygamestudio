@@ -7,4 +7,4 @@ class NameLineEdit(QLineEdit):
         self._inspector_window = inspector_window
         self.setText(text)
 
-        self.textChanged.connect(self._inspector_window.rename)
+        self.textChanged.connect(self._inspector_window.rename_object)
