@@ -60,8 +60,18 @@ class ObjectManager(QObject):
     def undo_stack(self):
         return self._undo_stack
     
-    def set_project_path(self, project_path):
+    def _reset(self):
+        self._is_cut = False
+        self._project_path = ''
+        self._scene_file_path = ''          # 从project.json中获取
+        self._scene_object_uuid = ''
+        self._clipboard_content = []
+        self._all_object_tree_struct = {}
+    
+    def get_ready_for_project(self, project_path):
+        self._reset()
         self._project_path = project_path
+        self._scene_file_path = ''  # 从project.json中获取
 
     def get_project_path(self):
         return self._project_path
@@ -619,6 +629,9 @@ class ObjectManager(QObject):
 
     def is_empty(self):
         return self._all_object_tree_struct == {}
+    
+    def clear(self):
+        self._all_object_tree_struct = {}
 
 
 class AddObjectCommand(QUndoCommand):

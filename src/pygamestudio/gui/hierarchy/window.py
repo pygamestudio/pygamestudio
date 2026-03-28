@@ -44,3 +44,6 @@ class HierarchyWindow(QWidget):
     @property
     def hierarchy_tree_view(self):
         return self._hierarchy_tree_view
+    
+    def get_ready_for_project(self):
+        self._hierarchy_tree_view.get_ready_for_project()

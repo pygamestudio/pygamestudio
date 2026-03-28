@@ -7,10 +7,10 @@ from pygamestudio.game.object.type import *
 
 
 class PygameWidget(QWidget):
-    def __init__(self, scene=None, object_manager=None):
+    def __init__(self, object_manager=None, scene=None):
         super().__init__()
-        self._scene = scene
         self._object_manager = object_manager
+        self._scene = scene
         
         self._clock = pygame.time.Clock()
         self._canvas_surface = pygame.Surface((self.width(), self.height()))
@@ -54,7 +54,18 @@ class PygameWidget(QWidget):
         pygame.init()
         self._canvas_surface = pygame.Surface((self.width(), self.height()))
         self._clock.tick(60)
+    
+    def _reset(self):
+        self._all_objects = []
+        self._final_selected_object = None
+        self._mouse_x = None
+        self._mouse_y = None
+        self._is_ctrl_pressed = False
+        self._update_scene()
 
+    def get_ready_for_project(self):
+        self._reset()
+        
     def _on_object_added(self, parent_uuid, object_uuid, inserted_pos):
         if object_uuid == self._object_manager.scene_object_uuid:
             obj = self._object_manager.get_object(object_uuid)

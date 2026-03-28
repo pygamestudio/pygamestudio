@@ -61,3 +61,7 @@ class DashboardWindow(WindowBase):
         pos_y = screen_height/2 - self.frameGeometry().height()/2
  
         self.move(int(pos_x), int(pos_y))
+
+    @property
+    def dashboard_list_view(self):
+        return self._dashboard_list_view

@@ -5,29 +5,48 @@ import math
 
 
 class GridGraphicsView(QGraphicsView):
-    def __init__(self, scene, parent=None):
-        super().__init__(parent)
+    def __init__(self, object_manager, scene):
+        super().__init__()
+        self._object_manager = object_manager
         self._scene = scene
         self._zoom_limit = [0.2, 5]
         self._zoom_factor = 1.05
         self._current_scale = 1.0
         self._previous_scale = 1.0
         self._is_dragging = False
+        self._is_first_show = True
         self._setup()
-        
+    
     def _setup(self):
         self._set_widget()
 
     def _set_widget(self):
         self.scale(0.6, 0.6)
         self.setScene(self._scene)
-        QTimer().singleShot(0, lambda: self.centerOn(self._scene.itemsBoundingRect().center()))
-        
+    
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate)
         self.setRenderHint(QPainter.RenderHint.Antialiasing|QPainter.RenderHint.TextAntialiasing|QPainter.RenderHint.SmoothPixmapTransform)
+
+    def _reset(self):
+        self._zoom_limit = [0.2, 5]
+        self._zoom_factor = 1.05
+        self._current_scale = 1.0
+        self._previous_scale = 1.0
+        self._is_dragging = False
+        self._is_view_loaded_completely = False
+
+    def resizeEvent(self, event):
+        # 为了确保最开始打开编辑器时，场景能够居中
+        if self._is_first_show:
+            self.centerOn(self._scene.itemsBoundingRect().center())
+        return super().resizeEvent(event)
+
+    def get_ready_for_project(self):
+        self._reset()
+        self.centerOn(self._scene.itemsBoundingRect().center())     # 根据项目配置确定场景位置
 
     def is_dragging(self):
         return self._is_dragging
@@ -73,6 +92,10 @@ class GridGraphicsView(QGraphicsView):
             return
         
         self._zoom(event)
+
+    def paintEvent(self, event):
+        self._is_first_show = False
+        return super().paintEvent(event)
 
 
 class GridGraphicsScene(QGraphicsScene):

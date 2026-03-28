@@ -23,7 +23,7 @@ class AssetTreeView(QTreeView):
         self._context_menu = ContextMenu('', self)
         self._delegate = AssetTreeWidgetDelegate(self, self._proxy_model, self._file_model)
 
-        self._root_path = self._object_manager.get_project_path()
+        self._root_path = ''
         self._sort_type = SORT_BY_NAME_ASC     # 项目配置文件
         self._clipboard_content = []
         self._is_cut = False
@@ -31,7 +31,6 @@ class AssetTreeView(QTreeView):
 
         self._is_connected = False
         self._highlight_indexes_paths = []
-        self._directory_loaded_count = 0
 
         self._set_up()
 
@@ -135,6 +134,20 @@ class AssetTreeView(QTreeView):
         
         return parent_index
     
+    def _reset(self):
+        self._clear_highlight_items()
+        self._sort_type = SORT_BY_NAME_ASC     # 项目配置文件
+        self._clipboard_content = []
+        self._is_cut = False
+        self._expand_state = {}
+        self._is_connected = False
+        self._highlight_indexes_paths = []
+        self._root_path = self._object_manager.get_project_path()
+    
+    def get_ready_for_project(self):
+        self._reset()
+        self.setRootIndex(self._proxy_model.mapFromSource(self._file_model.index(self._root_path)))
+
     def create(self, index_type):
         return self._create(index_type)
     

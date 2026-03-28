@@ -185,6 +185,16 @@ class HierarchyTreeView(QTreeView):
         if obj.is_expanded == True:
             self._object_manager.collapse(item_uuid)
 
+    def _reset(self):
+        self._is_cut = False
+        self._all_items = {}
+        # self._highlight_items = []
+        self._clipboard_items = []
+        self._items_to_delete_by_cut = []
+
+    def get_ready_for_project(self):
+        self._reset()
+
     def add(self, item_type):
         return self._add(item_type)
     

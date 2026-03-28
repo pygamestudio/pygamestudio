@@ -142,7 +142,7 @@ class DashboardListView(QListView):
         project_path = QFileDialog.getExistingDirectory(self, '请选择项目', '.', QFileDialog.Option.ReadOnly)
         if not project_path:
             return
-        
+
         if not (Path(project_path) / 'project.json').exists():
             QMessageBox.critical(self, '错误', '项目打开失败，没有找到project.json文件')
             return

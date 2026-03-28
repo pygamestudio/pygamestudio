@@ -44,3 +44,7 @@ class AssetWindow(QWidget):
 
         v_layout.addLayout(h_layout)
         v_layout.addWidget(self._asset_tree_view)
+
+    def get_ready_for_project(self):
+        self._search_line_edit.clear()
+        self._asset_tree_view.get_ready_for_project()

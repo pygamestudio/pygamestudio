@@ -15,8 +15,8 @@ class InspectorWindow(QWidget):
     def __init__(self, parent=None, object_manager=None):
         super().__init__(parent)
         self._object_manager = object_manager
-        self._object_uuid_in_inspection = None
         self._inspector_layout = QGridLayout(self)
+        self._object_uuid_in_inspection = None
         self._inspector_row = 0
         self._max_column = 1
         self._setup()
@@ -47,6 +47,15 @@ class InspectorWindow(QWidget):
 
     def _set_layout(self):
         self._inspector_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+    def _reset(self):
+        self._object_uuid_in_inspection = None
+        self._inspector_row = 0
+        self._max_column = 1
+        self._clear_layout(self._inspector_layout)
+
+    def get_ready_for_project(self):
+        self._reset()
 
     def rename_object(self):
         lineedit = self._find_widget(self._inspector_layout, 'name')

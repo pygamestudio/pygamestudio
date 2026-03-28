@@ -18,16 +18,6 @@ class ConsoleWindow(QWidget):
 
         self._set_up()
 
-#         self._console_log_browser.info('这是一条INFO消息')
-#         self._console_log_browser.error('这是一条ERROR消息\n你的还会第哦啊是')
-#         self._console_log_browser.warning('这是一条WARNING消息')
-#         self._console_log_browser.error("""
-# 还有一个文件不存在的错误：
-# File "missing.py", line 10
-#     import unknown_module
-# ModuleNotFoundError: No module named 'unknown_module'
-#         """)
-    
     def _set_up(self):
         self._set_widget()
         self._set_signal()
@@ -63,3 +53,6 @@ class ConsoleWindow(QWidget):
 
         v_layout.addLayout(h_layout)
         v_layout.addWidget(self._console_log_browser)
+
+    def get_ready_for_project(self):
+        self._console_log_browser.get_ready_for_project()
