@@ -82,6 +82,9 @@ class ConsoleLogBrowser(QTextBrowser):
         self._search_keyword = ''
 
     def get_ready_for_project(self):
+        ...
+        
+    def clean_up(self):
         self._reset()
 
     def clear_log(self):

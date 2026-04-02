@@ -17,6 +17,7 @@ from pygamestudio.game.object.manager import ObjectManager
 class EditorBody(QMainWindow):
     new_project_signal = Signal()
     open_project_signal = Signal()
+    quit_editor_signal = Signal()
 
     def __init__(self, object_manager):
         super().__init__()
@@ -80,6 +81,15 @@ class EditorBody(QMainWindow):
 
         self.setCentralWidget(self._central_widget)
 
+        # 调整菜单栏间距
+        # self.menuBar().setStyleSheet("""
+        #     QMenuBar::item {
+        #         padding: 6px 6px;
+        #         margin: 0px 6px;  /* 菜单项之间的间距 */
+        #         border-radius: 4px;
+        #     }
+        # """)
+
     def _set_signal(self):
         ...
 
@@ -91,6 +101,8 @@ class EditorBody(QMainWindow):
     def _set_menu(self):
         self._set_file_menu()
         self._set_edit_menu()
+        self._set_project_menu()
+        self._set_help_menu()
 
     def _set_file_menu(self):
         new_project_action = QAction('新建项目', self)
@@ -98,10 +110,13 @@ class EditorBody(QMainWindow):
         new_scene_action = QAction('新建场景', self)
         save_scene_action = QAction('保存场景', self)
         editor_settings_action = QAction('编辑器设置', self)
-        quit_action = QAction('退出', self)
+        quit_editor_action = QAction('退出', self)
 
         new_project_action.triggered.connect(self.new_project_signal.emit)
         open_project_action.triggered.connect(self.open_project_signal.emit)
+        new_scene_action.triggered.connect(lambda: self._object_manager.load_scene(''))
+        save_scene_action.triggered.connect(self._object_manager.save_scene)
+        quit_editor_action.triggered.connect(self.quit_editor_signal.emit)
 
         self._file_menu.addAction(new_project_action)
         self._file_menu.addAction(open_project_action)
@@ -109,9 +124,9 @@ class EditorBody(QMainWindow):
         self._file_menu.addAction(new_scene_action)
         self._file_menu.addAction(save_scene_action)
         self._file_menu.addSeparator()
-        self._file_menu.addAction(editor_settings_action)
-        self._file_menu.addSeparator()
-        self._file_menu.addAction(quit_action)
+        # self._file_menu.addAction(editor_settings_action)
+        # self._file_menu.addSeparator()
+        self._file_menu.addAction(quit_editor_action)
 
     def _set_edit_menu(self):
         undo_action = QAction('撤销', self)
@@ -128,13 +143,41 @@ class EditorBody(QMainWindow):
         self._edit_menu.addAction(paste_action)
         self._edit_menu.addAction(select_all_action)
 
+    def _set_project_menu(self):
+        run_action = QAction('运行', self)
+        package_action = QAction('打包', self)
+        # package_action.triggered.connect()
+
+        self._project_menu.addAction(run_action)
+        self._project_menu.addAction(package_action)
+
+    def _set_help_menu(self):
+        doc_action = QAction('在线文档', self)
+        update_log_action = QAction('更新日志', self)
+        github_action = QAction('Github仓库', self)
+        about_action = QAction('关于Pygame Studio', self)
+
+        self._help_menu.addAction(doc_action)
+        self._help_menu.addSeparator()
+        self._help_menu.addAction(update_log_action)
+        self._help_menu.addAction(github_action)
+        self._help_menu.addSeparator()
+        self._help_menu.addAction(about_action)
+
     def get_ready_for_project(self, project_path):
         self._object_manager.get_ready_for_project(project_path)
-        self._scene_widnow.get_ready_for_project()
         self._asset_window.get_ready_for_project()
         self._console_window.get_ready_for_project()
         self._hierarchy_window.get_ready_for_project()
         self._inspector_window.get_ready_for_project()
+
+    def clean_up(self):
+        self._scene_widnow.clean_up()
+        self._asset_window.clean_up()
+        self._console_window.clean_up()
+        self._hierarchy_window.clean_up()
+        self._inspector_window.clean_up()
+        self._object_manager.clean_up()
 
     def enterEvent(self, event):
         self.setCursor(Qt.CursorShape.ArrowCursor)
@@ -164,6 +207,7 @@ class Editor(WindowBase):
     def _set_signal(self):
         self._editor_body.new_project_signal.connect(self._new_project)
         self._editor_body.open_project_signal.connect(self._open_project)
+        self._editor_body.quit_editor_signal.connect(self.close)
 
     def _new_project(self):
         self._parent.show_dashboard_and_create_project_window()
@@ -183,12 +227,16 @@ class Editor(WindowBase):
 
     def get_ready_for_project(self, project_path):
         self._editor_body.get_ready_for_project(project_path)
+        self.window_title.set_title_name(f'Pygame Studio - {self._object_manager.get_project_path()}')
+
+    def clean_up(self):
+        self._editor_body.clean_up()
 
     def keyPressEvent(self, event):
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
             if event.key() == Qt.Key.Key_S:
                 print('保存')
-                self._object_manager.save()
+                self._object_manager.save_scene()
             elif event.key() == Qt.Key.Key_Z:
                 print('撤销')
                 self._object_manager.undo_stack.undo()
@@ -204,5 +252,15 @@ class Editor(WindowBase):
         super().keyPressEvent(event)
 
     def closeEvent(self, event):
+        if not self._object_manager.is_current_scene_saved():
+            choice = QMessageBox.warning(self, '保存提醒', '当前场景数据已修改，是否保存？', QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel)
+            if choice == QMessageBox.StandardButton.Cancel:
+                event.ignore()
+                return
+            
+            if choice == QMessageBox.StandardButton.Yes:
+                self._object_manager.save_scene()
+
+        self.clean_up()
         self._parent.show_dashboard()
         event.accept()

@@ -2,6 +2,7 @@ from pygamestudio.gui.window import Editor
 from pygamestudio.gui.dashboard.window import DashboardWindow
 from PySide6.QtCore import *
 
+
 class PygameStudio:
     def __init__(self):
         self._dashboard = DashboardWindow()
@@ -17,8 +18,12 @@ class PygameStudio:
 
     def _set_signal(self):
         self._dashboard.open_project_signal.connect(self._enter_editor)
-        
+    
     def _enter_editor(self, project_path):
+        # Clean up first if another project is opened while the edior is still visible.
+        if self._editor.isVisible():
+            self._editor.clean_up()
+
         self._editor.get_ready_for_project(project_path)
         self._dashboard.hide()
         self._editor.show()

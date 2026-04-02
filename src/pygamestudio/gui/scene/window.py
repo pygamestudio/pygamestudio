@@ -36,3 +36,7 @@ class SceneWindow(QWidget):
     def get_ready_for_project(self):
         self._grid_view.get_ready_for_project()
         self._pygame_widget.get_ready_for_project()
+
+    def clean_up(self):
+        self._grid_view.clean_up()
+        self._pygame_widget.clean_up()

@@ -12,16 +12,20 @@ class AssetTreeWidgetDelegate(QStyledItemDelegate):
         self._proxy_model = proxy_model
         self._file_model = file_model
 
+    def _on_rename_completed(self):
+        """Resort afte the rename action."""
+        QTimer.singleShot(0, lambda: self._proxy_model.invalidate())
+        
     def createEditor(self, parent, option, index):
         editor = super().createEditor(parent, option, index)
         if isinstance(editor, QLineEdit):
+            editor.editingFinished.connect(self._on_rename_completed)
             text = index.data(Qt.ItemDataRole.DisplayRole)
             last_dot = text.rfind('.')
             if last_dot > 0:
                 QTimer.singleShot(0, lambda: editor.setSelection(0, last_dot))
-                        
         return editor
-
+    
     # def paint(self, painter, option, index):
     #     clipboard_content = self._tree_view.get_clipboard_content()
     #     index_path = Path(self._file_model.filePath(self._proxy_model.mapToSource(index)))

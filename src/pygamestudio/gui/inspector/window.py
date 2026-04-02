@@ -55,6 +55,9 @@ class InspectorWindow(QWidget):
         self._clear_layout(self._inspector_layout)
 
     def get_ready_for_project(self):
+        ...
+        
+    def clean_up(self):
         self._reset()
 
     def rename_object(self):

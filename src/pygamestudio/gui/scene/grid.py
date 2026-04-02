@@ -23,7 +23,8 @@ class GridGraphicsView(QGraphicsView):
     def _set_widget(self):
         self.scale(0.6, 0.6)
         self.setScene(self._scene)
-    
+        self.centerOn(self._scene.itemsBoundingRect().center())     # 根据项目配置确定场景位置
+
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
@@ -36,7 +37,6 @@ class GridGraphicsView(QGraphicsView):
         self._current_scale = 1.0
         self._previous_scale = 1.0
         self._is_dragging = False
-        self._is_view_loaded_completely = False
 
     def resizeEvent(self, event):
         # 为了确保最开始打开编辑器时，场景能够居中
@@ -45,8 +45,10 @@ class GridGraphicsView(QGraphicsView):
         return super().resizeEvent(event)
 
     def get_ready_for_project(self):
+        ...
+        
+    def clean_up(self):
         self._reset()
-        self.centerOn(self._scene.itemsBoundingRect().center())     # 根据项目配置确定场景位置
 
     def is_dragging(self):
         return self._is_dragging

@@ -47,3 +47,6 @@ class HierarchyWindow(QWidget):
     
     def get_ready_for_project(self):
         self._hierarchy_tree_view.get_ready_for_project()
+
+    def clean_up(self):
+        self._hierarchy_tree_view.clean_up()

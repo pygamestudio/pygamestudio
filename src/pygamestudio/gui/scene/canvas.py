@@ -15,7 +15,6 @@ class PygameWidget(QWidget):
         self._clock = pygame.time.Clock()
         self._canvas_surface = pygame.Surface((self.width(), self.height()))
 
-        self._all_objects = []
         self._final_selected_object = None
         self._mouse_x = None
         self._mouse_y = None
@@ -32,6 +31,7 @@ class PygameWidget(QWidget):
         self.setWindowTitle("Scene Window")
         self.setFixedSize(800, 600)   # 这个大小要在项目打开时根据项目配置来，在项目开发时也需要可以被修改
         self.installEventFilter(self)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
     def _set_signal(self):
         self._object_manager.object_added.connect(self._on_object_added)
@@ -56,7 +56,6 @@ class PygameWidget(QWidget):
         self._clock.tick(60)
     
     def _reset(self):
-        self._all_objects = []
         self._final_selected_object = None
         self._mouse_x = None
         self._mouse_y = None
@@ -64,6 +63,9 @@ class PygameWidget(QWidget):
         self._update_scene()
 
     def get_ready_for_project(self):
+        ...
+        
+    def clean_up(self):
         self._reset()
         
     def _on_object_added(self, parent_uuid, object_uuid, inserted_pos):
@@ -218,8 +220,17 @@ class PygameWidget(QWidget):
 
     def paintEvent(self, event):
         painter = QPainter(self)
-        img = self._convert_canvas_surface_to_qimage(self._canvas_surface)
-        painter.drawPixmap(0, 0, QPixmap.fromImage(img))
+
+        if self._object_manager.is_current_scene_visible():
+            img = self._convert_canvas_surface_to_qimage(self._canvas_surface)
+            painter.drawPixmap(0, 0, QPixmap.fromImage(img))
+        else:
+            painter.save()
+            pen = QPen(Qt.GlobalColor.white)
+            pen.setWidth(5)
+            painter.setPen(pen)
+            painter.drawRect(0, 0, self._canvas_surface.get_width(), self._canvas_surface.get_height())
+            painter.restore()
 
     def resizeEvent(self, event):
         new_window_size = event.size()

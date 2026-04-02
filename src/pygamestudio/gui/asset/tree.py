@@ -42,7 +42,7 @@ class AssetTreeView(QTreeView):
         self._file_model.setReadOnly(False)
         self._file_model.setRootPath(self._root_path)
         self._file_model.setFilter(QDir.Filter.Dirs | QDir.Filter.Files | QDir.Filter.NoDotAndDotDot)
-        
+
         self._proxy_model.setFilterKeyColumn(0)
         self._proxy_model.setDynamicSortFilter(True)
         self._proxy_model.setSourceModel(self._file_model)
@@ -142,11 +142,17 @@ class AssetTreeView(QTreeView):
         self._expand_state = {}
         self._is_connected = False
         self._highlight_indexes_paths = []
-        self._root_path = self._object_manager.get_project_path()
-    
-    def get_ready_for_project(self):
-        self._reset()
+        self._root_path = ''
+        self._file_model.setRootPath(self._root_path)
         self.setRootIndex(self._proxy_model.mapFromSource(self._file_model.index(self._root_path)))
+        
+    def get_ready_for_project(self):
+        self._root_path = self._object_manager.get_project_path()
+        self._file_model.setRootPath(self._root_path)
+        self.setRootIndex(self._proxy_model.mapFromSource(self._file_model.index(self._root_path)))
+
+    def clean_up(self):
+        self._reset()
 
     def create(self, index_type):
         return self._create(index_type)
@@ -159,6 +165,8 @@ class AssetTreeView(QTreeView):
         else:
             self._create_file(index_type)
 
+        self._rename()
+
     def _create_folder(self):
         parent_index = self._get_parent_index_for_creation()
         self.setExpanded(parent_index, True)
@@ -168,8 +176,10 @@ class AssetTreeView(QTreeView):
         new_folder_name = INDEX_FOLDER
         folder_path = self._get_unique_path(new_folder_name, parent_path)
         folder_path.mkdir()
-        QTimer().singleShot(10, lambda:self.scrollTo(self._proxy_model.mapFromSource(self._file_model.index(str(folder_path)))))
-
+        
+        new_index = self._proxy_model.mapFromSource(self._file_model.index(str(folder_path)))
+        self.setCurrentIndex(new_index)
+        QTimer().singleShot(10, lambda:self.scrollTo(new_index))
         self._highlight_indexes_paths.append(folder_path)
 
     def _create_file(self, index_type):
@@ -182,7 +192,13 @@ class AssetTreeView(QTreeView):
         file_path = self._get_unique_path(new_file_name, parent_path)
         file_path.touch()
 
-        QTimer().singleShot(10, lambda:self.scrollTo(self._proxy_model.mapFromSource(self._file_model.index(str(file_path)))))
+        if index_type == INDEX_SCENE:
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write('{}')
+
+        new_index = self._proxy_model.mapFromSource(self._file_model.index(str(file_path)))
+        self.setCurrentIndex(new_index)
+        QTimer().singleShot(10, lambda:self.scrollTo(new_index))
         self._highlight_indexes_paths.append(file_path)
 
     def _delete(self):
@@ -492,6 +508,7 @@ class AssetTreeView(QTreeView):
     def refresh(self):
         self._file_model.setRootPath(self._root_path)
         self.setRootIndex(self._proxy_model.mapFromSource(self._file_model.index(self._root_path)))
+        self._proxy_model.invalidate()
 
     def get_file_system_model(self):
         return self._file_model
@@ -539,8 +556,24 @@ class AssetTreeView(QTreeView):
         
         index_path = Path(self._file_model.filePath(self._proxy_model.mapToSource(index)))
         if index_path.suffix == '.scene':
-            self._object_manager.load(index_path)
-        # print(index_path)
+            # Load the same scene.
+            if index_path.as_posix() == self._object_manager.current_scene_file_path:
+                self._object_manager.deselect_all()
+                self._object_manager.select(self._object_manager.scene_object_uuid)
+                return
+            
+            # Load a different scene.
+            self._object_manager.load_scene(index_path.as_posix())
+
+            # if self._object_manager.is_current_scene_saved():
+            #     self._object_manager.load_scene(index_path.as_posix())
+            # else:
+            #     choice = QMessageBox.warning(self, '保存提醒', '当前场景数据已修改，是否保存？', QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel)
+            #     if choice == QMessageBox.StandardButton.Yes:
+            #         self._object_manager.save_scene()
+            #         self._object_manager.load_scene(index_path.as_posix())
+            #     elif choice == QMessageBox.StandardButton.No:
+            #         self._object_manager.load_scene(index_path.as_posix())
 
     def dragEnterEvent(self, event):
         if event.source() != None and event.source() != self:

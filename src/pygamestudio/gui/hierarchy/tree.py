@@ -21,7 +21,6 @@ class HierarchyTreeView(QTreeView):
         self._delegate = HierarchyTreeViewDelegate(self, self._proxy_model, self._standard_model)
 
         self._is_cut = False
-        self._all_items = {}
         # self._highlight_items = []
         self._clipboard_items = []
         self._items_to_delete_by_cut = []
@@ -37,7 +36,7 @@ class HierarchyTreeView(QTreeView):
         # import os
         # scene_file = get_project_config()['asset']['scene']
         
-        # QTimer().singleShot(2000, lambda: self._object_manager.load(''))
+        # QTimer().singleShot(2000, lambda: self._standard_model.clear())
 
     def _setup(self):
         self._set_widget()
@@ -187,12 +186,19 @@ class HierarchyTreeView(QTreeView):
 
     def _reset(self):
         self._is_cut = False
-        self._all_items = {}
         # self._highlight_items = []
         self._clipboard_items = []
         self._items_to_delete_by_cut = []
+        self._scene_item = None
+        
+        self.selectionModel().blockSignals(True)
+        self._standard_model.clear()
+        self.selectionModel().blockSignals(False)
 
     def get_ready_for_project(self):
+        ...
+        
+    def clean_up(self):
         self._reset()
 
     def add(self, item_type):
@@ -311,18 +317,18 @@ class HierarchyTreeView(QTreeView):
         ...
     
     def _delete(self):
-        content = '是否要删除当前选中对象?'
-        reply = QMessageBox.question(self, '请确认...', content, QMessageBox.Yes | QMessageBox.No)
-            
-        if reply == QMessageBox.StandardButton.No:
-            return
-        
         items_to_delete = []
         selected_indexes = self.selectedIndexes()
         for index in selected_indexes:
             items_to_delete.append(self._standard_model.itemFromIndex(self._proxy_model.mapToSource(index)))
         
-        if not items_to_delete:
+        if not items_to_delete or len(items_to_delete)==1 and items_to_delete[0]==self._scene_item:
+            return
+    
+        content = '是否要删除当前选中对象?'
+        reply = QMessageBox.question(self, '请确认...', content, QMessageBox.Yes | QMessageBox.No)
+            
+        if reply == QMessageBox.StandardButton.No:
             return
         
         item_uuid_list = []
@@ -335,7 +341,9 @@ class HierarchyTreeView(QTreeView):
     def _on_object_deleted(self, object_uuid):
         matched_item = self._get_matched_item(object_uuid)
         if matched_item == self._scene_item:
+            self.selectionModel().blockSignals(True)
             self._standard_model.clear()
+            self.selectionModel().blockSignals(False)
         else:
             matched_item.parent().takeRow(matched_item.row())
     
@@ -352,7 +360,6 @@ class HierarchyTreeView(QTreeView):
         item = self._standard_model.itemFromIndex(self._proxy_model.mapToSource(self.currentIndex()))
         item_uuid = item.data(Qt.ItemDataRole.UserRole+1)
         QApplication.clipboard().setText(item_uuid)
-        print(item_uuid)
 
     def _copy_path(self):
         def get_path(item):

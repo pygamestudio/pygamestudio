@@ -9,7 +9,7 @@ from pygamestudio.game.object.scene import *
 from pygamestudio.game.object.text import *
 from pygamestudio.game.object.ellipse import *
 from pygamestudio.game.object.line import *
-
+from pygamestudio.common.utils.project import *
 
 class ObjectManager(QObject):
     object_saved = Signal()
@@ -38,8 +38,9 @@ class ObjectManager(QObject):
         super().__init__()
         self._is_cut = False
         self._project_path = ''
-        self._scene_file_path = ''
-        self._scene_object_uuid = ''
+        self._current_scene_file_path = ''
+        self._is_current_scene_saved = True
+        self._current_scene_object_uuid = ''
         self._clipboard_content = []
         self._all_object_tree_struct = {}
         self._undo_stack = QUndoStack(self)
@@ -49,29 +50,46 @@ class ObjectManager(QObject):
         return self._all_object_tree_struct
 
     @property
-    def scene_file_path(self):
-        return self._scene_file_path
-    
-    @property
     def scene_object_uuid(self):
-        return self._scene_object_uuid
+        return self._current_scene_object_uuid
     
     @property
     def undo_stack(self):
         return self._undo_stack
     
+    @property
+    def current_scene_file_path(self):
+        return self._current_scene_file_path
+    
+    def is_current_scene_saved(self):
+        return self._is_current_scene_saved
+    
+    def is_current_scene_visible(self):
+        scene_obj = self._get_object(self._current_scene_object_uuid)
+        return scene_obj.is_visible if scene_obj else False
+    
     def _reset(self):
         self._is_cut = False
         self._project_path = ''
-        self._scene_file_path = ''          # 从project.json中获取
-        self._scene_object_uuid = ''
+        self._current_scene_file_path = ''          # 从project.json中获取
+        self._is_current_scene_saved = True
+        self._current_scene_object_uuid = ''
         self._clipboard_content = []
         self._all_object_tree_struct = {}
     
     def get_ready_for_project(self, project_path):
-        self._reset()
         self._project_path = project_path
-        self._scene_file_path = ''  # 从project.json中获取
+        set_env('__PYGAMESTUDIO_PROJECT_PATH', project_path)
+
+        current_scene_file_relative_path = get_current_scene_from_project_config()
+        if current_scene_file_relative_path:
+            current_scene_file_path = (Path(self._project_path) / current_scene_file_relative_path).as_posix()
+        else:
+            current_scene_file_path = ''
+        self._load_scene(current_scene_file_path)
+
+    def clean_up(self):
+        self._reset()
 
     def get_project_path(self):
         return self._project_path
@@ -98,7 +116,7 @@ class ObjectManager(QObject):
     def _new_object(self, object_type, object_data={}):
         if object_type == OBJECT_SCENE:
             obj = ObjectScene(self, object_data)
-            self._scene_object_uuid = obj.uuid
+            self._current_scene_object_uuid = obj.uuid
         elif object_type == OBJECT_RECT:
             obj = ObjectRect(self, object_data)
         elif object_type == OBJECT_TEXT:
@@ -114,9 +132,14 @@ class ObjectManager(QObject):
         old_name = obj.name
         obj.name = new_name
 
+        if old_name == new_name:
+            return
+        
+        self._is_current_scene_saved = False
         self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'name', old_name, new_name))
 
     def resize(self, object_uuid, new_size):
+        self._is_current_scene_saved = False
         obj = self._get_object(object_uuid)
         old_size = (obj.width, obj.height)    
         self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'size', old_size, new_size))
@@ -195,24 +218,41 @@ class ObjectManager(QObject):
 
     def move(self, object_uuid, new_pos):
         obj = self._get_object(object_uuid)
-        old_pos = (obj.x, obj.y)    
+        old_pos = (obj.x, obj.y)
+
+        if old_pos == new_pos:
+            return
+        
+        self._is_current_scene_saved = False
         self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'pos', old_pos, new_pos))
 
     def scale(self, object_uuid, new_scale):
         obj = self._get_object(object_uuid)
         old_scale = (obj.scale_x, obj.scale_y)
+
+        if old_scale == new_scale:
+            return
+        
+        self._is_current_scene_saved = False
         self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'scale', old_scale, new_scale))
 
     def rotate(self, object_uuid, new_angle):
         obj = self._get_object(object_uuid)
         old_angle = obj.angle
+
+        if old_angle == new_angle:
+            return
+        
+        self._is_current_scene_saved = False
         self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'angle', old_angle, new_angle))
 
     def show(self, object_uuid):
+        self._is_current_scene_saved = False
         obj = self._get_object(object_uuid)       
         self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'is_visible', False, True))
 
     def hide(self, object_uuid):
+        self._is_current_scene_saved = False
         obj = self._get_object(object_uuid)       
         self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'is_visible', True, False))
 
@@ -227,6 +267,10 @@ class ObjectManager(QObject):
     def set_color(self, object_uuid, new_color):
         obj = self._get_object(object_uuid)
         old_color = obj.color
+
+        if old_color == new_color:
+            return
+        
         self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'color', old_color, new_color))
 
     def set_border_radius(self, object_uuid, attr, new_border_radius):
@@ -317,7 +361,9 @@ class ObjectManager(QObject):
     def add_object_tree_struct(self, parent_uuid, object_tree_struct_to_add, inserted_pos=-1):
         return self._add_object_tree_struct(parent_uuid, object_tree_struct_to_add, inserted_pos)
 
-    def _add_object_tree_struct(self, parent_uuid, object_tree_struct_to_add, inserted_pos=-1):
+    def _add_object_tree_struct(self, parent_uuid, object_tree_struct_to_add, inserted_pos=-1): 
+        self._is_current_scene_saved = False
+
         if not self._all_object_tree_struct:
             self._all_object_tree_struct.update(object_tree_struct_to_add)
             self.object_added.emit(parent_uuid, list(object_tree_struct_to_add.keys())[0], 0)
@@ -396,7 +442,7 @@ class ObjectManager(QObject):
         self._clipboard_content = []
         
         for object_uuid in object_uuid_list:
-            if object_uuid == self._scene_object_uuid:
+            if object_uuid == self._current_scene_object_uuid:
                 continue
             
             if is_to_discard(object_uuid):
@@ -417,7 +463,7 @@ class ObjectManager(QObject):
         self._clipboard_content = []
 
         for object_uuid in object_uuid_list:
-            if object_uuid == self._scene_object_uuid:
+            if object_uuid == self._current_scene_object_uuid:
                 continue
             
             if is_to_discard(object_uuid):
@@ -429,6 +475,8 @@ class ObjectManager(QObject):
         self.object_copied.emit()
 
     def paste(self, parent_uuid):
+        self._is_current_scene_saved = False
+
         if self._is_cut:
             self._paste_for_cut(parent_uuid)
         else:
@@ -507,7 +555,7 @@ class ObjectManager(QObject):
         
         object_tree_struct_list_to_duplicate = []
         for object_uuid in object_uuid_list:
-            if object_uuid == self._scene_object_uuid:
+            if object_uuid == self._current_scene_object_uuid:
                 continue
             
             if is_to_discard(object_uuid):
@@ -541,7 +589,7 @@ class ObjectManager(QObject):
         
         object_uuid_list_to_delete = []
         for object_uuid in object_uuid_list:
-            if object_uuid == self._scene_object_uuid:
+            if object_uuid == self._current_scene_object_uuid:
                 continue
             
             if is_to_discard(object_uuid):
@@ -561,7 +609,9 @@ class ObjectManager(QObject):
         return self._delete_object_tree_struct(object_uuid)
 
     def _delete_object_tree_struct(self, object_uuid):
-        if object_uuid == self._scene_object_uuid:
+        self._is_current_scene_saved = False
+
+        if object_uuid == self._current_scene_object_uuid:
             self._all_object_tree_struct = {}
             self.object_deleted.emit(object_uuid)
             return
@@ -582,39 +632,56 @@ class ObjectManager(QObject):
             
         _delete(object_uuid, self._all_object_tree_struct)
 
-    def save(self):
-        return self._save()
+    def save_scene(self):
+        return self._save_scene()
     
-    def _save(self):
-        if not self._scene_file_path:
-            self._scene_file_path, _ = QFileDialog.getSaveFileName(None, 'Save File', self._project_path, 'Files (*.scene)')
-        
-        if not self._scene_file_path:
-            return
-        
+    def _save_scene(self):
+        if not self._current_scene_file_path:
+            self._current_scene_file_path, _ = QFileDialog.getSaveFileName(None, 'Save File', self._project_path, 'Files (*.scene)')
+            if not self._current_scene_file_path:
+                return
+            
+        self._is_current_scene_saved = True
+        set_current_scene_to_projec_config(self._current_scene_file_path)
+
         def _default(obj):
             if hasattr(obj, 'to_dict'):
                 return obj.to_dict()
             raise TypeError(f'Object of type {obj.__class__.__name__} is not JSON serializable')
-
-        with open(self._scene_file_path, 'w', encoding='utf-8') as f:
+    
+        with open(self._current_scene_file_path, 'w', encoding='utf-8') as f:
             json.dump(self._all_object_tree_struct, f, default=_default, indent=4, ensure_ascii=False)
-    
-    def load(self, scene_file_path):
-        return self._load(scene_file_path)
-    
-    def _load(self, scene_file_path):
-        if not scene_file_path or not scene_file_path.exists():
-            self._add('', OBJECT_SCENE)
-            return
-        
-        self._delete_object_tree_struct(self._scene_object_uuid)
-        self._scene_file_path = scene_file_path
 
-        with open(scene_file_path, 'r', encoding='utf-8') as f:
-            data = json.loads(f.read())
+    def load_scene(self, current_scene_file_path):
+        return self._load_scene(current_scene_file_path)
+    
+    def _load_scene(self, current_scene_file_path):
+        if not self._is_current_scene_saved:
+            choice = QMessageBox.warning(None, '保存提醒', '当前场景数据已修改，是否保存？', QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel)
+            if choice == QMessageBox.StandardButton.Cancel:
+                return
+            
+            elif choice == QMessageBox.StandardButton.Yes:
+                self._save_scene()
 
+        if self._current_scene_object_uuid:
+            self._delete_object_tree_struct(self._current_scene_object_uuid)
+        self._current_scene_file_path = current_scene_file_path
+        set_current_scene_to_projec_config(current_scene_file_path)
+
+        if not current_scene_file_path or not Path(current_scene_file_path).exists():
+            data = {}
+        else:
+            with open(self._current_scene_file_path, 'r', encoding='utf-8') as f:
+                data = json.loads(f.read())
+                if not data:
+                    data = {}
+                
         def _l(parent_uuid, object_tree_struct):
+            if not object_tree_struct:
+                self._add('', OBJECT_SCENE)
+                return
+            
             key = list(object_tree_struct.keys())[0]
             value = list(object_tree_struct.values())[0]
 
@@ -626,6 +693,7 @@ class ObjectManager(QObject):
 
         _l('', data)
         self._undo_stack.clear()
+        self._is_current_scene_saved = True
 
     def is_empty(self):
         return self._all_object_tree_struct == {}

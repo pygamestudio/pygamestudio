@@ -1,6 +1,6 @@
 {   
     "theme": "white",
     "asset": {
-        "scene": "scene/new.scene"
+        "current_scene": ""
     }
 }

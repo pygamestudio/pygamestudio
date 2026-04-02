@@ -56,3 +56,6 @@ class ConsoleWindow(QWidget):
 
     def get_ready_for_project(self):
         self._console_log_browser.get_ready_for_project()
+
+    def clean_up(self):
+        self._console_log_browser.clean_up()

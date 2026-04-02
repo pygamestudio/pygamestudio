@@ -64,14 +64,22 @@ class AddItemButton(QPushButton):
         add_line_action = QAction('直线', self)
         add_rect_action = QAction('矩形', self)
         add_ellipse_action = QAction('椭圆', self)
+        add_text_action = QAction('文本', self)
 
         add_line_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_LINE))
         add_rect_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_RECT))
         add_ellipse_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_ELLIPSE))
+        add_text_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_TEXT))
 
-        menu.addAction(add_line_action)
-        menu.addAction(add_rect_action)
-        menu.addAction(add_ellipse_action)
+        add_shape_sub_menu = QMenu(title='形状')
+        add_ui_sub_menu = QMenu(title='UI')
+        menu.addMenu(add_shape_sub_menu)
+        menu.addMenu(add_ui_sub_menu)
+
+        add_shape_sub_menu.addAction(add_line_action)
+        add_shape_sub_menu.addAction(add_rect_action)
+        add_shape_sub_menu.addAction(add_ellipse_action)
+        add_ui_sub_menu.addAction(add_text_action)
 
         menu.exec(self.mapToGlobal(pos))
 

@@ -97,10 +97,20 @@ class CreateProjectBody(QWidget):
         project_name = self._project_name_edit.text().strip()
         project_dir_path = self._project_dir_path_edit.text().strip()
         project_path = Path(project_dir_path) / project_name
+        audio_folder_path = project_path / 'audio'
+        image_folder_path = project_path / 'image'
+        scene_folder_path = project_path / 'scene'
+        script_folder_path = project_path / 'script'
+        main_py_path = project_path / 'main.py'
         project_json_path = project_path / 'project.json'
-        
+
         try:
             project_path.mkdir(parents=True, exist_ok=False)
+            audio_folder_path.mkdir(parents=True, exist_ok=False)
+            image_folder_path.mkdir(parents=True, exist_ok=False)
+            scene_folder_path.mkdir(parents=True, exist_ok=False)
+            script_folder_path.mkdir(parents=True, exist_ok=False)
+            main_py_path.touch(exist_ok=False)
             with open(RES_PATH / 'templates/project.json', 'r', encoding='utf-8') as f:
                 project_json_path.write_text(f.read(), encoding='utf-8')
             

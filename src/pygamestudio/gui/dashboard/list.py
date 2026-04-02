@@ -120,7 +120,7 @@ class DashboardListView(QListView):
         project_data = {
             'icon': str(RES_PATH / 'images/project_icon.png'),
             'name': Path(project_path).name,
-            'path': project_path,
+            'path': Path(project_path).as_posix(),
             'date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }
         self._add_item(project_data)
@@ -185,7 +185,7 @@ class DashboardListView(QListView):
 
         item = self._standard_model.itemFromIndex(self._proxy_model.mapToSource(index))
         item.setData(Path(new_project_path).name, self.ProjectNameRole)
-        item.setData(new_project_path, self.ProjectPathRole)
+        item.setData(Path(new_project_path).as_posix(), self.ProjectPathRole)
         
     def _delete_project(self, index):
         chocie = QMessageBox.question(self, '请确认', '是否删除该项目？', QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
