@@ -7,14 +7,15 @@ from pygamestudio.gui.inspector.layout.common import INSPECTOR_LAYOUT_COMMON_PRE
 from pygamestudio.gui.inspector.layout.rect import INSPECTOR_LAYOUT_RECT
 from pygamestudio.gui.inspector.layout.ellipse import INSPECTOR_LAYOUT_ELLIPSE
 from pygamestudio.gui.inspector.layout.line import INSPECTOR_LAYOUT_LINE
+from pygamestudio.gui.inspector.layout.scene import INSPECTOR_LAYOUT_CANVAS
 
 from pygamestudio.game.object.type import *
 
 
 class InspectorWindow(QWidget):
-    def __init__(self, parent=None, object_manager=None):
+    def __init__(self, parent=None, game_manager=None):
         super().__init__(parent)
-        self._object_manager = object_manager
+        self._game_manager = game_manager
         self._inspector_layout = QGridLayout(self)
         self._object_uuid_in_inspection = None
         self._inspector_row = 0
@@ -30,20 +31,20 @@ class InspectorWindow(QWidget):
         ...
 
     def _set_signal(self):
-        self._object_manager.object_added.connect(self._on_object_added)
-        self._object_manager.object_deleted.connect(self._on_object_deleted)
-        self._object_manager.object_selected.connect(self._on_object_selected)
-        self._object_manager.object_deselected.connect(self._on_object_deselected)
-        self._object_manager.object_moved.connect(self._on_object_moved)
-        self._object_manager.object_scaled.connect(self._on_object_scaled)
-        self._object_manager.object_rotated.connect(self._on_object_rotated)
-        self._object_manager.object_showed.connect(self._on_object_showed)
-        self._object_manager.object_hidden.connect(self._on_object_hidden)
-        self._object_manager.object_color_changed.connect(self._on_object_color_changed)
-        self._object_manager.object_rect_border_radius_changed.connect(self._on_object_rect_border_radius_changed)
-        self._object_manager.object_line_start_point_changed.connect(self._on_object_line_start_point_changed)
-        self._object_manager.object_line_end_point_changed.connect(self._on_object_line_end_point_changed)
-        self._object_manager.object_line_thickness_changed.connect(self._on_object_line_thickness_changed)
+        self._game_manager.object_added.connect(self._on_object_added)
+        self._game_manager.object_deleted.connect(self._on_object_deleted)
+        self._game_manager.object_selected.connect(self._on_object_selected)
+        self._game_manager.object_deselected.connect(self._on_object_deselected)
+        self._game_manager.object_moved.connect(self._on_object_moved)
+        self._game_manager.object_scaled.connect(self._on_object_scaled)
+        self._game_manager.object_rotated.connect(self._on_object_rotated)
+        self._game_manager.object_showed.connect(self._on_object_showed)
+        self._game_manager.object_hidden.connect(self._on_object_hidden)
+        self._game_manager.object_color_changed.connect(self._on_object_color_changed)
+        self._game_manager.object_rect_border_radius_changed.connect(self._on_object_rect_border_radius_changed)
+        self._game_manager.object_line_start_point_changed.connect(self._on_object_line_start_point_changed)
+        self._game_manager.object_line_end_point_changed.connect(self._on_object_line_end_point_changed)
+        self._game_manager.object_line_thickness_changed.connect(self._on_object_line_thickness_changed)
 
     def _set_layout(self):
         self._inspector_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
@@ -62,59 +63,59 @@ class InspectorWindow(QWidget):
 
     def rename_object(self):
         lineedit = self._find_widget(self._inspector_layout, 'name')
-        self._object_manager.rename(self._object_uuid_in_inspection, lineedit.text().strip())
+        self._game_manager.rename(self._object_uuid_in_inspection, lineedit.text().strip())
 
     def resize_object(self):
         spinbox_width = self._find_widget(self._inspector_layout, 'width')
         spinbox_height = self._find_widget(self._inspector_layout, 'height')
         new_size = (spinbox_width.value(), spinbox_height.value())
-        self._object_manager.resize(self._object_uuid_in_inspection, new_size)
+        self._game_manager.resize(self._object_uuid_in_inspection, new_size)
 
     def move_object(self):
         spinbox_x = self._find_widget(self._inspector_layout, 'x')
         spinbox_y = self._find_widget(self._inspector_layout, 'y')
         new_pos = (spinbox_x.value(), spinbox_y.value())
-        self._object_manager.move(self._object_uuid_in_inspection, new_pos)
+        self._game_manager.move(self._object_uuid_in_inspection, new_pos)
 
     def scale_object(self):
         spinbox_scale_x = self._find_widget(self._inspector_layout, 'scale_x')
         spinbox_scale_y = self._find_widget(self._inspector_layout, 'scale_y')
         new_scale = (spinbox_scale_x.value(), spinbox_scale_y.value())
-        self._object_manager.scale(self._object_uuid_in_inspection, new_scale)
+        self._game_manager.scale(self._object_uuid_in_inspection, new_scale)
 
     def rotate_object(self):
         spinbox_angle = self._find_widget(self._inspector_layout, 'angle')
         new_angle = spinbox_angle.value()
-        self._object_manager.rotate(self._object_uuid_in_inspection, new_angle)
+        self._game_manager.rotate(self._object_uuid_in_inspection, new_angle)
 
     def show_object(self):
-        self._object_manager.show(self._object_uuid_in_inspection)
+        self._game_manager.show(self._object_uuid_in_inspection)
 
     def hide_object(self):
-        self._object_manager.hide(self._object_uuid_in_inspection)
+        self._game_manager.hide(self._object_uuid_in_inspection)
 
     def set_object_color(self, new_color):
-        self._object_manager.set_color(self._object_uuid_in_inspection, new_color)
+        self._game_manager.set_color(self._object_uuid_in_inspection, new_color)
 
     def set_object_border_radius(self, attr, new_border_radius):
-        self._object_manager.set_border_radius(self._object_uuid_in_inspection, attr, new_border_radius)
+        self._game_manager.set_border_radius(self._object_uuid_in_inspection, attr, new_border_radius)
     
     def set_object_thickness(self):
         spinbox_thickness = self._find_widget(self._inspector_layout, 'thickness')
         new_thickness = int(spinbox_thickness.value())
-        self._object_manager.set_thickness(self._object_uuid_in_inspection, new_thickness)
+        self._game_manager.set_thickness(self._object_uuid_in_inspection, new_thickness)
 
     def set_object_start_point(self):
         spinbox_start_x = self._find_widget(self._inspector_layout, 'start_x')
         spinbox_start_y = self._find_widget(self._inspector_layout, 'start_y')
         new_start_point = (spinbox_start_x.value(), spinbox_start_y.value())
-        self._object_manager.set_start_point(self._object_uuid_in_inspection, new_start_point)
+        self._game_manager.set_start_point(self._object_uuid_in_inspection, new_start_point)
 
     def set_object_end_point(self):
         spinbox_end_x = self._find_widget(self._inspector_layout, 'end_x')
         spinbox_end_y = self._find_widget(self._inspector_layout, 'end_y')
         new_end_point = (spinbox_end_x.value(), spinbox_end_y.value())
-        self._object_manager.set_end_point(self._object_uuid_in_inspection, new_end_point)
+        self._game_manager.set_end_point(self._object_uuid_in_inspection, new_end_point)
 
     def _on_object_added(self, parent_uuid, object_uuid, inserted_pos):
         # Object will be selected when added, and it will be inspected in slot _on_object_selected.
@@ -132,7 +133,7 @@ class InspectorWindow(QWidget):
 
     def _on_object_resized(self, object_uuid):
         # 等待gizmo实现
-        obj = self._object_manager.get_object(object_uuid)
+        obj = self._game_manager.get_object(object_uuid)
         spinbox_width = self._find_widget(self._inspector_layout, 'width')
         spinbox_height = self._find_widget(self._inspector_layout, 'height')
         spinbox_width.blockSignals(True)
@@ -143,7 +144,7 @@ class InspectorWindow(QWidget):
         spinbox_height.blockSignals(False)
 
     def _on_object_moved(self, object_uuid):
-        obj = self._object_manager.get_object(object_uuid)
+        obj = self._game_manager.get_object(object_uuid)
         spinbox_x = self._find_widget(self._inspector_layout, 'x')
         spinbox_y = self._find_widget(self._inspector_layout, 'y')
 
@@ -175,7 +176,7 @@ class InspectorWindow(QWidget):
             spinbox_end_y.blockSignals(False)
 
     def _on_object_scaled(self, object_uuid):
-        obj = self._object_manager.get_object(object_uuid)
+        obj = self._game_manager.get_object(object_uuid)
         spinbox_scale_x = self._find_widget(self._inspector_layout, 'scale_x')
         spinbox_scale_y = self._find_widget(self._inspector_layout, 'scale_y')
         spinbox_scale_x.blockSignals(True)
@@ -186,7 +187,7 @@ class InspectorWindow(QWidget):
         spinbox_scale_y.blockSignals(False)
 
     def _on_object_rotated(self, object_uuid):
-        obj = self._object_manager.get_object(object_uuid)
+        obj = self._game_manager.get_object(object_uuid)
         spinbox_angle = self._find_widget(self._inspector_layout, 'angle')
         spinbox_angle.blockSignals(True)
         spinbox_angle.setValue(obj.angle)
@@ -210,7 +211,7 @@ class InspectorWindow(QWidget):
         if object_uuid != self._object_uuid_in_inspection:
             return
         
-        obj = self._object_manager.get_object(object_uuid)
+        obj = self._game_manager.get_object(object_uuid)
         color_picker = self._find_widget(self._inspector_layout, 'color')
         color_picker.set_color(obj.color)
 
@@ -218,7 +219,7 @@ class InspectorWindow(QWidget):
         if object_uuid != self._object_uuid_in_inspection:
             return
         
-        obj = self._object_manager.get_object(object_uuid)
+        obj = self._game_manager.get_object(object_uuid)
         spinbox_radius = self._find_widget(self._inspector_layout, attr)
         spinbox_radius.blockSignals(True)
         spinbox_radius.setValue(getattr(obj, attr))
@@ -228,7 +229,7 @@ class InspectorWindow(QWidget):
         if object_uuid != self._object_uuid_in_inspection:
             return
         
-        obj = self._object_manager.get_object(object_uuid)
+        obj = self._game_manager.get_object(object_uuid)
         spinbox_thickness = self._find_widget(self._inspector_layout, 'thickness')
         spinbox_thickness.blockSignals(True)
         spinbox_thickness.setValue(obj.thickness)
@@ -238,7 +239,7 @@ class InspectorWindow(QWidget):
         if object_uuid != self._object_uuid_in_inspection:
             return
         
-        obj = self._object_manager.get_object(object_uuid)
+        obj = self._game_manager.get_object(object_uuid)
         spinbox_start_point_x = self._find_widget(self._inspector_layout, 'start_x')
         spinbox_start_point_y = self._find_widget(self._inspector_layout, 'start_y')
         spinbox_start_point_x.blockSignals(True)
@@ -252,7 +253,7 @@ class InspectorWindow(QWidget):
         if object_uuid != self._object_uuid_in_inspection:
             return
         
-        obj = self._object_manager.get_object(object_uuid)
+        obj = self._game_manager.get_object(object_uuid)
         spinbox_end_point_x = self._find_widget(self._inspector_layout, 'end_x')
         spinbox_end_point_y = self._find_widget(self._inspector_layout, 'end_y')
         spinbox_end_point_x.blockSignals(True)
@@ -280,23 +281,20 @@ class InspectorWindow(QWidget):
         return None
         
     def _inspect_object(self, object_uuid):
-        obj = self._object_manager.get_object(object_uuid)
-
-        # 如果是场景对象，先暂时返回
-        if obj.type == OBJECT_SCENE:
-            return
-        
+        obj = self._game_manager.get_object(object_uuid)
         self._object_uuid_in_inspection = object_uuid
         self._clear_layout(self._inspector_layout)
 
-        self._add_commom_layout_prefix(obj)
-        if obj.type == OBJECT_RECT:
+        # self._add_commom_layout_prefix(obj)
+        if obj.type == OBJECT_CANVAS:
+            self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_CANVAS)
+        elif obj.type == OBJECT_RECT:
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_RECT)
         elif obj.type == OBJECT_ELLIPSE:
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_ELLIPSE)
         elif obj.type == OBJECT_LINE:
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_LINE)
-        self._add_common_layout_suffix(obj)
+        # self._add_common_layout_suffix(obj)
 
     def _clear_layout(self, layout):
         if layout is None:
@@ -341,20 +339,22 @@ class InspectorWindow(QWidget):
     def _add_layout_for_specific_object(self, obj, layout_data):
         for property_detail in layout_data.values():
             name = property_detail['i18n']['en'] # 这里的名称要根据设置来修改
-            attributes = property_detail['component']['attribute']
-            widgets = property_detail['component']['widget']
+            attribute_list = property_detail['component']['attribute']
+            widget_list = property_detail['component']['widget']
+            enabled_list = property_detail['component']['enabled']
 
             label = PropertyLabel(self, 'name', name)
             self._inspector_layout.addWidget(label, self._inspector_row, 0, 1, 1)
 
-            for i, widget in enumerate(widgets):
-                w = widget(self, attributes[i], getattr(obj, attributes[i]))
-                w.setObjectName(attributes[i])
+            for i, widget in enumerate(widget_list):
+                w = widget(self, attribute_list[i], getattr(obj, attribute_list[i]))
+                w.setObjectName(attribute_list[i])
+                w.setEnabled(enabled_list[i])
 
                 row = i // 2
                 column = i%2+1
 
-                column_stretch = 2 if len(widgets) == 1 else 1
+                column_stretch = 2 if len(widget_list) == 1 else 1
                 self._inspector_layout.addWidget(w, self._inspector_row+row, column, 1, column_stretch)
 
             self._inspector_row += row+1

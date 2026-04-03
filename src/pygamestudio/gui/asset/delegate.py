@@ -6,11 +6,12 @@ from pathlib import Path
 
 
 class AssetTreeWidgetDelegate(QStyledItemDelegate):
-    def __init__(self, tree_view=None, proxy_model=None, file_model=None):
+    def __init__(self, tree_view=None, proxy_model=None, file_model=None, game_manager=None):
         super().__init__(tree_view)
         self._tree_view = tree_view
         self._proxy_model = proxy_model
         self._file_model = file_model
+        self._game_manager = game_manager
 
     def _on_rename_completed(self):
         """Resort afte the rename action."""

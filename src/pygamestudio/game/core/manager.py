@@ -11,8 +11,10 @@ from pygamestudio.game.object.ellipse import *
 from pygamestudio.game.object.line import *
 from pygamestudio.common.utils.project import *
 
-class ObjectManager(QObject):
-    object_saved = Signal()
+class GameManager(QObject):
+    scene_saved_signal = Signal(str)
+    scene_loaded_signal = Signal(str)
+    scene_renamed_signal = Signal(str)
 
     object_added = Signal(str, str, int)
     object_deleted = Signal(str)
@@ -107,15 +109,15 @@ class ObjectManager(QObject):
             }
         }
 
-        if object_type == OBJECT_SCENE:
+        if object_type == OBJECT_CANVAS:
             self._add_object_tree_struct(parent_uuid, object_tree_struct)
         else:
             inserted_pos = -1
             self._undo_stack.push(AddObjectCommand(self, parent_uuid, object_tree_struct, inserted_pos))
 
     def _new_object(self, object_type, object_data={}):
-        if object_type == OBJECT_SCENE:
-            obj = ObjectScene(self, object_data)
+        if object_type == OBJECT_CANVAS:
+            obj = ObjectCanvas(self, object_data)
             self._current_scene_object_uuid = obj.uuid
         elif object_type == OBJECT_RECT:
             obj = ObjectRect(self, object_data)
@@ -271,6 +273,7 @@ class ObjectManager(QObject):
         if old_color == new_color:
             return
         
+        self._is_current_scene_saved = False
         self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'color', old_color, new_color))
 
     def set_border_radius(self, object_uuid, attr, new_border_radius):
@@ -679,7 +682,7 @@ class ObjectManager(QObject):
                 
         def _l(parent_uuid, object_tree_struct):
             if not object_tree_struct:
-                self._add('', OBJECT_SCENE)
+                self._add('', OBJECT_CANVAS)
                 return
             
             key = list(object_tree_struct.keys())[0]
@@ -703,39 +706,39 @@ class ObjectManager(QObject):
 
 
 class AddObjectCommand(QUndoCommand):
-    def __init__(self, object_manager, parent_uuid, object_tree_struct, inserted_pos, description='Added an object'):
+    def __init__(self, game_manager, parent_uuid, object_tree_struct, inserted_pos, description='Added an object'):
         super().__init__(description)
-        self._object_manager = object_manager
+        self._game_manager = game_manager
         self._parent_uuid = parent_uuid
         self._object_tree_struct = object_tree_struct
         self._inserted_pos = inserted_pos
 
     def redo(self):
-        self._object_manager.add_object_tree_struct(self._parent_uuid, self._object_tree_struct, self._inserted_pos)
+        self._game_manager.add_object_tree_struct(self._parent_uuid, self._object_tree_struct, self._inserted_pos)
 
     def undo(self):
-        self._object_manager.delete_object_tree_struct(list(self._object_tree_struct.keys())[0])
+        self._game_manager.delete_object_tree_struct(list(self._object_tree_struct.keys())[0])
 
 
 class DeleteObjectCommand(QUndoCommand):
-    def __init__(self, object_manager, parent_uuid, object_tree_struct, inserted_pos, description='Deleted an item'):
+    def __init__(self, game_manager, parent_uuid, object_tree_struct, inserted_pos, description='Deleted an item'):
         super().__init__(description)
-        self._object_manager = object_manager
+        self._game_manager = game_manager
         self._parent_uuid = parent_uuid
         self._object_tree_struct = object_tree_struct
         self._inserted_pos = inserted_pos
 
     def redo(self):
-        self._object_manager.delete_object_tree_struct(list(self._object_tree_struct.keys())[0])
+        self._game_manager.delete_object_tree_struct(list(self._object_tree_struct.keys())[0])
 
     def undo(self):
-        self._object_manager.add_object_tree_struct(self._parent_uuid, self._object_tree_struct, self._inserted_pos)
+        self._game_manager.add_object_tree_struct(self._parent_uuid, self._object_tree_struct, self._inserted_pos)
 
 
 class UpdateAttrValueCommand(QUndoCommand):
-    def __init__(self, object_manager, obj, attr, old_value, new_value, descripton='Updated value'):
+    def __init__(self, game_manager, obj, attr, old_value, new_value, descripton='Updated value'):
         super().__init__(descripton)
-        self._object_manager = object_manager
+        self._game_manager = game_manager
         self._obj = obj
         self._attr = attr
         self._old_value = old_value
@@ -751,27 +754,27 @@ class UpdateAttrValueCommand(QUndoCommand):
 
     def _emit_signal(self, attr, value):
         if attr == 'name':
-            self._object_manager.object_renamed.emit(self._obj.uuid, value)
+            self._game_manager.object_renamed.emit(self._obj.uuid, value)
         elif attr == 'is_visible':
             if self._new_value == True:
-                self._object_manager.object_showed.emit(self._obj.uuid)  
+                self._game_manager.object_showed.emit(self._obj.uuid)  
             else:
-                self._object_manager.object_hidden.emit(self._obj.uuid)
+                self._game_manager.object_hidden.emit(self._obj.uuid)
         elif attr == 'pos':
-            self._object_manager.object_moved.emit(self._obj.uuid)
+            self._game_manager.object_moved.emit(self._obj.uuid)
         elif attr == 'size':
-            self._object_manager.object_resized.emit(self._obj.uuid)
+            self._game_manager.object_resized.emit(self._obj.uuid)
         elif attr == 'scale':
-            self._object_manager.object_scaled.emit(self._obj.uuid)
+            self._game_manager.object_scaled.emit(self._obj.uuid)
         elif attr == 'angle':
-            self._object_manager.object_rotated.emit(self._obj.uuid)
+            self._game_manager.object_rotated.emit(self._obj.uuid)
         elif attr == 'color':
-            self._object_manager.object_color_changed.emit(self._obj.uuid)
+            self._game_manager.object_color_changed.emit(self._obj.uuid)
         elif attr=='border_top_left_radius' or attr=='border_top_right_radius' or attr=='border_bottom_left_radius' or attr=='border_bottom_right_radius':
-            self._object_manager.object_rect_border_radius_changed.emit(self._obj.uuid, attr)
+            self._game_manager.object_rect_border_radius_changed.emit(self._obj.uuid, attr)
         elif attr == 'start_point':
-            self._object_manager.object_line_start_point_changed.emit(self._obj.uuid)
+            self._game_manager.object_line_start_point_changed.emit(self._obj.uuid)
         elif attr == 'end_point':
-            self._object_manager.object_line_end_point_changed.emit(self._obj.uuid)
+            self._game_manager.object_line_end_point_changed.emit(self._obj.uuid)
         elif attr == 'thickness':
-            self._object_manager.object_line_thickness_changed.emit(self._obj.uuid)
+            self._game_manager.object_line_thickness_changed.emit(self._obj.uuid)

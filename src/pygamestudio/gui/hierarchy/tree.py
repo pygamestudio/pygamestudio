@@ -11,10 +11,10 @@ from pygamestudio.game.object.type import *
 
 
 class HierarchyTreeView(QTreeView):
-    def __init__(self, parent, object_manager):
+    def __init__(self, parent, game_manager):
         super().__init__(parent)
         self._hierarchy_window = parent
-        self._object_manager = object_manager
+        self._game_manager = game_manager
 
         self._standard_model = QStandardItemModel()
         self._proxy_model = HierarchySortFilterProxyModel(self, self._standard_model)
@@ -25,12 +25,12 @@ class HierarchyTreeView(QTreeView):
         self._clipboard_items = []
         self._items_to_delete_by_cut = []
 
-        self._scene_item = None
+        self._canvas_item = None
         self._context_menu = ContextMenu('', self)
         self._setup()
 
         # # QTimer().singleShot(1000, lambda:self._add(OBJECT_RECT))
-        # # QTimer().singleShot(2000, lambda: self._object_manager.load('D:/Github/pygamestudio/src/pygamestudio/aaa.json'))
+        # # QTimer().singleShot(2000, lambda: self._game_manager.load('D:/Github/pygamestudio/src/pygamestudio/aaa.json'))
         # from pygamestudio.common.utils.project import get_project_config
         # from pathlib import Path
         # import os
@@ -109,28 +109,28 @@ class HierarchyTreeView(QTreeView):
         self._context_menu.copy_path_signal.connect(self._copy_path)
         self._context_menu.copy_name_signal.connect(self._copy_name)
 
-        self._object_manager.object_added.connect(self._on_object_added)
-        self._object_manager.object_selected.connect(self._on_object_selected)
-        self._object_manager.object_deselected.connect(self._on_object_deselected)
-        self._object_manager.object_renamed.connect(self._on_object_renamed)
-        self._object_manager.object_deleted.connect(self._on_object_deleted)
-        self._object_manager.object_cut.connect(self._on_object_cut)
-        self._object_manager.object_copied.connect(self._on_object_copied)
-        self._object_manager.object_showed.connect(self._on_object_showed)
-        self._object_manager.object_hidden.connect(self._on_object_hidden)
+        self._game_manager.object_added.connect(self._on_object_added)
+        self._game_manager.object_selected.connect(self._on_object_selected)
+        self._game_manager.object_deselected.connect(self._on_object_deselected)
+        self._game_manager.object_renamed.connect(self._on_object_renamed)
+        self._game_manager.object_deleted.connect(self._on_object_deleted)
+        self._game_manager.object_cut.connect(self._on_object_cut)
+        self._game_manager.object_copied.connect(self._on_object_copied)
+        self._game_manager.object_showed.connect(self._on_object_showed)
+        self._game_manager.object_hidden.connect(self._on_object_hidden)
 
-    def _add_scene_item(self):
+    def _add_canvas_item(self):
         """The scene objecct will exist at start and forever."""
-        self._object_manager.add('', OBJECT_SCENE)
+        self._game_manager.add('', OBJECT_CANVAS)
 
     def _on_item_selection_changed(self, selected, deselected):
         for index in selected.indexes():
             index_uuid = index.data(Qt.ItemDataRole.UserRole+1)
-            self._object_manager.select(index_uuid)
+            self._game_manager.select(index_uuid)
  
         for index in deselected.indexes():
             index_uuid = index.data(Qt.ItemDataRole.UserRole+1)
-            self._object_manager.deselect(index_uuid)
+            self._game_manager.deselect(index_uuid)
 
     def _on_object_selected(self, object_uuid):
         self.selectionModel().blockSignals(True)
@@ -149,7 +149,7 @@ class HierarchyTreeView(QTreeView):
 
     def _show_context_menu(self, pos):
         item = self._standard_model.itemFromIndex(self._proxy_model.mapToSource(self.indexAt(pos)))
-        item_type = self._object_manager.get_object(item.data(Qt.ItemDataRole.UserRole+1)).type if item else None
+        item_type = self._game_manager.get_object(item.data(Qt.ItemDataRole.UserRole+1)).type if item else None
         
         global_pos = self.mapToGlobal(pos)
         self._context_menu.show(global_pos, item_type)
@@ -160,7 +160,7 @@ class HierarchyTreeView(QTreeView):
             return
 
         new_name = item.text()
-        self._object_manager.rename(item_uuid, new_name)
+        self._game_manager.rename(item_uuid, new_name)
 
     def _on_object_renamed(self, object_uuid, new_name):
         self._standard_model.itemChanged.disconnect(self._on_item_changed)
@@ -171,25 +171,25 @@ class HierarchyTreeView(QTreeView):
     def _on_item_expanded(self, index):
         item = self._standard_model.itemFromIndex(self._proxy_model.mapToSource(index))
         item_uuid = item.data(Qt.ItemDataRole.UserRole+1)
-        obj = self._object_manager.get_object(item_uuid)
+        obj = self._game_manager.get_object(item_uuid)
 
         if obj.is_expanded == False:
-            self._object_manager.expand(item_uuid)
+            self._game_manager.expand(item_uuid)
 
     def _on_item_collapsed(self, index):
         item = self._standard_model.itemFromIndex(self._proxy_model.mapToSource(index))
         item_uuid = item.data(Qt.ItemDataRole.UserRole+1)
-        obj = self._object_manager.get_object(item_uuid)
+        obj = self._game_manager.get_object(item_uuid)
 
         if obj.is_expanded == True:
-            self._object_manager.collapse(item_uuid)
+            self._game_manager.collapse(item_uuid)
 
     def _reset(self):
         self._is_cut = False
         # self._highlight_items = []
         self._clipboard_items = []
         self._items_to_delete_by_cut = []
-        self._scene_item = None
+        self._canvas_item = None
         
         self.selectionModel().blockSignals(True)
         self._standard_model.clear()
@@ -208,33 +208,33 @@ class HierarchyTreeView(QTreeView):
         if self.selectedIndexes():
             parent_item = self._standard_model.itemFromIndex(self._proxy_model.mapToSource(self.selectedIndexes()[-1]))
         else:
-            parent_item = self._scene_item
+            parent_item = self._canvas_item
         
         parent_uuid = parent_item.data(Qt.ItemDataRole.UserRole+1)
-        self._object_manager.add(parent_uuid, item_type)
+        self._game_manager.add(parent_uuid, item_type)
     
     def _on_object_added(self, parent_uuid, object_uuid, inserted_pos):
-        obj = self._object_manager.get_object(object_uuid)
+        obj = self._game_manager.get_object(object_uuid)
 
-        if obj.type == OBJECT_SCENE:
+        if obj.type == OBJECT_CANVAS:
             self._on_scene_object_added(obj)
         else:
             self._on_regular_object_added(parent_uuid, obj, inserted_pos)
 
     def _on_scene_object_added(self, obj):
-        self._scene_item = QStandardItem()
-        self._scene_item.setText(obj.name)
-        self._scene_item.setIcon(QIcon(obj.icon))
-        self._scene_item.setData(obj.uuid, Qt.ItemDataRole.UserRole+1)
-        self._scene_item.setFlags(self._scene_item.flags() & ~Qt.ItemFlag.ItemIsDragEnabled)
-        self._standard_model.appendRow(self._scene_item)
+        self._canvas_item = QStandardItem()
+        self._canvas_item.setText(obj.name)
+        self._canvas_item.setIcon(QIcon(obj.icon))
+        self._canvas_item.setData(obj.uuid, Qt.ItemDataRole.UserRole+1)
+        self._canvas_item.setFlags(self._canvas_item.flags() & ~Qt.ItemFlag.ItemIsDragEnabled)
+        self._standard_model.appendRow(self._canvas_item)
         
     def _on_regular_object_added(self, parent_uuid, obj, inserted_pos):
         # self._highlight_items = []
 
         parent_item = self._get_matched_item(parent_uuid)
         if not parent_item:
-            parent_item = self._scene_item
+            parent_item = self._canvas_item
 
         item = QStandardItem()
         item.setText(obj.name)
@@ -265,7 +265,7 @@ class HierarchyTreeView(QTreeView):
             item = self._standard_model.itemFromIndex(self._proxy_model.mapToSource(index))
             item_uuid_list.append(item.data(Qt.ItemDataRole.UserRole+1))
 
-        self._object_manager.cut(item_uuid_list)
+        self._game_manager.cut(item_uuid_list)
 
     def _on_object_cut(self):
         # To remove transparent effet.
@@ -281,7 +281,7 @@ class HierarchyTreeView(QTreeView):
             item = self._standard_model.itemFromIndex(self._proxy_model.mapToSource(index))
             item_uuid_list.append(item.data(Qt.ItemDataRole.UserRole+1))
 
-        self._object_manager.copy(item_uuid_list)
+        self._game_manager.copy(item_uuid_list)
 
     def _on_object_copied(self):
         # self.viewport().update()
@@ -292,10 +292,10 @@ class HierarchyTreeView(QTreeView):
         if selected_indexes:
             parent_item = self._standard_model.itemFromIndex(self._proxy_model.mapToSource(selected_indexes[-1]))
         else:
-            parent_item = self._scene_item
+            parent_item = self._canvas_item
         
         parent_uuid = parent_item.data(Qt.ItemDataRole.UserRole+1)
-        self._object_manager.paste(parent_uuid)
+        self._game_manager.paste(parent_uuid)
 
     def _on_object_pasted(self):
         ...
@@ -311,7 +311,7 @@ class HierarchyTreeView(QTreeView):
             item_uuid = item.data(Qt.ItemDataRole.UserRole+1)
             item_uuid_list.append(item_uuid)
         
-        self._object_manager.duplicate(item_uuid_list)
+        self._game_manager.duplicate(item_uuid_list)
 
     def _on_object_duplicated(self):
         ...
@@ -322,7 +322,7 @@ class HierarchyTreeView(QTreeView):
         for index in selected_indexes:
             items_to_delete.append(self._standard_model.itemFromIndex(self._proxy_model.mapToSource(index)))
         
-        if not items_to_delete or len(items_to_delete)==1 and items_to_delete[0]==self._scene_item:
+        if not items_to_delete or len(items_to_delete)==1 and items_to_delete[0]==self._canvas_item:
             return
     
         content = '是否要删除当前选中对象?'
@@ -336,11 +336,11 @@ class HierarchyTreeView(QTreeView):
             item_uuid_list.append(item.data(Qt.ItemDataRole.UserRole+1))
 
         self.clearSelection()
-        self._object_manager.delete(item_uuid_list)
+        self._game_manager.delete(item_uuid_list)
     
     def _on_object_deleted(self, object_uuid):
         matched_item = self._get_matched_item(object_uuid)
-        if matched_item == self._scene_item:
+        if matched_item == self._canvas_item:
             self.selectionModel().blockSignals(True)
             self._standard_model.clear()
             self.selectionModel().blockSignals(False)
@@ -385,7 +385,7 @@ class HierarchyTreeView(QTreeView):
     def _restore_collapsed_items(self):
         def _restore(parent_item):
             item_uuid = parent_item.data(Qt.ItemDataRole.UserRole+1)
-            obj = self._object_manager.get_object(item_uuid)
+            obj = self._game_manager.get_object(item_uuid)
             if not obj.is_expanded:
                 index = self._proxy_model.mapFromSource(self._standard_model.indexFromItem(parent_item))
                 self.collapse(index)
@@ -394,7 +394,7 @@ class HierarchyTreeView(QTreeView):
                 child_item = parent_item.child(i)
                 _restore(child_item)
 
-        _restore(self._scene_item)
+        _restore(self._canvas_item)
 
     def _search(self, keyword):
         self.blockSignals(True)
@@ -413,14 +413,14 @@ class HierarchyTreeView(QTreeView):
         return self._search(keyword)
     
     def get_clipboard_content(self):
-        return self._object_manager.get_clipboard_content()
+        return self._game_manager.get_clipboard_content()
     
     def is_item_visible(self, item):
         return self._is_item_visible(item)
 
     def _is_item_visible(self, item):
         item_uuid = item.data(Qt.ItemDataRole.UserRole+1)
-        obj = self._object_manager.get_object(item_uuid)
+        obj = self._game_manager.get_object(item_uuid)
         return obj.is_visible
     
     def is_ancestor_item_visible(self, item):
@@ -433,9 +433,9 @@ class HierarchyTreeView(QTreeView):
     
     def toggle_item_visibility(self, item):
         if self._is_item_visible(item):
-            self._object_manager.hide(item.data(Qt.ItemDataRole.UserRole+1))
+            self._game_manager.hide(item.data(Qt.ItemDataRole.UserRole+1))
         else:
-            self._object_manager.show(item.data(Qt.ItemDataRole.UserRole+1))
+            self._game_manager.show(item.data(Qt.ItemDataRole.UserRole+1))
 
         self.viewport().update()
 
@@ -451,12 +451,12 @@ class HierarchyTreeView(QTreeView):
         self.blockSignals(True)
 
         index_uuid = current_index.data(Qt.ItemDataRole.UserRole+1)
-        obj = self._object_manager.get_object(index_uuid)
+        obj = self._game_manager.get_object(index_uuid)
         if obj.is_expanded:
             def collapse_recursively(parent_index):
                 self.setExpanded(parent_index, False)
                 parent_index_uuid = parent_index.data(Qt.ItemDataRole.UserRole+1)
-                self._object_manager.collapse(parent_index_uuid)
+                self._game_manager.collapse(parent_index_uuid)
 
                 for i in range(self._standard_model.rowCount(parent_index)):
                     child_index = self._standard_model.index(i, 0, parent_index)
@@ -467,7 +467,7 @@ class HierarchyTreeView(QTreeView):
             def expand_recursively(parent_index):
                 self.setExpanded(parent_index, True)
                 parent_index_uuid = parent_index.data(Qt.ItemDataRole.UserRole+1)
-                self._object_manager.expand(parent_index_uuid)
+                self._game_manager.expand(parent_index_uuid)
 
                 for i in range(self._standard_model.rowCount(parent_index)):
                     child_index = self._standard_model.index(i, 0, parent_index)
@@ -489,7 +489,7 @@ class HierarchyTreeView(QTreeView):
 
             return match_items
         
-        return _get(item_uuid_list, self._scene_item)
+        return _get(item_uuid_list, self._canvas_item)
     
     def _get_matched_item(self, item_uuid):
         def _get(item_uuid, parent_item):
@@ -504,7 +504,7 @@ class HierarchyTreeView(QTreeView):
 
             return None
         
-        return _get(item_uuid, self._scene_item)
+        return _get(item_uuid, self._canvas_item)
 
     def drawRow(self, painter, options, index):
         super().drawRow(painter, options, index)
@@ -513,7 +513,7 @@ class HierarchyTreeView(QTreeView):
         item_uuid = item.data(Qt.ItemDataRole.UserRole+1)
 
         painter.save()
-        if self._object_manager.is_cut() and item_uuid in self._object_manager.get_all_uuid_from_clipboard_content():
+        if self._game_manager.is_cut() and item_uuid in self._game_manager.get_all_uuid_from_clipboard_content():
             painter.setOpacity(0.5)
         painter.restore()
 
@@ -521,17 +521,17 @@ class HierarchyTreeView(QTreeView):
         # Rewirte the drop event. The logic is like cut and paste.
         parent_item = self._standard_model.itemFromIndex(self._proxy_model.mapToSource(self.indexAt(event.pos())))
         if not parent_item:
-            parent_item  = self._scene_item
+            parent_item  = self._canvas_item
 
         item_uuid_list = []
         for index in self.selectedIndexes():
             item = self._standard_model.itemFromIndex(self._proxy_model.mapToSource(index))
             item_uuid_list.append(item.data(Qt.ItemDataRole.UserRole+1))
 
-        self._object_manager.cut(item_uuid_list)
+        self._game_manager.cut(item_uuid_list)
 
         parent_uuid = parent_item.data(Qt.ItemDataRole.UserRole+1)
-        self._object_manager.paste(parent_uuid)
+        self._game_manager.paste(parent_uuid)
 
     def keyPressEvent(self, event):
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
@@ -547,16 +547,6 @@ class HierarchyTreeView(QTreeView):
                 self._paste()
                 event.accept()
                 return
-            # elif event.key() == Qt.Key.Key_Z and self._object_manager.undo_stack.canUndo():
-            #     self._object_manager.undo_stack.undo()
-            #     print(self._object_manager.undo_stack.index())
-            #     print('撤销')
-
-        # elif event.modifiers() == (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier):
-        #     if event.key() == Qt.Key.Key_Z and self._object_manager.undo_stack.canRedo():
-        #         print('重做')
-        #         self._object_manager.undo_stack.redo()
-        #         print(self._object_manager.undo_stack.index())
         
         elif event.key() == Qt.Key.Key_Delete:
             self._delete()

@@ -15,9 +15,9 @@ import shutil
 
 
 class AssetTreeView(QTreeView):
-    def __init__(self, parent=None, object_manager=None):
+    def __init__(self, parent=None, game_manager=None):
         super().__init__(parent)
-        self._object_manager = object_manager
+        self._game_manager = game_manager
         self._proxy_model = AssetSortFilterProxyModel(self)
         self._file_model = AssetFileSystemModel(self)
         self._context_menu = ContextMenu('', self)
@@ -147,7 +147,7 @@ class AssetTreeView(QTreeView):
         self.setRootIndex(self._proxy_model.mapFromSource(self._file_model.index(self._root_path)))
         
     def get_ready_for_project(self):
-        self._root_path = self._object_manager.get_project_path()
+        self._root_path = self._game_manager.get_project_path()
         self._file_model.setRootPath(self._root_path)
         self.setRootIndex(self._proxy_model.mapFromSource(self._file_model.index(self._root_path)))
 
@@ -557,23 +557,13 @@ class AssetTreeView(QTreeView):
         index_path = Path(self._file_model.filePath(self._proxy_model.mapToSource(index)))
         if index_path.suffix == '.scene':
             # Load the same scene.
-            if index_path.as_posix() == self._object_manager.current_scene_file_path:
-                self._object_manager.deselect_all()
-                self._object_manager.select(self._object_manager.scene_object_uuid)
+            if index_path.as_posix() == self._game_manager.current_scene_file_path:
+                self._game_manager.deselect_all()
+                self._game_manager.select(self._game_manager.scene_object_uuid)
                 return
             
             # Load a different scene.
-            self._object_manager.load_scene(index_path.as_posix())
-
-            # if self._object_manager.is_current_scene_saved():
-            #     self._object_manager.load_scene(index_path.as_posix())
-            # else:
-            #     choice = QMessageBox.warning(self, '保存提醒', '当前场景数据已修改，是否保存？', QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel)
-            #     if choice == QMessageBox.StandardButton.Yes:
-            #         self._object_manager.save_scene()
-            #         self._object_manager.load_scene(index_path.as_posix())
-            #     elif choice == QMessageBox.StandardButton.No:
-            #         self._object_manager.load_scene(index_path.as_posix())
+            self._game_manager.load_scene(index_path.as_posix())
 
     def dragEnterEvent(self, event):
         if event.source() != None and event.source() != self:

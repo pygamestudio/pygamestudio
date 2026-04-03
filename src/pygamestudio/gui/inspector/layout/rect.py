@@ -7,6 +7,7 @@ INSPECTOR_LAYOUT_RECT = {
             'en': 'Pos'
         },
         'component': {
+            'enabled': [True, True],
             'attribute': ['x', 'y'],
             'widget': [PosSpinBox, PosSpinBox]
         }
@@ -17,6 +18,7 @@ INSPECTOR_LAYOUT_RECT = {
             'en': 'Size'
         },
         'component': {
+            'enabled': [True, True],
             'attribute': ['width', 'height'],
             'widget': [SizeSpinBox, SizeSpinBox]
         }
@@ -27,6 +29,7 @@ INSPECTOR_LAYOUT_RECT = {
             'en': 'Border Radius'
         },
         'component': {
+            'enabled': [True, True, True, True],
             'attribute': ['border_top_left_radius', 'border_top_right_radius', 'border_bottom_left_radius', 'border_bottom_right_radius'],
             'widget': [BorderRadiusSpinBox, BorderRadiusSpinBox, BorderRadiusSpinBox, BorderRadiusSpinBox]
         }

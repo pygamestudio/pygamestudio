@@ -6,10 +6,10 @@ from pygamestudio.common.utils.path import RES_PATH
 
 
 class ObjectLine:
-    def __init__(self, object_manager, object_data=None):
+    def __init__(self, game_manager, object_data=None):
         self._is_initialized = False
 
-        self._object_manager = object_manager
+        self._game_manager = game_manager
         self._object_data = object_data or {}
 
         self.name = self._object_data.get('name', 'Line')
@@ -90,12 +90,12 @@ class ObjectLine:
 
     def get_world_rect(self):
         world_rect = self.get_rect()
-        parent_object = self._object_manager.get_parent_object(self.uuid)
+        parent_object = self._game_manager.get_parent_object(self.uuid)
 
         while parent_object:
             parent_rect = parent_object.get_rect()
             world_rect.move_ip(parent_rect.x, parent_rect.y)
-            parent_object = self._object_manager.get_parent_object(parent_object.uuid)
+            parent_object = self._game_manager.get_parent_object(parent_object.uuid)
 
         return world_rect 
 

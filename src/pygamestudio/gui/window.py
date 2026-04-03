@@ -11,22 +11,22 @@ from pygamestudio.gui.scene.window import SceneWindow
 from pygamestudio.gui.dashboard.window import DashboardWindow
 
 from pygamestudio.gui.base.window import WindowBase
-from pygamestudio.game.object.manager import ObjectManager
-
+from pygamestudio.game.core.manager import GameManager
+from pathlib import Path
 
 class EditorBody(QMainWindow):
     new_project_signal = Signal()
     open_project_signal = Signal()
     quit_editor_signal = Signal()
 
-    def __init__(self, object_manager):
+    def __init__(self, game_manager):
         super().__init__()
-        self._object_manager = object_manager
-        self._scene_widnow = SceneWindow(self, object_manager)
-        self._asset_window = AssetWindow(self, object_manager)
-        self._console_window = ConsoleWindow(self, object_manager)
-        self._hierarchy_window = HierarchyWindow(self, object_manager)
-        self._inspector_window = InspectorWindow(self, object_manager)
+        self._game_manager = game_manager
+        self._scene_widnow = SceneWindow(self, game_manager)
+        self._asset_window = AssetWindow(self, game_manager)
+        self._console_window = ConsoleWindow(self, game_manager)
+        self._hierarchy_window = HierarchyWindow(self, game_manager)
+        self._inspector_window = InspectorWindow(self, game_manager)
 
         self._left_top_tab_widget = QTabWidget()
         self._left_bottom_tab_widget = QTabWidget()
@@ -114,8 +114,8 @@ class EditorBody(QMainWindow):
 
         new_project_action.triggered.connect(self.new_project_signal.emit)
         open_project_action.triggered.connect(self.open_project_signal.emit)
-        new_scene_action.triggered.connect(lambda: self._object_manager.load_scene(''))
-        save_scene_action.triggered.connect(self._object_manager.save_scene)
+        new_scene_action.triggered.connect(lambda: self._game_manager.load_scene(''))
+        save_scene_action.triggered.connect(self._game_manager.save_scene)
         quit_editor_action.triggered.connect(self.quit_editor_signal.emit)
 
         self._file_menu.addAction(new_project_action)
@@ -165,7 +165,7 @@ class EditorBody(QMainWindow):
         self._help_menu.addAction(about_action)
 
     def get_ready_for_project(self, project_path):
-        self._object_manager.get_ready_for_project(project_path)
+        self._game_manager.get_ready_for_project(project_path)
         self._asset_window.get_ready_for_project()
         self._console_window.get_ready_for_project()
         self._hierarchy_window.get_ready_for_project()
@@ -177,7 +177,7 @@ class EditorBody(QMainWindow):
         self._console_window.clean_up()
         self._hierarchy_window.clean_up()
         self._inspector_window.clean_up()
-        self._object_manager.clean_up()
+        self._game_manager.clean_up()
 
     def enterEvent(self, event):
         self.setCursor(Qt.CursorShape.ArrowCursor)
@@ -190,8 +190,8 @@ class Editor(WindowBase):
     def __init__(self, parent):
         super().__init__()
         self._parent = parent
-        self._object_manager = ObjectManager()
-        self._editor_body = EditorBody(self._object_manager)
+        self._game_manager = GameManager()
+        self._editor_body = EditorBody(self._game_manager)
 
         self._setup()
 
@@ -227,7 +227,10 @@ class Editor(WindowBase):
 
     def get_ready_for_project(self, project_path):
         self._editor_body.get_ready_for_project(project_path)
-        self.window_title.set_title_name(f'Pygame Studio - {self._object_manager.get_project_path()}')
+
+        # Set the window title (Pygame Studio + current scene name + project path)
+        current_scene_name = Path(self._game_manager.current_scene_file_path).name if self._game_manager.current_scene_file_path else 'untitled.scene'
+        self.window_title.set_title_name(f'Pygame Studio - {current_scene_name} - {project_path}')
 
     def clean_up(self):
         self._editor_body.clean_up()
@@ -236,30 +239,30 @@ class Editor(WindowBase):
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
             if event.key() == Qt.Key.Key_S:
                 print('保存')
-                self._object_manager.save_scene()
+                self._game_manager.save_scene()
             elif event.key() == Qt.Key.Key_Z:
                 print('撤销')
-                self._object_manager.undo_stack.undo()
+                self._game_manager.undo_stack.undo()
             elif event.key() == Qt.Key.Key_Y:
                 print('重做')
-                self._object_manager.undo_stack.redo()
+                self._game_manager.undo_stack.redo()
 
         elif event.modifiers() == (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier):
             if event.key() == Qt.Key.Key_Z:
                 print('重做')
-                self._object_manager.undo_stack.redo()
+                self._game_manager.undo_stack.redo()
 
         super().keyPressEvent(event)
 
     def closeEvent(self, event):
-        if not self._object_manager.is_current_scene_saved():
+        if not self._game_manager.is_current_scene_saved():
             choice = QMessageBox.warning(self, '保存提醒', '当前场景数据已修改，是否保存？', QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel)
             if choice == QMessageBox.StandardButton.Cancel:
                 event.ignore()
                 return
             
             if choice == QMessageBox.StandardButton.Yes:
-                self._object_manager.save_scene()
+                self._game_manager.save_scene()
 
         self.clean_up()
         self._parent.show_dashboard()

@@ -5,11 +5,11 @@ from pygamestudio.gui.scene.canvas import PygameWidget
 
 
 class SceneWindow(QWidget):
-    def __init__(self, parent=None, object_manager=None):
+    def __init__(self, parent=None, game_manager=None):
         super().__init__(parent)
         self._grid_scene = GridGraphicsScene()
-        self._grid_view = GridGraphicsView(object_manager, self._grid_scene)
-        self._pygame_widget = PygameWidget(object_manager, self._grid_scene)
+        self._grid_view = GridGraphicsView(game_manager, self._grid_scene)
+        self._pygame_widget = PygameWidget(game_manager, self._grid_scene)
 
         self._setup()
 

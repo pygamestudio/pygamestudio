@@ -7,9 +7,9 @@ from pygamestudio.gui.hierarchy.widget import ExpandCollapseAllButton, AddItemBu
 
 
 class HierarchyWindow(QWidget):
-    def __init__(self, parent=None, object_manager=None):
+    def __init__(self, parent=None, game_manager=None):
         super().__init__(parent)
-        self._hierarchy_tree_view = HierarchyTreeView(self, object_manager)
+        self._hierarchy_tree_view = HierarchyTreeView(self, game_manager)
         self._search_line_edit = SearchLineEdit(self)
         self._add_item_button = AddItemButton(self)
         self._expand_collapse_all_button = ExpandCollapseAllButton(self)

@@ -68,7 +68,7 @@ class ContextMenu(QMenu):
             self.addAction(paste_action)
 
         # Right click on the root object.
-        elif item_type == OBJECT_SCENE:
+        elif item_type == OBJECT_CANVAS:
             self.addAction(paste_action)
             self.addSeparator()
             copy_menu = QMenu(title='复制路径 | 名称 | UUID')

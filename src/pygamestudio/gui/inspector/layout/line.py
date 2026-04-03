@@ -8,6 +8,7 @@ INSPECTOR_LAYOUT_LINE = {
             'en': 'Start Point'
         },
         'component': {
+            'enabled': [True, True],
             'attribute': ['start_x', 'start_y'],
             'widget': [PosSpinBox, PosSpinBox]
         }
@@ -18,6 +19,7 @@ INSPECTOR_LAYOUT_LINE = {
             'en': 'End Point'
         },
         'component': {
+            'enabled': [True, True],
             'attribute': ['end_x', 'end_y'],
             'widget': [PosSpinBox, PosSpinBox]
         }
@@ -28,6 +30,7 @@ INSPECTOR_LAYOUT_LINE = {
             'en': 'Thickness'
         },
         'component': {
+            'enabled': [True],
             'attribute': ['thickness'],
             'widget': [ThicknessSpinBox]
         }

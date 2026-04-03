@@ -7,6 +7,7 @@ INSPECTOR_LAYOUT_ELLIPSE = {
             'en': 'Pos'
         },
         'component': {
+            'enabled': [True, True],
             'attribute': ['x', 'y'],
             'widget': [PosSpinBox, PosSpinBox]
         }
@@ -17,6 +18,7 @@ INSPECTOR_LAYOUT_ELLIPSE = {
             'en': 'Size'
         },
         'component': {
+            'enabled': [True, True],
             'attribute': ['width', 'height'],
             'widget': [SizeSpinBox, SizeSpinBox]
         }

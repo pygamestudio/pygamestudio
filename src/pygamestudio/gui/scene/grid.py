@@ -5,9 +5,9 @@ import math
 
 
 class GridGraphicsView(QGraphicsView):
-    def __init__(self, object_manager, scene):
+    def __init__(self, game_manager, scene):
         super().__init__()
-        self._object_manager = object_manager
+        self._game_manager = game_manager
         self._scene = scene
         self._zoom_limit = [0.2, 5]
         self._zoom_factor = 1.05
