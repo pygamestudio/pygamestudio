@@ -153,3 +153,15 @@ class BorderRadiusSpinBox(SuffixSpinBox):
 
     def _on_border_radius_changed(self):
         self._inspector_window.set_object_border_radius(self._attr, int(self.value()))
+
+
+class FontSizeSpinBox(QDoubleSpinBox):
+    def __init__(self, inspector_window, attr, value):
+        super().__init__()
+        self._inspector_window = inspector_window
+        self.setRange(0, 999999)
+        self.setSingleStep(1)
+        self.setValue(value)
+        self.setDecimals(0)
+
+        self.valueChanged.connect(self._inspector_window.set_object_font_size)

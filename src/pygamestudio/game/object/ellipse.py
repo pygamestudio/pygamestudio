@@ -92,6 +92,13 @@ class ObjectEllipse:
         local_y = click_pos[1] - self.get_world_pos()[1]
         return rotated_mask.get_at((local_x, local_y))
 
+    def to_dict(self):
+        exclude_fields = ['_is_initialized', '_game_manager', 'surface', 'icon']
+        return {
+            key: value for key, value in self.__dict__.items() 
+            if key not in exclude_fields
+        }
+    
     def __str__(self):
         return str(self._object_data)
 

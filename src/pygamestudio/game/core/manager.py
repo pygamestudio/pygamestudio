@@ -12,9 +12,9 @@ from pygamestudio.game.object.line import *
 from pygamestudio.common.utils.project import *
 
 class GameManager(QObject):
-    scene_saved_signal = Signal(str)
-    scene_loaded_signal = Signal(str)
-    scene_renamed_signal = Signal(str)
+    scene_saved_signal = Signal()
+    scene_loaded_signal = Signal()
+    scene_renamed_signal = Signal()
 
     object_added = Signal(str, str, int)
     object_deleted = Signal(str)
@@ -35,6 +35,13 @@ class GameManager(QObject):
     object_line_start_point_changed = Signal(str)
     object_line_end_point_changed = Signal(str)
     object_line_thickness_changed = Signal(str)
+    object_text_changed = Signal(str)
+    object_font_size_changed = Signal(str)
+    object_font_family_changed = Signal(str)
+    object_bold_state_changed = Signal(str)
+    object_italic_state_changed = Signal(str)
+    object_underline_state_changed = Signal(str)
+    object_strikethrough_state_changed = Signal(str)
 
     def __init__(self):
         super().__init__()
@@ -62,6 +69,9 @@ class GameManager(QObject):
     @property
     def current_scene_file_path(self):
         return self._current_scene_file_path
+    
+    def set_current_scene_file_path(self, path):
+        self._current_scene_file_path = path
     
     def is_current_scene_saved(self):
         return self._is_current_scene_saved
@@ -298,6 +308,41 @@ class GameManager(QObject):
         obj = self._get_object(object_uuid)
         old_end_point = obj.end_point
         self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'end_point', old_end_point, new_end_point))
+
+    def set_text(self, object_uuid, new_text):
+        obj = self._get_object(object_uuid)
+        old_text = obj.text
+        self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'text', old_text, new_text))
+
+    def set_font_size(self, object_uuid, new_font_size):
+        obj = self._get_object(object_uuid)
+        old_font_size = obj.font_size
+        self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'font_size', old_font_size, new_font_size))
+
+    def set_font_family(self, object_uuid, new_font_family):
+        obj = self._get_object(object_uuid)
+        old_font_family = obj.font_family
+        self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'font_family', old_font_family, new_font_family))
+
+    def set_bold_state(self, object_uuid, new_bold_state):
+        obj = self._get_object(object_uuid)
+        old_bold_state = obj.is_bold
+        self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'is_bold', old_bold_state, new_bold_state))
+
+    def set_italic_state(self, object_uuid, new_italic_state):
+        obj = self._get_object(object_uuid)
+        old_italic_state = obj.is_italic
+        self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'is_italic', old_italic_state, new_italic_state))
+    
+    def set_underline_state(self, object_uuid, new_underline_state):
+        obj = self._get_object(object_uuid)
+        old_underline_state = obj.is_underline
+        self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'is_underline', old_underline_state, new_underline_state))
+    
+    def set_strikethrough_state(self, object_uuid, new_strikethrough_state):
+        obj = self._get_object(object_uuid)
+        old_strikethrough_state = obj.is_strikethrough
+        self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'is_strikethrough', old_strikethrough_state, new_strikethrough_state))
 
     def _get_object_tree_struct(self, object_uuid, parent_object_tree_struct=None):
         def _get(object_uuid, object_tree_struct):
@@ -643,9 +688,10 @@ class GameManager(QObject):
             self._current_scene_file_path, _ = QFileDialog.getSaveFileName(None, 'Save File', self._project_path, 'Files (*.scene)')
             if not self._current_scene_file_path:
                 return
-            
+        
         self._is_current_scene_saved = True
-        set_current_scene_to_projec_config(self._current_scene_file_path)
+        set_current_scene_to_project_config(self._current_scene_file_path)
+        self.scene_saved_signal.emit()
 
         def _default(obj):
             if hasattr(obj, 'to_dict'):
@@ -669,8 +715,10 @@ class GameManager(QObject):
 
         if self._current_scene_object_uuid:
             self._delete_object_tree_struct(self._current_scene_object_uuid)
+
         self._current_scene_file_path = current_scene_file_path
-        set_current_scene_to_projec_config(current_scene_file_path)
+        set_current_scene_to_project_config(current_scene_file_path)
+        self.scene_loaded_signal.emit()
 
         if not current_scene_file_path or not Path(current_scene_file_path).exists():
             data = {}
@@ -778,3 +826,17 @@ class UpdateAttrValueCommand(QUndoCommand):
             self._game_manager.object_line_end_point_changed.emit(self._obj.uuid)
         elif attr == 'thickness':
             self._game_manager.object_line_thickness_changed.emit(self._obj.uuid)
+        elif attr == 'text':
+            self._game_manager.object_text_changed.emit(self._obj.uuid)
+        elif attr == 'font_size':
+            self._game_manager.object_font_size_changed.emit(self._obj.uuid)
+        elif attr == 'font_family':
+            self._game_manager.object_font_family_changed.emit(self._obj.uuid)
+        elif attr == 'is_bold':
+            self._game_manager.object_bold_state_changed.emit(self._obj.uuid)
+        elif attr == 'is_italic':
+            self._game_manager.object_italic_state_changed.emit(self._obj.uuid)
+        elif attr == 'is_underline':
+            self._game_manager.object_underline_state_changed.emit(self._obj.uuid)
+        elif attr == 'is_strikethrough':
+            self._game_manager.object_strikethrough_state_changed.emit(self._obj.uuid)

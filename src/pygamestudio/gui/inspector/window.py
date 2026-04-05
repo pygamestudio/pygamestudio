@@ -3,11 +3,11 @@ from PySide6.QtCore import *
 from PySide6.QtGui import *
 
 from pygamestudio.gui.inspector.component.label import PropertyLabel
-from pygamestudio.gui.inspector.layout.common import INSPECTOR_LAYOUT_COMMON_PREFIX, INSPECTOR_LAYOUT_COMMON_SUFFIX
 from pygamestudio.gui.inspector.layout.rect import INSPECTOR_LAYOUT_RECT
 from pygamestudio.gui.inspector.layout.ellipse import INSPECTOR_LAYOUT_ELLIPSE
 from pygamestudio.gui.inspector.layout.line import INSPECTOR_LAYOUT_LINE
 from pygamestudio.gui.inspector.layout.scene import INSPECTOR_LAYOUT_CANVAS
+from pygamestudio.gui.inspector.layout.text import INSPECTOR_LAYOUT_TEXT
 
 from pygamestudio.game.object.type import *
 
@@ -28,6 +28,7 @@ class InspectorWindow(QWidget):
         self._set_layout()
 
     def _set_widget(self):
+        self.setMinimumWidth(260)
         ...
 
     def _set_signal(self):
@@ -45,6 +46,13 @@ class InspectorWindow(QWidget):
         self._game_manager.object_line_start_point_changed.connect(self._on_object_line_start_point_changed)
         self._game_manager.object_line_end_point_changed.connect(self._on_object_line_end_point_changed)
         self._game_manager.object_line_thickness_changed.connect(self._on_object_line_thickness_changed)
+        # self._game_manager.object_text_changed.connect(self._on_object_text_changed)
+        # self._game_manager.object_font_size_changed.connect(self._on_object_font_size_changed)
+        # self._game_manager.object_font_family_changed.connect(self._on_object_font_family_changed)
+        # self._game_manager.object_bold_state_changed.connect(self._on_object_bold_state_changed)
+        # self._game_manager.object_italic_state_changed.connect(self._on_object_italic_state_changed)
+        # self._game_manager.object_underline_state_changed.connect(self._on_object_underline_state_changed)
+        # self._game_manager.object_strikethrough_state_changed.connect(self._on_object_strikethrough_state_changed)
 
     def _set_layout(self):
         self._inspector_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
@@ -116,6 +124,41 @@ class InspectorWindow(QWidget):
         spinbox_end_y = self._find_widget(self._inspector_layout, 'end_y')
         new_end_point = (spinbox_end_x.value(), spinbox_end_y.value())
         self._game_manager.set_end_point(self._object_uuid_in_inspection, new_end_point)
+
+    def set_object_text(self):
+        text_edit = self._find_widget(self._inspector_layout, 'text')
+        text = text_edit.toPlainText()
+        self._game_manager.set_text(self._object_uuid_in_inspection, text)
+
+    def set_object_font_family(self):
+        combobox_font_family = self._find_widget(self._inspector_layout, 'font_family')
+        font_family = combobox_font_family.currentText()
+        self._game_manager.set_font_family(self._object_uuid_in_inspection, font_family)
+
+    def set_object_font_size(self):
+        spinbox_font_size = self._find_widget(self._inspector_layout, 'font_size')
+        new_font_size = int(spinbox_font_size.value())
+        self._game_manager.set_font_size(self._object_uuid_in_inspection, new_font_size)
+
+    def set_object_bold_state(self):
+        checkbox_bold = self._find_widget(self._inspector_layout, 'is_bold')
+        new_bold_state = checkbox_bold.isChecked()
+        self._game_manager.set_bold_state(self._object_uuid_in_inspection, new_bold_state)
+
+    def set_object_italic_state(self):
+        checkbox_italic = self._find_widget(self._inspector_layout, 'is_italic')
+        new_italic_state = checkbox_italic.isChecked()
+        self._game_manager.set_italic_state(self._object_uuid_in_inspection, new_italic_state)
+
+    def set_object_underline_state(self):
+        checkbox_underline = self._find_widget(self._inspector_layout, 'is_underline')
+        new_underline_state = checkbox_underline.isChecked()
+        self._game_manager.set_underline_state(self._object_uuid_in_inspection, new_underline_state)
+
+    def set_object_strikethrough_state(self):
+        checkbox_strikethrough = self._find_widget(self._inspector_layout, 'is_strikethrough')
+        new_strikethrough_state = checkbox_strikethrough.isChecked()
+        self._game_manager.set_strikethrough_state(self._object_uuid_in_inspection, new_strikethrough_state)
 
     def _on_object_added(self, parent_uuid, object_uuid, inserted_pos):
         # Object will be selected when added, and it will be inspected in slot _on_object_selected.
@@ -235,6 +278,36 @@ class InspectorWindow(QWidget):
         spinbox_thickness.setValue(obj.thickness)
         spinbox_thickness.blockSignals(False)
 
+    # def _on_object_text_changed(self, object_uuid):
+    #     if object_uuid != self._object_uuid_in_inspection:
+    #         return
+        
+    #     obj = self._game_manager.get_object(object_uuid)
+    #     text_edit = self._find_widget(self._inspector_layout, 'text')
+    #     text_edit.blockSignals(True)
+    #     text_edit.setText(obj.text)
+    #     text_edit.blockSignals(False) 
+
+    # def _on_object_font_size_changed(self, object_uuid):
+    #     if object_uuid != self._object_uuid_in_inspection:
+    #         return
+        
+    #     obj = self._game_manager.get_object(object_uuid)
+    #     spinbox_font_size = self._find_widget(self._inspector_layout, 'font_size')
+    #     spinbox_font_size.blockSignals(True)
+    #     spinbox_font_size.setValue(obj.font_size)
+    #     spinbox_font_size.blockSignals(False)
+        
+    # def _on_object_font_family_changed(self, object_uuid):
+    #     if object_uuid != self._object_uuid_in_inspection:
+    #         return
+        
+    #     obj = self._game_manager.get_object(object_uuid)
+    #     combobox_font_family = self._find_widget(self._inspector_layout, 'font_family')
+    #     combobox_font_family.blockSignals(True)
+    #     combobox_font_family.setCurrentText(obj.font_family)
+    #     combobox_font_family.blockSignals(False)
+
     def _on_object_line_start_point_changed(self, object_uuid):
         if object_uuid != self._object_uuid_in_inspection:
             return
@@ -285,7 +358,6 @@ class InspectorWindow(QWidget):
         self._object_uuid_in_inspection = object_uuid
         self._clear_layout(self._inspector_layout)
 
-        # self._add_commom_layout_prefix(obj)
         if obj.type == OBJECT_CANVAS:
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_CANVAS)
         elif obj.type == OBJECT_RECT:
@@ -294,7 +366,8 @@ class InspectorWindow(QWidget):
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_ELLIPSE)
         elif obj.type == OBJECT_LINE:
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_LINE)
-        # self._add_common_layout_suffix(obj)
+        elif obj.type == OBJECT_TEXT:
+            self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_TEXT)
 
     def _clear_layout(self, layout):
         if layout is None:
@@ -311,30 +384,6 @@ class InspectorWindow(QWidget):
                 item.layout().deleteLater()
             elif item.spacerItem():
                 layout.removeItem(item)
-
-    def _add_commom_layout_prefix(self, obj):
-        for property_detail in INSPECTOR_LAYOUT_COMMON_PREFIX.values():
-            name = property_detail['i18n']['en'] # 这里的名称要根据设置来修改
-            attributes = property_detail['component']['attribute']
-            widgets = property_detail['component']['widget']
-
-            label = PropertyLabel(self, 'name', name)
-            self._inspector_layout.addWidget(label, self._inspector_row, 0, 1, 1)
-
-            for i, widget in enumerate(widgets):
-                w = widget(self, attributes[i], getattr(obj, attributes[i]))
-                w.setObjectName(attributes[i])
-
-                row = i // 2
-                column = i%2+1
-
-                column_stretch = 2 if len(widgets) == 1 else 1
-                self._inspector_layout.addWidget(w, self._inspector_row+row, column, 1, column_stretch)
-
-            self._inspector_row += row+1
-
-    def _add_common_layout_suffix(self, obj):
-        ...
 
     def _add_layout_for_specific_object(self, obj, layout_data):
         for property_detail in layout_data.values():

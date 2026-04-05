@@ -21,7 +21,7 @@ class AssetTreeView(QTreeView):
         self._proxy_model = AssetSortFilterProxyModel(self)
         self._file_model = AssetFileSystemModel(self)
         self._context_menu = ContextMenu('', self)
-        self._delegate = AssetTreeWidgetDelegate(self, self._proxy_model, self._file_model)
+        self._delegate = AssetTreeWidgetDelegate(self, self._proxy_model, self._file_model, game_manager)
 
         self._root_path = ''
         self._sort_type = SORT_BY_NAME_ASC     # 项目配置文件

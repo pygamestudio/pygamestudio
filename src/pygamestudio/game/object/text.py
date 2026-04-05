@@ -6,42 +6,55 @@ from pygamestudio.common.utils.path import RES_PATH
 
 
 class ObjectText:
-    def __init__(self, game_manager, object_data=None):
+    def __init__(self, game_manager, object_data={}):
         self._is_initialized = False
-
         self._game_manager = game_manager
-        object_data = object_data or {}
 
-        self.name = object_data.get('name', 'Text')
-        self.type = object_data.get('type', OBJECT_TEXT)
-        self.uuid = object_data.get('uuid', str(uuid.uuid4()))
-        self.is_visible = object_data.get('is_visible', True)
-        self.is_expanded = object_data.get('is_expanded', True)
-        self.is_selected = object_data.get('is_selected', False)
+        defaults = {
+            'name': 'Text',
+            'type': OBJECT_TEXT,
+            'uuid': str(uuid.uuid4()),
+            'is_visible': True,
+            'is_expanded': True,
+            'is_selected': False,
+            'x': 0,
+            'y': 0,
+            'pos': (0, 0),
+            'width': 50, 
+            'height': 35,
+            'size': (50, 35),
+            'scale_x': 1,
+            'scale_y': 1,
+            'scale': (1, 1),
+            'angle': 0,
+            'icon': str(RES_PATH/'images/item.png'),
+            'color': '#ffffff',
+            'text': 'Text',
+            'font_size': 30,
+            'font_family': 'Arial',
+            'is_bold': False,
+            'is_italic': False,
+            'is_underline': False,
+            'is_strikethrough': False
+        }
 
-        self.text = object_data.get('string', 'Text')
-        self.background_color = object_data.get('color', random.choice(['#ff0000', '#00ff00', '#0000ff']))
-        self.font = object_data.get
+        for key, default_value in defaults.items():
+            setattr(self, key, object_data.get(key, default_value))
 
-        self.x = object_data.get('x', 0)
-        self.y = object_data.get('y', 0)
-        self.pos = object_data.get('pos', (0, 0))
-        self.width = object_data.get('width', 50)
-        self.height = object_data.get('height', 50)
-        self.size = object_data.get('size', (50, 50))
-        self.scale_x = object_data.get('scale_x', 1)
-        self.scale_y = object_data.get('scale_y', 1)
-        self.scale = object_data.get('scale', (1, 1))
-        self.angle = object_data.get('angle', 50)
-        self.icon = object_data.get('icon', str(RES_PATH/'images/item.png'))
-        self.color = object_data.get('color', random.choice(['#ff0000', '#00ff00', '#0000ff']))
-
+        font = self._init_font()
+        text = font.render(self.text, True, self.color)
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
-        pygame.draw.rect(self.surface, self.color, self.surface.get_rect(), width=0,
-                         border_radius=-1, border_top_left_radius=self.border_top_left_radius, border_top_right_radius=self.border_top_right_radius,
-                         border_bottom_left_radius=self.border_bottom_left_radius, border_bottom_right_radius=self.border_bottom_right_radius)
+        self.surface.blit(text, text.get_rect(center=(self.surface.width//2, self.surface.height//2)))
 
         self._is_initialized = True
+
+    def _init_font(self):
+        font = pygame.font.SysFont(self.font_family, self.font_size)
+        font.set_bold(self.is_bold)
+        font.set_italic(self.is_italic)
+        font.set_underline(self.is_underline)
+        font.set_strikethrough(self.is_strikethrough)
+        return font
 
     def draw(self, parent_surface):
         parent_surface.blit(self.surface, self.get_rect())
@@ -50,23 +63,20 @@ class ObjectText:
         return self.surface
     
     def update_surface(self):
+        font = self._init_font()
+        text = font.render(self.text, True, self.color)
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
-        pygame.draw.rect(self.surface, self.color, self.surface.get_rect(), width=0,
-                         border_radius=-1, border_top_left_radius=self.border_top_left_radius, border_top_right_radius=self.border_top_right_radius,
-                         border_bottom_left_radius=self.border_bottom_left_radius, border_bottom_right_radius=self.border_bottom_right_radius)
-
+        self.surface.blit(text, text.get_rect(center=(self.surface.width//2, self.surface.height//2)))
         
         scaled_size = (self.width * self.scale_x, self.height * self.scale_y)
         scaled_surface = pygame.transform.scale(self.surface, scaled_size)
 
         if self.is_selected:
-            pygame.draw.rect(scaled_surface, (255, 255, 50), scaled_surface.get_rect(), width=2,
-                             border_radius=-1, border_top_left_radius=self.border_top_left_radius, border_top_right_radius=self.border_top_right_radius,
-                             border_bottom_left_radius=self.border_bottom_left_radius, border_bottom_right_radius=self.border_bottom_right_radius)
+            pygame.draw.rect(scaled_surface, (255, 255, 50), scaled_surface.get_rect(), width=2)
 
         rotated_surface = pygame.transform.rotate(scaled_surface, self.angle)
         self.surface = rotated_surface
-
+    
     def get_pos(self):
         return self.pos
     
@@ -102,9 +112,13 @@ class ObjectText:
         local_x = click_pos[0] - self.get_world_pos()[0]
         local_y = click_pos[1] - self.get_world_pos()[1]
         return rotated_mask.get_at((local_x, local_y))
-
-    def __str__(self):
-        return self.__dict__.copy()
+    
+    def to_dict(self):
+        exclude_fields = ['_is_initialized', '_game_manager', 'surface', 'icon']
+        return {
+            key: value for key, value in self.__dict__.items() 
+            if key not in exclude_fields
+        }
     
     def __setattr__(self, name, value):
         if not hasattr(self, '_is_initialized') or not self._is_initialized:

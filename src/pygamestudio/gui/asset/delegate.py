@@ -3,6 +3,7 @@ from PySide6.QtCore import *
 from PySide6.QtGui import *
 from pygamestudio.common.utils.path import RES_PATH
 from pathlib import Path
+from pygamestudio.common.utils.project import *
 
 
 class AssetTreeWidgetDelegate(QStyledItemDelegate):
@@ -13,18 +14,29 @@ class AssetTreeWidgetDelegate(QStyledItemDelegate):
         self._file_model = file_model
         self._game_manager = game_manager
 
-    def _on_rename_completed(self):
-        """Resort afte the rename action."""
+    def _on_rename_completed(self, index, old_name):
+        # Reload the current scene if it is renamed.
+        if '.scene' in old_name and Path(self._game_manager.current_scene_file_path).name == old_name:
+            new_name = index.data(Qt.ItemDataRole.DisplayRole)
+            current_scene_file_path = Path(self._game_manager.current_scene_file_path).parent / new_name
+            self._game_manager.set_current_scene_file_path(current_scene_file_path)
+            set_current_scene_to_project_config(current_scene_file_path)
+
+            self._game_manager.load_scene(current_scene_file_path)
+            self._game_manager.scene_renamed_signal.emit()
+
+        # Resort afte the rename action.
         QTimer.singleShot(0, lambda: self._proxy_model.invalidate())
         
     def createEditor(self, parent, option, index):
         editor = super().createEditor(parent, option, index)
         if isinstance(editor, QLineEdit):
-            editor.editingFinished.connect(self._on_rename_completed)
             text = index.data(Qt.ItemDataRole.DisplayRole)
             last_dot = text.rfind('.')
             if last_dot > 0:
                 QTimer.singleShot(0, lambda: editor.setSelection(0, last_dot))
+            
+            editor.editingFinished.connect(lambda: self._on_rename_completed(index, text))
         return editor
     
     # def paint(self, painter, option, index):

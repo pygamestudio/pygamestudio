@@ -49,6 +49,13 @@ class PygameWidget(QWidget):
         self._game_manager.object_line_start_point_changed.connect(self._update_scene)
         self._game_manager.object_line_end_point_changed.connect(self._update_scene)
         self._game_manager.object_line_thickness_changed.connect(self._update_scene)
+        self._game_manager.object_text_changed.connect(self._update_scene)
+        self._game_manager.object_font_size_changed.connect(self._update_scene)
+        self._game_manager.object_font_family_changed.connect(self._update_scene)
+        self._game_manager.object_bold_state_changed.connect(self._update_scene)
+        self._game_manager.object_italic_state_changed.connect(self._update_scene)
+        self._game_manager.object_underline_state_changed.connect(self._update_scene)
+        self._game_manager.object_strikethrough_state_changed.connect(self._update_scene)
 
     def _set_pygame(self):
         pygame.init()

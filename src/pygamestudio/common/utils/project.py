@@ -39,7 +39,7 @@ def get_current_scene_from_project_config() -> str:
         Logger.error(f'读取project.json错误：{e}')
 
 
-def set_current_scene_to_projec_config(current_scene_file_path):
+def set_current_scene_to_project_config(current_scene_file_path):
     try:
         current_scene_file_relative_path = Path(current_scene_file_path).relative_to(get_env('__PYGAMESTUDIO_PROJECT_PATH')).as_posix()
     except ValueError:

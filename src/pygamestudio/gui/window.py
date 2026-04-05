@@ -45,7 +45,7 @@ class EditorBody(QMainWindow):
         self._file_menu = self.menuBar().addMenu('文件')
         self._edit_menu = self.menuBar().addMenu('编辑')
         self._project_menu = self.menuBar().addMenu('项目')
-        self._panel_menu = self.menuBar().addMenu('面板')
+        # self._panel_menu = self.menuBar().addMenu('面板')
         self._help_menu = self.menuBar().addMenu('帮助')
         
         self._setup()
@@ -209,6 +209,10 @@ class Editor(WindowBase):
         self._editor_body.open_project_signal.connect(self._open_project)
         self._editor_body.quit_editor_signal.connect(self.close)
 
+        self._game_manager.scene_saved_signal.connect(self._update_window_title)
+        self._game_manager.scene_loaded_signal.connect(self._update_window_title)
+        self._game_manager.scene_renamed_signal.connect(self._update_window_title)
+
     def _new_project(self):
         self._parent.show_dashboard_and_create_project_window()
 
@@ -225,12 +229,15 @@ class Editor(WindowBase):
  
         self.move(int(pos_x), int(pos_y))
 
-    def get_ready_for_project(self, project_path):
-        self._editor_body.get_ready_for_project(project_path)
-
-        # Set the window title (Pygame Studio + current scene name + project path)
+    def _update_window_title(self):
+        """Set the window title (Pygame Studio + current scene name + project path)"""
+        project_path = self._game_manager.get_project_path()
         current_scene_name = Path(self._game_manager.current_scene_file_path).name if self._game_manager.current_scene_file_path else 'untitled.scene'
         self.window_title.set_title_name(f'Pygame Studio - {current_scene_name} - {project_path}')
+
+    def get_ready_for_project(self, project_path):
+        self._editor_body.get_ready_for_project(project_path)
+        self._update_window_title()
 
     def clean_up(self):
         self._editor_body.clean_up()
