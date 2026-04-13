@@ -1,6 +1,8 @@
 from PySide6.QtWidgets import QGraphicsView, QGraphicsScene
 from PySide6.QtGui import QPen, QColor, QPainter, QMouseEvent
 from PySide6.QtCore import Qt, QLine, QEvent, QTimer
+from PySide6.QtWidgets import *
+from pygamestudio.gui.scene.widget import *
 import math
 
 
@@ -15,10 +17,13 @@ class GridGraphicsView(QGraphicsView):
         self._previous_scale = 1.0
         self._is_dragging = False
         self._is_first_show = True
+        self._run_project_btn = RunProjectButton()
         self._setup()
     
     def _setup(self):
         self._set_widget()
+        self._set_signal()
+        self._set_layout()
 
     def _set_widget(self):
         self.scale(0.6, 0.6)
@@ -30,6 +35,17 @@ class GridGraphicsView(QGraphicsView):
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate)
         self.setRenderHint(QPainter.RenderHint.Antialiasing|QPainter.RenderHint.TextAntialiasing|QPainter.RenderHint.SmoothPixmapTransform)
+
+    def _set_signal(self):
+        self._run_project_btn.clicked.connect(self._game_manager.run_project)
+
+    def _set_layout(self):
+        v_layout = QVBoxLayout(self)
+        h_layout = QHBoxLayout()
+        h_layout.addWidget(self._run_project_btn)
+        h_layout.addStretch(1)
+        v_layout.addLayout(h_layout)
+        v_layout.addStretch(1)
 
     def _reset(self):
         self._zoom_limit = [0.2, 5]

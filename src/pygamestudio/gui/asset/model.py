@@ -20,7 +20,8 @@ class AssetSortFilterProxyModel(QSortFilterProxyModel):
     def __init__(self, parent):
         super().__init__()
         self._tree_view = parent
-    
+        self._excluded_extensions = ['.pygs']
+
     def lessThan(self, source_left, source_right):
         source_model = self.sourceModel()
 
@@ -66,40 +67,18 @@ class AssetSortFilterProxyModel(QSortFilterProxyModel):
             right_value = right_file_info.lastModified().toSecsSinceEpoch()
             return left_value > right_value
 
+    def filterAcceptsRow(self, source_row, source_parent):
+        source_model = self.sourceModel()
+        index = source_model.index(source_row, 0, source_parent)
+        file_info = source_model.fileInfo(index)
+
+        if file_info.isDir():
+            return True
         
-
-    # def setFilterRegularExpression(self, pattern):
-    #     super().setFilterRegularExpression(pattern)
-
-    # def filterAcceptsRow(self, source_row, source_parent):
-    #     source_index = self.sourceModel().index(source_row, 0, source_parent)
-
+        file_name = file_info.fileName()
+        if self._excluded_extensions:
+            for ext in self._excluded_extensions:
+                if file_name.lower().endswith(ext.lower()):
+                    return False
         
-    #     if super().filterAcceptsRow(source_row, source_parent):
-    #         self.matching_items.add(source_index)
-    #         return True
-    #     else:
-
-    #         child_count = self.sourceModel().rowCount(source_index)
-    #         for child_row in range(child_count):
-    #             if self.filterAcceptsRow(child_row, source_index):
-    #                 self.matching_items.add(source_index)
-    #                 return True
-                
-    #     return False
-        # item_name = self.sourceModel().fileName(source_index)
-
-
-        # child_count = self.sourceModel().rowCount(source_index)
-        # for child_row in range(child_count):
-        #     self.filterAcceptsRow(child_row, source_index)
-
-        # if self._pattern.match(item_name).hasMatch():
-        #     print(111)
-        #     self._tree_view.setExpanded(source_index, True)
-        #     print(self._tree_view.isExpanded(source_index))
-        #     return True
-        # else:
-        #     return False
-
-        # return self._pattern.match(item_name).hasMatch()
+        return True

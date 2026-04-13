@@ -26,6 +26,28 @@ INSPECTOR_LAYOUT_ELLIPSE = {
             'widget': [NameLineEdit]
         }
     },
+    'pos': {
+        'i18n': {
+            'zh': '坐标',
+            'en': 'Pos'
+        },
+        'component': {
+            'enabled': [True, True],
+            'attribute': ['x', 'y'],
+            'widget': [PosSpinBox, PosSpinBox]
+        }
+    },
+    'size': {
+        'i18n': {
+            'zh': '尺寸',
+            'en': 'Size'
+        },
+        'component': {
+            'enabled': [True, True],
+            'attribute': ['width', 'height'],
+            'widget': [SizeSpinBox, SizeSpinBox]
+        }
+    },
     'scale': {
         'i18n': {
             'zh': '缩放',
@@ -57,28 +79,6 @@ INSPECTOR_LAYOUT_ELLIPSE = {
             'enabled': [True],
             'attribute': ['color'],
             'widget': [ColorPicker]
-        }
-    },
-    'pos': {
-        'i18n': {
-            'zh': '坐标',
-            'en': 'Pos'
-        },
-        'component': {
-            'enabled': [True, True],
-            'attribute': ['x', 'y'],
-            'widget': [PosSpinBox, PosSpinBox]
-        }
-    },
-    'size': {
-        'i18n': {
-            'zh': '尺寸',
-            'en': 'Size'
-        },
-        'component': {
-            'enabled': [True, True],
-            'attribute': ['width', 'height'],
-            'widget': [SizeSpinBox, SizeSpinBox]
         }
     },
 }

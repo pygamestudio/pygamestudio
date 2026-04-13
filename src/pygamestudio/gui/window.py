@@ -3,6 +3,8 @@ from PySide6.QtCore import *
 from PySide6.QtGui import *
 
 from pygamestudio.common.utils.path import RES_PATH
+from pygamestudio.common.utils.config import get_editor_config
+from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.gui.hierarchy.window import HierarchyWindow
 from pygamestudio.gui.asset.window import AssetWindow
 from pygamestudio.gui.console.window import ConsoleWindow
@@ -47,15 +49,19 @@ class EditorBody(QMainWindow):
         self._project_menu = self.menuBar().addMenu('项目')
         # self._panel_menu = self.menuBar().addMenu('面板')
         self._help_menu = self.menuBar().addMenu('帮助')
-        
         self._setup()
 
     def _setup(self):
+        self._set_translator()
         self._set_widget()
         self._set_signal()
         self._set_layout()
         self._set_menu()
 
+    def _set_translator(self):
+        editor_config = get_editor_config()
+        T.load_language(editor_config['lang'])
+        
     def _set_widget(self):
         self.resize(1420, 900)
         self._left_top_tab_widget.addTab(self._hierarchy_window, '层级')
@@ -145,11 +151,13 @@ class EditorBody(QMainWindow):
 
     def _set_project_menu(self):
         run_action = QAction('运行', self)
-        package_action = QAction('打包', self)
-        # package_action.triggered.connect()
+        build_action = QAction('打包', self)
+
+        run_action.triggered.connect(self._game_manager.run_project)
+        # build_action.triggered.connect()
 
         self._project_menu.addAction(run_action)
-        self._project_menu.addAction(package_action)
+        self._project_menu.addAction(build_action)
 
     def _set_help_menu(self):
         doc_action = QAction('在线文档', self)

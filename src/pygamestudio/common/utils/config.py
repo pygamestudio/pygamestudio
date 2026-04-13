@@ -1,22 +1,54 @@
 import os
 import json
 from pathlib import Path
+from platformdirs import user_config_dir
 from pygamestudio.common.utils.path import RES_PATH
 from pygamestudio.gui.console.logger import Logger
 
 
+def get_editor_config() -> dict:
+    editor_config_dir_path =  Path(user_config_dir()) / 'PygameStudio'
+    if not editor_config_dir_path.exists():
+        editor_config_dir_path.mkdir(parents=True)
+    
+    editor_config_file_path = editor_config_dir_path / 'editor.pygs'
+    if not editor_config_file_path.exists():
+        editor_config_file_path.touch()
+        with open(RES_PATH/'templates/editor_template.pygs', 'r', encoding='utf-8') as f:
+            editor_config_template_content = f.read()
+    
+        with open(editor_config_file_path, 'w', encoding='utf-8') as f:
+            f.write(editor_config_template_content)
+
+        return json.loads(editor_config_template_content)
+    
+    with open(editor_config_file_path, 'r', encoding='utf-8') as f:
+        return json.loads(f.read())
+
+    
+def update_editor_config(key, value):
+    editor_config = get_editor_config()
+    editor_config[key] = value
+    try:
+        editor_config_json_path = Path(user_config_dir()) / 'PygameStudio/editor.pygs'
+        with open(editor_config_json_path, 'w', encoding='utf-8') as f:
+            json.dump(editor_config, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        Logger.error(f'编辑器配置保存失败：{e}')
+
+
 def get_project_config() -> dict:
-    project_config_json_path = Path(get_env('__PYGAMESTUDIO_PROJECT_PATH')) / 'project.json'
+    project_config_json_path = Path(get_env('__PYGAMESTUDIO_PROJECT_PATH')) / 'project.pygs'
 
     if not project_config_json_path.exists():
         project_config_json_path.touch()
-        with open(RES_PATH/'templates/project.json', 'r', encoding='utf-8') as f:
+        with open(RES_PATH/'templates/project_template.pygs', 'r', encoding='utf-8') as f:
             project_config_template_content = f.read()
         
         with open(project_config_json_path, 'w', encoding='utf-8') as f:
             f.write(project_config_template_content)
 
-        return project_config_template_content
+        return json.loads(project_config_template_content)
     
     with open(project_config_json_path, 'r', encoding='utf-8') as f:
         return json.loads(f.read())
@@ -24,7 +56,7 @@ def get_project_config() -> dict:
 
 def save_project_config(config) -> None:
     try:
-        project_config_json_path = Path(get_env('__PYGAMESTUDIO_PROJECT_PATH')) / 'project.json'
+        project_config_json_path = Path(get_env('__PYGAMESTUDIO_PROJECT_PATH')) / 'project.pygs'
         with open(project_config_json_path, 'w', encoding='utf-8') as f:
             json.dump(config, f, indent=4, ensure_ascii=False)
     except Exception as e:
@@ -36,7 +68,7 @@ def get_current_scene_from_project_config() -> str:
     try:
         return project_config['asset']['current_scene']
     except Exception as e:
-        Logger.error(f'读取project.json错误：{e}')
+        Logger.error(f'读取project.pygs错误：{e}')
 
 
 def set_current_scene_to_project_config(current_scene_file_path):

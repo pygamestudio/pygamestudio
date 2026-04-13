@@ -6,14 +6,14 @@ from PySide6.QtCore import *
 from pygamestudio.game.object.type import *
 
 
-class PygameWidget(QWidget):
+class PygameScreen(QWidget):
     def __init__(self, game_manager=None, scene=None):
         super().__init__()
         self._game_manager = game_manager
         self._scene = scene
         
         self._clock = pygame.time.Clock()
-        self._canvas_surface = pygame.Surface((self.width(), self.height()))
+        self._screen_surface = pygame.Surface((self.width(), self.height()))
 
         self._final_selected_object = None
         self._mouse_x = None
@@ -59,7 +59,7 @@ class PygameWidget(QWidget):
 
     def _set_pygame(self):
         pygame.init()
-        self._canvas_surface = pygame.Surface((self.width(), self.height()))
+        self._screen_surface = pygame.Surface((self.width(), self.height()))
         self._clock.tick(60)
     
     def _reset(self):
@@ -78,8 +78,8 @@ class PygameWidget(QWidget):
     def _on_object_added(self, parent_uuid, object_uuid, inserted_pos):
         if object_uuid == self._game_manager.scene_object_uuid:
             obj = self._game_manager.get_object(object_uuid)
-            setattr(obj, 'size', self._canvas_surface.get_size())
-            obj.set_surface(self._canvas_surface)
+            setattr(obj, 'size', self._screen_surface.get_size())
+            # obj.set_surface(self._screen_surface)
             obj.update_surface()
 
         self._update_scene()
@@ -91,7 +91,7 @@ class PygameWidget(QWidget):
         
     def _update_scene(self):
         if self._game_manager.is_empty():
-            self._canvas_surface.fill((0, 0, 0))
+            self._screen_surface.fill((0, 0, 0))
             self.update()
             return
         
@@ -106,10 +106,10 @@ class PygameWidget(QWidget):
 
                 obj.draw(parent_surface)
 
-        _update(self._game_manager.all_object_tree_struct, self._canvas_surface)
+        _update(self._game_manager.all_object_tree_struct, self._screen_surface)
         self.update()
 
-    def _convert_canvas_surface_to_qimage(self, surface):
+    def _convert_screen_surface_to_qimage(self, surface):
         # surarray.shape returns (width, height, depth). However, QImage expects (height, width, depth).
         # Thats why we need to swap width and height and transform the image here.
         surarray = pygame.surfarray.pixels3d(surface)
@@ -229,17 +229,17 @@ class PygameWidget(QWidget):
         painter = QPainter(self)
 
         if self._game_manager.is_current_scene_visible():
-            img = self._convert_canvas_surface_to_qimage(self._canvas_surface)
+            img = self._convert_screen_surface_to_qimage(self._screen_surface)
             painter.drawPixmap(0, 0, QPixmap.fromImage(img))
         else:
             painter.save()
             pen = QPen(Qt.GlobalColor.white)
             pen.setWidth(5)
             painter.setPen(pen)
-            painter.drawRect(0, 0, self._canvas_surface.get_width(), self._canvas_surface.get_height())
+            painter.drawRect(0, 0, self._screen_surface.get_width(), self._screen_surface.get_height())
             painter.restore()
 
     def resizeEvent(self, event):
         new_window_size = event.size()
-        self._canvas_surface = pygame.Surface((new_window_size.width(), new_window_size.height()))
+        self._screen_surface = pygame.Surface((new_window_size.width(), new_window_size.height()))
         return super().resizeEvent(event)

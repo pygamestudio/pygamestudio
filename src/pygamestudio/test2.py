@@ -1,35 +1,35 @@
-import pygame
 import sys
+from PySide6.QtWidgets import QMainWindow, QApplication, QComboBox, QLabel
+from PySide6.QtGui import QAction
 
-pygame.init()
-screen = pygame.display.set_mode((800, 600))
-font = pygame.font.SysFont('Arial', 72)
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("菜单栏添加控件示例")
+        self.resize(400, 300)
 
-# 创建一个较小的 Surface（200x50）
-small_surface = pygame.Surface((200, 50))
-small_surface.fill((200, 200, 200))
+        # 1. 获取窗口的菜单栏
+        menubar = self.menuBar()
 
-# 创建较大的文本（需要300x80的空间）
-text = font.render("ABCDEFGHIJK", True, (255, 0, 0))
-print(f"文本实际尺寸: {text.get_size()}")  # 可能输出 (280, 70)
+        # 2. 添加一个普通的“文件”菜单作为示例
+        file_menu = menubar.addMenu("文件")
+        file_menu.addAction("打开")
+        file_menu.addAction("保存")
 
-# 将大文本绘制到小Surface上
-small_surface.blit(text, (0, 0))  # 超出部分会被裁剪！
+        # 3. 创建一个要放在菜单栏上的控件（以下拉框为例）
+        combo_box = QComboBox(self)
+        combo_box.addItems(["选项 A", "选项 B", "选项 C"])
+        # 设置占位符文本，让它在菜单栏上看起来更协调
+        combo_box.setPlaceholderText("请选择...")
 
-# 主循环
-running = True
-while running:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-    
-    screen.fill((255, 255, 255))
-    screen.blit(small_surface, (100, 100))
-    
-    # 同时显示完整文本作为对比
-    screen.blit(text, (100, 200))
-    
-    pygame.display.flip()
+        # 4. 关键步骤：将控件设置到菜单栏的右上角
+        menubar.setCornerWidget(combo_box)
 
-pygame.quit()
-sys.exit()
+        # 你也可以使用 Qt.TopLeftCorner 将其放在左上角
+        # menubar.setCornerWidget(combo_box, Qt.TopLeftCorner)
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec())

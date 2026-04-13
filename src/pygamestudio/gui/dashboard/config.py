@@ -3,7 +3,7 @@ from pathlib import Path
 import json
 
 
-DASHBOARD_PROJECTS_FILE_NAME = 'dashboard.json'
+DASHBOARD_PROJECTS_FILE_NAME = 'dashboard.pygs'
 DASHBOARD_CONFIG_DIR_PATH = Path(user_config_dir()) / 'PygameStudio'
 DASHBOARD_PROJECTS_FILE_PATH = DASHBOARD_CONFIG_DIR_PATH / DASHBOARD_PROJECTS_FILE_NAME
 
@@ -45,7 +45,6 @@ def delete_project_from_dashboard_config(project_path):
             break
 
     save_projects_to_dashbaord_config(project_list)
-
 
 def load_projects_from_dashboard_config():
     if not DASHBOARD_PROJECTS_FILE_PATH.exists():

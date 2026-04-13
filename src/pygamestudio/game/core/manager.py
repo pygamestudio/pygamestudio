@@ -1,15 +1,18 @@
-import os
+import sys
 import json
+import subprocess
 from PySide6.QtWidgets import *
 from PySide6.QtCore import *
 from PySide6.QtGui import *
 from pygamestudio.game.object.type import *
 from pygamestudio.game.object.rect import *
-from pygamestudio.game.object.scene import *
+from pygamestudio.game.object.canvas import *
 from pygamestudio.game.object.text import *
 from pygamestudio.game.object.ellipse import *
 from pygamestudio.game.object.line import *
-from pygamestudio.common.utils.project import *
+from pygamestudio.common.utils.config import *
+
+from pygamestudio.gui.console.logger import Logger
 
 class GameManager(QObject):
     scene_saved_signal = Signal()
@@ -83,7 +86,7 @@ class GameManager(QObject):
     def _reset(self):
         self._is_cut = False
         self._project_path = ''
-        self._current_scene_file_path = ''          # 从project.json中获取
+        self._current_scene_file_path = ''          # 从project.pygs中获取
         self._is_current_scene_saved = True
         self._current_scene_object_uuid = ''
         self._clipboard_content = []
@@ -701,6 +704,8 @@ class GameManager(QObject):
         with open(self._current_scene_file_path, 'w', encoding='utf-8') as f:
             json.dump(self._all_object_tree_struct, f, default=_default, indent=4, ensure_ascii=False)
 
+        Logger.info('场景已保存')
+        
     def load_scene(self, current_scene_file_path):
         return self._load_scene(current_scene_file_path)
     
@@ -751,6 +756,19 @@ class GameManager(QObject):
     
     def clear(self):
         self._all_object_tree_struct = {}
+
+    def run_project(self):
+        try:
+            subprocess.Popen(
+                [sys.executable, Path(self._project_path)/'main.py'],
+                cwd=self._project_path,
+                stdout=None,
+                stderr=None,
+                shell=False
+            )
+            Logger.info(f'启动项目{Path(self._project_path).name}')
+        except Exception as e:
+            Logger.error(f'启动项目失败: {e}')
 
 
 class AddObjectCommand(QUndoCommand):

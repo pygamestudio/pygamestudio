@@ -3,7 +3,7 @@ from PySide6.QtCore import *
 from PySide6.QtGui import *
 from pygamestudio.common.utils.path import RES_PATH
 from pathlib import Path
-from pygamestudio.common.utils.project import *
+from pygamestudio.common.utils.config import *
 
 
 class AssetTreeWidgetDelegate(QStyledItemDelegate):

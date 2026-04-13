@@ -15,6 +15,9 @@ class WindowTitleBase(QWidget):
         super().__init__()
         self._icon = QLabel()
         self._name_label = QLabel()
+        # self._run_project_btn = QPushButton()
+        # self._open_project_dir_btn = QPushButton()
+        # self._package_project_btn = QPushButton()
         self._minimize_btn = QPushButton()
         self._maximize_btn = QPushButton()
         self._close_btn = QPushButton()
@@ -39,6 +42,10 @@ class WindowTitleBase(QWidget):
         scaled_pixmap = pixmap.scaled(self._icon.size())
         self._icon.setPixmap(scaled_pixmap)
 
+        # self._run_project_btn.setIcon(QIcon(str(RES_PATH / 'images/run.png')))
+        # self._open_project_dir_btn.setIcon(QIcon(str(RES_PATH / 'images/folder.png')))
+        # self._package_project_btn.setIcon(QIcon(str(RES_PATH / 'images/package.png')))
+
         self._minimize_btn.setIcon(QIcon(str(RES_PATH / 'images/minimize.png')))
         self._maximize_btn.setIcon(QIcon(str(RES_PATH / 'images/maximize.png')))
         self._close_btn.setIcon(QIcon(str(RES_PATH / 'images/close.png')))
@@ -58,6 +65,11 @@ class WindowTitleBase(QWidget):
         left_h_layout.addWidget(self._icon)
         left_h_layout.addWidget(self._name_label)
 
+        # center_h_layout = QHBoxLayout()
+        # center_h_layout.addWidget(self._run_project_btn)
+        # center_h_layout.addWidget(self._open_project_dir_btn)
+        # center_h_layout.addWidget(self._package_project_btn)
+
         right_h_layout = QHBoxLayout()
         right_h_layout.addWidget(self._minimize_btn)
         right_h_layout.addWidget(self._maximize_btn)
@@ -65,6 +77,8 @@ class WindowTitleBase(QWidget):
         right_h_layout.setSpacing(10)
 
         main_h_layout.addLayout(left_h_layout)
+        # main_h_layout.addStretch(1)
+        # main_h_layout.addLayout(center_h_layout)
         main_h_layout.addStretch(1)
         main_h_layout.addLayout(right_h_layout)
         main_h_layout.setContentsMargins(3, 3, 3, 3)

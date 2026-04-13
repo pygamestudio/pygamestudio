@@ -10,9 +10,9 @@ class Logger(QObject):
         return cls.instance
     
     def __init__(self):
-        if not hasattr(self, 'initialized'):
+        if not hasattr(self, '_initialized'):
             super().__init__()
-            self.initialized = True
+            self._initialized = True
             self.log_widget = None
     
     @staticmethod
@@ -29,8 +29,6 @@ class Logger(QObject):
     @staticmethod
     def info(message):
         instance = Logger.get_instance()
-        print(instance)
-        print(instance.log_widget)
         if instance.log_widget:
             instance.log_widget.info(message)
     

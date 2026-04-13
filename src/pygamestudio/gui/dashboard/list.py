@@ -101,7 +101,7 @@ class DashboardListView(QListView):
         self.scrollToBottom()
 
     def _delete_item(self, row):
-        self._standard_model.removeRow(row)
+        self._proxy_model.removeRow(row)
 
     def _load_projects(self):
         project_list = load_projects_from_dashboard_config()
@@ -125,7 +125,7 @@ class DashboardListView(QListView):
         }
         self._add_item(project_data)
         
-        # Add new project data to PygameStudio dashboard.json.
+        # Add new project data to PygameStudio dashboard.pygs.
         add_project_to_dashboard_config(project_data)
     
     def show_create_project_window(self):
@@ -143,8 +143,8 @@ class DashboardListView(QListView):
         if not project_path:
             return
 
-        if not (Path(project_path) / 'project.json').exists():
-            QMessageBox.critical(self, '错误', '项目打开失败，没有找到project.json文件')
+        if not (Path(project_path) / 'project.pygs').exists():
+            QMessageBox.critical(self, '错误', '项目打开失败，没有找到project.pygs文件')
             return
         
         project_data = {

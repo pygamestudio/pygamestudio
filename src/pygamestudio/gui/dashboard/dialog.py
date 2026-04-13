@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import *
 from PySide6.QtCore import *
 from PySide6.QtGui import *
+import json
 from pathlib import Path
 from pygamestudio.common.utils.path import RES_PATH
 from pygamestudio.gui.base.window import WindowBase
@@ -102,7 +103,7 @@ class CreateProjectBody(QWidget):
         scene_folder_path = project_path / 'scene'
         script_folder_path = project_path / 'script'
         main_py_path = project_path / 'main.py'
-        project_json_path = project_path / 'project.json'
+        project_json_path = project_path / 'project.pygs'
 
         try:
             project_path.mkdir(parents=True, exist_ok=False)
@@ -110,9 +111,12 @@ class CreateProjectBody(QWidget):
             image_folder_path.mkdir(parents=True, exist_ok=False)
             scene_folder_path.mkdir(parents=True, exist_ok=False)
             script_folder_path.mkdir(parents=True, exist_ok=False)
-            main_py_path.touch(exist_ok=False)
-            with open(RES_PATH / 'templates/project.json', 'r', encoding='utf-8') as f:
-                project_json_path.write_text(f.read(), encoding='utf-8')
+            with open(RES_PATH / 'templates/main_template.py', 'r', encoding='utf-8') as f:
+                main_py_path.write_text(f.read(), encoding='utf-8')
+            with open(RES_PATH / 'templates/project_template.pygs', 'r', encoding='utf-8') as f:
+                project_config = json.loads(f.read())
+                project_config['caption'] = project_name
+                project_json_path.write_text(json.dumps(project_config, indent=4, ensure_ascii=False), encoding='utf-8')
             
             self._project_name_edit.clear()
             self._project_dir_path_edit.clear()
