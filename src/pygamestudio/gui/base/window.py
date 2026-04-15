@@ -1,8 +1,9 @@
-from PySide6.QtWidgets import *
-from PySide6.QtCore import *
-from PySide6.QtGui import *
-from pygamestudio.common.utils.path import RES_PATH
 
+from PySide6.QtGui import *
+from PySide6.QtCore import *
+from PySide6.QtWidgets import *
+from pygamestudio.common.utils.path import RES_PATH
+from pygamestudio.common.i18n.translator import Translator as T
 
 class WindowTitleBase(QWidget):
     window_minimized = Signal()
@@ -15,9 +16,6 @@ class WindowTitleBase(QWidget):
         super().__init__()
         self._icon = QLabel()
         self._name_label = QLabel()
-        # self._run_project_btn = QPushButton()
-        # self._open_project_dir_btn = QPushButton()
-        # self._package_project_btn = QPushButton()
         self._minimize_btn = QPushButton()
         self._maximize_btn = QPushButton()
         self._close_btn = QPushButton()
@@ -42,10 +40,6 @@ class WindowTitleBase(QWidget):
         scaled_pixmap = pixmap.scaled(self._icon.size())
         self._icon.setPixmap(scaled_pixmap)
 
-        # self._run_project_btn.setIcon(QIcon(str(RES_PATH / 'images/run.png')))
-        # self._open_project_dir_btn.setIcon(QIcon(str(RES_PATH / 'images/folder.png')))
-        # self._package_project_btn.setIcon(QIcon(str(RES_PATH / 'images/package.png')))
-
         self._minimize_btn.setIcon(QIcon(str(RES_PATH / 'images/minimize.png')))
         self._maximize_btn.setIcon(QIcon(str(RES_PATH / 'images/maximize.png')))
         self._close_btn.setIcon(QIcon(str(RES_PATH / 'images/close.png')))
@@ -65,11 +59,6 @@ class WindowTitleBase(QWidget):
         left_h_layout.addWidget(self._icon)
         left_h_layout.addWidget(self._name_label)
 
-        # center_h_layout = QHBoxLayout()
-        # center_h_layout.addWidget(self._run_project_btn)
-        # center_h_layout.addWidget(self._open_project_dir_btn)
-        # center_h_layout.addWidget(self._package_project_btn)
-
         right_h_layout = QHBoxLayout()
         right_h_layout.addWidget(self._minimize_btn)
         right_h_layout.addWidget(self._maximize_btn)
@@ -77,8 +66,6 @@ class WindowTitleBase(QWidget):
         right_h_layout.setSpacing(10)
 
         main_h_layout.addLayout(left_h_layout)
-        # main_h_layout.addStretch(1)
-        # main_h_layout.addLayout(center_h_layout)
         main_h_layout.addStretch(1)
         main_h_layout.addLayout(right_h_layout)
         main_h_layout.setContentsMargins(3, 3, 3, 3)
@@ -181,7 +168,7 @@ class WindowBase(QWidget):
     def __set_editor_theme(self, theme='white'):
         theme_qss_path = RES_PATH / f'qss/{theme}.qss'
         if not theme_qss_path.exists():
-            QMessageBox.critical(self, '错误', '该主题QSS文件不存在！')
+            QMessageBox.critical(self, T.tr('message_box.critical_title', 'Error'), T.tr('message_box.critical_read_qss_content', 'The theme QSS file {}.qss does not exist!').format(theme))
             return
         
         with open(theme_qss_path, 'r', encoding='utf-8') as f:

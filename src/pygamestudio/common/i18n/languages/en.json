@@ -1,1 +1,87 @@
-{}
+{
+    "dialog": {
+        "save_title": "Save File",
+        "format": "Format",
+        "get_dir_title": "Select Project"
+    },
+
+    "message_box": {
+        "warning_title": "Warning",
+        "warning_scene_save_content": "The current scene data has been modified. Do you want to save it?",
+        "quesiton_title": "Confirm",
+        "question_delete_item_content": "Delete {} item(s)? This cannot be undone.\n{}",
+        "question_delete_project_content": "Delete the project?",
+        "question_overwrite_content": "Overwrite the following duplicate resources?\n{}",
+        "information_title": "Info",
+        "information_os_content": "Unsupported Operating System",
+        "critical_title": "Error",
+        "critical_read_qss_content": "The theme QSS file {}.qss does not exist!",
+        "critical_save_project_list_content": "Failed to save project list: {}",
+        "critical_not_list_content": "Invalid configuration file format. Expected a list.",
+        "critical_corrupted_json_content": "The configuration file is corrupted. Failed to parse JSON.",
+        "critical_failed_to_load_content": "Failed to load projects: {}",
+        "critical_rename_content": "Failed to rename: {}",
+        "critical_open_project": "Failed to open the project. Couldn't find project.pygs.",
+        "critical_find_project": "Couldn't find the project."
+    },
+
+    "menu": {
+        "open": "Open",
+        "import": "Import",
+        "edit": "Edit",
+        "folder": "Folder",
+        "script": "Script",
+        "scene": "Scene",
+        "cut": "Cut",
+        "copy": "Copy",
+        "paste": "Paste",
+        "delete": "Delete",
+        "rename": "Rename",
+        "duplicate": "Duplicate",
+        "copy_uuid": "Copy UUID",
+        "copy_path": "Copy Path",
+        "copy_name": "Copy Name",
+        "open_in_terminal": "Open in Terminal",
+        "open_externally": "Open Externally",
+        "show_in_explorer": "Show in Explorer",
+        "create": "Create",
+        "text_file": "Text File",
+        "copy_menu_title": "Copy Path | Name | UUID",
+        "select_all": "Select All"
+    },
+
+    "asset": {
+        "search_placeholder": "Search by name",
+        "sort_by_name_asc": "Sort by Name (ASC)",
+        "sort_by_name_desc": "Sort by Name (DESC)",
+        "sort_by_type_asc": "Sort by Type (ASC)",
+        "sort_by_type_desc": "Sort by Type (DESC)",
+        "sort_by_size_asc": "Sort by Size (ASC)",
+        "sort_by_size_desc": "Sort by Size (DESC)",
+        "sort_by_time_asc": "Sort by Time (ASC)",
+        "sort_by_time_desc": "Sort by Time (DESC)"
+    },
+
+    "dashboard": {
+        "not_found": " (Not Found)",
+        "project_name": "Project Name:",
+        "project_name_edit_placeholder": "Please enter the project name",
+        "project_rename_edit_placeholder": "Please enter the new project name",
+        "project_path": "Project Path:",
+        "project_path_edit_placeholder": "Please select or enter the project path",
+        "browse": "Browse",
+        "create": "Create",
+        "cancel": "Cancel",
+        "project_exist_error": "The project already exists. Please change the project name.",
+        "create_project_error": "Failed to create project: {}",
+        "select_project_path": "Select Project Path",
+        "rename": "Rename",
+        "import": "Import",
+        "same_name": "Same name as the original.",
+        "create_project_guide": "You don't have any projects yet.\nPlease click the button to create or import one.",
+        "sort_by_time": "Sort by Time",
+        "sort_by_name": "Sort by Name",
+        "sort_by_path": "Sort by Path",
+        "sort": "Sort:"
+    }
+}

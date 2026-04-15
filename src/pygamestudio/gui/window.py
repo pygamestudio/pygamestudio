@@ -52,7 +52,7 @@ class EditorBody(QMainWindow):
         self._setup()
 
     def _setup(self):
-        self._set_translator()
+        # self._set_translator()
         self._set_widget()
         self._set_signal()
         self._set_layout()
@@ -209,6 +209,7 @@ class Editor(WindowBase):
 
     def _set_widget(self):
         self.resize(1420, 930)
+        self.setWindowIcon(QIcon(str(RES_PATH / 'images/folder.png')))
         self._center()
         self.set_window_body(self._editor_body)
 

@@ -1,6 +1,5 @@
 
 import uuid
-import random
 import pygame
 from pygamestudio.game.object.type import *
 from pygamestudio.common.utils.path import RES_PATH
@@ -32,7 +31,7 @@ class ObjectBase:
             'scale_y': 1,
             'scale': (1, 1),
             'angle': 0,
-            'color': random.choice(['#ff0000', '#00ff00', '#0000ff']),
+            'color': '#ffffff',
             'is_visible': True,
         }
     

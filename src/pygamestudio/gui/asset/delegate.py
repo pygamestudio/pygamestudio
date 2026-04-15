@@ -1,8 +1,7 @@
-from PySide6.QtWidgets import *
-from PySide6.QtCore import *
-from PySide6.QtGui import *
-from pygamestudio.common.utils.path import RES_PATH
 from pathlib import Path
+from PySide6.QtGui import *
+from PySide6.QtCore import *
+from PySide6.QtWidgets import *
 from pygamestudio.common.utils.config import *
 
 
@@ -38,20 +37,3 @@ class AssetTreeWidgetDelegate(QStyledItemDelegate):
             
             editor.editingFinished.connect(lambda: self._on_rename_completed(index, text))
         return editor
-    
-    # def paint(self, painter, option, index):
-    #     clipboard_content = self._tree_view.get_clipboard_content()
-    #     index_path = Path(self._file_model.filePath(self._proxy_model.mapToSource(index)))
-
-    #     painter.setOpacity(1)
-    #     if self._tree_view.is_cut():
-    #         if index_path in clipboard_content:
-    #             painter.setOpacity(0.5)
-        
-    #     if index_path in self._tree_view.get_highlight_indexes_paths():
-    #         painter.setPen(QPen(QColor(0, 255, 255, 100)))
-    #         painter.setBrush(QColor(0, 255, 255, 100))
-    #         painter.drawRect(option.rect)
-
-    #     return super().paint(painter, option, index)
-

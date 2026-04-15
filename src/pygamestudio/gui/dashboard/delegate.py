@@ -1,7 +1,8 @@
-from PySide6.QtWidgets import *
-from PySide6.QtCore import *
-from PySide6.QtGui import *
 from pathlib import Path
+from PySide6.QtGui import *
+from PySide6.QtCore import *
+from PySide6.QtWidgets import *
+from pygamestudio.common.i18n.translator import Translator as T
 
 
 class DashboardDelegate(QStyledItemDelegate):
@@ -48,7 +49,7 @@ class DashboardDelegate(QStyledItemDelegate):
             painter.setPen(QColor(50, 50, 50))
         else:
             painter.setPen(QColor(255, 0, 0))
-            project_name += ' (找不到项目文件)'
+            project_name += T.tr('dashboard.not_found', ' (Not Found)')
 
         painter.drawText(name_rect, Qt.AlignmentFlag.AlignTop, 
                          painter.fontMetrics().elidedText(project_name, Qt.TextElideMode.ElideRight, name_width))

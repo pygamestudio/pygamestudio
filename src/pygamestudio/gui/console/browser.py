@@ -1,9 +1,6 @@
-from PySide6.QtWidgets import *
-from PySide6.QtCore import *
 from PySide6.QtGui import *
-import re
-from datetime import datetime
-
+from PySide6.QtCore import *
+from PySide6.QtWidgets import *
 from pygamestudio.gui.console.type import *
 from pygamestudio.gui.console.menu import *
 from pygamestudio.gui.console.logger import Logger
@@ -93,7 +90,6 @@ class ConsoleLogBrowser(QTextBrowser):
         self.clear_log_signal.emit()
 
     def info(self, msg):
-        # timestamp = datetime.now().strftime("%H:%M:%S")
         log_level = INFO
         self._add_log(msg, log_level)
         self.info_log_signal.emit(log_level)

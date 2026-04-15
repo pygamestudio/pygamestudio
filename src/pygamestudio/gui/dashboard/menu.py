@@ -1,8 +1,8 @@
-from PySide6.QtWidgets import QApplication, QMenu
-from PySide6.QtGui import QAction
 from PySide6.QtCore import *
+from PySide6.QtGui import QAction
+from PySide6.QtWidgets import QMenu
 from pygamestudio.game.object.type import *
-
+from pygamestudio.common.i18n.translator import Translator as T
 
 class ContextMenu(QMenu):
     open_project_signal = Signal(QModelIndex)
@@ -18,11 +18,11 @@ class ContextMenu(QMenu):
     def _add_actions(self, index):
         is_valid_index = index.isValid()
 
-        open_action = QAction('打开', self)
-        rename_action = QAction('重命名', self)
-        delete_action = QAction('删除', self)
-        create_action = QAction('创建', self)
-        import_action = QAction('导入', self)
+        open_action = QAction(T.tr('menu.open', 'Open'), self)
+        rename_action = QAction(T.tr('menu.rename', 'Rename'), self)
+        delete_action = QAction(T.tr('menu.delete', 'Delete'), self)
+        create_action = QAction(T.tr('menu.create', 'Create'), self)
+        import_action = QAction(T.tr('menu.import', 'Import'), self)
 
         open_action.triggered.connect(lambda: self.open_project_signal.emit(index))
         rename_action.triggered.connect(lambda: self.rename_project_signal.emit(index))

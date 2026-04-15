@@ -12,6 +12,7 @@ class ObjectCanvas(ObjectBase):
 
         self.name = 'Canvas'
         self.type = OBJECT_CANVAS
+        self.color = '#000000'
 
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
         pygame.draw.rect(self.surface, self.color, self.surface.get_rect())

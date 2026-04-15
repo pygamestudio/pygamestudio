@@ -1,8 +1,8 @@
-from PySide6.QtWidgets import QLineEdit, QHBoxLayout, QPushButton
-from PySide6.QtCore import Signal
 from PySide6.QtGui import QIcon
-
+from PySide6.QtCore import Signal
+from PySide6.QtWidgets import QLineEdit, QHBoxLayout, QPushButton
 from pygamestudio.common.utils.path import RES_PATH
+from pygamestudio.common.i18n.translator import Translator as T
 
 
 class SearchLineEdit(QLineEdit):
@@ -20,7 +20,7 @@ class SearchLineEdit(QLineEdit):
 
     def _set_widget(self):
         self.setTextMargins(20, 0, 0, 0)
-        self.setPlaceholderText('search by name or uuid')
+        self.setPlaceholderText(T.tr('asset.search_placeholder', 'Search by name'))
 
         self._btn.setIcon(QIcon(str(RES_PATH / 'images/search.png')))
         self._btn.resize(self.height(), self.height())
@@ -31,9 +31,13 @@ class SearchLineEdit(QLineEdit):
 
     def _set_signal(self):
         self.textChanged.connect(lambda: self.search_signal.emit(self.text().strip().lower()))
+        T.add_observer(self)
 
     def _set_layout(self):
         h_layout = QHBoxLayout(self)
         h_layout.addWidget(self._btn)
         h_layout.addStretch(1)
         h_layout.setContentsMargins(0, 0, 0, 0)
+
+    def retranslate(self):
+        self.setPlaceholderText(T.tr('asset.search_placeholder', 'Search by name'))

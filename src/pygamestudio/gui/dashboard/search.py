@@ -1,7 +1,6 @@
-from PySide6.QtWidgets import QLineEdit, QHBoxLayout, QPushButton
-from PySide6.QtCore import Signal
 from PySide6.QtGui import QIcon
-
+from PySide6.QtCore import Signal
+from PySide6.QtWidgets import QLineEdit, QHBoxLayout, QPushButton
 from pygamestudio.common.utils.path import RES_PATH
 
 

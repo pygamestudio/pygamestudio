@@ -1,10 +1,12 @@
-from PySide6.QtWidgets import *
-from PySide6.QtCore import *
-from PySide6.QtGui import *
+
 import json
 from pathlib import Path
+from PySide6.QtGui import *
+from PySide6.QtCore import *
+from PySide6.QtWidgets import *
 from pygamestudio.common.utils.path import RES_PATH
 from pygamestudio.gui.base.window import WindowBase
+from pygamestudio.common.i18n.translator import Translator as T
 
 
 class CreateProjectBody(QWidget):
@@ -32,22 +34,22 @@ class CreateProjectBody(QWidget):
         self._set_layout()
 
     def _set_widget(self):
-        self._project_name_label.setText('项目名称:')
-        self._project_name_edit.setPlaceholderText('请输入项目名称')
+        self._project_name_label.setText(T.tr('dashboard.project_name', 'Project Name:'))
+        self._project_name_edit.setPlaceholderText(T.tr('dashboard.project_name_edit_placeholder', 'Please enter the project name'))
     
-        self._project_dir_path_label.setText('项目路径:')
-        self._project_dir_path_edit.setPlaceholderText('请选择或输入项目路径')
+        self._project_dir_path_label.setText(T.tr('dashboard.project_path', 'Project Path:'))
+        self._project_dir_path_edit.setPlaceholderText(T.tr('dashboard.project_path_edit_placeholder', 'Please select or enter the project path'))
 
-        self._browse_button.setText('浏览')
+        self._browse_button.setText(T.tr('dashboard.browse', 'Browse'))
         self._error_label.setStyleSheet("""
         QLabel {
             color: red;
         }
         """)
 
-        self._create_button.setText('创建')
+        self._create_button.setText(T.tr('dashboard.create', 'Create'))
         self._create_button.setEnabled(False)
-        self._cancel_button.setText('取消')
+        self._cancel_button.setText(T.tr('dashboard.cancel', 'Cancel'))
 
     def _set_signal(self):
         self._project_name_edit.textChanged.connect(self._validate_project)
@@ -55,6 +57,7 @@ class CreateProjectBody(QWidget):
         self._create_button.clicked.connect(self._create_project)
         self._browse_button.clicked.connect(self._browse)
         self._cancel_button.clicked.connect(self._close_window)
+        T.add_observer(self)
 
     def _set_layout(self):
         h_layout1 = QHBoxLayout()
@@ -89,7 +92,7 @@ class CreateProjectBody(QWidget):
             return
         
         if project_path.exists():
-            self._show_error('目标文件夹已存在，请修改项目名称')
+            self._show_error(T.tr('dashboard.project_exist_error', 'The project already exists. Please change the project name.'))
             self._create_button.setEnabled(False)
         else:
             self._create_button.setEnabled(True)
@@ -123,10 +126,10 @@ class CreateProjectBody(QWidget):
             self.close_window_signal.emit()
             self.create_project_signal.emit(str(project_path))
         except FileExistsError:
-            self._show_error('目标文件夹已存在，请修改项目名称')
+            self._show_error(T.tr('dashboard.project_exist_error', 'The project already exists. Please change the project name.'))
             self._create_button.setEnabled(False)
         except Exception as e:
-            self._show_error(f'目录创建失败: {e}')
+            self._show_error(T.tr('dashboard.project_exist_error', 'Failed to create project: {}').format(e))
             self._create_button.setEnabled(False)
 
     def _close_window(self):
@@ -143,9 +146,18 @@ class CreateProjectBody(QWidget):
         self._error_label.show()
 
     def _browse(self):
-        project_dir_path = QFileDialog.getExistingDirectory(self, '选择项目路径')
+        project_dir_path = QFileDialog.getExistingDirectory(self, T.tr('dashboard.select_project_path', 'Select Project Path'))
         if project_dir_path:
             self._project_dir_path_edit.setText(project_dir_path)
+
+    def retranslate(self):
+        self._project_name_label.setText(T.tr('dashboard.project_name', 'Project Name:'))
+        self._project_name_edit.setPlaceholderText(T.tr('dashboard.project_name_edit_placeholder', 'Please enter the project name'))
+        self._project_dir_path_label.setText(T.tr('dashboard.project_path', 'Project Path:'))
+        self._project_dir_path_edit.setPlaceholderText(T.tr('dashboard.project_path_edit_placeholder', 'Please select or enter the project path'))
+        self._browse_button.setText(T.tr('dashboard.browse', 'Browse'))
+        self._create_button.setText(T.tr('dashboard.create', 'Create'))
+        self._cancel_button.setText(T.tr('dashboard.cancel', 'Cancel'))
 
     def enterEvent(self, event):
         self.setCursor(Qt.CursorShape.ArrowCursor)
@@ -196,23 +208,23 @@ class RenameProjectBody(QWidget):
         self._set_layout()
 
     def _set_widget(self):
-        self._project_name_label.setText('项目名称:')
-        self._project_name_edit.setPlaceholderText('请输入新的项目名称')
-
+        self._project_name_label.setText(T.tr('dashboard.project_name', 'Project Name:'))
+        self._project_name_edit.setPlaceholderText(T.tr('dashboard.project_rename_edit_placeholder', 'Please enter the new project name'))
         self._error_label.setStyleSheet("""
         QLabel {
             color: red;
         }
         """)
 
-        self._rename_button.setText('重命名')
+        self._rename_button.setText(T.tr('dashboard.rename', 'Rename'))
         self._rename_button.setEnabled(False)
-        self._cancel_button.setText('取消')
+        self._cancel_button.setText(T.tr('dashboard.cancel', 'Cancel'))
 
     def _set_signal(self):
         self._project_name_edit.textChanged.connect(self._validate_project)
         self._rename_button.clicked.connect(self._rename)
         self._cancel_button.clicked.connect(self._close_window)
+        T.add_observer(self)
 
     def _set_layout(self):
         h_layout1 = QHBoxLayout()
@@ -239,11 +251,11 @@ class RenameProjectBody(QWidget):
             return
         
         if new_project_name == Path(self._old_project_path).name:
-            self._show_error('项目名称与原来的一样')
+            self._show_error(T.tr('dashboard.same_name', 'Same name as the original.'))
             return
         
         if new_project_path.exists():
-            self._show_error('目标文件夹已存在，请修改项目名称')
+            self._show_error(T.tr('dashboard.project_exist_error', 'The project already exists. Please change the project name.'))
             self._rename_button.setEnabled(False)
         else:
             self._rename_button.setEnabled(True)
@@ -257,7 +269,7 @@ class RenameProjectBody(QWidget):
             self._project_name_edit.clear()
             self.close_window_signal.emit()
         except Exception as e:
-            QMessageBox.critical(self, '错误', f'重命名失败!\n{e}')
+            QMessageBox.critical(self, T.tr('message_box.critical_title'), T.tr('message_box.critical_rename_content', 'Failed to rename: {}').format(e))
         else:
             self.rename_project_signal.emit(self._index, self._old_project_path, new_project_path)
 
@@ -276,6 +288,12 @@ class RenameProjectBody(QWidget):
     def set_index_and_old_project_path(self, index, old_project_path):
         self._index = index
         self._old_project_path = old_project_path
+
+    def retranslate(self):
+        self._project_name_label.setText(T.tr('dashboard.project_name', 'Project Name:'))
+        self._project_name_edit.setPlaceholderText(T.tr('dashboard.project_rename_edit_placeholder', 'Please enter the new project name'))
+        self._rename_button.setText(T.tr('dashboard.rename', 'Rename'))
+        self._cancel_button.setText(T.tr('dashboard.cancel', 'Cancel'))
 
 
 class RenameProjectWindow(WindowBase):

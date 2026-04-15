@@ -1,9 +1,9 @@
 import sys
 import json
 import subprocess
-from PySide6.QtWidgets import *
-from PySide6.QtCore import *
 from PySide6.QtGui import *
+from PySide6.QtCore import *
+from PySide6.QtWidgets import *
 from pygamestudio.game.object.type import *
 from pygamestudio.game.object.rect import *
 from pygamestudio.game.object.canvas import *
@@ -11,8 +11,9 @@ from pygamestudio.game.object.text import *
 from pygamestudio.game.object.ellipse import *
 from pygamestudio.game.object.line import *
 from pygamestudio.common.utils.config import *
-
 from pygamestudio.gui.console.logger import Logger
+from pygamestudio.common.i18n.translator import Translator as T
+
 
 class GameManager(QObject):
     scene_saved_signal = Signal()
@@ -86,7 +87,7 @@ class GameManager(QObject):
     def _reset(self):
         self._is_cut = False
         self._project_path = ''
-        self._current_scene_file_path = ''          # 从project.pygs中获取
+        self._current_scene_file_path = ''
         self._is_current_scene_saved = True
         self._current_scene_object_uuid = ''
         self._clipboard_content = []
@@ -391,7 +392,6 @@ class GameManager(QObject):
 
     def _get_parent_object(self, object_uuid):
         def _get(object_uuid, object_tree_struct):
-            # key = list(object_tree_struct.keys())[0]
             value = list(object_tree_struct.values())[0]
 
             if object_uuid in [list(child_object_tree_struct.keys())[0] for child_object_tree_struct in value['children']]:
@@ -534,7 +534,7 @@ class GameManager(QObject):
             self._paste_for_copy(parent_uuid)
 
     def _paste_for_cut(self, parent_uuid):
-        # Can't paste to the object or its children.
+        # Don't paste to the cut object or its children.
         for object_tree_struct in self._clipboard_content:
             if self._get_object_tree_struct(parent_uuid, object_tree_struct):
                 self._clipboard_content.clear()
@@ -549,14 +549,12 @@ class GameManager(QObject):
         self._undo_stack.beginMacro('Cut')
         for object_tree_struct in self._clipboard_content:
             object_uuid = list(object_tree_struct.keys())[0]
-            # self._delete_object_tree_struct(object_uuid)
 
             original_parent_uuid = self._get_parent_uuid(object_uuid)
             inserted_pos = self._get_inserted_pos(object_uuid)
             self._undo_stack.push(DeleteObjectCommand(self, original_parent_uuid, object_tree_struct, inserted_pos))
         
         for new_object_tree_struct in deep_copy_clipboard_content:
-            # self._add_object_tree_struct(parent_uuid, object_tree_struct)
             self._undo_stack.push(AddObjectCommand(self, parent_uuid, new_object_tree_struct, -1))
         self._undo_stack.endMacro()
 
@@ -623,7 +621,6 @@ class GameManager(QObject):
 
         self._undo_stack.beginMacro('Duplicate')
         for parent_uuid, new_object_tree_struct in content_to_duplicate:
-            # self._add_object_tree_struct(parent_uuid, new_object_tree_struct)
             self._undo_stack.push(AddObjectCommand(self, parent_uuid, new_object_tree_struct, -1))
         self._undo_stack.endMacro()
 
@@ -649,8 +646,6 @@ class GameManager(QObject):
             object_tree_struct = self._get_object_tree_struct(object_uuid)
             object_tree_struct_list_to_delete.append(object_tree_struct)
             object_uuid_list_to_delete.append(object_uuid)
-            # self._delete_object_tree_struct(object_uuid)
-            # 确定inserted_pos
 
             parent_uuid = self._get_parent_uuid(object_uuid)
             inserted_pos = self._get_inserted_pos(object_uuid)
@@ -688,7 +683,7 @@ class GameManager(QObject):
     
     def _save_scene(self):
         if not self._current_scene_file_path:
-            self._current_scene_file_path, _ = QFileDialog.getSaveFileName(None, 'Save File', self._project_path, 'Files (*.scene)')
+            self._current_scene_file_path, _ = QFileDialog.getSaveFileName(QApplication.activeWindow(), T.tr('dialog.save_title', 'Save File'), self._project_path, f"{T.tr('dialog.format', 'Format')} (*.scene)")
             if not self._current_scene_file_path:
                 return
         
@@ -704,14 +699,14 @@ class GameManager(QObject):
         with open(self._current_scene_file_path, 'w', encoding='utf-8') as f:
             json.dump(self._all_object_tree_struct, f, default=_default, indent=4, ensure_ascii=False)
 
-        Logger.info('场景已保存')
+        Logger.info('Scene saved')
         
     def load_scene(self, current_scene_file_path):
         return self._load_scene(current_scene_file_path)
     
     def _load_scene(self, current_scene_file_path):
         if not self._is_current_scene_saved:
-            choice = QMessageBox.warning(None, '保存提醒', '当前场景数据已修改，是否保存？', QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel)
+            choice = QMessageBox.warning(QApplication.activeWindow(), T.tr('message_box.warning_title', 'Warning'), T.tr('message_box.warning_scene_save_content', 'The current scene data has been modified. Do you want to save it?'), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel)
             if choice == QMessageBox.StandardButton.Cancel:
                 return
             
@@ -766,13 +761,13 @@ class GameManager(QObject):
                 stderr=None,
                 shell=False
             )
-            Logger.info(f'启动项目{Path(self._project_path).name}')
+            Logger.info(f'Run Project{Path(self._project_path).name}')
         except Exception as e:
-            Logger.error(f'启动项目失败: {e}')
+            Logger.error(f'Failed to run project{Path(self._project_path).name}: {e}')
 
 
 class AddObjectCommand(QUndoCommand):
-    def __init__(self, game_manager, parent_uuid, object_tree_struct, inserted_pos, description='Added an object'):
+    def __init__(self, game_manager, parent_uuid, object_tree_struct, inserted_pos, description=''):
         super().__init__(description)
         self._game_manager = game_manager
         self._parent_uuid = parent_uuid
@@ -787,7 +782,7 @@ class AddObjectCommand(QUndoCommand):
 
 
 class DeleteObjectCommand(QUndoCommand):
-    def __init__(self, game_manager, parent_uuid, object_tree_struct, inserted_pos, description='Deleted an item'):
+    def __init__(self, game_manager, parent_uuid, object_tree_struct, inserted_pos, description=''):
         super().__init__(description)
         self._game_manager = game_manager
         self._parent_uuid = parent_uuid
@@ -802,7 +797,7 @@ class DeleteObjectCommand(QUndoCommand):
 
 
 class UpdateAttrValueCommand(QUndoCommand):
-    def __init__(self, game_manager, obj, attr, old_value, new_value, descripton='Updated value'):
+    def __init__(self, game_manager, obj, attr, old_value, new_value, descripton=''):
         super().__init__(descripton)
         self._game_manager = game_manager
         self._obj = obj

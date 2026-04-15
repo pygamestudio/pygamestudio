@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout
+from pygamestudio.gui.asset.widget import *
 from pygamestudio.gui.asset.tree import AssetTreeView
 from pygamestudio.gui.asset.search import SearchLineEdit
-from pygamestudio.gui.asset.widget import *
 
 
 class AssetWindow(QWidget):

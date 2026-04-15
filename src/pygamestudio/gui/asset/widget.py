@@ -1,10 +1,10 @@
-from PySide6.QtWidgets import *
 from PySide6.QtGui import *
 from PySide6.QtCore import *
-
+from PySide6.QtWidgets import *
 from pygamestudio.gui.asset.type import *
 from pygamestudio.common.utils.path import RES_PATH
-
+from pygamestudio.common.utils.config import get_project_config
+from pygamestudio.common.i18n.translator import Translator as T
 
 class RefreshAssetButton(QPushButton):
     def __init__(self, parent=None):
@@ -37,7 +37,6 @@ class SortAssetButton(QPushButton):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._sort_type = SORT_BY_NAME_ASC  # 项目配置文件
         self._set_up()
 
     def _set_up(self):
@@ -65,26 +64,27 @@ class SortAssetButton(QPushButton):
         super().mousePressEvent(event)
 
     def _show_context_menu(self, pos):
+        config_sort_type = get_project_config()['asset']['sort_type']
         menu = QMenu()
 
         action_group = QActionGroup(self)
         action_group.setExclusive(True)
 
         action_text_list = [
-            ('按名称(升序)', SORT_BY_NAME_ASC), 
-            ('按名称(降序)', SORT_BY_NAME_DESC),
-            ('按类型(升序)', SORT_BY_TYPE_ASC),
-            ('按类型(降序)', SORT_BY_TYPE_DESC),
-            ('按大小(升序)', SORT_BY_SIZE_ASC),
-            ('按大小(降序)', SORT_BY_SIZE_DESC),
-            ('按修改时间(升序)', SORT_BY_TIME_ASC),
-            ('按修改时间(降序)', SORT_BY_TIME_DESC),
+            (T.tr('asset.sort_by_name_asc', 'Sort By Name (ASC)'), SORT_BY_NAME_ASC), 
+            (T.tr('asset.sort_by_name_desc', 'Sort By Name (DESC)'), SORT_BY_NAME_DESC),
+            (T.tr('asset.sort_by_type_asc', 'Sort By Type (ASC)'), SORT_BY_TYPE_ASC),
+            (T.tr('asset.sort_by_type_desc', 'Sort By Type (DESC)'), SORT_BY_TYPE_DESC),
+            (T.tr('asset.sort_by_size_asc', 'Sort By Size (ASC)'), SORT_BY_SIZE_ASC),
+            (T.tr('asset.sort_by_size_desc', 'Sort By Size (DESC)'), SORT_BY_SIZE_DESC),
+            (T.tr('asset.sort_by_time_asc', 'Sort By Time (ASC)'), SORT_BY_TIME_ASC),
+            (T.tr('asset.sort_by_time_desc', 'Sort By Time (DESC)'), SORT_BY_TIME_DESC),
         ]
         for (text, sort_type) in action_text_list:
             action = QAction(text, self)
             action.setData(sort_type)
             action.setCheckable(True)
-            action.setChecked(True) if sort_type == self._sort_type else action.setChecked(False)
+            action.setChecked(True) if sort_type == config_sort_type else action.setChecked(False)
             action.triggered.connect(self._set_sort_type)
             menu.addAction(action)
             action_group.addAction(action)
@@ -92,8 +92,8 @@ class SortAssetButton(QPushButton):
         menu.exec(self.mapToGlobal(pos))
 
     def _set_sort_type(self):
-        self._sort_type = self.sender().data()
-        self.sort_signal.emit(self._sort_type)
+        sort_type = self.sender().data()
+        self.sort_signal.emit(sort_type)
 
 
 class CreateAssetButton(QPushButton):
@@ -125,11 +125,11 @@ class CreateAssetButton(QPushButton):
 
     def _show_context_menu(self, pos):
         create_menu = QMenu()
-        text_file_sub_menu = QMenu(title='文本文件')
+        text_file_sub_menu = QMenu(title=T.tr('menu.text_file', 'Text File'))
 
-        create_folder_action = QAction('文件夹', self)
-        create_script_action = QAction('脚本', self)
-        create_scene_action = QAction('场景', self)
+        create_folder_action = QAction(T.tr('menu.folder', 'Folder'), self)
+        create_script_action = QAction(T.tr('menu.script', 'Script'), self)
+        create_scene_action = QAction(T.tr('menu.scene', 'Scene'), self)
         create_txt_action = QAction('TXT', self)
         create_json_action = QAction('JSON', self)
 

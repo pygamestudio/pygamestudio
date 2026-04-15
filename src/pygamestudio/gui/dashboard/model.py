@@ -1,8 +1,7 @@
-from PySide6.QtWidgets import *
-from PySide6.QtCore import *
-from PySide6.QtGui import *
-
 from datetime import datetime
+from PySide6.QtGui import *
+from PySide6.QtCore import *
+from PySide6.QtWidgets import *
 from pygamestudio.gui.dashboard.type import *
 
 

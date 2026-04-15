@@ -5,7 +5,6 @@ from pygamestudio.gui.console.logger import Logger
 from pygamestudio.common.utils.path import LANG_PATH
 
 
-# 设计成单例
 class Translator:
     toggle_language_signal = Signal()
     instance = None
@@ -20,6 +19,7 @@ class Translator:
             super().__init__()
             self.initialized = True
             self.current_lang = 'en'
+            self.observers = []
             self.lang_dict = {}
 
     @staticmethod
@@ -27,7 +27,7 @@ class Translator:
         lang_file = LANG_PATH / f'{lang_code}.json'
         
         if not lang_file.exists():
-            Logger.error('找不到对应的语言文件，请检查下是否被删除了？')
+            Logger.error(f"Couldn't find {lang_code}.json")
             return
         
         instance = Translator.get_instance()
@@ -37,13 +37,14 @@ class Translator:
                 instance.lang_dict = json.load(f)
                 instance.current_language = lang_code
         except Exception as e:
-            Logger.error(f'语言文件加载失败: {e}')
+            Logger.error(f'Failed to load {lang_code}.json: {e}')
 
     @staticmethod
     def toggle_language(lang_code):
         instance = Translator.get_instance()
         instance.load_language(lang_code)
-        instance.toggle_language_signal.emit()
+        for observer in instance.observers:
+            observer.retranslate()
 
     @staticmethod
     def get_instance():
@@ -52,8 +53,31 @@ class Translator:
         return Translator.instance
     
     @staticmethod
-    def tr(key, default=''):
+    def tr(key, default='') -> str:
         instance = Translator.get_instance()
-        return instance.lang_dict.get(key, default)
-
+        
+        keys = key.split('.')
+        value = instance.lang_dict
+        
+        try:
+            for k in keys:
+                value = value[k]
+            return value
+        except Exception:
+            return default
     
+    @staticmethod
+    def get_available_languages():
+        return [f.stem for f in LANG_PATH.glob('*.json')]
+    
+    @staticmethod
+    def add_observer(target):
+        instance = Translator.get_instance()
+        instance.observers.append(target)
+
+    # @staticmethod
+    # def clean_up():
+    #     instance = Translator.get_instance()
+    #     instance.current_lang = 'en'
+    #     instance.observers = []
+    #     instance.lang_dict = {}

@@ -1,7 +1,6 @@
-from PySide6.QtWidgets import *
-from PySide6.QtCore import *
 from PySide6.QtGui import *
-
+from PySide6.QtCore import *
+from PySide6.QtWidgets import *
 from pygamestudio.gui.console.type import *
 from pygamestudio.common.utils.path import RES_PATH
 

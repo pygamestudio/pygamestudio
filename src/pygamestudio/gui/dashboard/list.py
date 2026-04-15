@@ -1,17 +1,16 @@
-from PySide6.QtWidgets import *
-from PySide6.QtCore import *
-from PySide6.QtGui import *
-
+import shutil
 from datetime import datetime
-from pygamestudio.common.utils.path import RES_PATH
+from PySide6.QtGui import *
+from PySide6.QtCore import *
+from PySide6.QtWidgets import *
+from pygamestudio.gui.dashboard.type import *
+from pygamestudio.gui.dashboard.config import *
 from pygamestudio.gui.dashboard.menu import ContextMenu
 from pygamestudio.gui.dashboard.delegate import DashboardDelegate
 from pygamestudio.gui.dashboard.dialog import CreatePorjectWindow, RenameProjectWindow
-from pygamestudio.gui.dashboard.config import *
-from pygamestudio.gui.dashboard.type import *
 from pygamestudio.gui.dashboard.model import DashboardSortFilterProxyModel
-import shutil
-
+from pygamestudio.common.utils.path import RES_PATH
+from pygamestudio.common.i18n.translator import Translator as T
 
 class DashboardListView(QListView):
     open_project_signal = Signal(str)
@@ -139,12 +138,12 @@ class DashboardListView(QListView):
         return self._import_project()
 
     def _import_project(self):
-        project_path = QFileDialog.getExistingDirectory(self, '请选择项目', '.', QFileDialog.Option.ReadOnly)
+        project_path = QFileDialog.getExistingDirectory(self, T.tr('dialog.get_dir_title', 'Select Project'), '.', QFileDialog.Option.ReadOnly)
         if not project_path:
             return
 
         if not (Path(project_path) / 'project.pygs').exists():
-            QMessageBox.critical(self, '错误', '项目打开失败，没有找到project.pygs文件')
+            QMessageBox.critical(self, T.tr('message_box.critical_title', 'Error'), T.tr('message_box.critical_open_project', "Failed to open the project. Couldn't find project.pygs."))
             return
         
         project_data = {
@@ -159,7 +158,7 @@ class DashboardListView(QListView):
     def _open_project(self, index):
         project_path = index.data(self.ProjectPathRole)
         if not Path(project_path).exists():
-            QMessageBox.critical(self, '错误', '找不到项目文件')
+            QMessageBox.critical(self, T.tr('message_box.critical_title', 'Error'), T.tr('message_box.critical_find_project', "Couldn't find the project."))
             return
         
         self.open_project_signal.emit(project_path)
@@ -173,7 +172,7 @@ class DashboardListView(QListView):
     def _show_rename_project_window(self, index):
         project_path = index.data(self.ProjectPathRole)
         if not Path(project_path).exists():
-            QMessageBox.critical(self, '错误', '找不到项目文件')
+            QMessageBox.critical(self, T.tr('message_box.critical_title', 'Error'), T.tr('message_box.critical_find_project', "Couldn't find the project."))
             return
         
         self._rename_project_window.set_index_and_old_project_path(index, project_path)
@@ -188,7 +187,7 @@ class DashboardListView(QListView):
         item.setData(Path(new_project_path).as_posix(), self.ProjectPathRole)
         
     def _delete_project(self, index):
-        chocie = QMessageBox.question(self, '请确认', '是否删除该项目？', QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        chocie = QMessageBox.question(self, T.tr('message_box.question_title', 'Confirm'), T.tr('message_box.question_delete_project_content', 'Delete the project?'), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if chocie == QMessageBox.StandardButton.No:
             return
         
@@ -222,7 +221,6 @@ class DashboardListView(QListView):
         return super().enterEvent(event)
     
     def paintEvent(self, event):
-        """重写绘制事件"""
         super().paintEvent(event)
         
         model = self.model()
@@ -236,6 +234,6 @@ class DashboardListView(QListView):
             painter.setFont(font)
             
             rect = self.viewport().rect()
-            painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, '目前你还没有任何项目\n请点击按钮创建或导入')
+            painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, T.tr('message_box.create_project_guide', "You don't have any projects yet.\nPlease click the button to create or import one."))
             
             painter.restore()

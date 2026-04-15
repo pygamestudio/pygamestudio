@@ -1,7 +1,8 @@
-from PySide6.QtWidgets import QApplication, QMenu
 from PySide6.QtGui import QAction
 from PySide6.QtCore import Signal
+from PySide6.QtWidgets import QMenu
 from pygamestudio.gui.asset.type import *
+from pygamestudio.common.i18n.translator import Translator as T
 
 
 class ContextMenu(QMenu):
@@ -24,24 +25,24 @@ class ContextMenu(QMenu):
         self._tree_view = parent
 
     def _add_actions(self, index_type):
-        edit_action = QAction('编辑', self)
-        create_folder_action = QAction('文件夹', self)
-        create_script_action = QAction('脚本', self)
-        create_scene_action = QAction('场景', self)
+        edit_action = QAction(T.tr('menu.edit', 'Edit'), self)
+        create_folder_action = QAction(T.tr('menu.folder', 'Folder'), self)
+        create_script_action = QAction(T.tr('menu.script', 'Script'), self)
+        create_scene_action = QAction(T.tr('menu.scene', 'Scene'), self)
         create_txt_action = QAction('TXT', self)
         create_json_action = QAction('JSON', self)
-        cut_action = QAction('剪切', self)
-        copy_action = QAction('复制', self)
-        paste_action = QAction('粘贴', self)
-        delete_action = QAction('删除', self)
-        rename_action = QAction('重命名', self)
-        duplicate_action = QAction('生成副本', self)
-        copy_uuid_action = QAction('复制UUID', self)
-        copy_path_action = QAction('复制路径', self)
-        copy_name_action = QAction('复制名称', self)
-        open_in_terminal_action = QAction('在终端中打开', self)
-        open_externally_action = QAction('在外部程序中打开', self)
-        show_in_explorer_action = QAction('在文件管理器中显示', self)
+        cut_action = QAction(T.tr('menu.cut', 'Cut'), self)
+        copy_action = QAction(T.tr('menu.copy', 'Copy'), self)
+        paste_action = QAction(T.tr('menu.paste', 'Paste'), self)
+        delete_action = QAction(T.tr('menu.delete', 'Delete'), self)
+        rename_action = QAction(T.tr('menu.rename', 'Rename'), self)
+        duplicate_action = QAction(T.tr('menu.duplicate', 'Duplicate'), self)
+        copy_uuid_action = QAction(T.tr('menu.copy_uuid', 'Copy UUID'), self)
+        copy_path_action = QAction(T.tr('menu.copy_path', 'Copy Path'), self)
+        copy_name_action = QAction(T.tr('menu.copy_name', 'Copy Name'), self)
+        open_in_terminal_action = QAction(T.tr('menu.open_in_terminal', 'Open in Terminal'), self)
+        open_externally_action = QAction(T.tr('menu.open_externally', 'Open Externally'), self)
+        show_in_explorer_action = QAction(T.tr('menu.show_in_explorer', 'Show in Explorer'), self)
 
         edit_action.triggered.connect(self.open_externally_signal.emit)
         create_folder_action.triggered.connect(lambda: self.create_signal.emit(INDEX_FOLDER))
@@ -62,8 +63,8 @@ class ContextMenu(QMenu):
         open_externally_action.triggered.connect(self.open_externally_signal.emit)
         show_in_explorer_action.triggered.connect(self.show_in_explorer_signal.emit)
         
-        create_menu = QMenu(title='创建')
-        text_file_sub_menu = QMenu(title='文本文件')
+        create_menu = QMenu(title=T.tr('menu.create', 'Create'))
+        text_file_sub_menu = QMenu(title=T.tr('menu.text_file', 'Text File'))
 
         # Create actions are for all index types.
         self.addMenu(create_menu)
@@ -95,7 +96,7 @@ class ContextMenu(QMenu):
             self.addAction(delete_action)
 
             self.addSeparator()
-            copy_menu = QMenu(title='复制路径 | 名称 | UUID')
+            copy_menu = QMenu(title=T.tr('menu.copy_menu_title', 'Copy Path | Name | UUID'))
             copy_menu.addAction(copy_path_action)
             copy_menu.addAction(copy_name_action)
             copy_menu.addAction(copy_uuid_action)

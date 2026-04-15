@@ -4,6 +4,7 @@
     "screen_height": 600,
     "screen_size": [800, 600],
     "asset": {
-        "current_scene": ""
+        "current_scene": "",
+        "sort_type: 1,
     }
 }

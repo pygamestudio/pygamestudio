@@ -1,8 +1,8 @@
 from PySide6.QtWidgets import *
-from pygamestudio.gui.console.browser import ConsoleLogBrowser
-from pygamestudio.gui.console.search import SearchLineEdit
-from pygamestudio.gui.console.widget import *
 from pygamestudio.gui.console.type import *
+from pygamestudio.gui.console.widget import *
+from pygamestudio.gui.console.search import SearchLineEdit
+from pygamestudio.gui.console.browser import ConsoleLogBrowser
 
 
 class ConsoleWindow(QWidget):

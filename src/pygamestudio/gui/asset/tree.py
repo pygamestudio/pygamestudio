@@ -1,17 +1,16 @@
-from PySide6.QtWidgets import *
-from PySide6.QtCore import *
-from PySide6.QtGui import *
-
-from pygamestudio.gui.asset.menu import ContextMenu
-from pygamestudio.gui.asset.command import *
-from pygamestudio.gui.asset.model import *
-
-from pygamestudio.gui.asset.delegate import AssetTreeWidgetDelegate
-from pygamestudio.gui.asset.type import *
-from pathlib import Path
-import subprocess
-import platform
 import shutil
+import platform
+import subprocess
+from pathlib import Path
+from PySide6.QtGui import *
+from PySide6.QtCore import *
+from PySide6.QtWidgets import *
+from pygamestudio.gui.asset.type import *
+from pygamestudio.gui.asset.model import *
+from pygamestudio.gui.asset.menu import ContextMenu
+from pygamestudio.gui.asset.delegate import AssetTreeWidgetDelegate
+from pygamestudio.common.i18n.translator import Translator as T
+from pygamestudio.common.utils.config import get_project_config, update_project_config
 
 
 class AssetTreeView(QTreeView):
@@ -24,13 +23,12 @@ class AssetTreeView(QTreeView):
         self._delegate = AssetTreeWidgetDelegate(self, self._proxy_model, self._file_model, game_manager)
 
         self._root_path = ''
-        self._sort_type = SORT_BY_NAME_ASC     # 项目配置文件
-        self._clipboard_content = []
         self._is_cut = False
         self._expand_state = {}
-
         self._is_connected = False
+        self._clipboard_content = []
         self._highlight_indexes_paths = []
+        self._sort_type = SORT_BY_NAME_ASC
 
         self._set_up()
 
@@ -47,7 +45,7 @@ class AssetTreeView(QTreeView):
         self._proxy_model.setDynamicSortFilter(True)
         self._proxy_model.setSourceModel(self._file_model)
         self._proxy_model.setRecursiveFilteringEnabled(True)
-        self._proxy_model.sort(0, Qt.SortOrder.AscendingOrder)  # 项目配置文件
+        self._proxy_model.sort(0, Qt.SortOrder.AscendingOrder)
         self._proxy_model.setFilterCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
         
         self.setModel(self._proxy_model)
@@ -136,12 +134,12 @@ class AssetTreeView(QTreeView):
     
     def _reset(self):
         self._clear_highlight_items()
-        self._sort_type = SORT_BY_NAME_ASC     # 项目配置文件
-        self._clipboard_content = []
         self._is_cut = False
         self._expand_state = {}
         self._is_connected = False
+        self._clipboard_content = []
         self._highlight_indexes_paths = []
+        self._sort_type = SORT_BY_NAME_ASC
         self._root_path = ''
         self._file_model.setRootPath(self._root_path)
         self.setRootIndex(self._proxy_model.mapFromSource(self._file_model.index(self._root_path)))
@@ -149,6 +147,7 @@ class AssetTreeView(QTreeView):
     def get_ready_for_project(self):
         self._root_path = self._game_manager.get_project_path()
         self._file_model.setRootPath(self._root_path)
+        self._sort_type = get_project_config()['asset']['sort_type']
         self.setRootIndex(self._proxy_model.mapFromSource(self._file_model.index(self._root_path)))
 
     def clean_up(self):
@@ -221,8 +220,8 @@ class AssetTreeView(QTreeView):
         indexes_to_delete = [index for index in selected_indexes if is_to_delete(index, selected_indexes)]
         index_names = [index.data(Qt.ItemDataRole.DisplayRole) for index in indexes_to_delete]
 
-        content = '确定要删除这 {} 个项目吗？此操作不可撤销。\n{}'.format(str(len(indexes_to_delete)), ('\n').join(index_names))
-        reply = QMessageBox.question(self, '请确认...', content, QMessageBox.Yes | QMessageBox.No)
+        content = T.tr('message_box.question_delete_item_content', 'Delete {} item(s)? This cannot be undone.\n{}').format(str(len(indexes_to_delete)), ('\n').join(index_names))
+        reply = QMessageBox.question(self, T.tr('message_box.question_title', 'Confirm'), content, QMessageBox.Yes | QMessageBox.No)
 
         if reply == QMessageBox.StandardButton.No:
             return
@@ -306,8 +305,8 @@ class AssetTreeView(QTreeView):
             return
         
         repetitive_asset_names = [ele[0].name for ele in repetitive_assets_paths]
-        content = '有以下重复资源，是否覆盖？\n{}'.format(('\n').join(repetitive_asset_names))
-        reply = QMessageBox.question(self, '请确认...', content, QMessageBox.Yes | QMessageBox.No)
+        content = T.tr('message_box.question_overwrite_content', 'Overwrite the following duplicate resources?\n{}').format(('\n').join(repetitive_asset_names))
+        reply = QMessageBox.question(self, T.tr('message_box.question_title', 'Confirm'), content, QMessageBox.Yes | QMessageBox.No)
 
         if reply == QMessageBox.StandardButton.Yes:
             for ele in repetitive_assets_paths:
@@ -371,9 +370,9 @@ class AssetTreeView(QTreeView):
             try:
                 subprocess.Popen(['gnome-terminal', '--working-directory', target_path])
             except:
-                QMessageBox.information(self, '提示', '不支持的操作系统')
+                QMessageBox.information(self, T.tr('message_box.information_title', 'Info'), T.tr('message_box.information_os_content', 'Unsupported Operating System'))
         else:
-            QMessageBox.information(self, '提示', '不支持的操作系统')
+            QMessageBox.information(self, T.tr('message_box.information_title', 'Info'), T.tr('message_box.information_os_content', 'Unsupported Operating System'))
 
     def _open_externally(self):
         """Open with VS Code by default. If it's not installed, open with txt."""
@@ -384,19 +383,18 @@ class AssetTreeView(QTreeView):
         system = platform.system()
         if system == 'Windows':
             subprocess.Popen(['notepad', target_path])
-            # subprocess.Popen(['code', target_item_path])
+            # subprocess.Popen(['code', target_path])
         elif system == 'Darwin':
             subprocess.Popen(['open', '-a', 'TextEdit', target_path])
-            # subprocess.Popen(['open', '-a', 'Visual Studio Code', target_item_path])
-
+            # subprocess.Popen(['open', '-a', 'Visual Studio Code', target_path])
         elif system == 'Linux':
-            # subprocess.Popen(['code', target_item_path])
+            # subprocess.Popen(['code', target_path])
             try:
                 subprocess.Popen(['gedit', target_path])
             except FileNotFoundError:
                 subprocess.Popen(['xdg-open', target_path])
         else:
-            QMessageBox.information(self, '提示', '不支持的操作系统')
+            QMessageBox.information(self, T.tr('message_box.information_title', 'Info'), T.tr('message_box.information_os_content', 'Unsupported Operating System'))
 
     def _show_in_explorer(self):
         selected_indexes = self.selectedIndexes()
@@ -410,7 +408,7 @@ class AssetTreeView(QTreeView):
         elif system == 'Linux':
             subprocess.Popen(["xdg-open", target_path])
         else:
-            QMessageBox.information(self, '提示', '不支持的操作系统')
+            QMessageBox.information(self, T.tr('message_box.information_title', 'Info'), T.tr('message_box.information_os_content', 'Unsupported Operating System'))
 
     def _drop_indexes(self, parent_path, source_paths, is_internal_drag):
         repetitive_assets_paths = []
@@ -430,8 +428,8 @@ class AssetTreeView(QTreeView):
             return
         
         repetitive_asset_names = [ele[0].name for ele in repetitive_assets_paths]
-        content = '有以下重复资源，是否覆盖？\n{}'.format(('\n').join(repetitive_asset_names))
-        reply = QMessageBox.question(self, '请确认...', content, QMessageBox.Yes | QMessageBox.No)
+        content = T.tr('message_box.question_overwrite_content', 'Overwrite the following duplicate resources?\n{}').format(('\n').join(repetitive_asset_names))
+        reply = QMessageBox.question(self, T.tr('message_box.question_title', 'Confirm'), content, QMessageBox.Yes | QMessageBox.No)
 
         if reply == QMessageBox.StandardButton.Yes:
             for ele in repetitive_assets_paths:
@@ -525,6 +523,7 @@ class AssetTreeView(QTreeView):
     def set_sort_type(self, sort_type):
         self._sort_type = sort_type
         self._proxy_model.invalidate()
+        update_project_config('asset.sort_type', sort_type)
 
     def drawRow(self, painter, options, index):
         index_path = Path(self._file_model.filePath(self._proxy_model.mapToSource(index)))
