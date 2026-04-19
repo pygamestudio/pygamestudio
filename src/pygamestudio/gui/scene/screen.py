@@ -39,7 +39,7 @@ class PygameScreen(QWidget):
         self._game_manager.object_moved.connect(self._update_scene)
         self._game_manager.object_scaled.connect(self._update_scene)
         self._game_manager.object_rotated.connect(self._update_scene)
-        self._game_manager.object_resized.connect(self._update_scene)
+        self._game_manager.object_resized.connect(self._on_object_resized)
         self._game_manager.object_showed.connect(self._update_scene)
         self._game_manager.object_hidden.connect(self._update_scene)
         self._game_manager.object_color_changed.connect(self._update_scene)
@@ -79,7 +79,15 @@ class PygameScreen(QWidget):
         # Delete all selected objects.
         selected_uuids = self._game_manager.get_selected_objects_uuids()
         self._game_manager.delete(selected_uuids)
-        
+
+    def _on_object_resized(self, object_uuid):
+        if object_uuid == self._game_manager.canvas_object_uuid:
+            obj = self._game_manager.get_object(object_uuid)
+            self.setFixedSize(obj.width, obj.height)
+            self._screen_surface = pygame.Surface((obj.width, obj.height))
+
+        self._update_scene()
+    
     def _update_scene(self):
         if self._game_manager.is_empty():
             self._screen_surface.fill((0, 0, 0))

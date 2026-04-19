@@ -103,7 +103,6 @@ class HierarchyTreeView(QTreeView):
         self._game_manager.object_renamed.connect(self._on_object_renamed)
         self._game_manager.object_deleted.connect(self._on_object_deleted)
         self._game_manager.object_cut.connect(self._on_object_cut)
-        self._game_manager.object_copied.connect(self._on_object_copied)
         self._game_manager.object_showed.connect(self._on_object_showed)
         self._game_manager.object_hidden.connect(self._on_object_hidden)
 
@@ -174,14 +173,8 @@ class HierarchyTreeView(QTreeView):
             self._game_manager.collapse(item_uuid)
 
     def get_ready_for_project(self):
-        # Select the items that were selected from last time.
-        # self.selectionModel().blockSignals(True)
-        # selected_objects_uuids = self._game_manager.get_selected_objects_uuids()
-        # for object_uuid in selected_objects_uuids:
-        #     item = self._get_matched_item(object_uuid)
-        #     index = self._proxy_model.mapFromSource(self._standard_model.indexFromItem(item))
-        #     self.selectionModel().select(index, QItemSelectionModel.SelectionFlag.Select)
-        # self.selectionModel().blockSignals(False)
+        # No selection at start.
+        self.selectionModel().clearSelection()
 
         # Restore the expanded / collapsed status from last time.
         self.blockSignals(True)
@@ -248,9 +241,9 @@ class HierarchyTreeView(QTreeView):
         index = self._proxy_model.mapFromSource(self._standard_model.indexFromItem(item))
 
         # Ensure that the is_selected property of objects is not changed while loading the scene file.
-        if self._game_manager.is_project_ready:
-            self.setCurrentIndex(index)
-            self.scrollTo(index)
+        # if self._game_manager.is_project_ready:
+        self.setCurrentIndex(index)
+        self.scrollTo(index)
 
     def _cut(self):
         selected_indexes = self.selectedIndexes()
@@ -280,10 +273,6 @@ class HierarchyTreeView(QTreeView):
 
         self._game_manager.copy(item_uuid_list)
 
-    def _on_object_copied(self):
-        # self.viewport().update()
-        ...
-
     def _paste(self):
         selected_indexes = self.selectedIndexes()
         if selected_indexes:
@@ -293,9 +282,6 @@ class HierarchyTreeView(QTreeView):
         
         parent_uuid = parent_item.data(Qt.ItemDataRole.UserRole+1)
         self._game_manager.paste(parent_uuid)
-
-    def _on_object_pasted(self):
-        ...
 
     def _duplicate(self):
         selected_indexes = self.selectedIndexes()
@@ -309,9 +295,6 @@ class HierarchyTreeView(QTreeView):
             item_uuid_list.append(item_uuid)
         
         self._game_manager.duplicate(item_uuid_list)
-
-    def _on_object_duplicated(self):
-        ...
     
     def _delete(self):
         items_to_delete = []

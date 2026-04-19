@@ -165,7 +165,7 @@ class GameManager(QObject):
         obj = self._get_object(object_uuid)
         old_size = (obj.width, obj.height)    
         self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'size', old_size, new_size))
-
+        
     def get_selected_objects_uuids(self):
         selected_uuids = []
         selected_objects = self.get_selected_objects()

@@ -6,7 +6,10 @@ from pygamestudio.gui.inspector.component.checkbox import *
 
 INSPECTOR_LAYOUT_LINE = {
     'visibility': {
-        'text': T.tr('inspector.visibility', 'Visibility'),
+        'i18n': {
+            'key': 'inspector.visibility',
+            'default': 'Visibility'
+        },
         'component': {
             'enabled': [True],
             'attribute': ['is_visible'],
@@ -14,7 +17,10 @@ INSPECTOR_LAYOUT_LINE = {
         }
     },
     'name': {
-        'text': T.tr('inspector.name', 'Name'),
+        'i18n': {
+            'key': 'inspector.name',
+            'default': 'Name'
+        },
         'component': {
             'enabled': [True],
             'attribute': ['name'],
@@ -22,7 +28,10 @@ INSPECTOR_LAYOUT_LINE = {
         }
     },
     'scale': {
-        "text": T.tr('inspector.scale', 'Scale'),
+        'i18n': {
+            'key': 'inspector.scale',
+            'default': 'Scale'
+        },
         'component': {
             'enabled': [True, True],
             'attribute': ['scale_x', 'scale_y'],
@@ -30,7 +39,10 @@ INSPECTOR_LAYOUT_LINE = {
         }
     },
     'angle': {
-        "text": T.tr('inspector.angle', 'Angle'),
+        'i18n': {
+            'key': 'inspector.angle',
+            'default': 'Angle'
+        },
         'component': {
             'enabled': [True],
             'attribute': ['angle'],
@@ -38,7 +50,10 @@ INSPECTOR_LAYOUT_LINE = {
         }
     },
     'color': {
-        "text": T.tr('inspector.color', 'Color'),
+        'i18n': {
+            'key': 'inspector.color',
+            'default': 'Color'
+        },
         'component': {
             'enabled': [True],
             'attribute': ['color'],
@@ -46,7 +61,10 @@ INSPECTOR_LAYOUT_LINE = {
         }
     },
     'start_point': {
-        "text": T.tr('inspector.start_point', 'Start Point'),
+        'i18n': {
+            'key': 'inspector.start_point',
+            'default': 'Start Point'
+        },
         'component': {
             'enabled': [True, True],
             'attribute': ['start_x', 'start_y'],
@@ -54,7 +72,10 @@ INSPECTOR_LAYOUT_LINE = {
         }
     },
     'end_point': {
-        "text": T.tr('inspector.end_point', 'End Point'),
+        'i18n': {
+            'key': 'inspector.end_point',
+            'default': 'End Point'
+        },
         'component': {
             'enabled': [True, True],
             'attribute': ['end_x', 'end_y'],
@@ -62,7 +83,10 @@ INSPECTOR_LAYOUT_LINE = {
         }
     },
     'thickness': {
-        "text": T.tr('inspector.thickness', 'Thickness'),
+        'i18n': {
+            'key': 'inspector.thickness',
+            'default': 'Thickness'
+        },
         'component': {
             'enabled': [True],
             'attribute': ['thickness'],

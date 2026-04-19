@@ -30,6 +30,7 @@ class InspectorWindow(QWidget):
         self.setMinimumWidth(270)
 
     def _set_signal(self):
+        T.add_observer(self)
         # self._game_manager.object_added.connect(self._on_object_added)
         self._game_manager.object_deleted.connect(self._on_object_deleted)
         self._game_manager.object_selected.connect(self._on_object_selected)
@@ -388,7 +389,7 @@ class InspectorWindow(QWidget):
 
     def _add_layout_for_specific_object(self, obj, layout_data):
         for property_detail in layout_data.values():
-            text = property_detail['text']
+            text = T.tr(property_detail['i18n']['key'], property_detail['i18n']['default'])
             attribute_list = property_detail['component']['attribute']
             widget_list = property_detail['component']['widget']
             enabled_list = property_detail['component']['enabled']
@@ -409,3 +410,5 @@ class InspectorWindow(QWidget):
 
             self._inspector_row += row+1
 
+    def retranslate(self):
+        self._inspect_object(self._object_uuid_in_inspection)

@@ -9,10 +9,10 @@
         "warning_title": "Warning",
         "warning_scene_save_content": "The current scene data has been modified. Do you want to save it?",
         "quesiton_title": "Confirm",
-        "question_delete_asset_item_content": "Delete {} item(s)? This cannot be undone.\n{}",
-        "question_delete_hierarchy_item_content": "Delete the selected item(s)?",
-        "question_delete_project_content": "Delete the project?",
-        "question_overwrite_content": "Overwrite the following duplicate resources?\n{}",
+        "question_delete_asset_item_content": "Sure to delete {} item(s)? This cannot be undone.\n{}",
+        "question_delete_hierarchy_item_content": "Sure to delete the selected item(s)?",
+        "question_delete_project_content": "Sure to delete the project?",
+        "question_overwrite_content": "Sure to overwrite the following duplicate resources?\n{}",
         "information_title": "Info",
         "information_os_content": "Unsupported Operating System",
         "critical_title": "Error",
@@ -59,7 +59,8 @@
         "new_scene": "New Scene",
         "save_scene": "Save Scene",
         "save_as": "Save As",
-        "preference": "Preference",
+        "editor_settings": "Editor Settings",
+        "project_settings": "Project Settings",
         "quit": "Quit",
         "undo": "Undo",
         "redo": "Redo",
@@ -102,7 +103,8 @@
     },
 
     "console": {
-        "console": "Console"
+        "console": "Console",
+        "clear": "Clear"
     },
 
     "inspector": {
@@ -113,6 +115,7 @@
         "size": "Size",
         "scale": "Scale",
         "color": "Color",
+        "angle": "Angle",
         "start_point": "Start Point",
         "end_point": "End Point",
         "thickness": "Thickness",
@@ -147,5 +150,13 @@
         "sort_by_name": "Sort by Name",
         "sort_by_path": "Sort by Path",
         "sort": "Sort:"
+    },
+
+    "settings": {
+        "game_screen": "Game Screen",
+        "screen_width": "Screen Width",
+        "screen_height": "Screen Height",
+        "general": "General",
+        "language": "Language"
     }
 }

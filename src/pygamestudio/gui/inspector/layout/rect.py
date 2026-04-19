@@ -6,7 +6,10 @@ from pygamestudio.gui.inspector.component.checkbox import *
 
 INSPECTOR_LAYOUT_RECT = {
     'visibility': {
-        'text': T.tr('inspector.visibility', 'Visibility'),
+        'i18n': {
+            'key': 'inspector.visibility',
+            'default': 'Visibility'
+        },
         'component': {
             'enabled': [True],
             'attribute': ['is_visible'],
@@ -14,7 +17,10 @@ INSPECTOR_LAYOUT_RECT = {
         }
     },
     'name': {
-        'text': T.tr('inspector.name', 'Name'),
+        'i18n': {
+            'key': 'inspector.name',
+            'default': 'Name'
+        },
         'component': {
             'enabled': [True],
             'attribute': ['name'],
@@ -22,7 +28,10 @@ INSPECTOR_LAYOUT_RECT = {
         }
     },
     'pos': {
-        "text": T.tr('inspector.pos', 'Pos'),
+        'i18n': {
+            'key': 'inspector.pos',
+            'default': 'Pos'
+        },
         'component': {
             'enabled': [True, True],
             'attribute': ['x', 'y'],
@@ -30,7 +39,10 @@ INSPECTOR_LAYOUT_RECT = {
         }
     },
     'size': {
-        "text": T.tr('inspector.size', 'Size'),
+        'i18n': {
+            'key': 'inspector.size',
+            'default': 'Size'
+        },
         'component': {
             'enabled': [True, True],
             'attribute': ['width', 'height'],
@@ -38,7 +50,10 @@ INSPECTOR_LAYOUT_RECT = {
         }
     },
     'scale': {
-        "text": T.tr('inspector.scale', 'Scale'),
+        'i18n': {
+            'key': 'inspector.scale',
+            'default': 'Scale'
+        },
         'component': {
             'enabled': [True, True],
             'attribute': ['scale_x', 'scale_y'],
@@ -46,7 +61,10 @@ INSPECTOR_LAYOUT_RECT = {
         }
     },
     'angle': {
-        "text": T.tr('inspector.angle', 'Angle'),
+        'i18n': {
+            'key': 'inspector.angle',
+            'default': 'Angle'
+        },        
         'component': {
             'enabled': [True],
             'attribute': ['angle'],
@@ -54,7 +72,10 @@ INSPECTOR_LAYOUT_RECT = {
         }
     },
     'color': {
-        "text": T.tr('inspector.color', 'Color'),
+        'i18n': {
+            'key': 'inspector.color',
+            'default': 'Color'
+        },
         'component': {
             'enabled': [True],
             'attribute': ['color'],
@@ -62,7 +83,10 @@ INSPECTOR_LAYOUT_RECT = {
         }
     },
     'border_radius': {
-        "text": T.tr('inspector.border_radius', 'Border Radius'),
+        'i18n': {
+            'key': 'inspector.border_radius',
+            'default': 'Border Radius'
+        },
         'component': {
             'enabled': [True, True, True, True],
             'attribute': ['border_top_left_radius', 'border_top_right_radius', 'border_bottom_left_radius', 'border_bottom_right_radius'],

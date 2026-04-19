@@ -1,0 +1,162 @@
+{
+    "dialog": {
+        "save_title": "保存文件",
+        "format": "格式",
+        "get_dir_title": "选择项目"
+    },
+
+    "message_box": {
+        "warning_title": "警告",
+        "warning_scene_save_content": "当前场景数据已被修改，是否保存？",
+        "quesiton_title": "确认",
+        "question_delete_asset_item_content": "是否删除这{}项？此操作无法撤销。\n{}",
+        "question_delete_hierarchy_item_content": "是否删除选中的对象？",
+        "question_delete_project_content": "是否删除该项目？",
+        "question_overwrite_content": "是否覆盖以下重复资源？\n{}",
+        "information_title": "提示",
+        "information_os_content": "不支持的操作系统",
+        "critical_title": "错误",
+        "critical_read_qss_content": "主题QSS文件{}.qss不存在！",
+        "critical_save_project_list_content": "保存项目列表失败：{}",
+        "critical_not_list_content": "配置文件格式无效，应为列表格式。",
+        "critical_corrupted_json_content": "配置文件已损坏，解析JSON失败。",
+        "critical_failed_to_load_content": "加载项目失败：{}",
+        "critical_rename_content": "重命名失败：{}",
+        "critical_open_project": "打开项目失败，找不到project.pygs。",
+        "critical_find_project": "找不到该项目。"
+    },
+
+    "menu": {
+        "add": "添加",
+        "open": "打开",
+        "import": "导入",
+        "edit": "编辑",
+        "folder": "文件夹",
+        "script": "脚本",
+        "scene": "场景",
+        "cut": "剪切",
+        "copy": "复制",
+        "paste": "粘贴",
+        "delete": "删除",
+        "rename": "重命名",
+        "duplicate": "生成副本",
+        "copy_uuid": "复制 UUID",
+        "copy_path": "复制路径",
+        "copy_name": "复制名称",
+        "open_in_terminal": "在终端中打开",
+        "open_externally": "使用外部程序打开",
+        "show_in_explorer": "在资源管理器中显示",
+        "create": "创建",
+        "text_file": "文本文件",
+        "copy_menu_title": "复制路径 | 名称 | UUID",
+        "select_all": "全选",
+        "file": "文件",
+        "project": "项目",
+        "panel": "面板",
+        "help": "帮助",
+        "new_project": "新建项目",
+        "open_project": "打开项目",
+        "new_scene": "新建场景",
+        "save_scene": "保存场景",
+        "save_as": "另存为",
+        "editor_settings": "编辑器设置",
+        "project_settings": "项目设置",
+        "quit": "退出",
+        "undo": "撤销",
+        "redo": "重做",
+        "run": "运行",
+        "build": "构建",
+        "documentation": "在线文档",
+        "release_notes": "更新日志",
+        "github_repository": "GitHub仓库",
+        "about_pygamestudio": "关于Pygame Studio"
+    },
+
+    "item": {
+        "shape": "形状",
+        "line": "线条",
+        "rect": "矩形",
+        "ellipse": "椭圆",
+        "text": "文本"
+    },
+
+    "asset": {
+        "asset": "资源管理器",
+        "search_placeholder": "输入名称搜索",
+        "sort_by_name_asc": "按名称排序（升序）",
+        "sort_by_name_desc": "按名称排序（降序）",
+        "sort_by_type_asc": "按类型排序（升序）",
+        "sort_by_type_desc": "按类型排序（降序）",
+        "sort_by_size_asc": "按大小排序（升序）",
+        "sort_by_size_desc": "按大小排序（降序）",
+        "sort_by_time_asc": "按时间排序（升序）",
+        "sort_by_time_desc": "按时间排序（降序）"
+    },
+
+    "scene": {
+        "scene": "场景编辑器"
+    },
+
+    "hierarchy": {
+        "hierarchy": "层级管理器",
+        "search_placeholder": "输入名称或UUID搜索"
+    },
+
+    "console": {
+        "console": "控制台",
+        "clear": "清空"
+    },
+
+    "inspector": {
+        "inspector": "属性检查器",
+        "visibility": "可见性",
+        "name": "名称",
+        "pos": "位置",
+        "size": "大小",
+        "scale": "缩放",
+        "color": "颜色",
+        "angle": "角度",
+        "start_point": "起点",
+        "end_point": "终点",
+        "thickness": "粗细",
+        "border_radius": "圆角半径",
+        "text": "文本",
+        "font_size": "字体大小",
+        "font_family": "字体族",
+        "bold": "粗体",
+        "italic": "斜体",
+        "underline": "下划线",
+        "strikethrough": "删除线"
+    },
+
+    "dashboard": {
+        "not_found": " (未找到)",
+        "project_name": "项目名称：",
+        "project_name_edit_placeholder": "请输入项目名称",
+        "project_rename_edit_placeholder": "请输入新项目名称",
+        "project_path": "项目路径：",
+        "project_path_edit_placeholder": "请选择或输入项目路径",
+        "browse": "浏览",
+        "create": "创建",
+        "cancel": "取消",
+        "project_exist_error": "项目已存在，请更改项目名称。",
+        "create_project_error": "创建项目失败：{}",
+        "select_project_path": "选择项目路径",
+        "rename": "重命名",
+        "import": "导入",
+        "same_name": "与原名称相同。",
+        "create_project_guide": "您还没有任何项目。\n请点击按钮创建或导入一个项目。",
+        "sort_by_time": "按时间排序",
+        "sort_by_name": "按名称排序",
+        "sort_by_path": "按路径排序",
+        "sort": "排序："
+    },
+
+    "settings": {
+        "game_screen": "游戏窗口",
+        "screen_width": "窗口宽度",
+        "screen_height": "窗口高度",
+        "general": "通用",
+        "language": "语言"
+    }
+}

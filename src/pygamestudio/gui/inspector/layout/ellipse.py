@@ -7,7 +7,10 @@ from pygamestudio.gui.inspector.component.checkbox import *
 
 INSPECTOR_LAYOUT_ELLIPSE = {
     'visibility': {
-        'text': T.tr('inspector.visibility', 'Visibility'),
+        'i18n': {
+            'key': 'inspector.visibility',
+            'default': 'Visibility'
+        },
         'component': {
             'enabled': [True],
             'attribute': ['is_visible'],
@@ -15,7 +18,10 @@ INSPECTOR_LAYOUT_ELLIPSE = {
         }
     },
     'name': {
-        'text': T.tr('inspector.name', 'Name'),
+        'i18n': {
+            'key': 'inspector.name',
+            'default': 'Name'
+        },
         'component': {
             'enabled': [True],
             'attribute': ['name'],
@@ -23,7 +29,10 @@ INSPECTOR_LAYOUT_ELLIPSE = {
         }
     },
     'pos': {
-        "text": T.tr('inspector.pos', 'Pos'),
+        'i18n': {
+            'key': 'inspector.pos',
+            'default': 'Pos'
+        },        
         'component': {
             'enabled': [True, True],
             'attribute': ['x', 'y'],
@@ -31,7 +40,10 @@ INSPECTOR_LAYOUT_ELLIPSE = {
         }
     },
     'size': {
-        "text": T.tr('inspector.size', 'Size'),
+        'i18n': {
+            'key': 'inspector.size',
+            'default': 'Size'
+        },
         'component': {
             'enabled': [True, True],
             'attribute': ['width', 'height'],
@@ -39,7 +51,10 @@ INSPECTOR_LAYOUT_ELLIPSE = {
         }
     },
     'scale': {
-        "text": T.tr('inspector.scale', 'Scale'),
+        'i18n': {
+            'key': 'inspector.scale',
+            'default': 'Scale'
+        },
         'component': {
             'enabled': [True, True],
             'attribute': ['scale_x', 'scale_y'],
@@ -47,7 +62,10 @@ INSPECTOR_LAYOUT_ELLIPSE = {
         }
     },
     'angle': {
-        "text": T.tr('inspector.angle', 'Angle'),
+        'i18n': {
+            'key': 'inspector.angle',
+            'default': 'Angle'
+        },
         'component': {
             'enabled': [True],
             'attribute': ['angle'],
@@ -55,7 +73,10 @@ INSPECTOR_LAYOUT_ELLIPSE = {
         }
     },
     'color': {
-        "text": T.tr('inspector.color', 'Color'),
+        'i18n': {
+            'key': 'inspector.color',
+            'default': 'Color'
+        },
         'component': {
             'enabled': [True],
             'attribute': ['color'],

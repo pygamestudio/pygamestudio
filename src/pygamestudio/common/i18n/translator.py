@@ -74,10 +74,3 @@ class Translator:
     def add_observer(target):
         instance = Translator.get_instance()
         instance.observers.append(target)
-
-    # @staticmethod
-    # def clean_up():
-    #     instance = Translator.get_instance()
-    #     instance.current_lang = 'en'
-    #     instance.observers = []
-    #     instance.lang_dict = {}

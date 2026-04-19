@@ -9,7 +9,10 @@ from pygamestudio.gui.inspector.component.textedit import *
 
 INSPECTOR_LAYOUT_TEXT = {
     'visibility': {
-        'text': T.tr('inspector.visibility', 'Visibility'),
+        'i18n': {
+            'key': 'inspector.visibility',
+            'default': 'Visibility'
+        },
         'component': {
             'enabled': [True],
             'attribute': ['is_visible'],
@@ -17,7 +20,10 @@ INSPECTOR_LAYOUT_TEXT = {
         }
     },
     'name': {
-        'text': T.tr('inspector.name', 'Name'),
+        'i18n': {
+            'key': 'inspector.name',
+            'default': 'Name'
+        },
         'component': {
             'enabled': [True],
             'attribute': ['name'],
@@ -25,7 +31,10 @@ INSPECTOR_LAYOUT_TEXT = {
         }
     },
     'pos': {
-        "text": T.tr('inspector.pos', 'Pos'),
+        'i18n': {
+            'key': 'inspector.pos',
+            'default': 'Pos'
+        },
         'component': {
             'enabled': [True, True],
             'attribute': ['x', 'y'],
@@ -33,7 +42,10 @@ INSPECTOR_LAYOUT_TEXT = {
         }
     },
     'size': {
-        "text": T.tr('inspector.size', 'Size'),
+        'i18n': {
+            'key': 'inspector.size',
+            'default': 'Size'
+        },
         'component': {
             'enabled': [True, True],
             'attribute': ['width', 'height'],
@@ -41,7 +53,10 @@ INSPECTOR_LAYOUT_TEXT = {
         }
     },
     'scale': {
-        "text": T.tr('inspector.scale', 'Scale'),
+        'i18n': {
+            'key': 'inspector.scale',
+            'default': 'Scale'
+        },
         'component': {
             'enabled': [True, True],
             'attribute': ['scale_x', 'scale_y'],
@@ -49,7 +64,10 @@ INSPECTOR_LAYOUT_TEXT = {
         }
     },
     'angle': {
-        "text": T.tr('inspector.angle', 'Angle'),
+        'i18n': {
+            'key': 'inspector.angle',
+            'default': 'Angle'
+        },
         'component': {
             'enabled': [True],
             'attribute': ['angle'],
@@ -57,15 +75,21 @@ INSPECTOR_LAYOUT_TEXT = {
         }
     },
     'color': {
-        "text": T.tr('inspector.color', 'Color'),
+        'i18n': {
+            'key': 'inspector.color',
+            'default': 'Color'
+        },
         'component': {
             'enabled': [True],
             'attribute': ['color'],
             'widget': [ColorPicker]
         }
     },
-    'string': {
-        "text": T.tr('inspector.text', 'Text'),
+    'text': {
+        'i18n': {
+            'key': 'inspector.text',
+            'default': 'Text'
+        },        
         'component': {
             'enabled': [True],
             'attribute': ['text'],
@@ -73,7 +97,10 @@ INSPECTOR_LAYOUT_TEXT = {
         }
     },
     'font_size': {
-        "text": T.tr('inspector.font_size', 'Font Size'),
+        'i18n': {
+            'key': 'inspector.font_size',
+            'default': 'Font Size'
+        },
         'component': {
             'enabled': [True],
             'attribute': ['font_size'],
@@ -81,7 +108,10 @@ INSPECTOR_LAYOUT_TEXT = {
         }
     },
     'font_family': {
-        "text": T.tr('inspector.font_family', 'Font Family'),
+        'i18n': {
+            'key': 'inspector.font_family',
+            'default': 'Font Family'
+        },
         'component': {
             'enabled': [True],
             'attribute': ['font_family'],
@@ -89,7 +119,10 @@ INSPECTOR_LAYOUT_TEXT = {
         }
     },
     'is_bold': {
-        "text": T.tr('inspector.bold', 'Bold'),
+        'i18n': {
+            'key': 'inspector.bold',
+            'default': 'Bold'
+        },
         'component': {
             'enabled': [True],
             'attribute': ['is_bold'],
@@ -97,7 +130,10 @@ INSPECTOR_LAYOUT_TEXT = {
         }
     },
     'is_italic': {
-        "text": T.tr('inspector.italic', 'Italic'),
+        'i18n': {
+            'key': 'inspector.italic',
+            'default': 'Italic'
+        },
         'component': {
             'enabled': [True],
             'attribute': ['is_italic'],
@@ -105,7 +141,10 @@ INSPECTOR_LAYOUT_TEXT = {
         }
     },
     'is_underline': {
-        "text": T.tr('inspector.underline', 'Underline'),
+        'i18n': {
+            'key': 'inspector.underline',
+            'default': 'Underline'
+        },
         'component': {
             'enabled': [True],
             'attribute': ['is_underline'],
@@ -113,7 +152,10 @@ INSPECTOR_LAYOUT_TEXT = {
         }
     },
     'is_strikethrough': {
-        "text": T.tr('inspector.strikethrough', 'Strikethrough'),
+        'i18n': {
+            'key': 'inspector.strikethrough',
+            'default': 'Strikethrough'
+        },
         'component': {
             'enabled': [True],
             'attribute': ['is_strikethrough'],

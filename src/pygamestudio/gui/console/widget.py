@@ -3,6 +3,7 @@ from PySide6.QtCore import *
 from PySide6.QtWidgets import *
 from pygamestudio.gui.console.type import *
 from pygamestudio.common.utils.path import RES_PATH
+from pygamestudio.common.i18n.translator import Translator as T
 
 
 class LogCheckBox(QWidget):
@@ -58,7 +59,7 @@ class ClearButton(QPushButton):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setIcon(QIcon(str(RES_PATH/'images/clear.png')))
-        self.setText('清空')
+        self.setText(T.tr('console.clear', 'Clear'))
         self.setStyleSheet("""
         QPushButton {
             border: none;
@@ -73,3 +74,8 @@ class ClearButton(QPushButton):
             background-color: cyan;
         }                            
         """)
+
+        T.add_observer(self)
+
+    def retranslate(self):
+        self.setText(T.tr('console.clear', 'Clear'))

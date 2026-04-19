@@ -7,7 +7,10 @@ from pygamestudio.gui.inspector.component.checkbox import *
 
 INSPECTOR_LAYOUT_CANVAS = {
     'visibility': {
-        'text': T.tr('inspector.visibility', 'Visibility'),
+        'i18n': {
+            'key': 'inspector.visibility',
+            'default': 'Visibility'
+        },
         'component': {
             'enabled': [True],
             'attribute': ['is_visible'],
@@ -15,7 +18,10 @@ INSPECTOR_LAYOUT_CANVAS = {
         }
     },
     'name': {
-        'text': T.tr('inspector.name', 'Name'),
+        'i18n': {
+            'key': 'inspector.name',
+            'default': 'Name'
+        },        
         'component': {
             'enabled': [False],
             'attribute': ['name'],
@@ -23,7 +29,10 @@ INSPECTOR_LAYOUT_CANVAS = {
         }
     },
     'size': {
-        "text": T.tr('inspector.size', 'Size'),
+        'i18n': {
+            'key': 'inspector.size',
+            'default': 'Size'
+        },
         'component': {
             'enabled': [False, False],
             'attribute': ['width', 'height'],
@@ -31,7 +40,10 @@ INSPECTOR_LAYOUT_CANVAS = {
         }
     },
     'color': {
-        "text": T.tr('inspector.color', 'Color'),
+        'i18n': {
+            'key': 'inspector.color',
+            'default': 'Color'
+        },
         'component': {
             'enabled': [True],
             'attribute': ['color'],

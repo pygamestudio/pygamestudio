@@ -12,6 +12,8 @@ from pygamestudio.gui.console.window import ConsoleWindow
 from pygamestudio.gui.inspector.window import InspectorWindow
 from pygamestudio.gui.scene.window import SceneWindow
 from pygamestudio.gui.base.window import WindowBase
+from pygamestudio.gui.settings.project import ProjectSettingsWindow
+from pygamestudio.gui.settings.editor import EditorSettingsWindow
 from pygamestudio.game.core.manager import GameManager
 
 
@@ -91,7 +93,7 @@ class EditorBody(QMainWindow):
         # """)
 
     def _set_signal(self):
-        ...
+        T.add_observer(self)
 
     def _set_layout(self):
         main_layout = QHBoxLayout(self._central_widget)
@@ -105,12 +107,14 @@ class EditorBody(QMainWindow):
         self._set_help_menu()
 
     def _set_file_menu(self):
+        self._file_menu.clear()
+
         new_project_action = QAction(T.tr('menu.new_project', 'New Project'), self)
         open_project_action = QAction(T.tr('menu.open_project', 'Open Project'), self)
         new_scene_action = QAction(T.tr('menu.new_scene', 'New Scene'), self)
         save_scene_action = QAction(T.tr('menu.save_scene', 'Save Scene'), self)
         save_as_action = QAction(T.tr('menu.save_as', 'Save As'), self)
-        preference_action = QAction(T.tr('menu.preference', 'Preference'), self)
+        editor_settings_action = QAction(T.tr('menu.editor_settings', 'Editor Settings'), self)
         quit_editor_action = QAction(T.tr('menu.new_project', 'Quit'), self)
 
         new_project_action.triggered.connect(self.new_project_signal.emit)
@@ -118,6 +122,7 @@ class EditorBody(QMainWindow):
         new_scene_action.triggered.connect(lambda: self._game_manager.load_scene(''))
         save_scene_action.triggered.connect(self._game_manager.save_scene)
         save_as_action.triggered.connect(self._game_manager.save_as)
+        editor_settings_action.triggered.connect(self._show_editor_settings_window)
         quit_editor_action.triggered.connect(self.quit_editor_signal.emit)
 
         self._file_menu.addAction(new_project_action)
@@ -127,11 +132,13 @@ class EditorBody(QMainWindow):
         self._file_menu.addAction(save_scene_action)
         self._file_menu.addAction(save_as_action)
         self._file_menu.addSeparator()
-        # self._file_menu.addAction(preference_action)
-        # self._file_menu.addSeparator()
+        self._file_menu.addAction(editor_settings_action)
+        self._file_menu.addSeparator()
         self._file_menu.addAction(quit_editor_action)
 
     def _set_edit_menu(self):
+        self._edit_menu.clear()
+
         undo_action = QAction(T.tr('menu.undo', 'Undo'), self)
         redo_action = QAction(T.tr('menu.redo', 'Redo'), self)
         cut_action = QAction(T.tr('menu.cut', 'Cut'), self)
@@ -147,15 +154,23 @@ class EditorBody(QMainWindow):
         self._edit_menu.addAction(select_all_action)
 
     def _set_project_menu(self):
+        self._project_menu.clear()
+
+        project_settings_action = QAction(T.tr('menu.project_settings', 'Project Settings'), self)
         run_action = QAction(T.tr('menu.run', 'Run'), self)
         build_action = QAction(T.tr('menu.build', 'Build'), self)
 
+        project_settings_action.triggered.connect(self._show_project_settings_window)
         run_action.triggered.connect(self._game_manager.run_project)
 
+        self._project_menu.addAction(project_settings_action)
+        self._project_menu.addSeparator()
         self._project_menu.addAction(run_action)
         self._project_menu.addAction(build_action)
 
     def _set_help_menu(self):
+        self._help_menu.clear()
+
         doc_action = QAction(T.tr('menu.documentation', 'Documentation'), self)
         update_log_action = QAction(T.tr('menu.release_notes', 'Release Notes'), self)
         github_action = QAction(T.tr('menu.github_repository', 'Github Repository'), self)
@@ -184,6 +199,28 @@ class EditorBody(QMainWindow):
         self._hierarchy_window.clean_up()
         self._inspector_window.clean_up()
         self._game_manager.clean_up()
+
+    def _show_project_settings_window(self):
+        project_settings_window = ProjectSettingsWindow(self._game_manager)
+        project_settings_window.show()
+
+    def _show_editor_settings_window(self):
+        editor_settings_window = EditorSettingsWindow(self._game_manager)
+        editor_settings_window.show()
+
+    def retranslate(self):
+        self.menuBar().clear()
+        self._file_menu = self.menuBar().addMenu(T.tr('menu.file', 'File'))
+        self._edit_menu = self.menuBar().addMenu(T.tr('menu.edit', 'Edit'))
+        self._project_menu = self.menuBar().addMenu(T.tr('menu.project', 'Project'))
+        self._help_menu = self.menuBar().addMenu(T.tr('menu.help', 'Help'))
+        self._set_menu()
+
+        self._left_top_tab_widget.setTabText(0, T.tr('hierarchy.hierarchy', 'Hierarchy'))
+        self._left_bottom_tab_widget.setTabText(0, T.tr('asset.asset', 'Asset'))
+        self._center_top_tab_widget.setTabText(0, T.tr('scene.scene', 'Scene'))
+        self._center_bottom_tab_widget.setTabText(0, T.tr('console.console', 'Console'))
+        self._right_top_tab_widget.setTabText(0, T.tr('inspector.inspector', 'Inspector'))
 
     def enterEvent(self, event):
         self.setCursor(Qt.CursorShape.ArrowCursor)
