@@ -1,14 +1,13 @@
+from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.gui.inspector.component.spinbox import *
 from pygamestudio.gui.inspector.component.lineedit import *
 from pygamestudio.gui.inspector.component.picker import *
 from pygamestudio.gui.inspector.component.checkbox import *
 
+
 INSPECTOR_LAYOUT_ELLIPSE = {
     'visibility': {
-        'i18n': {
-            'zh': '可见性',
-            'en': 'Visibility'
-        },
+        'text': T.tr('inspector.visibility', 'Visibility'),
         'component': {
             'enabled': [True],
             'attribute': ['is_visible'],
@@ -16,10 +15,7 @@ INSPECTOR_LAYOUT_ELLIPSE = {
         }
     },
     'name': {
-        'i18n': {
-            'zh': '名称',
-            'en': 'Name'
-        },
+        'text': T.tr('inspector.name', 'Name'),
         'component': {
             'enabled': [True],
             'attribute': ['name'],
@@ -27,10 +23,7 @@ INSPECTOR_LAYOUT_ELLIPSE = {
         }
     },
     'pos': {
-        'i18n': {
-            'zh': '坐标',
-            'en': 'Pos'
-        },
+        "text": T.tr('inspector.pos', 'Pos'),
         'component': {
             'enabled': [True, True],
             'attribute': ['x', 'y'],
@@ -38,10 +31,7 @@ INSPECTOR_LAYOUT_ELLIPSE = {
         }
     },
     'size': {
-        'i18n': {
-            'zh': '尺寸',
-            'en': 'Size'
-        },
+        "text": T.tr('inspector.size', 'Size'),
         'component': {
             'enabled': [True, True],
             'attribute': ['width', 'height'],
@@ -49,10 +39,7 @@ INSPECTOR_LAYOUT_ELLIPSE = {
         }
     },
     'scale': {
-        'i18n': {
-            'zh': '缩放',
-            'en': 'Scale'
-        },
+        "text": T.tr('inspector.scale', 'Scale'),
         'component': {
             'enabled': [True, True],
             'attribute': ['scale_x', 'scale_y'],
@@ -60,10 +47,7 @@ INSPECTOR_LAYOUT_ELLIPSE = {
         }
     },
     'angle': {
-        'i18n': {
-            'zh': '角度',
-            'en': 'Angle'
-        },
+        "text": T.tr('inspector.angle', 'Angle'),
         'component': {
             'enabled': [True],
             'attribute': ['angle'],
@@ -71,10 +55,7 @@ INSPECTOR_LAYOUT_ELLIPSE = {
         }
     },
     'color': {
-        'i18n': {
-            'zh': '颜色',
-            'en': 'Color'
-        },
+        "text": T.tr('inspector.color', 'Color'),
         'component': {
             'enabled': [True],
             'attribute': ['color'],

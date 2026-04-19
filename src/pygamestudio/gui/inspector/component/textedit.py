@@ -1,10 +1,10 @@
-from PySide6.QtWidgets import *
-from PySide6.QtCore import *
 from PySide6.QtGui import *
+from PySide6.QtCore import *
+from PySide6.QtWidgets import *
 
 
 class TextEdit(QTextEdit):
-    def __init__(self, inspector_window, attr, text=''):
+    def __init__(self, inspector_window, text='', attr=''):
         super().__init__()
         self._inspector_window = inspector_window
         self.setText(text)

@@ -1,3 +1,4 @@
+import uuid
 import pygame
 from pygamestudio.game.object.type import *
 from pygamestudio.game.object.base import ObjectBase
@@ -7,23 +8,44 @@ from pygamestudio.common.utils.path import RES_PATH
 class ObjectText(ObjectBase):
     def __init__(self, game_manager, object_data={}, is_for_api=False):
         super().__init__(game_manager, object_data, is_for_api)
+        self._is_initialized = False
+                
         if hasattr(self, 'icon'):
             self.icon = str(RES_PATH/'images/item.png')
 
-        self.name = 'Text'
-        self.type = OBJECT_TEXT
-        self.text = 'Text'
-        self.font_size = 30
-        self.font_family = 'Arial'
-        self.is_bold = False
-        self.is_italic = False
-        self.is_underline = False
-        self.is_strikethrough = False
+        common_properties = {
+            'name': 'Text',
+            'type': OBJECT_TEXT,
+            'uuid': str(uuid.uuid4()),
+            'x': 0,
+            'y': 0,
+            'pos': (0, 0),
+            'width': 50, 
+            'height': 50,
+            'size': (50, 50),
+            'scale_x': 1,
+            'scale_y': 1,
+            'scale': (1, 1),
+            'angle': 0,
+            'color': "#ffffff",
+            'is_visible': True,
+            'text': 'Text',
+            'font_size': 30,
+            'font_family': 'Arial',
+            'is_bold': False,
+            'is_italic': False,
+            'is_underline': False,
+            'is_strikethrough': False
+        }
+        
+        for key, value in common_properties.items():
+            setattr(self, key, object_data.get(key, value))
 
         font = self._init_font()
         text = font.render(self.text, True, self.color)
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
         self.surface.blit(text, text.get_rect(center=(self.surface.width//2, self.surface.height//2)))
+        self._is_initialized = True
 
     def _init_font(self):
         font = pygame.font.SysFont(self.font_family, self.font_size)

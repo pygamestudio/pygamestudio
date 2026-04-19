@@ -74,15 +74,12 @@ class ConsoleLogBrowser(QTextBrowser):
         selected_text = self.textCursor().selection().toPlainText()
         QApplication.clipboard().setText(selected_text)
     
-    def _reset(self):
-        self._logs = []
-        self._search_keyword = ''
-
     def get_ready_for_project(self):
         ...
         
     def clean_up(self):
-        self._reset()
+        self._logs = []
+        self._search_keyword = ''
 
     def clear_log(self):
         self.clear()

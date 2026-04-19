@@ -1,5 +1,4 @@
 
-import uuid
 import pygame
 from pygamestudio.game.object.type import *
 from pygamestudio.common.utils.path import RES_PATH
@@ -7,7 +6,6 @@ from pygamestudio.common.utils.path import RES_PATH
 
 class ObjectBase:
     def __init__(self, game_manager, object_data={}, is_for_api=False):
-        self._is_initialized = False
         self._is_for_api = is_for_api
         self._game_manager = game_manager
 
@@ -16,34 +14,12 @@ class ObjectBase:
             'is_selected': False,
             'icon': str(RES_PATH/'images/item.png'),
         }
-        
-        common_properties = {
-            'name': 'Base',
-            'type': OBJECT_BASE,
-            'uuid': str(uuid.uuid4()),
-            'x': 0,
-            'y': 0,
-            'pos': (0, 0),
-            'width': 50, 
-            'height': 50,
-            'size': (50, 50),
-            'scale_x': 1,
-            'scale_y': 1,
-            'scale': (1, 1),
-            'angle': 0,
-            'color': '#ffffff',
-            'is_visible': True,
-        }
     
         if not self._is_for_api:
             for key, value in internal_properties.items():
                 setattr(self, key, object_data.get(key, value))
 
-        for key, value in common_properties.items():
-            setattr(self, key, object_data.get(key, value))
-
-        self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
-        self._is_initialized = True
+        self.surface = None
 
     def draw(self, parent_surface):
         parent_surface.blit(self.surface, self.get_rect())

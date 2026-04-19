@@ -65,7 +65,6 @@ def load_projects_from_dashboard_config():
         QMessageBox.critical(QApplication.activeWindow(), T.tr('message_box.critical_title', 'Error'), T.tr('message_box.critical_corrupted_json_content', 'The configuration file is corrupted. Failed to parse JSON.'))
         return []
     except Exception as e:
-        print(f"加载最近项目列表时出错: {e}")
         QMessageBox.critical(QApplication.activeWindow(), T.tr('message_box.critical_title', 'Error'), T.tr('message_box.critical_failed_to_load_content', 'Failed to load projects: {}').format(e))
         return []
     

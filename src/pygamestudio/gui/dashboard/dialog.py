@@ -129,7 +129,7 @@ class CreateProjectBody(QWidget):
             self._show_error(T.tr('dashboard.project_exist_error', 'The project already exists. Please change the project name.'))
             self._create_button.setEnabled(False)
         except Exception as e:
-            self._show_error(T.tr('dashboard.project_exist_error', 'Failed to create project: {}').format(e))
+            self._show_error(T.tr('dashboard.create_project_error', 'Failed to create project: {}').format(e))
             self._create_button.setEnabled(False)
 
     def _close_window(self):

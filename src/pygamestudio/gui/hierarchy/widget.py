@@ -1,9 +1,9 @@
-from PySide6.QtWidgets import QPushButton, QMenu
-from PySide6.QtGui import QIcon, QAction
 from PySide6.QtCore import Signal
-
-from pygamestudio.common.utils.path import RES_PATH
+from PySide6.QtGui import QIcon, QAction
+from PySide6.QtWidgets import QPushButton, QMenu
 from pygamestudio.game.object.type import *
+from pygamestudio.common.utils.path import RES_PATH
+from pygamestudio.common.i18n.translator import Translator as T
 
 
 class ExpandCollapseAllButton(QPushButton):
@@ -61,17 +61,17 @@ class AddItemButton(QPushButton):
 
     def _show_context_menu(self, pos):
         menu = QMenu()
-        # add_line_action = QAction('直线', self)
-        add_rect_action = QAction('矩形', self)
-        add_ellipse_action = QAction('椭圆', self)
-        add_text_action = QAction('文本', self)
+        # add_line_action = QAction(T.tr('item.line', 'Line'), self)
+        add_rect_action = QAction(T.tr('item.rect', 'Rect'), self)
+        add_ellipse_action = QAction(T.tr('item.ellipse', 'Ellipse'), self)
+        add_text_action = QAction(T.tr('item.text', 'Text'), self)
 
         # add_line_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_LINE))
         add_rect_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_RECT))
         add_ellipse_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_ELLIPSE))
         add_text_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_TEXT))
 
-        add_shape_sub_menu = QMenu(title='形状')
+        add_shape_sub_menu = QMenu(title=T.tr('item.shape', 'Shape'))
         add_ui_sub_menu = QMenu(title='UI')
         menu.addMenu(add_shape_sub_menu)
         menu.addMenu(add_ui_sub_menu)

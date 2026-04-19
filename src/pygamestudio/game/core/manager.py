@@ -24,7 +24,7 @@ class GameManager(QObject):
     object_deleted = Signal(str)
     object_selected = Signal(str)
     object_deselected = Signal(str)
-    object_renamed = Signal(str, str)
+    object_renamed = Signal(str)
     object_moved = Signal(str)
     object_scaled = Signal(str)
     object_rotated = Signal(str)
@@ -53,9 +53,10 @@ class GameManager(QObject):
         self._project_path = ''
         self._current_scene_file_path = ''
         self._is_current_scene_saved = True
-        self._current_scene_object_uuid = ''
+        self._current_canvas_object_uuid = ''
         self._clipboard_content = []
         self._all_object_tree_struct = {}
+        self._is_project_ready = False
         self._undo_stack = QUndoStack(self)
 
     @property
@@ -63,8 +64,12 @@ class GameManager(QObject):
         return self._all_object_tree_struct
 
     @property
-    def scene_object_uuid(self):
-        return self._current_scene_object_uuid
+    def is_project_ready(self):
+        return self._is_project_ready
+
+    @property
+    def canvas_object_uuid(self):
+        return self._current_canvas_object_uuid
     
     @property
     def undo_stack(self):
@@ -80,18 +85,12 @@ class GameManager(QObject):
     def is_current_scene_saved(self):
         return self._is_current_scene_saved
     
-    def is_current_scene_visible(self):
-        scene_obj = self._get_object(self._current_scene_object_uuid)
-        return scene_obj.is_visible if scene_obj else False
+    def is_current_canvas_visible(self):
+        canvas_obj = self._get_object(self._current_canvas_object_uuid)
+        return canvas_obj.is_visible if canvas_obj else False
     
-    def _reset(self):
-        self._is_cut = False
-        self._project_path = ''
-        self._current_scene_file_path = ''
-        self._is_current_scene_saved = True
-        self._current_scene_object_uuid = ''
-        self._clipboard_content = []
-        self._all_object_tree_struct = {}
+    def set_project_ready(self):
+        self._is_project_ready = True
     
     def get_ready_for_project(self, project_path):
         self._project_path = project_path
@@ -105,7 +104,14 @@ class GameManager(QObject):
         self._load_scene(current_scene_file_path)
 
     def clean_up(self):
-        self._reset()
+        self._is_cut = False
+        self._project_path = ''
+        self._current_scene_file_path = ''
+        self._is_current_scene_saved = True
+        self._current_canvas_object_uuid = ''
+        self._clipboard_content = []
+        self._all_object_tree_struct = {}
+        self._is_project_ready = False
 
     def get_project_path(self):
         return self._project_path
@@ -132,7 +138,7 @@ class GameManager(QObject):
     def _new_object(self, object_type, object_data={}):
         if object_type == OBJECT_CANVAS:
             obj = ObjectCanvas(self, object_data)
-            self._current_scene_object_uuid = obj.uuid
+            self._current_canvas_object_uuid = obj.uuid
         elif object_type == OBJECT_RECT:
             obj = ObjectRect(self, object_data)
         elif object_type == OBJECT_TEXT:
@@ -493,7 +499,7 @@ class GameManager(QObject):
         self._clipboard_content = []
         
         for object_uuid in object_uuid_list:
-            if object_uuid == self._current_scene_object_uuid:
+            if object_uuid == self._current_canvas_object_uuid:
                 continue
             
             if is_to_discard(object_uuid):
@@ -514,7 +520,7 @@ class GameManager(QObject):
         self._clipboard_content = []
 
         for object_uuid in object_uuid_list:
-            if object_uuid == self._current_scene_object_uuid:
+            if object_uuid == self._current_canvas_object_uuid:
                 continue
             
             if is_to_discard(object_uuid):
@@ -604,7 +610,7 @@ class GameManager(QObject):
         
         object_tree_struct_list_to_duplicate = []
         for object_uuid in object_uuid_list:
-            if object_uuid == self._current_scene_object_uuid:
+            if object_uuid == self._current_canvas_object_uuid:
                 continue
             
             if is_to_discard(object_uuid):
@@ -637,7 +643,7 @@ class GameManager(QObject):
         
         object_uuid_list_to_delete = []
         for object_uuid in object_uuid_list:
-            if object_uuid == self._current_scene_object_uuid:
+            if object_uuid == self._current_canvas_object_uuid:
                 continue
             
             if is_to_discard(object_uuid):
@@ -657,13 +663,13 @@ class GameManager(QObject):
     def _delete_object_tree_struct(self, object_uuid):
         self._is_current_scene_saved = False
 
-        if object_uuid == self._current_scene_object_uuid:
+        if object_uuid == self._current_canvas_object_uuid:
             self._all_object_tree_struct = {}
             self.object_deleted.emit(object_uuid)
             return
 
         def _delete(object_uuid, object_tree_struct):
-            value = list(object_tree_struct.values())[0]  
+            value = list(object_tree_struct.values())[0]
             for child_object_tree_struct in value['children']:
                 if object_uuid == list(child_object_tree_struct.keys())[0]:
                     value['children'].remove(child_object_tree_struct)
@@ -678,15 +684,7 @@ class GameManager(QObject):
             
         _delete(object_uuid, self._all_object_tree_struct)
 
-    def save_scene(self):
-        return self._save_scene()
-    
-    def _save_scene(self):
-        if not self._current_scene_file_path:
-            self._current_scene_file_path, _ = QFileDialog.getSaveFileName(QApplication.activeWindow(), T.tr('dialog.save_title', 'Save File'), self._project_path, f"{T.tr('dialog.format', 'Format')} (*.scene)")
-            if not self._current_scene_file_path:
-                return
-        
+    def _save(self):
         self._is_current_scene_saved = True
         set_current_scene_to_project_config(self._current_scene_file_path)
         self.scene_saved_signal.emit()
@@ -700,7 +698,28 @@ class GameManager(QObject):
             json.dump(self._all_object_tree_struct, f, default=_default, indent=4, ensure_ascii=False)
 
         Logger.info('Scene saved')
+
+    def save_scene(self):
+        return self._save_scene()
+    
+    def _save_scene(self):
+        if not self._current_scene_file_path:
+            self._save_as()
+            return
         
+        self._save()
+    
+    def save_as(self):
+        return self._save_as()
+    
+    def _save_as(self):
+        path, _ = QFileDialog.getSaveFileName(QApplication.activeWindow(), T.tr('dialog.save_title', 'Save File'), self._project_path, f"{T.tr('dialog.format', 'Format')} (*.scene)")
+        if not path:
+            return
+        
+        self._current_scene_file_path = path
+        self._save()
+
     def load_scene(self, current_scene_file_path):
         return self._load_scene(current_scene_file_path)
     
@@ -713,8 +732,8 @@ class GameManager(QObject):
             elif choice == QMessageBox.StandardButton.Yes:
                 self._save_scene()
 
-        if self._current_scene_object_uuid:
-            self._delete_object_tree_struct(self._current_scene_object_uuid)
+        if self._current_canvas_object_uuid:
+            self._delete_object_tree_struct(self._current_canvas_object_uuid)
 
         self._current_scene_file_path = current_scene_file_path
         set_current_scene_to_project_config(current_scene_file_path)
@@ -815,7 +834,7 @@ class UpdateAttrValueCommand(QUndoCommand):
 
     def _emit_signal(self, attr, value):
         if attr == 'name':
-            self._game_manager.object_renamed.emit(self._obj.uuid, value)
+            self._game_manager.object_renamed.emit(self._obj.uuid)
         elif attr == 'is_visible':
             if self._new_value == True:
                 self._game_manager.object_showed.emit(self._obj.uuid)  

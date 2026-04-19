@@ -1,8 +1,8 @@
+from PySide6.QtCore import *
 from pygamestudio.gui.window import Editor
 from pygamestudio.gui.dashboard.window import DashboardWindow
 from pygamestudio.common.utils.config import get_editor_config
 from pygamestudio.common.i18n.translator import Translator as T
-from PySide6.QtCore import *
 
 
 class PygameStudio:
@@ -13,15 +13,11 @@ class PygameStudio:
         self._setup()
 
     def _setup(self):
-        self._set_widget()
         self._set_signal()
 
     def _set_translator(self):
         editor_config = get_editor_config()
         T.load_language(editor_config['lang'])
-
-    def _set_widget(self):
-        ...
 
     def _set_signal(self):
         self._dashboard.open_project_signal.connect(self._enter_editor)

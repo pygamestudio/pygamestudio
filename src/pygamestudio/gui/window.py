@@ -1,20 +1,19 @@
-from PySide6.QtWidgets import *
-from PySide6.QtCore import *
+from pathlib import Path
+
 from PySide6.QtGui import *
+from PySide6.QtCore import *
+from PySide6.QtWidgets import *
 
 from pygamestudio.common.utils.path import RES_PATH
-from pygamestudio.common.utils.config import get_editor_config
 from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.gui.hierarchy.window import HierarchyWindow
 from pygamestudio.gui.asset.window import AssetWindow
 from pygamestudio.gui.console.window import ConsoleWindow
 from pygamestudio.gui.inspector.window import InspectorWindow
 from pygamestudio.gui.scene.window import SceneWindow
-from pygamestudio.gui.dashboard.window import DashboardWindow
-
 from pygamestudio.gui.base.window import WindowBase
 from pygamestudio.game.core.manager import GameManager
-from pathlib import Path
+
 
 class EditorBody(QMainWindow):
     new_project_signal = Signal()
@@ -44,31 +43,26 @@ class EditorBody(QMainWindow):
 
         self._central_widget = QWidget()
 
-        self._file_menu = self.menuBar().addMenu('文件')
-        self._edit_menu = self.menuBar().addMenu('编辑')
-        self._project_menu = self.menuBar().addMenu('项目')
-        # self._panel_menu = self.menuBar().addMenu('面板')
-        self._help_menu = self.menuBar().addMenu('帮助')
+        self._file_menu = self.menuBar().addMenu(T.tr('menu.file', 'File'))
+        self._edit_menu = self.menuBar().addMenu(T.tr('menu.edit', 'Edit'))
+        self._project_menu = self.menuBar().addMenu(T.tr('menu.project', 'Project'))
+        # self._panel_menu = self.menuBar().addMenu('T.tr('menu.panel', 'Panel'))
+        self._help_menu = self.menuBar().addMenu(T.tr('menu.help', 'Help'))
         self._setup()
 
     def _setup(self):
-        # self._set_translator()
         self._set_widget()
         self._set_signal()
         self._set_layout()
         self._set_menu()
-
-    def _set_translator(self):
-        editor_config = get_editor_config()
-        T.load_language(editor_config['lang'])
         
     def _set_widget(self):
         self.resize(1420, 900)
-        self._left_top_tab_widget.addTab(self._hierarchy_window, '层级')
-        self._left_bottom_tab_widget.addTab(self._asset_window, '资源')
-        self._center_top_tab_widget.addTab(self._scene_widnow, '场景')
-        self._center_bottom_tab_widget.addTab(self._console_window, '日志')
-        self._right_top_tab_widget.addTab(self._inspector_window, '属性')
+        self._left_top_tab_widget.addTab(self._hierarchy_window, T.tr('hierarchy.hierarchy', 'Hierarchy'))
+        self._left_bottom_tab_widget.addTab(self._asset_window, T.tr('asset.asset', 'Asset'))
+        self._center_top_tab_widget.addTab(self._scene_widnow, T.tr('scene.scene', 'Scene'))
+        self._center_bottom_tab_widget.addTab(self._console_window, T.tr('console.console', 'Console'))
+        self._right_top_tab_widget.addTab(self._inspector_window, T.tr('inspector.inspector', 'Inspector'))
         self._right_bottom_tab_widget.setHidden(True)
 
         self._left_vertical_splitter.setOrientation(Qt.Orientation.Vertical)
@@ -83,7 +77,7 @@ class EditorBody(QMainWindow):
         self._main_horizontal_splitter.addWidget(self._left_vertical_splitter)
         self._main_horizontal_splitter.addWidget(self._center_vertical_splitter)
         self._main_horizontal_splitter.addWidget(self._right_vertical_splitter)
-        self._main_horizontal_splitter.setSizes([260, 900, 260])
+        self._main_horizontal_splitter.setSizes([270, 880, 270])
 
         self.setCentralWidget(self._central_widget)
 
@@ -111,17 +105,19 @@ class EditorBody(QMainWindow):
         self._set_help_menu()
 
     def _set_file_menu(self):
-        new_project_action = QAction('新建项目', self)
-        open_project_action = QAction('打开项目', self)
-        new_scene_action = QAction('新建场景', self)
-        save_scene_action = QAction('保存场景', self)
-        editor_settings_action = QAction('编辑器设置', self)
-        quit_editor_action = QAction('退出', self)
+        new_project_action = QAction(T.tr('menu.new_project', 'New Project'), self)
+        open_project_action = QAction(T.tr('menu.open_project', 'Open Project'), self)
+        new_scene_action = QAction(T.tr('menu.new_scene', 'New Scene'), self)
+        save_scene_action = QAction(T.tr('menu.save_scene', 'Save Scene'), self)
+        save_as_action = QAction(T.tr('menu.save_as', 'Save As'), self)
+        preference_action = QAction(T.tr('menu.preference', 'Preference'), self)
+        quit_editor_action = QAction(T.tr('menu.new_project', 'Quit'), self)
 
         new_project_action.triggered.connect(self.new_project_signal.emit)
         open_project_action.triggered.connect(self.open_project_signal.emit)
         new_scene_action.triggered.connect(lambda: self._game_manager.load_scene(''))
         save_scene_action.triggered.connect(self._game_manager.save_scene)
+        save_as_action.triggered.connect(self._game_manager.save_as)
         quit_editor_action.triggered.connect(self.quit_editor_signal.emit)
 
         self._file_menu.addAction(new_project_action)
@@ -129,18 +125,19 @@ class EditorBody(QMainWindow):
         self._file_menu.addSeparator()
         self._file_menu.addAction(new_scene_action)
         self._file_menu.addAction(save_scene_action)
+        self._file_menu.addAction(save_as_action)
         self._file_menu.addSeparator()
-        # self._file_menu.addAction(editor_settings_action)
+        # self._file_menu.addAction(preference_action)
         # self._file_menu.addSeparator()
         self._file_menu.addAction(quit_editor_action)
 
     def _set_edit_menu(self):
-        undo_action = QAction('撤销', self)
-        redo_action = QAction('重做', self)
-        cut_action = QAction('剪切', self)
-        copy_action = QAction('复制', self)
-        paste_action = QAction('粘贴', self)
-        select_all_action = QAction('全选', self)
+        undo_action = QAction(T.tr('menu.undo', 'Undo'), self)
+        redo_action = QAction(T.tr('menu.redo', 'Redo'), self)
+        cut_action = QAction(T.tr('menu.cut', 'Cut'), self)
+        copy_action = QAction(T.tr('menu.copy', 'Copy'), self)
+        paste_action = QAction(T.tr('menu.paste', 'Paste'), self)
+        select_all_action = QAction(T.tr('menu.select_all', 'Select All'), self)
         self._edit_menu.addAction(undo_action)
         self._edit_menu.addAction(redo_action)
         self._edit_menu.addAction(cut_action)
@@ -150,20 +147,19 @@ class EditorBody(QMainWindow):
         self._edit_menu.addAction(select_all_action)
 
     def _set_project_menu(self):
-        run_action = QAction('运行', self)
-        build_action = QAction('打包', self)
+        run_action = QAction(T.tr('menu.run', 'Run'), self)
+        build_action = QAction(T.tr('menu.build', 'Build'), self)
 
         run_action.triggered.connect(self._game_manager.run_project)
-        # build_action.triggered.connect()
 
         self._project_menu.addAction(run_action)
         self._project_menu.addAction(build_action)
 
     def _set_help_menu(self):
-        doc_action = QAction('在线文档', self)
-        update_log_action = QAction('更新日志', self)
-        github_action = QAction('Github仓库', self)
-        about_action = QAction('关于Pygame Studio', self)
+        doc_action = QAction(T.tr('menu.documentation', 'Documentation'), self)
+        update_log_action = QAction(T.tr('menu.release_notes', 'Release Notes'), self)
+        github_action = QAction(T.tr('menu.github_repository', 'Github Repository'), self)
+        about_action = QAction(T.tr('menu.about_pygamestudio', 'About Pygame Studio'), self)
 
         self._help_menu.addAction(doc_action)
         self._help_menu.addSeparator()
@@ -174,10 +170,12 @@ class EditorBody(QMainWindow):
 
     def get_ready_for_project(self, project_path):
         self._game_manager.get_ready_for_project(project_path)
+        self._scene_widnow.get_ready_for_project()
         self._asset_window.get_ready_for_project()
         self._console_window.get_ready_for_project()
         self._hierarchy_window.get_ready_for_project()
         self._inspector_window.get_ready_for_project()
+        self._game_manager.set_project_ready()
 
     def clean_up(self):
         self._scene_widnow.clean_up()
@@ -254,25 +252,21 @@ class Editor(WindowBase):
     def keyPressEvent(self, event):
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
             if event.key() == Qt.Key.Key_S:
-                print('保存')
                 self._game_manager.save_scene()
             elif event.key() == Qt.Key.Key_Z:
-                print('撤销')
                 self._game_manager.undo_stack.undo()
             elif event.key() == Qt.Key.Key_Y:
-                print('重做')
                 self._game_manager.undo_stack.redo()
 
         elif event.modifiers() == (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier):
             if event.key() == Qt.Key.Key_Z:
-                print('重做')
                 self._game_manager.undo_stack.redo()
 
         super().keyPressEvent(event)
 
     def closeEvent(self, event):
         if not self._game_manager.is_current_scene_saved():
-            choice = QMessageBox.warning(self, '保存提醒', '当前场景数据已修改，是否保存？', QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel)
+            choice = QMessageBox.warning(self, T.tr('message_box.warning_title', 'Warning'), T.tr('message_box.warning_scene_save_content', 'The current scene data has been modified. Do you want to save it?'), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel)
             if choice == QMessageBox.StandardButton.Cancel:
                 event.ignore()
                 return

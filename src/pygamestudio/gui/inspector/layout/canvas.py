@@ -1,3 +1,4 @@
+from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.gui.inspector.component.lineedit import *
 from pygamestudio.gui.inspector.component.picker import *
 from pygamestudio.gui.inspector.component.spinbox import *
@@ -6,10 +7,7 @@ from pygamestudio.gui.inspector.component.checkbox import *
 
 INSPECTOR_LAYOUT_CANVAS = {
     'visibility': {
-        'i18n': {
-            'zh': '可见性',
-            'en': 'Visibility'
-        },
+        'text': T.tr('inspector.visibility', 'Visibility'),
         'component': {
             'enabled': [True],
             'attribute': ['is_visible'],
@@ -17,10 +15,7 @@ INSPECTOR_LAYOUT_CANVAS = {
         }
     },
     'name': {
-        'i18n': {
-            'zh': '名称',
-            'en': 'Name'
-        },
+        'text': T.tr('inspector.name', 'Name'),
         'component': {
             'enabled': [False],
             'attribute': ['name'],
@@ -28,10 +23,7 @@ INSPECTOR_LAYOUT_CANVAS = {
         }
     },
     'size': {
-        'i18n': {
-            'zh': '尺寸',
-            'en': 'Size'
-        },
+        "text": T.tr('inspector.size', 'Size'),
         'component': {
             'enabled': [False, False],
             'attribute': ['width', 'height'],
@@ -39,10 +31,7 @@ INSPECTOR_LAYOUT_CANVAS = {
         }
     },
     'color': {
-        'i18n': {
-            'zh': '颜色',
-            'en': 'Color'
-        },
+        "text": T.tr('inspector.color', 'Color'),
         'component': {
             'enabled': [True],
             'attribute': ['color'],

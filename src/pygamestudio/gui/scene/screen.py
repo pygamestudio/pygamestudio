@@ -1,40 +1,38 @@
 import pygame
-from PySide6.QtWidgets import *
 from PySide6.QtGui import *
 from PySide6.QtCore import *
-
+from PySide6.QtWidgets import *
 from pygamestudio.game.object.type import *
-
+from pygamestudio.common.utils.config import get_project_config
 
 class PygameScreen(QWidget):
     def __init__(self, game_manager=None, scene=None):
         super().__init__()
         self._game_manager = game_manager
         self._scene = scene
-        
+        self._screen_width = 800
+        self._screen_height = 600
         self._clock = pygame.time.Clock()
-        self._screen_surface = pygame.Surface((self.width(), self.height()))
+        self._screen_surface = pygame.Surface((self._screen_width, self._screen_height))
 
-        self._final_selected_object = None
         self._mouse_x = None
         self._mouse_y = None
         self._is_ctrl_pressed = False
+        self._final_selected_object = None
 
         self._setup()
     
     def _setup(self):
         self._set_widget()
         self._set_signal()
-        self._set_pygame()
 
     def _set_widget(self):
-        self.setWindowTitle("Scene Window")
-        self.setFixedSize(800, 600)   # 这个大小要在项目打开时根据项目配置来，在项目开发时也需要可以被修改
-        self.installEventFilter(self)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setFixedSize(self._screen_width, self._screen_height)
+        self.installEventFilter(self)
 
     def _set_signal(self):
-        self._game_manager.object_added.connect(self._on_object_added)
+        self._game_manager.object_added.connect(self._update_scene)
         self._game_manager.object_deleted.connect(self._update_scene)
         self._game_manager.object_selected.connect(self._update_scene)
         self._game_manager.object_deselected.connect(self._update_scene)
@@ -59,33 +57,26 @@ class PygameScreen(QWidget):
 
     def _set_pygame(self):
         pygame.init()
-        self._screen_surface = pygame.Surface((self.width(), self.height()))
+        self._screen_surface = pygame.Surface((self._screen_width, self._screen_height))
         self._clock.tick(60)
-    
-    def _reset(self):
+
+    def get_ready_for_project(self):
+        self._screen_width = get_project_config()['screen_width']
+        self._screen_height = get_project_config()['screen_height']
+        self.setFixedSize(self._screen_width, self._screen_height)
+        self._set_pygame()
+        self._update_scene()
+
+    def clean_up(self):
         self._final_selected_object = None
         self._mouse_x = None
         self._mouse_y = None
         self._is_ctrl_pressed = False
-        self._update_scene()
-
-    def get_ready_for_project(self):
-        ...
-        
-    def clean_up(self):
-        self._reset()
-        
-    def _on_object_added(self, parent_uuid, object_uuid, inserted_pos):
-        if object_uuid == self._game_manager.scene_object_uuid:
-            obj = self._game_manager.get_object(object_uuid)
-            setattr(obj, 'size', self._screen_surface.get_size())
-            # obj.set_surface(self._screen_surface)
-            obj.update_surface()
-
-        self._update_scene()
+        self._screen_width = 800
+        self._screen_height = 600
 
     def _delete(self):
-        # 找出所有选中的is_selected为True的对s象，然后调用game_manager.delete()
+        # Delete all selected objects.
         selected_uuids = self._game_manager.get_selected_objects_uuids()
         self._game_manager.delete(selected_uuids)
         
@@ -145,7 +136,6 @@ class PygameScreen(QWidget):
         self._update_scene()
 
     def _set_selected_object(self, pos):
-        # 要在这里加上gizmo！！！！！！！！！！！！！！
         self._final_selected_object = None
 
         def _set(object_tree_struct, pos):
@@ -166,7 +156,7 @@ class PygameScreen(QWidget):
             # Clear selection if no object is selected.
             self._game_manager.deselect_all()
             # self._final_selected_object = None
-            self._game_manager.select(self._game_manager.scene_object_uuid)
+            self._game_manager.select(self._game_manager.canvas_object_uuid)
 
     def _move_selected_objects(self, pos):
         if not self._final_selected_object:
@@ -177,11 +167,7 @@ class PygameScreen(QWidget):
             new_x = obj.x+pos.x()-self._mouse_x
             new_y = obj.y+pos.y()-self._mouse_y
             self._game_manager.move(obj.uuid, (new_x, new_y))
-            # obj.x += pos.x() - self._mouse_x
-            # obj.y += pos.y() - self._mouse_y
-        
-        # self._final_selected_object.x += pos.x()-self._mouse_x
-        # self._final_selected_object.y += pos.y()-self._mouse_y
+            
         self._mouse_x = pos.x()
         self._mouse_y = pos.y()
 
@@ -228,7 +214,7 @@ class PygameScreen(QWidget):
     def paintEvent(self, event):
         painter = QPainter(self)
 
-        if self._game_manager.is_current_scene_visible():
+        if self._game_manager.is_current_canvas_visible():
             img = self._convert_screen_surface_to_qimage(self._screen_surface)
             painter.drawPixmap(0, 0, QPixmap.fromImage(img))
         else:

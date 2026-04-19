@@ -1,10 +1,10 @@
-from PySide6.QtWidgets import *
-from PySide6.QtCore import *
 from PySide6.QtGui import *
+from PySide6.QtCore import *
+from PySide6.QtWidgets import *
 
 
 class FontFamilyComboBox(QComboBox):
-    def __init__(self, inspector_window, attr, current_text=''):
+    def __init__(self, inspector_window, current_text='',  attr=''):
         super().__init__()
         self._inspector_window = inspector_window
         self._add_system_fonts()

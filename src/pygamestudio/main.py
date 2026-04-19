@@ -1,10 +1,8 @@
-import os
 import sys
 sys.path.insert(0, 'D:\\Github\\pygamestudio\\src')
-# # print(os.path.join(os.path.dirname(__file__)))
-
 from PySide6.QtWidgets import QApplication
 from pygamestudio.gui.main import PygameStudio
+
 
 if __name__ == '__main__':
     app = QApplication([])

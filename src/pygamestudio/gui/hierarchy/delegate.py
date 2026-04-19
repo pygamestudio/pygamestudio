@@ -1,6 +1,6 @@
-from PySide6.QtWidgets import *
-from PySide6.QtCore import *
 from PySide6.QtGui import *
+from PySide6.QtCore import *
+from PySide6.QtWidgets import *
 from pygamestudio.common.utils.path import RES_PATH
 
 
@@ -56,7 +56,7 @@ class HierarchyTreeViewDelegate(QStyledItemDelegate):
     def paint(self, painter, option, index):
         super().paint(painter, option, index)
 
-        # Get the visibility of target item and that of its ancestor.
+        # Get the visibility of target item and the visibility of its ancestor.
         item = self._standard_model.itemFromIndex(self._proxy_model.mapToSource(index))
         if not item:
             return
@@ -65,7 +65,6 @@ class HierarchyTreeViewDelegate(QStyledItemDelegate):
         is_item_visible = self._tree_view.is_item_visible(item)
         is_ancestor_visible = self._tree_view.is_ancestor_item_visible(item)
         self._draw_eye_pixmap(painter, option.rect, is_hovered, is_item_visible, is_ancestor_visible)
-        # self._draw_index_foreground(index, is_item_visible, is_ancestor_visible)
 
     def editorEvent(self, event, model, option, index):
         # Toggle item's visibility.

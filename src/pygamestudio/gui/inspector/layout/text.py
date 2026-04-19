@@ -1,3 +1,4 @@
+from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.gui.inspector.component.spinbox import *
 from pygamestudio.gui.inspector.component.lineedit import *
 from pygamestudio.gui.inspector.component.picker import *
@@ -8,10 +9,7 @@ from pygamestudio.gui.inspector.component.textedit import *
 
 INSPECTOR_LAYOUT_TEXT = {
     'visibility': {
-        'i18n': {
-            'zh': '可见性',
-            'en': 'Visibility'
-        },
+        'text': T.tr('inspector.visibility', 'Visibility'),
         'component': {
             'enabled': [True],
             'attribute': ['is_visible'],
@@ -19,10 +17,7 @@ INSPECTOR_LAYOUT_TEXT = {
         }
     },
     'name': {
-        'i18n': {
-            'zh': '名称',
-            'en': 'Name'
-        },
+        'text': T.tr('inspector.name', 'Name'),
         'component': {
             'enabled': [True],
             'attribute': ['name'],
@@ -30,10 +25,7 @@ INSPECTOR_LAYOUT_TEXT = {
         }
     },
     'pos': {
-        'i18n': {
-            'zh': '坐标',
-            'en': 'Pos'
-        },
+        "text": T.tr('inspector.pos', 'Pos'),
         'component': {
             'enabled': [True, True],
             'attribute': ['x', 'y'],
@@ -41,10 +33,7 @@ INSPECTOR_LAYOUT_TEXT = {
         }
     },
     'size': {
-        'i18n': {
-            'zh': '尺寸',
-            'en': 'Size'
-        },
+        "text": T.tr('inspector.size', 'Size'),
         'component': {
             'enabled': [True, True],
             'attribute': ['width', 'height'],
@@ -52,10 +41,7 @@ INSPECTOR_LAYOUT_TEXT = {
         }
     },
     'scale': {
-        'i18n': {
-            'zh': '缩放',
-            'en': 'Scale'
-        },
+        "text": T.tr('inspector.scale', 'Scale'),
         'component': {
             'enabled': [True, True],
             'attribute': ['scale_x', 'scale_y'],
@@ -63,10 +49,7 @@ INSPECTOR_LAYOUT_TEXT = {
         }
     },
     'angle': {
-        'i18n': {
-            'zh': '角度',
-            'en': 'Angle'
-        },
+        "text": T.tr('inspector.angle', 'Angle'),
         'component': {
             'enabled': [True],
             'attribute': ['angle'],
@@ -74,10 +57,7 @@ INSPECTOR_LAYOUT_TEXT = {
         }
     },
     'color': {
-        'i18n': {
-            'zh': '颜色',
-            'en': 'Color'
-        },
+        "text": T.tr('inspector.color', 'Color'),
         'component': {
             'enabled': [True],
             'attribute': ['color'],
@@ -85,10 +65,7 @@ INSPECTOR_LAYOUT_TEXT = {
         }
     },
     'string': {
-        'i18n': {
-            'zh': '文本内容',
-            'en': 'Text'
-        },
+        "text": T.tr('inspector.text', 'Text'),
         'component': {
             'enabled': [True],
             'attribute': ['text'],
@@ -96,10 +73,7 @@ INSPECTOR_LAYOUT_TEXT = {
         }
     },
     'font_size': {
-        'i18n': {
-            'zh': '字体大小',
-            'en': 'Font Size'
-        },
+        "text": T.tr('inspector.font_size', 'Font Size'),
         'component': {
             'enabled': [True],
             'attribute': ['font_size'],
@@ -107,10 +81,7 @@ INSPECTOR_LAYOUT_TEXT = {
         }
     },
     'font_family': {
-        'i18n': {
-            'zh': '字体',
-            'en': 'Font Family'
-        },
+        "text": T.tr('inspector.font_family', 'Font Family'),
         'component': {
             'enabled': [True],
             'attribute': ['font_family'],
@@ -118,10 +89,7 @@ INSPECTOR_LAYOUT_TEXT = {
         }
     },
     'is_bold': {
-        'i18n': {
-            'zh': '加粗',
-            'en': 'Bold'
-        },
+        "text": T.tr('inspector.bold', 'Bold'),
         'component': {
             'enabled': [True],
             'attribute': ['is_bold'],
@@ -129,10 +97,7 @@ INSPECTOR_LAYOUT_TEXT = {
         }
     },
     'is_italic': {
-        'i18n': {
-            'zh': '斜体',
-            'en': 'Italic'
-        },
+        "text": T.tr('inspector.italic', 'Italic'),
         'component': {
             'enabled': [True],
             'attribute': ['is_italic'],
@@ -140,10 +105,7 @@ INSPECTOR_LAYOUT_TEXT = {
         }
     },
     'is_underline': {
-        'i18n': {
-            'zh': '下划线',
-            'en': 'Underline'
-        },
+        "text": T.tr('inspector.underline', 'Underline'),
         'component': {
             'enabled': [True],
             'attribute': ['is_underline'],
@@ -151,10 +113,7 @@ INSPECTOR_LAYOUT_TEXT = {
         }
     },
     'is_strikethrough': {
-        'i18n': {
-            'zh': '删除线',
-            'en': 'Strikethrough'
-        },
+        "text": T.tr('inspector.strikethrough', 'Strikethrough'),
         'component': {
             'enabled': [True],
             'attribute': ['is_strikethrough'],

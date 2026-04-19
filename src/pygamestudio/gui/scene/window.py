@@ -1,17 +1,16 @@
-import platform
-import subprocess
-from PySide6.QtWidgets import *
 from PySide6.QtCore import *
-from pygamestudio.gui.scene.grid import GridGraphicsView, GridGraphicsScene
+from PySide6.QtWidgets import *
 from pygamestudio.gui.scene.screen import PygameScreen
+from pygamestudio.gui.scene.grid import GridGraphicsView, GridGraphicsScene
+
 
 class SceneWindow(QWidget):
     def __init__(self, parent=None, game_manager=None):
         super().__init__(parent)
         self._game_manager = game_manager
         self._grid_scene = GridGraphicsScene()
-        self._grid_view = GridGraphicsView(game_manager, self._grid_scene)
         self._pygame_screen = PygameScreen(game_manager, self._grid_scene)
+        self._grid_view = GridGraphicsView(game_manager, self._grid_scene, self._pygame_screen)
 
         self._setup()
 
@@ -32,8 +31,8 @@ class SceneWindow(QWidget):
         return self._pygame_screen
     
     def get_ready_for_project(self):
-        self._grid_view.get_ready_for_project()
         self._pygame_screen.get_ready_for_project()
+        self._grid_view.get_ready_for_project()
 
     def clean_up(self):
         self._grid_view.clean_up()

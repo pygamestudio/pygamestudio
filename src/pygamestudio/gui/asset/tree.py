@@ -131,8 +131,14 @@ class AssetTreeView(QTreeView):
             parent_index = parent_index.parent()
         
         return parent_index
-    
-    def _reset(self):
+        
+    def get_ready_for_project(self):
+        self._root_path = self._game_manager.get_project_path()
+        self._file_model.setRootPath(self._root_path)
+        self._sort_type = get_project_config()['asset']['sort_type']
+        self.setRootIndex(self._proxy_model.mapFromSource(self._file_model.index(self._root_path)))
+
+    def clean_up(self):
         self._clear_highlight_items()
         self._is_cut = False
         self._expand_state = {}
@@ -143,15 +149,6 @@ class AssetTreeView(QTreeView):
         self._root_path = ''
         self._file_model.setRootPath(self._root_path)
         self.setRootIndex(self._proxy_model.mapFromSource(self._file_model.index(self._root_path)))
-        
-    def get_ready_for_project(self):
-        self._root_path = self._game_manager.get_project_path()
-        self._file_model.setRootPath(self._root_path)
-        self._sort_type = get_project_config()['asset']['sort_type']
-        self.setRootIndex(self._proxy_model.mapFromSource(self._file_model.index(self._root_path)))
-
-    def clean_up(self):
-        self._reset()
 
     def create(self, index_type):
         return self._create(index_type)
@@ -220,7 +217,7 @@ class AssetTreeView(QTreeView):
         indexes_to_delete = [index for index in selected_indexes if is_to_delete(index, selected_indexes)]
         index_names = [index.data(Qt.ItemDataRole.DisplayRole) for index in indexes_to_delete]
 
-        content = T.tr('message_box.question_delete_item_content', 'Delete {} item(s)? This cannot be undone.\n{}').format(str(len(indexes_to_delete)), ('\n').join(index_names))
+        content = T.tr('message_box.question_delete_asset_item_content', 'Delete {} item(s)? This cannot be undone.\n{}').format(str(len(indexes_to_delete)), ('\n').join(index_names))
         reply = QMessageBox.question(self, T.tr('message_box.question_title', 'Confirm'), content, QMessageBox.Yes | QMessageBox.No)
 
         if reply == QMessageBox.StandardButton.No:
@@ -558,7 +555,7 @@ class AssetTreeView(QTreeView):
             # Load the same scene.
             if index_path.as_posix() == self._game_manager.current_scene_file_path:
                 self._game_manager.deselect_all()
-                self._game_manager.select(self._game_manager.scene_object_uuid)
+                self._game_manager.select(self._game_manager.canvas_object_uuid)
                 return
             
             # Load a different scene.

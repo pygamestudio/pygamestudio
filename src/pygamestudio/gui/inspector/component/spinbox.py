@@ -1,6 +1,6 @@
-from PySide6.QtWidgets import *
-from PySide6.QtCore import *
 from PySide6.QtGui import *
+from PySide6.QtCore import *
+from PySide6.QtWidgets import *
 
 
 class SuffixSpinBox(QDoubleSpinBox):
@@ -51,7 +51,7 @@ class SuffixSpinBox(QDoubleSpinBox):
 
 
 class PosSpinBox(SuffixSpinBox):
-    def __init__(self, inspector_window, attr, value):
+    def __init__(self, inspector_window, value, attr=''):
         super().__init__()
         self._inspector_window = inspector_window
         self.setRange(-999999, 999999)
@@ -73,7 +73,7 @@ class PosSpinBox(SuffixSpinBox):
 
 
 class SizeSpinBox(SuffixSpinBox):
-    def __init__(self, inspector_window, attr, value):
+    def __init__(self, inspector_window, value, attr=''):
         super().__init__()
         self._inspector_window = inspector_window
         self.setRange(0, 999999)
@@ -90,7 +90,7 @@ class SizeSpinBox(SuffixSpinBox):
 
 
 class ScaleSpinBox(SuffixSpinBox):
-    def __init__(self, inspector_window, attr, value):
+    def __init__(self, inspector_window, value, attr=''):
         super().__init__()
         self._inspector_window = inspector_window
         self.setRange(0, 999999)
@@ -107,7 +107,7 @@ class ScaleSpinBox(SuffixSpinBox):
 
 
 class AngleSpinBox(QDoubleSpinBox):
-    def __init__(self, inspector_window, attr, value):
+    def __init__(self, inspector_window, value, attr=''):
         super().__init__()
         self._inspector_window = inspector_window
         self.setRange(-360, 360)
@@ -119,7 +119,7 @@ class AngleSpinBox(QDoubleSpinBox):
 
 
 class ThicknessSpinBox(SuffixSpinBox):
-    def __init__(self, inspector_window, attr, value):
+    def __init__(self, inspector_window, value, attr=''):
         super().__init__()
         self._inspector_window = inspector_window
         self.setRange(0, 999999)
@@ -131,7 +131,7 @@ class ThicknessSpinBox(SuffixSpinBox):
 
 
 class BorderRadiusSpinBox(SuffixSpinBox):
-    def __init__(self, inspector_window, attr, value):
+    def __init__(self, inspector_window, value, attr=''):
         super().__init__()
         self._inspector_window = inspector_window
         self._attr = attr
@@ -156,7 +156,7 @@ class BorderRadiusSpinBox(SuffixSpinBox):
 
 
 class FontSizeSpinBox(QDoubleSpinBox):
-    def __init__(self, inspector_window, attr, value):
+    def __init__(self, inspector_window, value, attr=''):
         super().__init__()
         self._inspector_window = inspector_window
         self.setRange(0, 999999)

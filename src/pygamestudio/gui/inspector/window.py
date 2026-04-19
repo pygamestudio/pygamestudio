@@ -1,15 +1,14 @@
-from PySide6.QtWidgets import *
-from PySide6.QtCore import *
 from PySide6.QtGui import *
-
+from PySide6.QtCore import *
+from PySide6.QtWidgets import *
+from pygamestudio.game.object.type import *
+from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.gui.inspector.component.label import PropertyLabel
 from pygamestudio.gui.inspector.layout.rect import INSPECTOR_LAYOUT_RECT
 from pygamestudio.gui.inspector.layout.ellipse import INSPECTOR_LAYOUT_ELLIPSE
 from pygamestudio.gui.inspector.layout.line import INSPECTOR_LAYOUT_LINE
-from pygamestudio.gui.inspector.layout.scene import INSPECTOR_LAYOUT_CANVAS
+from pygamestudio.gui.inspector.layout.canvas import INSPECTOR_LAYOUT_CANVAS
 from pygamestudio.gui.inspector.layout.text import INSPECTOR_LAYOUT_TEXT
-
-from pygamestudio.game.object.type import *
 
 
 class InspectorWindow(QWidget):
@@ -28,14 +27,14 @@ class InspectorWindow(QWidget):
         self._set_layout()
 
     def _set_widget(self):
-        self.setMinimumWidth(260)
-        ...
+        self.setMinimumWidth(270)
 
     def _set_signal(self):
-        self._game_manager.object_added.connect(self._on_object_added)
+        # self._game_manager.object_added.connect(self._on_object_added)
         self._game_manager.object_deleted.connect(self._on_object_deleted)
         self._game_manager.object_selected.connect(self._on_object_selected)
-        self._game_manager.object_deselected.connect(self._on_object_deselected)
+        # self._game_manager.object_deselected.connect(self._on_object_deselected)
+        self._game_manager.object_renamed.connect(self._on_object_renamed)
         self._game_manager.object_moved.connect(self._on_object_moved)
         self._game_manager.object_scaled.connect(self._on_object_scaled)
         self._game_manager.object_rotated.connect(self._on_object_rotated)
@@ -57,17 +56,14 @@ class InspectorWindow(QWidget):
     def _set_layout(self):
         self._inspector_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
-    def _reset(self):
-        self._object_uuid_in_inspection = None
-        self._inspector_row = 0
-        self._max_column = 1
-        self._clear_layout(self._inspector_layout)
-
     def get_ready_for_project(self):
         ...
         
     def clean_up(self):
-        self._reset()
+        self._object_uuid_in_inspection = None
+        self._inspector_row = 0
+        self._max_column = 1
+        self._clear_layout(self._inspector_layout)
 
     def rename_object(self):
         lineedit = self._find_widget(self._inspector_layout, 'name')
@@ -175,7 +171,6 @@ class InspectorWindow(QWidget):
         ...
 
     def _on_object_resized(self, object_uuid):
-        # 等待gizmo实现
         obj = self._game_manager.get_object(object_uuid)
         spinbox_width = self._find_widget(self._inspector_layout, 'width')
         spinbox_height = self._find_widget(self._inspector_layout, 'height')
@@ -185,6 +180,13 @@ class InspectorWindow(QWidget):
         spinbox_height.setValue(obj.y)
         spinbox_width.blockSignals(False)
         spinbox_height.blockSignals(False)
+
+    def _on_object_renamed(self, object_uuid):
+        obj = self._game_manager.get_object(object_uuid)
+        name_lineedit = self._find_widget(self._inspector_layout, 'name')
+        name_lineedit.blockSignals(True)
+        name_lineedit.setText(obj.name)
+        name_lineedit.blockSignals(False)
 
     def _on_object_moved(self, object_uuid):
         obj = self._game_manager.get_object(object_uuid)
@@ -340,7 +342,6 @@ class InspectorWindow(QWidget):
         for i in range(layout.count()):
             item = layout.itemAt(i)
             
-            # 如果是控件
             widget = item.widget()
             if widget and widget.objectName() == widget_name:
                 return widget
@@ -387,16 +388,16 @@ class InspectorWindow(QWidget):
 
     def _add_layout_for_specific_object(self, obj, layout_data):
         for property_detail in layout_data.values():
-            name = property_detail['i18n']['en'] # 这里的名称要根据设置来修改
+            text = property_detail['text']
             attribute_list = property_detail['component']['attribute']
             widget_list = property_detail['component']['widget']
             enabled_list = property_detail['component']['enabled']
 
-            label = PropertyLabel(self, 'name', name)
+            label = PropertyLabel(self, text)
             self._inspector_layout.addWidget(label, self._inspector_row, 0, 1, 1)
 
             for i, widget in enumerate(widget_list):
-                w = widget(self, attribute_list[i], getattr(obj, attribute_list[i]))
+                w = widget(self, getattr(obj, attribute_list[i]), attribute_list[i])
                 w.setObjectName(attribute_list[i])
                 w.setEnabled(enabled_list[i])
 

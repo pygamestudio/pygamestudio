@@ -1,3 +1,4 @@
+from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.gui.inspector.component.spinbox import *
 from pygamestudio.gui.inspector.component.lineedit import *
 from pygamestudio.gui.inspector.component.picker import *
@@ -5,10 +6,7 @@ from pygamestudio.gui.inspector.component.checkbox import *
 
 INSPECTOR_LAYOUT_RECT = {
     'visibility': {
-        'i18n': {
-            'zh': '可见性',
-            'en': 'Visibility'
-        },
+        'text': T.tr('inspector.visibility', 'Visibility'),
         'component': {
             'enabled': [True],
             'attribute': ['is_visible'],
@@ -16,10 +14,7 @@ INSPECTOR_LAYOUT_RECT = {
         }
     },
     'name': {
-        'i18n': {
-            'zh': '名称',
-            'en': 'Name'
-        },
+        'text': T.tr('inspector.name', 'Name'),
         'component': {
             'enabled': [True],
             'attribute': ['name'],
@@ -27,10 +22,7 @@ INSPECTOR_LAYOUT_RECT = {
         }
     },
     'pos': {
-        'i18n': {
-            'zh': '坐标',
-            'en': 'Pos'
-        },
+        "text": T.tr('inspector.pos', 'Pos'),
         'component': {
             'enabled': [True, True],
             'attribute': ['x', 'y'],
@@ -38,10 +30,7 @@ INSPECTOR_LAYOUT_RECT = {
         }
     },
     'size': {
-        'i18n': {
-            'zh': '尺寸',
-            'en': 'Size'
-        },
+        "text": T.tr('inspector.size', 'Size'),
         'component': {
             'enabled': [True, True],
             'attribute': ['width', 'height'],
@@ -49,10 +38,7 @@ INSPECTOR_LAYOUT_RECT = {
         }
     },
     'scale': {
-        'i18n': {
-            'zh': '缩放',
-            'en': 'Scale'
-        },
+        "text": T.tr('inspector.scale', 'Scale'),
         'component': {
             'enabled': [True, True],
             'attribute': ['scale_x', 'scale_y'],
@@ -60,10 +46,7 @@ INSPECTOR_LAYOUT_RECT = {
         }
     },
     'angle': {
-        'i18n': {
-            'zh': '角度',
-            'en': 'Angle'
-        },
+        "text": T.tr('inspector.angle', 'Angle'),
         'component': {
             'enabled': [True],
             'attribute': ['angle'],
@@ -71,10 +54,7 @@ INSPECTOR_LAYOUT_RECT = {
         }
     },
     'color': {
-        'i18n': {
-            'zh': '颜色',
-            'en': 'Color'
-        },
+        "text": T.tr('inspector.color', 'Color'),
         'component': {
             'enabled': [True],
             'attribute': ['color'],
@@ -82,10 +62,7 @@ INSPECTOR_LAYOUT_RECT = {
         }
     },
     'border_radius': {
-        'i18n': {
-            'zh': '边框圆角',
-            'en': 'Border Radius'
-        },
+        "text": T.tr('inspector.border_radius', 'Border Radius'),
         'component': {
             'enabled': [True, True, True, True],
             'attribute': ['border_top_left_radius', 'border_top_right_radius', 'border_bottom_left_radius', 'border_bottom_right_radius'],

@@ -1,6 +1,6 @@
-from PySide6.QtWidgets import *
-from PySide6.QtCore import *
 from PySide6.QtGui import *
+from PySide6.QtCore import *
+from PySide6.QtWidgets import *
 from pygamestudio.gui.hierarchy.tree import HierarchyTreeView
 from pygamestudio.gui.hierarchy.search import SearchLineEdit
 from pygamestudio.gui.hierarchy.widget import ExpandCollapseAllButton, AddItemButton
@@ -17,12 +17,8 @@ class HierarchyWindow(QWidget):
         self._set_up()
     
     def _set_up(self):
-        self._set_widget()
         self._set_signal()
         self._set_layout()
-
-    def _set_widget(self):
-        ...
 
     def _set_signal(self):
         self._add_item_button.add_signal.connect(self._hierarchy_tree_view.add)

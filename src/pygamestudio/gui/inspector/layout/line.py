@@ -1,3 +1,4 @@
+from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.gui.inspector.component.spinbox import *
 from pygamestudio.gui.inspector.component.lineedit import *
 from pygamestudio.gui.inspector.component.picker import *
@@ -5,10 +6,7 @@ from pygamestudio.gui.inspector.component.checkbox import *
 
 INSPECTOR_LAYOUT_LINE = {
     'visibility': {
-        'i18n': {
-            'zh': '可见性',
-            'en': 'Visibility'
-        },
+        'text': T.tr('inspector.visibility', 'Visibility'),
         'component': {
             'enabled': [True],
             'attribute': ['is_visible'],
@@ -16,10 +14,7 @@ INSPECTOR_LAYOUT_LINE = {
         }
     },
     'name': {
-        'i18n': {
-            'zh': '名称',
-            'en': 'Name'
-        },
+        'text': T.tr('inspector.name', 'Name'),
         'component': {
             'enabled': [True],
             'attribute': ['name'],
@@ -27,10 +22,7 @@ INSPECTOR_LAYOUT_LINE = {
         }
     },
     'scale': {
-        'i18n': {
-            'zh': '缩放',
-            'en': 'Scale'
-        },
+        "text": T.tr('inspector.scale', 'Scale'),
         'component': {
             'enabled': [True, True],
             'attribute': ['scale_x', 'scale_y'],
@@ -38,10 +30,7 @@ INSPECTOR_LAYOUT_LINE = {
         }
     },
     'angle': {
-        'i18n': {
-            'zh': '角度',
-            'en': 'Angle'
-        },
+        "text": T.tr('inspector.angle', 'Angle'),
         'component': {
             'enabled': [True],
             'attribute': ['angle'],
@@ -49,10 +38,7 @@ INSPECTOR_LAYOUT_LINE = {
         }
     },
     'color': {
-        'i18n': {
-            'zh': '颜色',
-            'en': 'Color'
-        },
+        "text": T.tr('inspector.color', 'Color'),
         'component': {
             'enabled': [True],
             'attribute': ['color'],
@@ -60,10 +46,7 @@ INSPECTOR_LAYOUT_LINE = {
         }
     },
     'start_point': {
-        'i18n': {
-            'zh': '开始坐标',
-            'en': 'Start Point'
-        },
+        "text": T.tr('inspector.start_point', 'Start Point'),
         'component': {
             'enabled': [True, True],
             'attribute': ['start_x', 'start_y'],
@@ -71,10 +54,7 @@ INSPECTOR_LAYOUT_LINE = {
         }
     },
     'end_point': {
-        'i18n': {
-            'zh': '结束坐标',
-            'en': 'End Point'
-        },
+        "text": T.tr('inspector.end_point', 'End Point'),
         'component': {
             'enabled': [True, True],
             'attribute': ['end_x', 'end_y'],
@@ -82,10 +62,7 @@ INSPECTOR_LAYOUT_LINE = {
         }
     },
     'thickness': {
-        'i18n': {
-            'zh': '线宽',
-            'en': 'Thickness'
-        },
+        "text": T.tr('inspector.thickness', 'Thickness'),
         'component': {
             'enabled': [True],
             'attribute': ['thickness'],

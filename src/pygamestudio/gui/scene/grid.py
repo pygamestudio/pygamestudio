@@ -1,16 +1,16 @@
-from PySide6.QtWidgets import QGraphicsView, QGraphicsScene
-from PySide6.QtGui import QPen, QColor, QPainter, QMouseEvent
-from PySide6.QtCore import Qt, QLine, QEvent, QTimer
+import math
+from PySide6.QtGui import *
+from PySide6.QtCore import *
 from PySide6.QtWidgets import *
 from pygamestudio.gui.scene.widget import *
-import math
 
 
 class GridGraphicsView(QGraphicsView):
-    def __init__(self, game_manager, scene):
+    def __init__(self, game_manager, scene, pygame_screen):
         super().__init__()
         self._game_manager = game_manager
         self._scene = scene
+        self._pygame_screen = pygame_screen
         self._zoom_limit = [0.2, 5]
         self._zoom_factor = 1.05
         self._current_scale = 1.0
@@ -28,7 +28,7 @@ class GridGraphicsView(QGraphicsView):
     def _set_widget(self):
         self.scale(0.6, 0.6)
         self.setScene(self._scene)
-        self.centerOn(self._scene.itemsBoundingRect().center())     # 根据项目配置确定场景位置
+        self._center()
 
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -47,24 +47,27 @@ class GridGraphicsView(QGraphicsView):
         v_layout.addLayout(h_layout)
         v_layout.addStretch(1)
 
-    def _reset(self):
+    def _center(self):
+        screen_width = self._pygame_screen.width()
+        screen_height = self._pygame_screen.height()
+        self.centerOn(QPointF(screen_width/2, screen_height/2))
+
+    def resizeEvent(self, event):
+        # Make sure the scene is at center when the editor shows up.
+        if self._is_first_show:
+            self._center()
+        return super().resizeEvent(event)
+
+    def get_ready_for_project(self):
+        self._center()
+
+    def clean_up(self):
         self._zoom_limit = [0.2, 5]
         self._zoom_factor = 1.05
         self._current_scale = 1.0
         self._previous_scale = 1.0
         self._is_dragging = False
-
-    def resizeEvent(self, event):
-        # 为了确保最开始打开编辑器时，场景能够居中
-        if self._is_first_show:
-            self.centerOn(self._scene.itemsBoundingRect().center())
-        return super().resizeEvent(event)
-
-    def get_ready_for_project(self):
-        ...
-        
-    def clean_up(self):
-        self._reset()
+        self._is_first_show = True
 
     def is_dragging(self):
         return self._is_dragging

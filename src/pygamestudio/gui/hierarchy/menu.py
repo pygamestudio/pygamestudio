@@ -1,7 +1,8 @@
-from PySide6.QtWidgets import QApplication, QMenu
 from PySide6.QtGui import QAction
 from PySide6.QtCore import Signal
+from PySide6.QtWidgets import QMenu
 from pygamestudio.game.object.type import *
+from pygamestudio.common.i18n.translator import Translator as T
 
 
 class ContextMenu(QMenu):
@@ -21,19 +22,19 @@ class ContextMenu(QMenu):
         self._parent = parent
 
     def _add_actions(self, item_type):
-        # add_line_action = QAction('直线', self)
-        add_rect_action = QAction('矩形', self)
-        add_ellipse_action = QAction('椭圆', self)
-        add_text_action = QAction('文本', self)
-        cut_action = QAction('剪切', self)
-        copy_action = QAction('复制', self)
-        paste_action = QAction('粘贴', self)
-        delete_action = QAction('删除', self)
-        rename_action = QAction('重命名', self)
-        duplicate_action = QAction('生成副本', self)
-        copy_uuid_action = QAction('复制UUID', self)
-        copy_path_action = QAction('复制路径', self)
-        copy_name_action = QAction('复制名称', self)
+        # add_line_action = QAction(T.tr('item.line', 'Line'), self)
+        add_rect_action = QAction(T.tr('item.rect', 'Rect'), self)
+        add_ellipse_action = QAction(T.tr('item.ellipse', 'Ellipse'), self)
+        add_text_action = QAction(T.tr('item.text', 'Text'), self)
+        cut_action = QAction(T.tr('menu.cut', 'Cut'), self)
+        copy_action = QAction(T.tr('menu.copy', 'Copy'), self)
+        paste_action = QAction(T.tr('menu.paste', 'Paste'), self)
+        delete_action = QAction(T.tr('menu.delete', 'Delete'), self)
+        rename_action = QAction(T.tr('menu.rename', 'Rename'), self)
+        duplicate_action = QAction(T.tr('menu.duplicate', 'Duplicate'), self)
+        copy_uuid_action = QAction(T.tr('menu.copy_uuid', 'Copy UUID'), self)
+        copy_path_action = QAction(T.tr('menu.copy_path', 'Copy Path'), self)
+        copy_name_action = QAction(T.tr('menu.copy_name', 'Copy Name'), self)
 
         # add_line_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_LINE))
         add_rect_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_RECT))
@@ -50,8 +51,8 @@ class ContextMenu(QMenu):
         copy_name_action.triggered.connect(self.copy_name_signal.emit)
 
         # Create actions are for all object types.
-        add_menu = QMenu(title='添加')
-        add_shape_sub_menu = QMenu(title='形状')
+        add_menu = QMenu(title=T.tr('menu.add', 'Add'))
+        add_shape_sub_menu = QMenu(title=T.tr('item.shape', 'Shape'))
         add_ui_sub_menu = QMenu(title='UI')
 
         self.addMenu(add_menu)
@@ -71,7 +72,7 @@ class ContextMenu(QMenu):
         elif item_type == OBJECT_CANVAS:
             self.addAction(paste_action)
             self.addSeparator()
-            copy_menu = QMenu(title='复制路径 | 名称 | UUID')
+            copy_menu = QMenu(title=T.tr('menu.copy_menu_title', 'Copy Path | Name | UUID'))
             copy_menu.addAction(copy_path_action)
             copy_menu.addAction(copy_name_action)
             copy_menu.addAction(copy_uuid_action)
@@ -88,7 +89,7 @@ class ContextMenu(QMenu):
             self.addAction(delete_action)
             self.addAction(rename_action)
             self.addSeparator()
-            copy_menu = QMenu(title='复制路径 | 名称 | UUID')
+            copy_menu = QMenu(title=T.tr('menu.copy_menu_title', 'Copy Path | Name | UUID'))
             copy_menu.addAction(copy_path_action)
             copy_menu.addAction(copy_name_action)
             copy_menu.addAction(copy_uuid_action)

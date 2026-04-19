@@ -1,13 +1,11 @@
-from PySide6.QtWidgets import *
-from PySide6.QtCore import *
 from PySide6.QtGui import *
-
-from pygamestudio.gui.hierarchy.delegate import HierarchyTreeViewDelegate
-from pygamestudio.gui.hierarchy.menu import ContextMenu
-from pygamestudio.gui.hierarchy.command import *
-
-from pygamestudio.gui.hierarchy.model import *
+from PySide6.QtCore import *
+from PySide6.QtWidgets import *
 from pygamestudio.game.object.type import *
+from pygamestudio.gui.console.logger import Logger
+from pygamestudio.gui.hierarchy.menu import ContextMenu
+from pygamestudio.gui.hierarchy.delegate import HierarchyTreeViewDelegate
+from pygamestudio.common.i18n.translator import Translator as T
 
 
 class HierarchyTreeView(QTreeView):
@@ -17,26 +15,16 @@ class HierarchyTreeView(QTreeView):
         self._game_manager = game_manager
 
         self._standard_model = QStandardItemModel()
-        self._proxy_model = HierarchySortFilterProxyModel(self, self._standard_model)
+        self._proxy_model = QSortFilterProxyModel()
         self._delegate = HierarchyTreeViewDelegate(self, self._proxy_model, self._standard_model)
 
         self._is_cut = False
-        # self._highlight_items = []
         self._clipboard_items = []
         self._items_to_delete_by_cut = []
 
         self._canvas_item = None
         self._context_menu = ContextMenu('', self)
         self._setup()
-
-        # # QTimer().singleShot(1000, lambda:self._add(OBJECT_RECT))
-        # # QTimer().singleShot(2000, lambda: self._game_manager.load('D:/Github/pygamestudio/src/pygamestudio/aaa.json'))
-        # from pygamestudio.common.utils.project import get_project_config
-        # from pathlib import Path
-        # import os
-        # scene_file = get_project_config()['asset']['scene']
-        
-        # QTimer().singleShot(2000, lambda: self._standard_model.clear())
 
     def _setup(self):
         self._set_widget()
@@ -162,10 +150,11 @@ class HierarchyTreeView(QTreeView):
         new_name = item.text()
         self._game_manager.rename(item_uuid, new_name)
 
-    def _on_object_renamed(self, object_uuid, new_name):
+    def _on_object_renamed(self, object_uuid):
         self._standard_model.itemChanged.disconnect(self._on_item_changed)
+        obj = self._game_manager.get_object(object_uuid)
         matched_item = self._get_matched_item(object_uuid)
-        matched_item.setText(new_name)
+        matched_item.setText(obj.name)
         self._standard_model.itemChanged.connect(self._on_item_changed)
 
     def _on_item_expanded(self, index):
@@ -184,9 +173,24 @@ class HierarchyTreeView(QTreeView):
         if obj.is_expanded == True:
             self._game_manager.collapse(item_uuid)
 
-    def _reset(self):
+    def get_ready_for_project(self):
+        # Select the items that were selected from last time.
+        # self.selectionModel().blockSignals(True)
+        # selected_objects_uuids = self._game_manager.get_selected_objects_uuids()
+        # for object_uuid in selected_objects_uuids:
+        #     item = self._get_matched_item(object_uuid)
+        #     index = self._proxy_model.mapFromSource(self._standard_model.indexFromItem(item))
+        #     self.selectionModel().select(index, QItemSelectionModel.SelectionFlag.Select)
+        # self.selectionModel().blockSignals(False)
+
+        # Restore the expanded / collapsed status from last time.
+        self.blockSignals(True)
+        self.expandAll()
+        self._restore_collapsed_items()
+        self.blockSignals(False)
+
+    def clean_up(self):
         self._is_cut = False
-        # self._highlight_items = []
         self._clipboard_items = []
         self._items_to_delete_by_cut = []
         self._canvas_item = None
@@ -194,12 +198,6 @@ class HierarchyTreeView(QTreeView):
         self.selectionModel().blockSignals(True)
         self._standard_model.clear()
         self.selectionModel().blockSignals(False)
-
-    def get_ready_for_project(self):
-        ...
-        
-    def clean_up(self):
-        self._reset()
 
     def add(self, item_type):
         return self._add(item_type)
@@ -217,11 +215,11 @@ class HierarchyTreeView(QTreeView):
         obj = self._game_manager.get_object(object_uuid)
 
         if obj.type == OBJECT_CANVAS:
-            self._on_scene_object_added(obj)
+            self._on_canvas_object_added(obj)
         else:
             self._on_regular_object_added(parent_uuid, obj, inserted_pos)
 
-    def _on_scene_object_added(self, obj):
+    def _on_canvas_object_added(self, obj):
         self._canvas_item = QStandardItem()
         self._canvas_item.setText(obj.name)
         self._canvas_item.setIcon(QIcon(obj.icon))
@@ -230,8 +228,6 @@ class HierarchyTreeView(QTreeView):
         self._standard_model.appendRow(self._canvas_item)
         
     def _on_regular_object_added(self, parent_uuid, obj, inserted_pos):
-        # self._highlight_items = []
-
         parent_item = self._get_matched_item(parent_uuid)
         if not parent_item:
             parent_item = self._canvas_item
@@ -250,10 +246,11 @@ class HierarchyTreeView(QTreeView):
             parent_item.setChild(inserted_pos, item)
 
         index = self._proxy_model.mapFromSource(self._standard_model.indexFromItem(item))
-        self.setCurrentIndex(index)
-        self.scrollTo(index)
 
-        # self._highlight_items.append(item)
+        # Ensure that the is_selected property of objects is not changed while loading the scene file.
+        if self._game_manager.is_project_ready:
+            self.setCurrentIndex(index)
+            self.scrollTo(index)
 
     def _cut(self):
         selected_indexes = self.selectedIndexes()
@@ -325,8 +322,8 @@ class HierarchyTreeView(QTreeView):
         if not items_to_delete or len(items_to_delete)==1 and items_to_delete[0]==self._canvas_item:
             return
     
-        content = '是否要删除当前选中对象?'
-        reply = QMessageBox.question(self, '请确认...', content, QMessageBox.Yes | QMessageBox.No)
+        content = T.tr('message_box.question_delete_hierarchy_item_content', 'Delete the selected item(s)')
+        reply = QMessageBox.question(self, T.tr('message_box.quesiton_title', 'Confirm'), content, QMessageBox.Yes | QMessageBox.No)
             
         if reply == QMessageBox.StandardButton.No:
             return
@@ -374,13 +371,13 @@ class HierarchyTreeView(QTreeView):
         item = self._standard_model.itemFromIndex(self._proxy_model.mapToSource(self.currentIndex()))
         path = get_path(item)
         QApplication.clipboard().setText(path)
-        print(path)
+        Logger.info(path)
 
     def _copy_name(self):
         item = self._standard_model.itemFromIndex(self._proxy_model.mapToSource(self.currentIndex()))
         name = item.text()
         QApplication.clipboard().setText(name)
-        print(name)
+        Logger.info(name)
 
     def _restore_collapsed_items(self):
         def _restore(parent_item):
@@ -438,10 +435,6 @@ class HierarchyTreeView(QTreeView):
             self._game_manager.show(item.data(Qt.ItemDataRole.UserRole+1))
 
         self.viewport().update()
-
-    # def _clear_highlight_items(self):
-    #     self._highlight_items = []
-    #     self.viewport().update()
 
     def expand_or_collapse_all(self):
         current_index = self.currentIndex()

@@ -1,9 +1,9 @@
-from PySide6.QtWidgets import *
 from PySide6.QtCore import *
+from PySide6.QtWidgets import *
 
 
 class VisibilityCheckBox(QCheckBox):
-    def __init__(self, inspector_window, attr, is_checked=True):
+    def __init__(self, inspector_window, is_checked=True, attr=''):
         super().__init__()
         self._inspector_window = inspector_window
         self.setChecked(is_checked)
@@ -18,7 +18,7 @@ class VisibilityCheckBox(QCheckBox):
 
 
 class BoldCheckBox(QCheckBox):
-    def __init__(self, inspector_window, attr, is_checked=False):
+    def __init__(self, inspector_window, is_checked=False, attr=''):
         super().__init__()
         self._inspector_window = inspector_window
         self.setChecked(is_checked)
@@ -27,7 +27,7 @@ class BoldCheckBox(QCheckBox):
 
 
 class ItalicCheckBox(QCheckBox):
-    def __init__(self, inspector_window, attr, is_checked=False):
+    def __init__(self, inspector_window, is_checked=False, attr=''):
         super().__init__()
         self._inspector_window = inspector_window
         self.setChecked(is_checked)
@@ -36,7 +36,7 @@ class ItalicCheckBox(QCheckBox):
 
 
 class UnderlineCheckBox(QCheckBox):
-    def __init__(self, inspector_window, attr, is_checked=False):
+    def __init__(self, inspector_window, is_checked=False, attr=''):
         super().__init__()
         self._inspector_window = inspector_window
         self.setChecked(is_checked)
@@ -45,7 +45,7 @@ class UnderlineCheckBox(QCheckBox):
 
 
 class StrikethroughCheckBox(QCheckBox):
-    def __init__(self, inspector_window, attr, is_checked=False):
+    def __init__(self, inspector_window, is_checked=False, attr=''):
         super().__init__()
         self._inspector_window = inspector_window
         self.setChecked(is_checked)
