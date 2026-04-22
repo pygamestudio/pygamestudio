@@ -13,27 +13,17 @@ class CreateProjectButton(QPushButton):
     def _set_up(self):
         self._set_widget()
         self._set_signal()
+        self._set_object_name()
     
     def _set_widget(self):
         self.setText(T.tr('dashboard.create', 'Create'))
-        self.setIcon(QIcon(str(RES_PATH / 'images/create.png')))
-        self.setStyleSheet("""
-        QPushButton {
-            border: none;
-            border-radius: 5px;
-        }
-
-        QPushButton:hover {
-            background-color: red;
-        }    
-
-        QPushButton:pressed {
-            background-color: cyan;
-        }                            
-        """)
+        self.setIcon(QIcon(str(RES_PATH / 'images/create_project.png')))
 
     def _set_signal(self):
         T.add_observer(self)
+
+    def _set_object_name(self):
+        self.setObjectName('dashboardCreateProjectButton')
 
     def retranslate(self):
         self.setText(T.tr('dashboard.create', 'Create'))
@@ -47,27 +37,17 @@ class ImportProjectButton(QPushButton):
     def _set_up(self):
         self._set_widget()
         self._set_signal()
+        self._set_object_name()
 
     def _set_widget(self):
         self.setText(T.tr('dashboard.import', 'Import'))
-        self.setIcon(QIcon(str(RES_PATH / 'images/folder.png')))
-        self.setStyleSheet("""
-        QPushButton {
-            border: none;
-            border-radius: 5px;
-        }
-
-        QPushButton:hover {
-            background-color: red;
-        }    
-
-        QPushButton:pressed {
-            background-color: cyan;
-        }                            
-        """)
+        self.setIcon(QIcon(str(RES_PATH / 'images/import_project.png')))
 
     def _set_signal(self):
         T.add_observer(self)
+
+    def _set_object_name(self):
+        self.setObjectName('dashboardImportProjectButton')
 
     def retranslate(self):
         self.setText(T.tr('dashboard.import', 'Import'))

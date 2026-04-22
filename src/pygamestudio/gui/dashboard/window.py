@@ -32,8 +32,8 @@ class DashboardWindow(WindowBase):
     def _set_widget(self):
         self.resize(640, 460)
         self._center()
-        self.window_title.set_title_name('Pygame Studio Dashboard')
         self.set_window_body(self._dashboard_list_view)
+        self.window_title.set_title_name('Pygame Studio Dashboard')
 
         self._sort_label.setText(T.tr('dashboard.sort', 'Sort:'))
 

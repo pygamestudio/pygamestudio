@@ -5,8 +5,8 @@ from pygamestudio.common.i18n.translator import Translator as T
 
 
 class ProjectSettingsWindow(QWidget):
-    def __init__(self, game_manager):
-        super().__init__()
+    def __init__(self, parent, game_manager):
+        super().__init__(parent)
         self._game_manager = game_manager
         self._list_widget = QListWidget()
         self._main_stacked_widget = QStackedWidget()

@@ -18,7 +18,7 @@ class DashboardDelegate(QStyledItemDelegate):
 
         self._hovered_index = None
         self._button_margin = 5
-        self._button_size = QSize(20, 20)
+        self._button_size = QSize(18, 18)
 
     def paint(self, painter, option, index):
         super().paint(painter, option, index)
@@ -34,7 +34,7 @@ class DashboardDelegate(QStyledItemDelegate):
 
         icon_rect = QRect(option.rect.x() + self._padding, option.rect.y() + (option.rect.height() - self._icon_size.height()) // 2,
                     self._icon_size.width(), self._icon_size.height())
-        icon = QPixmap(project_icon).scaled(self._icon_size)
+        icon = QPixmap(project_icon).scaled(self._icon_size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         painter.drawPixmap(icon_rect, icon)
 
         name_x = icon_rect.right() + self._padding
@@ -46,7 +46,7 @@ class DashboardDelegate(QStyledItemDelegate):
         name_font.setPointSize(12)
         painter.setFont(name_font)
         if is_project_existed:
-            painter.setPen(QColor(50, 50, 50))
+            painter.setPen(QColor(255, 255, 255))
         else:
             painter.setPen(QColor(255, 0, 0))
             project_name += T.tr('dashboard.not_found', ' (Not Found)')
@@ -58,7 +58,7 @@ class DashboardDelegate(QStyledItemDelegate):
         path_font = QFont()
         path_font.setPointSize(8)
         painter.setFont(path_font)
-        painter.setPen(QColor(100, 100, 100))
+        painter.setPen(QColor(204, 204, 204))
         painter.drawText(path_rect, Qt.AlignmentFlag.AlignTop, 
                          painter.fontMetrics().elidedText(project_path, Qt.TextElideMode.ElideRight, name_width))
         
@@ -66,7 +66,7 @@ class DashboardDelegate(QStyledItemDelegate):
         date_font = QFont()
         date_font.setPointSize(7)
         painter.setFont(date_font)
-        painter.setPen(QColor(100, 100, 100))
+        painter.setPen(QColor(204, 204, 204))
         painter.drawText(date_rect, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop, project_date)
         
 
@@ -75,7 +75,7 @@ class DashboardDelegate(QStyledItemDelegate):
         button_rect = QRect(button_x, button_y, self._button_size.width(), self._button_size.height())
         
         if self._hovered_index == index:
-            painter.setBrush(QColor(230, 230, 230))
+            # painter.setBrush(QColor(204, 204, 204))
             painter.setPen(QPen(QColor(150, 150, 150), 1))
             painter.drawRoundedRect(button_rect, 5, 5)
 
@@ -94,6 +94,7 @@ class DashboardDelegate(QStyledItemDelegate):
         if event.type() == QMouseEvent.Type.MouseButtonPress and event.button() == Qt.MouseButton.LeftButton:
             if button_rect.contains(event.pos()):
                 self._hovered_index = index
+                self._list_view.setCurrentIndex(index)
                 self.menuRequested.emit(event.pos())
                 self._hovered_index = None
                 return True

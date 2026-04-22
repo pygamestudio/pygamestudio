@@ -83,15 +83,6 @@ class EditorBody(QMainWindow):
 
         self.setCentralWidget(self._central_widget)
 
-        # 调整菜单栏间距
-        # self.menuBar().setStyleSheet("""
-        #     QMenuBar::item {
-        #         padding: 6px 6px;
-        #         margin: 0px 6px;  /* 菜单项之间的间距 */
-        #         border-radius: 4px;
-        #     }
-        # """)
-
     def _set_signal(self):
         T.add_observer(self)
 
@@ -201,11 +192,11 @@ class EditorBody(QMainWindow):
         self._game_manager.clean_up()
 
     def _show_project_settings_window(self):
-        project_settings_window = ProjectSettingsWindow(self._game_manager)
+        project_settings_window = ProjectSettingsWindow(self, self._game_manager)
         project_settings_window.show()
 
     def _show_editor_settings_window(self):
-        editor_settings_window = EditorSettingsWindow(self._game_manager)
+        editor_settings_window = EditorSettingsWindow(self, self._game_manager)
         editor_settings_window.show()
 
     def retranslate(self):

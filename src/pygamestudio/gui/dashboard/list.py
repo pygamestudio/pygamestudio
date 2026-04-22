@@ -12,6 +12,7 @@ from pygamestudio.gui.dashboard.model import DashboardSortFilterProxyModel
 from pygamestudio.common.utils.path import RES_PATH
 from pygamestudio.common.i18n.translator import Translator as T
 
+
 class DashboardListView(QListView):
     open_project_signal = Signal(str)
 
@@ -37,7 +38,6 @@ class DashboardListView(QListView):
     def _setup(self):
         self._set_widget()
         self._set_signal()
-        self._set_layout()
         self._set_object_name()
         self._load_projects()
 
@@ -71,17 +71,8 @@ class DashboardListView(QListView):
         self._context_menu.create_project_signal.connect(self._show_create_project_window)
         self._context_menu.import_project_signal.connect(self._import_project)
 
-    def _set_layout(self):
-        ...
-
     def _set_object_name(self):
         self.setObjectName('dashboardListView')
-        self.setStyleSheet("""
-            QListView::item {
-                height: 80px;
-                padding: 2px;
-            }
-        """)
 
     def _add_item(self, project_data):
         item = QStandardItem()
@@ -234,6 +225,6 @@ class DashboardListView(QListView):
             painter.setFont(font)
             
             rect = self.viewport().rect()
-            painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, T.tr('message_box.create_project_guide', "You don't have any projects yet.\nPlease click the button to create or import one."))
+            painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, T.tr('dashboard.create_project_guide', "You don't have any projects yet.\nPlease click the button to create or import one."))
             
             painter.restore()

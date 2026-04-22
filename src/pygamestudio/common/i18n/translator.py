@@ -6,7 +6,6 @@ from pygamestudio.common.utils.path import LANG_PATH
 
 
 class Translator:
-    toggle_language_signal = Signal()
     instance = None
     
     def __new__(cls):

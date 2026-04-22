@@ -32,6 +32,7 @@ class CreateProjectBody(QWidget):
         self._set_widget()
         self._set_signal()
         self._set_layout()
+        self._set_object_name()
 
     def _set_widget(self):
         self._project_name_label.setText(T.tr('dashboard.project_name', 'Project Name:'))
@@ -41,12 +42,6 @@ class CreateProjectBody(QWidget):
         self._project_dir_path_edit.setPlaceholderText(T.tr('dashboard.project_path_edit_placeholder', 'Please select or enter the project path'))
 
         self._browse_button.setText(T.tr('dashboard.browse', 'Browse'))
-        self._error_label.setStyleSheet("""
-        QLabel {
-            color: red;
-        }
-        """)
-
         self._create_button.setText(T.tr('dashboard.create', 'Create'))
         self._create_button.setEnabled(False)
         self._cancel_button.setText(T.tr('dashboard.cancel', 'Cancel'))
@@ -80,6 +75,9 @@ class CreateProjectBody(QWidget):
         main_v_layout.addWidget(self._error_label)
         main_v_layout.addStretch()
         main_v_layout.addLayout(h_layout3)
+
+    def _set_object_name(self):
+        self._error_label.setObjectName('dashboardCreateProjectErrorLabel')
         
     def _validate_project(self):
         project_name = self._project_name_edit.text().strip()
@@ -179,10 +177,15 @@ class CreatePorjectWindow(WindowBase):
     def _set_widget(self):
         self.resize(350, 150)
         self.set_window_body(self._create_project_body)
+        self.window_title.set_title_name(T.tr('dashboard.create', 'Create'))
 
     def _set_signal(self):
         self._create_project_body.create_project_signal.connect(self.create_project_signal.emit)
         self._create_project_body.close_window_signal.connect(self.close)
+        T.add_observer(self)
+
+    def retranslate(self):
+        self.window_title.set_title_name(T.tr('dashboard.create', 'Create'))
 
 
 class RenameProjectBody(QWidget):
@@ -206,15 +209,11 @@ class RenameProjectBody(QWidget):
         self._set_widget()
         self._set_signal()
         self._set_layout()
+        self._set_object_name()
 
     def _set_widget(self):
         self._project_name_label.setText(T.tr('dashboard.project_name', 'Project Name:'))
         self._project_name_edit.setPlaceholderText(T.tr('dashboard.project_rename_edit_placeholder', 'Please enter the new project name'))
-        self._error_label.setStyleSheet("""
-        QLabel {
-            color: red;
-        }
-        """)
 
         self._rename_button.setText(T.tr('dashboard.rename', 'Rename'))
         self._rename_button.setEnabled(False)
@@ -241,6 +240,9 @@ class RenameProjectBody(QWidget):
         main_v_layout.addStretch()
         main_v_layout.addLayout(h_layout2)
 
+    def _set_object_name(self):
+        self._error_label.setObjectName('dashboardRenameProjectErrorLabel')
+
     def _validate_project(self):
         new_project_name = self._project_name_edit.text().strip()
         new_project_path = Path(self._old_project_path).parent / new_project_name
@@ -252,6 +254,7 @@ class RenameProjectBody(QWidget):
         
         if new_project_name == Path(self._old_project_path).name:
             self._show_error(T.tr('dashboard.same_name', 'Same name as the original.'))
+            self._rename_button.setEnabled(False)
             return
         
         if new_project_path.exists():
@@ -294,7 +297,11 @@ class RenameProjectBody(QWidget):
         self._project_name_edit.setPlaceholderText(T.tr('dashboard.project_rename_edit_placeholder', 'Please enter the new project name'))
         self._rename_button.setText(T.tr('dashboard.rename', 'Rename'))
         self._cancel_button.setText(T.tr('dashboard.cancel', 'Cancel'))
-
+    
+    def closeEvent(self, event):
+        self._project_name_edit.clear()
+        return super().closeEvent(event)
+    
 
 class RenameProjectWindow(WindowBase):
     rename_project_signal = Signal(QModelIndex, str, str)
@@ -310,11 +317,16 @@ class RenameProjectWindow(WindowBase):
 
     def _set_widget(self):
         self.resize(350, 80)
+        self.window_title.set_title_name(T.tr('dashboard.rename', 'Rename'))
         self.set_window_body(self._rename_project_body)
 
     def _set_signal(self):
         self._rename_project_body.rename_project_signal.connect(self.rename_project_signal.emit)
         self._rename_project_body.close_window_signal.connect(self.close)
+        T.add_observer(self)
 
     def set_index_and_old_project_path(self, index, old_project_path):
         self._rename_project_body.set_index_and_old_project_path(index, old_project_path)
+
+    def retranslate(self):
+        self.window_title.set_title_name(T.tr('menu.rename', 'Rename'))

@@ -5,6 +5,7 @@ from PySide6.QtWidgets import *
 from pygamestudio.common.utils.path import RES_PATH
 from pygamestudio.common.i18n.translator import Translator as T
 
+
 class WindowTitleBase(QWidget):
     window_minimized = Signal()
     window_maximized = Signal()
@@ -33,16 +34,19 @@ class WindowTitleBase(QWidget):
         self._set_object_name()
 
     def _set_widget(self):
-        self._name_label.setText('PygameStudio')
+        self._name_label.setText('Pygame Studio')
 
         self._icon.setFixedSize(20, 20)
         pixmap = QPixmap(str(RES_PATH / 'images/logo.png'))
         scaled_pixmap = pixmap.scaled(self._icon.size())
         self._icon.setPixmap(scaled_pixmap)
-
+        
         self._minimize_btn.setIcon(QIcon(str(RES_PATH / 'images/minimize.png')))
         self._maximize_btn.setIcon(QIcon(str(RES_PATH / 'images/maximize.png')))
         self._close_btn.setIcon(QIcon(str(RES_PATH / 'images/close.png')))
+        self._minimize_btn.setFixedSize(20, 20)
+        self._maximize_btn.setFixedSize(20, 20)
+        self._close_btn.setFixedSize(20, 20)
         self._minimize_btn.setToolTip('Minimize')
         self._maximize_btn.setToolTip('Maximize')
         self._close_btn.setToolTip('Close')
@@ -68,10 +72,9 @@ class WindowTitleBase(QWidget):
         main_h_layout.addLayout(left_h_layout)
         main_h_layout.addStretch(1)
         main_h_layout.addLayout(right_h_layout)
-        main_h_layout.setContentsMargins(3, 3, 3, 3)
+        main_h_layout.setContentsMargins(3, 3, 0, 3)
 
     def _set_object_name(self):
-        self.setObjectName('windowTtitleBase')
         self._name_label.setObjectName('windowTitleBaseNameLabel')
         self._minimize_btn.setObjectName('windowTitleBaseMinimizeBtn')
         self._maximize_btn.setObjectName('windowTitleBaseMaximizeBtn')
@@ -143,6 +146,7 @@ class WindowBase(QWidget):
         self.setMouseTracking(True)
         self.central_widget.setMouseTracking(True)
         self.setWindowFlag(Qt.WindowType.FramelessWindowHint)
+        self.setWindowIcon(QIcon(str(RES_PATH/'images/logo.png')))
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
     def __set_signal(self):
@@ -162,10 +166,9 @@ class WindowBase(QWidget):
         main_v_layout.setContentsMargins(0, 0, 0, 0)
     
     def __set_object_name(self):
-        self.setObjectName('windowBase')
         self.central_widget.setObjectName('windowBaseCentralWidget')
 
-    def __set_editor_theme(self, theme='white'):
+    def __set_editor_theme(self, theme='dark'):
         theme_qss_path = RES_PATH / f'qss/{theme}.qss'
         if not theme_qss_path.exists():
             QMessageBox.critical(self, T.tr('message_box.critical_title', 'Error'), T.tr('message_box.critical_read_qss_content', 'The theme QSS file {}.qss does not exist!').format(theme))
