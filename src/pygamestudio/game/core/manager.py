@@ -780,9 +780,9 @@ class GameManager(QObject):
                 stderr=None,
                 shell=False
             )
-            Logger.info(f'Run Project{Path(self._project_path).name}')
+            Logger.info(f'Run Project {Path(self._project_path).name}')
         except Exception as e:
-            Logger.error(f'Failed to run project{Path(self._project_path).name}: {e}')
+            Logger.error(f'Failed to run project {Path(self._project_path).name}: {e}')
 
 
 class AddObjectCommand(QUndoCommand):

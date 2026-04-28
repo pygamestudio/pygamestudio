@@ -19,12 +19,8 @@ class ConsoleWindow(QWidget):
         self._set_up()
 
     def _set_up(self):
-        self._set_widget()
         self._set_signal()
         self._set_layout()
-
-    def _set_widget(self):
-        ...
 
     def _set_signal(self):
         self._console_log_browser.clear_log_signal.connect(self._info_check_box.reset_log_num)
@@ -40,6 +36,12 @@ class ConsoleWindow(QWidget):
         self._error_check_box.check_box_clicked.connect(self._console_log_browser.on_error_check_box_clicked)
         self._warning_check_box.check_box_clicked.connect(self._console_log_browser.on_warning_check_box_clicked)
 
+        from pygamestudio.gui.console.logger import Logger
+
+        Logger.info('测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试')
+        Logger.error('测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试')
+        Logger.warning('测试测试测试测试测试测试测试测试测试')
+
     def _set_layout(self):
         h_layout = QHBoxLayout()
         v_layout = QVBoxLayout(self)
@@ -47,7 +49,9 @@ class ConsoleWindow(QWidget):
         h_layout.addWidget(self._search_line_edit)
         h_layout.addStretch(1)
         h_layout.addWidget(self._info_check_box)
+        h_layout.addSpacerItem(QSpacerItem(10, 0))
         h_layout.addWidget(self._warning_check_box)
+        h_layout.addSpacerItem(QSpacerItem(10, 0))
         h_layout.addWidget(self._error_check_box)
         h_layout.setContentsMargins(0, 0, 0, 0)
 

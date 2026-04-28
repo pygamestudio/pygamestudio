@@ -90,21 +90,28 @@
         "sort_by_size_asc": "按大小排序（升序）",
         "sort_by_size_desc": "按大小排序（降序）",
         "sort_by_time_asc": "按时间排序（升序）",
-        "sort_by_time_desc": "按时间排序（降序）"
+        "sort_by_time_desc": "按时间排序（降序）",
+        "add": "添加",
+        "sort": "排序",
+        "refresh": "刷新"
     },
 
     "scene": {
-        "scene": "场景编辑器"
+        "scene": "场景编辑器",
+        "run_project": "运行项目"
     },
 
     "hierarchy": {
         "hierarchy": "层级管理器",
-        "search_placeholder": "输入名称或UUID搜索"
+        "search_placeholder": "输入名称或UUID搜索",
+        "expand_or_collapse_all": "全部展开或收缩",
+        "add": "添加"
     },
 
     "console": {
         "console": "控制台",
-        "clear": "清空"
+        "clear": "清空",
+        "search_placeholder": "搜索日志"
     },
 
     "inspector": {

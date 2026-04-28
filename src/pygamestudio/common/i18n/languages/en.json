@@ -90,21 +90,28 @@
         "sort_by_size_asc": "Sort by Size (ASC)",
         "sort_by_size_desc": "Sort by Size (DESC)",
         "sort_by_time_asc": "Sort by Time (ASC)",
-        "sort_by_time_desc": "Sort by Time (DESC)"
+        "sort_by_time_desc": "Sort by Time (DESC)",
+        "add": "Add",
+        "sort": "Sort",
+        "refresh": "Refresh"
     },
 
     "scene": {
-        "scene": "Scene"
+        "scene": "Scene",
+        "run_project": "Run Project"
     },
 
     "hierarchy": {
         "hierarchy": "Hierarchy",
-        "search_placeholder": "Search by name or uuid"
+        "search_placeholder": "Search by name or uuid",
+        "expand_or_collapse_all": "Expand Or Collapse All",
+        "add": "Add"
     },
 
     "console": {
         "console": "Console",
-        "clear": "Clear"
+        "clear": "Clear",
+        "search_placeholder": "Search log"
     },
 
     "inspector": {

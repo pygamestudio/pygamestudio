@@ -6,7 +6,7 @@ from pygamestudio.common.i18n.translator import Translator as T
 
 
 class ContextMenu(QMenu):
-    create_signal = Signal(str)
+    add_signal = Signal(str)
     cut_signal = Signal()
     copy_signal = Signal()
     paste_signal = Signal()
@@ -26,11 +26,11 @@ class ContextMenu(QMenu):
 
     def _add_actions(self, index_type):
         edit_action = QAction(T.tr('menu.edit', 'Edit'), self)
-        create_folder_action = QAction(T.tr('menu.folder', 'Folder'), self)
-        create_script_action = QAction(T.tr('menu.script', 'Script'), self)
-        create_scene_action = QAction(T.tr('menu.scene', 'Scene'), self)
-        create_txt_action = QAction('TXT', self)
-        create_json_action = QAction('JSON', self)
+        add_folder_action = QAction(T.tr('menu.folder', 'Folder'), self)
+        add_script_action = QAction(T.tr('menu.script', 'Script'), self)
+        add_scene_action = QAction(T.tr('menu.scene', 'Scene'), self)
+        add_txt_action = QAction('TXT', self)
+        add_json_action = QAction('JSON', self)
         cut_action = QAction(T.tr('menu.cut', 'Cut'), self)
         copy_action = QAction(T.tr('menu.copy', 'Copy'), self)
         paste_action = QAction(T.tr('menu.paste', 'Paste'), self)
@@ -45,11 +45,11 @@ class ContextMenu(QMenu):
         show_in_explorer_action = QAction(T.tr('menu.show_in_explorer', 'Show in Explorer'), self)
 
         edit_action.triggered.connect(self.open_externally_signal.emit)
-        create_folder_action.triggered.connect(lambda: self.create_signal.emit(INDEX_FOLDER))
-        create_script_action.triggered.connect(lambda: self.create_signal.emit(INDEX_SCRIPT))
-        create_scene_action.triggered.connect(lambda: self.create_signal.emit(INDEX_SCENE))
-        create_txt_action.triggered.connect(lambda: self.create_signal.emit(INDEX_TXT))
-        create_json_action.triggered.connect(lambda: self.create_signal.emit(INDEX_JSON))
+        add_folder_action.triggered.connect(lambda: self.add_signal.emit(INDEX_FOLDER))
+        add_script_action.triggered.connect(lambda: self.add_signal.emit(INDEX_SCRIPT))
+        add_scene_action.triggered.connect(lambda: self.add_signal.emit(INDEX_SCENE))
+        add_txt_action.triggered.connect(lambda: self.add_signal.emit(INDEX_TXT))
+        add_json_action.triggered.connect(lambda: self.add_signal.emit(INDEX_JSON))
         cut_action.triggered.connect(self.cut_signal.emit)
         copy_action.triggered.connect(self.copy_signal.emit)
         paste_action.triggered.connect(self.paste_signal.emit)
@@ -63,17 +63,17 @@ class ContextMenu(QMenu):
         open_externally_action.triggered.connect(self.open_externally_signal.emit)
         show_in_explorer_action.triggered.connect(self.show_in_explorer_signal.emit)
         
-        create_menu = QMenu(title=T.tr('menu.create', 'Create'))
-        text_file_sub_menu = QMenu(title=T.tr('menu.text_file', 'Text File'))
+        add_menu = QMenu(title=T.tr('menu.add', 'Add'), parent=self)
+        text_file_sub_menu = QMenu(title=T.tr('menu.text_file', 'Text File'), parent=self)
 
-        # Create actions are for all index types.
-        self.addMenu(create_menu)
-        create_menu.addAction(create_folder_action)
-        create_menu.addAction(create_script_action)
-        create_menu.addAction(create_scene_action)
-        text_file_sub_menu.addAction(create_txt_action)
-        text_file_sub_menu.addAction(create_json_action)
-        create_menu.addMenu(text_file_sub_menu)
+        # Create actions that are for all index types.
+        self.addMenu(add_menu)
+        add_menu.addAction(add_folder_action)
+        add_menu.addAction(add_script_action)
+        add_menu.addAction(add_scene_action)
+        text_file_sub_menu.addAction(add_txt_action)
+        text_file_sub_menu.addAction(add_json_action)
+        add_menu.addMenu(text_file_sub_menu)
 
         # Right click on the blank area.
         if index_type == INDEX_INVALID:
@@ -96,7 +96,7 @@ class ContextMenu(QMenu):
             self.addAction(delete_action)
 
             self.addSeparator()
-            copy_menu = QMenu(title=T.tr('menu.copy_menu_title', 'Copy Path | Name | UUID'))
+            copy_menu = QMenu(title=T.tr('menu.copy_menu_title', 'Copy Path | Name | UUID'), parent=self)
             copy_menu.addAction(copy_path_action)
             copy_menu.addAction(copy_name_action)
             copy_menu.addAction(copy_uuid_action)
@@ -108,8 +108,8 @@ class ContextMenu(QMenu):
 
         # Right click on the specific file index.
         if index_type == INDEX_FILE:
-            self.insertAction(create_menu.menuAction(), edit_action)
-            self.insertSeparator(create_menu.menuAction())
+            self.insertAction(add_menu.menuAction(), edit_action)
+            self.insertSeparator(add_menu.menuAction())
             self.insertAction(show_in_explorer_action, open_externally_action)
         
         self._set_paste_action_status(paste_action)

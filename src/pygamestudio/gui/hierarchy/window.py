@@ -19,6 +19,7 @@ class HierarchyWindow(QWidget):
     def _set_up(self):
         self._set_signal()
         self._set_layout()
+        self._set_object_name()
 
     def _set_signal(self):
         self._add_item_button.add_signal.connect(self._hierarchy_tree_view.add)
@@ -29,13 +30,16 @@ class HierarchyWindow(QWidget):
         h_layout = QHBoxLayout()
         v_layout = QVBoxLayout(self)
         h_layout.addWidget(self._add_item_button)
-        h_layout.addWidget(self._search_line_edit)
         h_layout.addWidget(self._expand_collapse_all_button)
-        h_layout.setSpacing(0)
-        h_layout.setContentsMargins(0, 0, 0, 0)
+        h_layout.addWidget(self._search_line_edit)
+        h_layout.setContentsMargins(0, 4, 0, 0)
 
         v_layout.addLayout(h_layout)
         v_layout.addWidget(self._hierarchy_tree_view)
+        v_layout.setContentsMargins(0, 0, 0, 0)
+
+    def _set_object_name(self):
+        self.setObjectName('hierarchy')
 
     @property
     def hierarchy_tree_view(self):

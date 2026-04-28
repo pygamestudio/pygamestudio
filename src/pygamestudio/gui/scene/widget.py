@@ -2,6 +2,7 @@ from PySide6.QtGui import *
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
 from pygamestudio.common.utils.path import RES_PATH
+from pygamestudio.common.i18n.translator import Translator as T
 
 
 class RunProjectButton(QPushButton):
@@ -11,20 +12,18 @@ class RunProjectButton(QPushButton):
 
     def _set_up(self):
         self._set_widget()
+        self._set_signal()
+        self._set_object_name()
     
     def _set_widget(self):
+        self.setToolTip(T.tr('scene.run_project', 'Run Project'))
         self.setIcon(QIcon(str(RES_PATH / 'images/run.png')))
-        self.setStyleSheet("""
-        QPushButton {
-            border: none;
-            border-radius: 5px;
-        }
 
-        QPushButton:hover {
-            background-color: red;
-        }    
+    def _set_signal(self):
+        T.add_observer(self)
 
-        QPushButton:pressed {
-            background-color: cyan;
-        }                            
-        """)
+    def _set_object_name(self):
+        self.setObjectName('sceneRunProjectBtn')
+    
+    def retranslate(self):
+        self.setToolTip(T.tr('scene.run_project', 'Run Project'))

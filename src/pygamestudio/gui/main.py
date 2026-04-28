@@ -1,3 +1,4 @@
+import pygame
 from PySide6.QtCore import *
 from pygamestudio.gui.window import Editor
 from pygamestudio.gui.dashboard.window import DashboardWindow
@@ -7,10 +8,12 @@ from pygamestudio.common.i18n.translator import Translator as T
 
 class PygameStudio:
     def __init__(self):
+        pygame.init()
         self._set_translator()
         self._dashboard = DashboardWindow()
         self._editor = Editor(self)
         self._setup()
+        self._enter_editor("C:/Users/louis/Desktop/111")
 
     def _setup(self):
         self._set_signal()

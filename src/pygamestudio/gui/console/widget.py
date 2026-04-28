@@ -32,9 +32,10 @@ class LogCheckBox(QWidget):
 
     def _set_layout(self):
         h_layout = QHBoxLayout(self)
-        h_layout.addWidget(self._check_box)
         h_layout.addWidget(self._log_icon)
         h_layout.addWidget(self._log_text)
+        h_layout.addWidget(self._check_box)
+        h_layout.setContentsMargins(0, 0, 0, 0)
 
     def _set_icon(self):
         pixmap = QPixmap()
@@ -44,7 +45,7 @@ class LogCheckBox(QWidget):
             pixmap = QPixmap(RES_PATH/'images/warning.png')
         else:
             pixmap = QPixmap(RES_PATH/'images/info.png')
-        pixmap = pixmap.scaled(QSize(18, 18))
+        pixmap = pixmap.scaled(QSize(20, 20), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         self._log_icon.setPixmap(pixmap)
 
     def increase_one_log_num(self):
@@ -60,21 +61,6 @@ class ClearButton(QPushButton):
         super().__init__(parent)
         self.setIcon(QIcon(str(RES_PATH/'images/clear.png')))
         self.setText(T.tr('console.clear', 'Clear'))
-        self.setStyleSheet("""
-        QPushButton {
-            border: none;
-            border-radius: 5px;
-        }
-
-        QPushButton:hover {
-            background-color: red;
-        }    
-
-        QPushButton:pressed {
-            background-color: cyan;
-        }                            
-        """)
-
         T.add_observer(self)
 
     def retranslate(self):

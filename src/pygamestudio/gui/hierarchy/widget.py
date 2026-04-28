@@ -1,6 +1,6 @@
-from PySide6.QtCore import Signal
-from PySide6.QtGui import QIcon, QAction
-from PySide6.QtWidgets import QPushButton, QMenu
+from PySide6.QtGui import *
+from PySide6.QtCore import *
+from PySide6.QtWidgets import *
 from pygamestudio.game.object.type import *
 from pygamestudio.common.utils.path import RES_PATH
 from pygamestudio.common.i18n.translator import Translator as T
@@ -13,23 +13,17 @@ class ExpandCollapseAllButton(QPushButton):
 
     def _set_up(self):
         self._set_widget()
-    
+        self._set_signal()
+
     def _set_widget(self):
-        self.setIcon(QIcon(str(RES_PATH / 'images/expand.png')))
-        self.setStyleSheet("""
-        QPushButton {
-            border: none;
-            border-radius: 5px;
-        }
+        self.setToolTip(T.tr('hierarchy.expand_or_collapse_all', 'Expand or Collapse All'))
+        self.setIcon(QIcon(str(RES_PATH / 'images/expand_or_collapse_all.png')))
 
-        QPushButton:hover {
-            background-color: red;
-        }    
+    def _set_signal(self):
+        T.add_observer(self)
 
-        QPushButton:pressed {
-            background-color: cyan;
-        }                            
-        """)
+    def retranslate(self):
+        self.setToolTip(T.tr('hierarchy.expand_or_collapse_all', 'Expand or Collapse All'))
 
 
 class AddItemButton(QPushButton):
@@ -41,26 +35,24 @@ class AddItemButton(QPushButton):
 
     def _set_up(self):
         self._set_widget()
+        self._set_signal()
     
     def _set_widget(self):
-        self.setIcon(QIcon(str(RES_PATH / 'images/create.png')))
-        self.setStyleSheet("""
-        QPushButton {
-            border: none;
-            border-radius: 5px;
-        }
+        self.setToolTip(T.tr('hierarchy.add', 'Add'))
+        self.setIcon(QIcon(str(RES_PATH / 'images/add_item.png')))
 
-        QPushButton:hover {
-            background-color: red;
-        }                       
-        """)
+    def _set_signal(self):
+        T.add_observer(self)
+ 
+    def retranslate(self):
+        self.setToolTip(T.tr('hierarchy.add', 'Add'))
 
     def mousePressEvent(self, event):
         self._show_context_menu(event.pos())
         super().mousePressEvent(event)
 
     def _show_context_menu(self, pos):
-        menu = QMenu()
+        menu = QMenu(self)
         # add_line_action = QAction(T.tr('item.line', 'Line'), self)
         add_rect_action = QAction(T.tr('item.rect', 'Rect'), self)
         add_ellipse_action = QAction(T.tr('item.ellipse', 'Ellipse'), self)
@@ -71,8 +63,8 @@ class AddItemButton(QPushButton):
         add_ellipse_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_ELLIPSE))
         add_text_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_TEXT))
 
-        add_shape_sub_menu = QMenu(title=T.tr('item.shape', 'Shape'))
-        add_ui_sub_menu = QMenu(title='UI')
+        add_shape_sub_menu = QMenu(title=T.tr('item.shape', 'Shape'), parent=self)
+        add_ui_sub_menu = QMenu(title='UI', parent=self)
         menu.addMenu(add_shape_sub_menu)
         menu.addMenu(add_ui_sub_menu)
 

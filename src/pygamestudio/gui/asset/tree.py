@@ -35,6 +35,7 @@ class AssetTreeView(QTreeView):
     def _set_up(self):
         self._set_widget()
         self._set_signal()
+        self._set_object_name()
 
     def _set_widget(self):
         self._file_model.setReadOnly(False)
@@ -63,38 +64,12 @@ class AssetTreeView(QTreeView):
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.setSelectionMode(QTreeWidget.SelectionMode.ExtendedSelection)
         self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-
-        self.setStyleSheet("""
-        QTreeView {
-            border: none !important;
-            outline: none !important;
-            background-color: transparent;
-        } 
-                                              
-        QTreeView::item:hover {
-            background-color: #e5f3ff;
-        }
-                           
-        QTreeView::item:selected {
-            background-color: #cce8ff;
-        }
-
-        QTreeView::item:selected:active {
-            background-color: #cce8ff;
-            color: black;
-        }
-
-        QTreeView::item:selected:!active {
-            background-color: #d9d9d9;
-            color: black;
-        }
-        """)
-    
+                
     def _set_signal(self):
         self.selectionModel().selectionChanged.connect(self._clear_highlight_items)
         self.customContextMenuRequested.connect(self._show_context_menu)
 
-        self._context_menu.create_signal.connect(self._create)
+        self._context_menu.add_signal.connect(self._add)
         self._context_menu.cut_signal.connect(self._cut)
         self._context_menu.copy_signal.connect(self._copy)
         self._context_menu.paste_signal.connect(self._paste)
@@ -106,6 +81,9 @@ class AssetTreeView(QTreeView):
         self._context_menu.open_in_terminal_signal.connect(self._open_in_terminal)
         self._context_menu.open_externally_signal.connect(self._open_externally)
         self._context_menu.show_in_explorer_signal.connect(self._show_in_explorer)
+
+    def _set_object_name(self):
+        self.setObjectName('assetTreeView')
 
     def _show_context_menu(self, pos):
         index = self.indexAt(pos)
@@ -150,25 +128,25 @@ class AssetTreeView(QTreeView):
         self._file_model.setRootPath(self._root_path)
         self.setRootIndex(self._proxy_model.mapFromSource(self._file_model.index(self._root_path)))
 
-    def create(self, index_type):
-        return self._create(index_type)
+    def add(self, index_type):
+        return self._add(index_type)
     
-    def _create(self, index_type):
+    def _add(self, index_type):
         self._highlight_indexes_paths = []
 
         if index_type == INDEX_FOLDER:
-            self._create_folder()
+            self._add_folder()
         else:
-            self._create_file(index_type)
+            self._add_file(index_type)
 
         self._rename()
 
-    def _create_folder(self):
+    def _add_folder(self):
         parent_index = self._get_parent_index_for_creation()
         self.setExpanded(parent_index, True)
         parent_path = Path(self._file_model.filePath(self._proxy_model.mapToSource(parent_index)))
 
-        # Make sure the created folder name does not exist in the current directory.
+        # Make sure the added folder name does not exist in the current directory.
         new_folder_name = INDEX_FOLDER
         folder_path = self._get_unique_path(new_folder_name, parent_path)
         folder_path.mkdir()
@@ -178,12 +156,12 @@ class AssetTreeView(QTreeView):
         QTimer().singleShot(10, lambda:self.scrollTo(new_index))
         self._highlight_indexes_paths.append(folder_path)
 
-    def _create_file(self, index_type):
+    def _add_file(self, index_type):
         parent_index = self._get_parent_index_for_creation()
         self.setExpanded(parent_index, True)
         parent_path = Path(self._file_model.filePath(self._proxy_model.mapToSource(parent_index)))
 
-        # Make sure the created file name does not exist in the current directory.
+        # Make sure the added file name does not exist in the current directory.
         new_file_name = index_type
         file_path = self._get_unique_path(new_file_name, parent_path)
         file_path.touch()

@@ -28,6 +28,7 @@ class DashboardWindow(WindowBase):
         self._set_widget()
         self._set_signal()
         self._set_layout()
+        self._set_object_name()
 
     def _set_widget(self):
         self.resize(640, 460)
@@ -54,6 +55,9 @@ class DashboardWindow(WindowBase):
         widget_h_layout.addWidget(self._sort_type_combobox)
         self.central_v_layout.insertLayout(1, widget_h_layout)
 
+    def _set_object_name(self):
+        self.setObjectName('dashboard')
+        
     def _center(self):
         screen = QApplication.primaryScreen()
         screen_width = screen.availableGeometry().width()

@@ -1,6 +1,6 @@
-from PySide6.QtGui import QAction
-from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QMenu
+from PySide6.QtGui import *
+from PySide6.QtCore import *
+from PySide6.QtWidgets import *
 from pygamestudio.game.object.type import *
 from pygamestudio.common.i18n.translator import Translator as T
 
@@ -50,10 +50,10 @@ class ContextMenu(QMenu):
         copy_path_action.triggered.connect(self.copy_path_signal.emit)
         copy_name_action.triggered.connect(self.copy_name_signal.emit)
 
-        # Create actions are for all object types.
-        add_menu = QMenu(title=T.tr('menu.add', 'Add'))
-        add_shape_sub_menu = QMenu(title=T.tr('item.shape', 'Shape'))
-        add_ui_sub_menu = QMenu(title='UI')
+        # Create actions that are for all object types.
+        add_menu = QMenu(title=T.tr('menu.add', 'Add'), parent=self)
+        add_shape_sub_menu = QMenu(title=T.tr('item.shape', 'Shape'), parent=self)
+        add_ui_sub_menu = QMenu(title='UI', parent=self)
 
         self.addMenu(add_menu)
         add_menu.addMenu(add_shape_sub_menu)
@@ -72,7 +72,7 @@ class ContextMenu(QMenu):
         elif item_type == OBJECT_CANVAS:
             self.addAction(paste_action)
             self.addSeparator()
-            copy_menu = QMenu(title=T.tr('menu.copy_menu_title', 'Copy Path | Name | UUID'))
+            copy_menu = QMenu(title=T.tr('menu.copy_menu_title', 'Copy Path | Name | UUID'), parent=self)
             copy_menu.addAction(copy_path_action)
             copy_menu.addAction(copy_name_action)
             copy_menu.addAction(copy_uuid_action)
@@ -89,7 +89,7 @@ class ContextMenu(QMenu):
             self.addAction(delete_action)
             self.addAction(rename_action)
             self.addSeparator()
-            copy_menu = QMenu(title=T.tr('menu.copy_menu_title', 'Copy Path | Name | UUID'))
+            copy_menu = QMenu(title=T.tr('menu.copy_menu_title', 'Copy Path | Name | UUID'), parent=self)
             copy_menu.addAction(copy_path_action)
             copy_menu.addAction(copy_name_action)
             copy_menu.addAction(copy_uuid_action)

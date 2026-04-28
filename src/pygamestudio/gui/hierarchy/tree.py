@@ -40,7 +40,7 @@ class HierarchyTreeView(QTreeView):
 
         self.setModel(self._proxy_model)
         self.setItemDelegate(self._delegate)
-        
+
         self.setAcceptDrops(True)
         self.setDragEnabled(True)
         self.setHeaderHidden(True)
@@ -51,33 +51,9 @@ class HierarchyTreeView(QTreeView):
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.setSelectionMode(QTreeView.SelectionMode.ExtendedSelection)
         self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.header().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-
-        self.setStyleSheet("""
-        QTreeView {
-            border: none !important;
-            outline: none !important;
-            background-color: transparent;
-        } 
-                                              
-        QTreeView::item:hover {
-            background-color: #e5f3ff;
-        }
-                           
-        QTreeView::item:selected {
-            background-color: #cce8ff;
-        }
-
-        QTreeView::item:selected:active {
-            background-color: #cce8ff;
-            color: black;
-        }
-
-        QTreeView::item:selected:!active {
-            background-color: #d9d9d9;
-            color: black;
-        }
-        """)
+        self.header().setStretchLastSection(False)
+        self.header().setMinimumSectionSize(self.viewport().width())
+        self.header().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
 
     def _set_signal(self):
         self.selectionModel().selectionChanged.connect(self._on_item_selection_changed)
@@ -105,10 +81,6 @@ class HierarchyTreeView(QTreeView):
         self._game_manager.object_cut.connect(self._on_object_cut)
         self._game_manager.object_showed.connect(self._on_object_showed)
         self._game_manager.object_hidden.connect(self._on_object_hidden)
-
-    def _add_canvas_item(self):
-        """The scene objecct will exist at start and forever."""
-        self._game_manager.add('', OBJECT_CANVAS)
 
     def _on_item_selection_changed(self, selected, deselected):
         for index in selected.indexes():
@@ -211,7 +183,7 @@ class HierarchyTreeView(QTreeView):
             self._on_canvas_object_added(obj)
         else:
             self._on_regular_object_added(parent_uuid, obj, inserted_pos)
-
+        
     def _on_canvas_object_added(self, obj):
         self._canvas_item = QStandardItem()
         self._canvas_item.setText(obj.name)
@@ -219,7 +191,7 @@ class HierarchyTreeView(QTreeView):
         self._canvas_item.setData(obj.uuid, Qt.ItemDataRole.UserRole+1)
         self._canvas_item.setFlags(self._canvas_item.flags() & ~Qt.ItemFlag.ItemIsDragEnabled)
         self._standard_model.appendRow(self._canvas_item)
-        
+
     def _on_regular_object_added(self, parent_uuid, obj, inserted_pos):
         parent_item = self._get_matched_item(parent_uuid)
         if not parent_item:
@@ -340,6 +312,7 @@ class HierarchyTreeView(QTreeView):
         item = self._standard_model.itemFromIndex(self._proxy_model.mapToSource(self.currentIndex()))
         item_uuid = item.data(Qt.ItemDataRole.UserRole+1)
         QApplication.clipboard().setText(item_uuid)
+        Logger.info(item_uuid)
 
     def _copy_path(self):
         def get_path(item):
@@ -425,17 +398,17 @@ class HierarchyTreeView(QTreeView):
             return
         
         self.blockSignals(True)
-
         index_uuid = current_index.data(Qt.ItemDataRole.UserRole+1)
         obj = self._game_manager.get_object(index_uuid)
+
         if obj.is_expanded:
             def collapse_recursively(parent_index):
                 self.setExpanded(parent_index, False)
                 parent_index_uuid = parent_index.data(Qt.ItemDataRole.UserRole+1)
                 self._game_manager.collapse(parent_index_uuid)
 
-                for i in range(self._standard_model.rowCount(parent_index)):
-                    child_index = self._standard_model.index(i, 0, parent_index)
+                for i in range(self._standard_model.rowCount(self._proxy_model.mapToSource(parent_index))):
+                    child_index = self._proxy_model.mapFromSource(self._standard_model.index(i, 0, self._proxy_model.mapToSource(parent_index)))
                     collapse_recursively(child_index)
             
             collapse_recursively(current_index)
@@ -444,9 +417,9 @@ class HierarchyTreeView(QTreeView):
                 self.setExpanded(parent_index, True)
                 parent_index_uuid = parent_index.data(Qt.ItemDataRole.UserRole+1)
                 self._game_manager.expand(parent_index_uuid)
-
-                for i in range(self._standard_model.rowCount(parent_index)):
-                    child_index = self._standard_model.index(i, 0, parent_index)
+    
+                for i in range(self._standard_model.rowCount(self._proxy_model.mapToSource(parent_index))):
+                    child_index = self._proxy_model.mapFromSource(self._standard_model.index(i, 0, self._proxy_model.mapToSource(parent_index)))
                     expand_recursively(child_index)
             
             expand_recursively(current_index)
@@ -530,3 +503,7 @@ class HierarchyTreeView(QTreeView):
             return
         
         super().keyPressEvent(event)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.header().setMinimumSectionSize(self.viewport().width())

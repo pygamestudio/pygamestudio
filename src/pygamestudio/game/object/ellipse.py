@@ -11,7 +11,7 @@ class ObjectEllipse(ObjectBase):
         self._is_initialized = False
 
         if hasattr(self, 'icon'):
-            self.icon = str(RES_PATH/'images/item.png')
+            self.icon = str(RES_PATH/'images/ellipse.png')
 
         common_properties = {
             'name': 'Ellipse',

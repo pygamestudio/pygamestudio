@@ -4,6 +4,22 @@ QWidget {
     background-color: #1e1e1e;
 }
 
+QSplitter {
+    background-color: #282828;
+}
+
+QSplitter::handle {
+    background-color: #000000;
+}
+
+QSplitter::handle:horizontal {
+    width: 2px;
+}
+
+QSplitter::handle:vertical {
+    height: 2px;
+}
+
 QPushButton {
     background-color: #2e2f30;
     border-radius: 5px;
@@ -14,11 +30,11 @@ QPushButton:disabled {
     color: gray;
 }
 
-QPushButton:hover, QPushButton:hover {
+QPushButton:hover {
     background-color: #404142;
 }
 
-QPushButton:pressed, QPushButton:pressed {
+QPushButton:pressed {
     background-color: #28292a;
 }
 
@@ -78,6 +94,7 @@ QMenu::separator {
 }
 
 QMenuBar {
+    border-bottom: 2px solid black;
 }
 
 QMenuBar::item {
@@ -92,6 +109,150 @@ QMenuBar::item:selected {
 
 QMenuBar::item:pressed {
     background-color: #404142;
+}
+
+QTabBar::tab {
+    color: #cccccc;
+    padding: 5px 12px;
+    margin-right: 2px;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    min-width: 65px;
+}
+
+QTabBar::tab:selected {
+    color: #ffffff;
+    border-bottom: 2px solid #007acc;
+}
+
+QTabBar::tab:hover:!selected {
+    background-color: #282828;
+    color: #cccccc;
+}
+
+QTreeView {
+    background-color: #282828;
+    color: #cccccc;
+    border: none;
+    outline: none;
+}
+
+QTreeView::item:selected {
+    background-color: #007acc;
+    color: #ffffff;
+}
+
+QTreeView::item:hover:!selected {
+    background-color: #404142;
+}
+
+QTreeView::item:selected:!active {
+    background-color: #e0007acc;
+    color: #cccccc;
+}
+
+QTreeView::branch:selected {
+    background-color: #007acc;
+}
+
+QTreeView::branch:hover:!selected {
+    background-color: #404142
+}
+
+QTreeView::branch:selected:!active {
+    background-color: #e0007acc;
+}
+
+QTreeView::branch:has-children:!has-siblings:closed,
+QTreeView::branch:closed:has-children:has-siblings {
+    image: url(./common/res/images/tree_arrow_right.png);
+}
+
+QTreeView::branch:open:has-children:!has-siblings,
+QTreeView::branch:open:has-children:has-siblings {
+    image: url(./common/res/images/tree_arrow_down.png);
+} 
+
+QCheckBox {
+    background-color: transparent;
+}
+
+QCheckBox::indicator {
+    border-radius: 5px;
+    border: 1px solid #404142;
+    background-color: #282828;
+    width: 14px;
+    height: 14px;
+}
+
+QCheckBox::indicator:hover {
+    border-color: #007acc;
+}
+
+QCheckBox::indicator:checked {
+    image: url(./common/res/images/check.png);
+}
+
+QScrollBar:vertical {
+    background-color: #1e1e1e;
+    width: 10px;
+    margin: 0px;
+    border: none;
+}
+
+QScrollBar::handle:vertical {
+    background-color: #5a5a5a;
+    min-height: 30px;
+    border-radius: 7px;
+    margin: 2px 2px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background-color: #6e6e6e;
+}
+
+QScrollBar::handle:vertical:pressed {
+    background-color: #8a8a8a;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+    border: none;
+}
+
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+    background-color: #1e1e1e;
+}
+
+QScrollBar:horizontal {
+    background-color: #1e1e1e;
+    height: 10px;
+    margin: 0px;
+    border: none;
+}
+
+QScrollBar::handle:horizontal {
+    background-color: #5a5a5a;
+    min-width: 30px;
+    border-radius: 7px;
+    margin: 2px 2px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background-color: #6e6e6e;
+}
+
+QScrollBar::handle:horizontal:pressed {
+    background-color: #8a8a8a;
+}
+
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    width: 0px;
+    border: none;
+}
+
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
+    background-color: #1e1e1e;
 }
 
 /* ----- Window Base ----- */
@@ -157,4 +318,78 @@ QListView#dashboardListView::item:selected {
 
 QListView#dashboardListView::item:hover:!selected {
     background-color: #404142;
+}
+
+/* ----- Asset ----- */
+QTreeView#assetTreeView {
+    padding-top: 5px;
+}
+
+QLineEdit#assetSearchLineEdit {
+    padding-left: 21px;
+}
+
+QWidget#asset QPushButton {
+    background-color: transparent;
+    border:none;
+    padding: 3px, 3px;
+}
+
+QWidget#asset QPushButton:hover {
+    background-color: #404142;
+    border-radius: 5px;
+}
+
+QWidget#asset QPushButton:pressed {
+    background-color: #28292a;
+    border-radius: 5px;
+}
+
+/* ----- Hierarchy ----- */
+QTreeView#hierarchyTreeView {
+    padding-top: 5px;
+}
+
+QLineEdit#hierarchySearchLineEdit {
+    padding-left: 21px;
+}
+
+QWidget#hierarchy QPushButton {
+    background-color: transparent;
+    border:none;
+    padding: 3px, 3px;
+}
+
+QWidget#hierarchy QPushButton:hover {
+    background-color: #404142;
+    border-radius: 5px;
+}
+
+QWidget#hierarchy QPushButton:pressed {
+    background-color: #28292a;
+    border-radius: 5px;
+}
+
+/* ----- Console ----- */
+QTextBrowser#consoleLogBrowser {
+    background-color: #282828;
+    padding-left: 4px;
+    padding-top: 4px;
+}
+
+QLineEdit#consoleSearchLineEdit {
+    padding-left: 21px;
+}
+
+/* ----- Scene ----- */
+QPushButton#sceneRunProjectBtn {
+    background-color: #1e1e1e;
+}
+
+QPushButton:hover#sceneRunProjectBtn {
+    background-color: #404142;
+}
+
+QPushButton:pressed#sceneRunProjectBtn {
+    background-color: #28292a;
 }

@@ -12,9 +12,9 @@ class HierarchyTreeViewDelegate(QStyledItemDelegate):
         self._standard_model = standard_model
 
         self._pixmap_size = QSize(16, 16)
-        self._open_eye_pixmap = QPixmap(RES_PATH/'images/open_eye.png')
-        self._open_eye_gray_pixmap = QPixmap(RES_PATH/'images/open_eye_gray.png')
-        self._closed_eye_pixmap = QPixmap(RES_PATH/'images/closed_eye.png')
+        self._eye_open_pixmap = QPixmap(RES_PATH/'images/eye_open.png')
+        self._eye_off_pixmap = QPixmap(RES_PATH/'images/eye_off.png')
+        self._eye_closed_pixmap = QPixmap(RES_PATH/'images/eye_closed.png')
 
         self._hovered_index = None
 
@@ -30,13 +30,13 @@ class HierarchyTreeViewDelegate(QStyledItemDelegate):
             pixmap_rect.adjust(-1, -1, 1, 1)
 
         # If current item is visible but its ancestor is not, 
-        # then draw a gray open eye to indicate the ancestor of this item is invisible.
+        # then draw an eye (off) to indicate the ancestor of this item is invisible.
         if is_item_visible and is_ancestor_visible:
-            painter.drawPixmap(pixmap_rect, self._open_eye_pixmap)
+            painter.drawPixmap(pixmap_rect, self._eye_open_pixmap)
         elif is_item_visible and not is_ancestor_visible:
-            painter.drawPixmap(pixmap_rect, self._open_eye_gray_pixmap)
+            painter.drawPixmap(pixmap_rect, self._eye_off_pixmap)
         else:
-            painter.drawPixmap(pixmap_rect, self._closed_eye_pixmap)
+            painter.drawPixmap(pixmap_rect, self._eye_closed_pixmap)
 
         painter.restore()
 

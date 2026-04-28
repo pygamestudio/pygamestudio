@@ -55,8 +55,7 @@ class PygameScreen(QWidget):
         self._game_manager.object_underline_state_changed.connect(self._update_scene)
         self._game_manager.object_strikethrough_state_changed.connect(self._update_scene)
 
-    def _set_pygame(self):
-        pygame.init()
+    def _set_pygame_screen_and_clock(self):
         self._screen_surface = pygame.Surface((self._screen_width, self._screen_height))
         self._clock.tick(60)
 
@@ -64,7 +63,7 @@ class PygameScreen(QWidget):
         self._screen_width = get_project_config()['screen_width']
         self._screen_height = get_project_config()['screen_height']
         self.setFixedSize(self._screen_width, self._screen_height)
-        self._set_pygame()
+        self._set_pygame_screen_and_clock()
         self._update_scene()
 
     def clean_up(self):

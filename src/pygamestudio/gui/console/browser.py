@@ -23,9 +23,9 @@ class ConsoleLogBrowser(QTextBrowser):
         info_format = QTextCharFormat()
         error_format = QTextCharFormat()
         warning_format = QTextCharFormat()
-        info_format.setForeground(QColor('#000000'))
-        error_format.setForeground(QColor('#FF0000'))
-        warning_format.setForeground(QColor('#FFFF00'))
+        info_format.setForeground(QColor('#ffffff'))
+        error_format.setForeground(QColor('#ff0000'))
+        warning_format.setForeground(QColor('#ffde66'))
         self._log_formats = {
             INFO: info_format,
             ERROR: error_format,
@@ -44,6 +44,7 @@ class ConsoleLogBrowser(QTextBrowser):
         self._set_widget()
         self._set_signal()
         self._set_logger()
+        self._set_object_name()
 
     def _set_widget(self):
         font = QFont('Consolas', 10)
@@ -61,9 +62,13 @@ class ConsoleLogBrowser(QTextBrowser):
     def _set_logger(self):
         Logger.set_log_widget(self)
 
+    def _set_object_name(self):
+        self.setObjectName('consoleLogBrowser')
+
     def _add_log(self, msg, log_level):
         self._logs.append((msg, log_level))
         log_format = self._log_formats[log_level]
+        self.moveCursor(QTextCursor.MoveOperation.End)
         self.textCursor().insertText(f'{msg}\n', log_format)
     
     def _show_context_menu(self, pos):

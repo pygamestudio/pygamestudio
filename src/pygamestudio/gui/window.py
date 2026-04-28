@@ -79,6 +79,7 @@ class EditorBody(QMainWindow):
         self._main_horizontal_splitter.addWidget(self._left_vertical_splitter)
         self._main_horizontal_splitter.addWidget(self._center_vertical_splitter)
         self._main_horizontal_splitter.addWidget(self._right_vertical_splitter)
+        self._center_vertical_splitter.setSizes([600, 300])
         self._main_horizontal_splitter.setSizes([270, 880, 270])
 
         self.setCentralWidget(self._central_widget)
@@ -293,15 +294,15 @@ class Editor(WindowBase):
         super().keyPressEvent(event)
 
     def closeEvent(self, event):
-        if not self._game_manager.is_current_scene_saved():
-            choice = QMessageBox.warning(self, T.tr('message_box.warning_title', 'Warning'), T.tr('message_box.warning_scene_save_content', 'The current scene data has been modified. Do you want to save it?'), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel)
-            if choice == QMessageBox.StandardButton.Cancel:
-                event.ignore()
-                return
+        # if not self._game_manager.is_current_scene_saved():
+        #     choice = QMessageBox.warning(self, T.tr('message_box.warning_title', 'Warning'), T.tr('message_box.warning_scene_save_content', 'The current scene data has been modified. Do you want to save it?'), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel)
+        #     if choice == QMessageBox.StandardButton.Cancel:
+        #         event.ignore()
+        #         return
             
-            if choice == QMessageBox.StandardButton.Yes:
-                self._game_manager.save_scene()
+        #     if choice == QMessageBox.StandardButton.Yes:
+        #         self._game_manager.save_scene()
 
-        self.clean_up()
-        self._parent.show_dashboard()
+        # self.clean_up()
+        # self._parent.show_dashboard()
         event.accept()
