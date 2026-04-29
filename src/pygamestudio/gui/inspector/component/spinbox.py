@@ -13,7 +13,6 @@ class SuffixSpinBox(QDoubleSpinBox):
 
     def _setup(self):
         self._set_widget()
-        self._set_signal()
         self._set_layout()
 
     def _set_widget(self):
@@ -21,13 +20,12 @@ class SuffixSpinBox(QDoubleSpinBox):
         self._suffix_label.setText(self._suffix)
         self._suffix_label.setStyleSheet("""
             QLabel {
-                color: gray; 
-                padding-right: 5px;                   
+                background-color: transparent;
+                padding-right: 2px;
+                font-size: 10px;
+                font-family: Times New Roman;
             }
         """)
-        
-    def _set_signal(self):
-        ...
 
     def _set_layout(self):
         main_layout = QHBoxLayout(self)
@@ -51,9 +49,9 @@ class SuffixSpinBox(QDoubleSpinBox):
 
 
 class PosSpinBox(SuffixSpinBox):
-    def __init__(self, inspector_window, value, attr=''):
+    def __init__(self, inspector_container, value, attr=''):
         super().__init__()
-        self._inspector_window = inspector_window
+        self._inspector_container = inspector_container
         self.setRange(-999999, 999999)
         self.setSingleStep(1)
         self.setValue(value)
@@ -65,17 +63,17 @@ class PosSpinBox(SuffixSpinBox):
             self.set_suffix('Y')
 
         if attr == 'start_x' or attr == 'start_y':
-            self.valueChanged.connect(self._inspector_window.set_object_start_point)
+            self.valueChanged.connect(self._inspector_container.set_object_start_point)
         elif attr == 'end_x' or attr == 'end_y':
-            self.valueChanged.connect(self._inspector_window.set_object_end_point)
+            self.valueChanged.connect(self._inspector_container.set_object_end_point)
         else:
-            self.valueChanged.connect(self._inspector_window.move_object)
+            self.valueChanged.connect(self._inspector_container.move_object)
 
 
 class SizeSpinBox(SuffixSpinBox):
-    def __init__(self, inspector_window, value, attr=''):
+    def __init__(self, inspector_container, value, attr=''):
         super().__init__()
-        self._inspector_window = inspector_window
+        self._inspector_container = inspector_container
         self.setRange(0, 999999)
         self.setSingleStep(1)
         self.setValue(value)
@@ -86,13 +84,13 @@ class SizeSpinBox(SuffixSpinBox):
         elif attr == 'height':
             self.set_suffix('H')
 
-        self.valueChanged.connect(self._inspector_window.resize_object)
+        self.valueChanged.connect(self._inspector_container.resize_object)
 
 
 class ScaleSpinBox(SuffixSpinBox):
-    def __init__(self, inspector_window, value, attr=''):
+    def __init__(self, inspector_container, value, attr=''):
         super().__init__()
-        self._inspector_window = inspector_window
+        self._inspector_container = inspector_container
         self.setRange(0, 999999)
         self.setSingleStep(0.01)
         self.setValue(value)
@@ -103,37 +101,37 @@ class ScaleSpinBox(SuffixSpinBox):
         elif attr == 'scale_y':
             self.set_suffix('Y')
 
-        self.valueChanged.connect(self._inspector_window.scale_object)
+        self.valueChanged.connect(self._inspector_container.scale_object)
 
 
 class AngleSpinBox(QDoubleSpinBox):
-    def __init__(self, inspector_window, value, attr=''):
+    def __init__(self, inspector_container, value, attr=''):
         super().__init__()
-        self._inspector_window = inspector_window
+        self._inspector_container = inspector_container
         self.setRange(-360, 360)
         self.setSingleStep(0.01)
         self.setValue(value)
         self.setDecimals(2)
 
-        self.valueChanged.connect(self._inspector_window.rotate_object)
+        self.valueChanged.connect(self._inspector_container.rotate_object)
 
 
 class ThicknessSpinBox(SuffixSpinBox):
-    def __init__(self, inspector_window, value, attr=''):
+    def __init__(self, inspector_container, value, attr=''):
         super().__init__()
-        self._inspector_window = inspector_window
+        self._inspector_container = inspector_container
         self.setRange(0, 999999)
         self.setSingleStep(1)
         self.setValue(value)
         self.setDecimals(0)
 
-        self.valueChanged.connect(self._inspector_window.set_object_thickness)
+        self.valueChanged.connect(self._inspector_container.set_object_thickness)
 
 
 class BorderRadiusSpinBox(SuffixSpinBox):
-    def __init__(self, inspector_window, value, attr=''):
+    def __init__(self, inspector_container, value, attr=''):
         super().__init__()
-        self._inspector_window = inspector_window
+        self._inspector_container = inspector_container
         self._attr = attr
         self.setRange(0, 999999)
         self.setSingleStep(1)
@@ -152,16 +150,16 @@ class BorderRadiusSpinBox(SuffixSpinBox):
         self.valueChanged.connect(self._on_border_radius_changed)
 
     def _on_border_radius_changed(self):
-        self._inspector_window.set_object_border_radius(self._attr, int(self.value()))
+        self._inspector_container.set_object_border_radius(self._attr, int(self.value()))
 
 
 class FontSizeSpinBox(QDoubleSpinBox):
-    def __init__(self, inspector_window, value, attr=''):
+    def __init__(self, inspector_container, value, attr=''):
         super().__init__()
-        self._inspector_window = inspector_window
+        self._inspector_container = inspector_container
         self.setRange(0, 999999)
         self.setSingleStep(1)
         self.setValue(value)
         self.setDecimals(0)
 
-        self.valueChanged.connect(self._inspector_window.set_object_font_size)
+        self.valueChanged.connect(self._inspector_container.set_object_font_size)

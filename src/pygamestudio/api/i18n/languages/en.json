@@ -126,7 +126,9 @@
         "bold": "Bold",
         "italic": "Italic",
         "underline": "Underline",
-        "strikethrough": "Strikethrough"
+        "strikethrough": "Strikethrough",
+        "select_previous_object": "Select Previous Object",
+        "select_next_object": "Select Next Object"
     },
 
     "dashboard": {

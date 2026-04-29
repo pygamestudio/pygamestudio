@@ -29,6 +29,7 @@ class HierarchyTreeView(QTreeView):
     def _setup(self):
         self._set_widget()
         self._set_signal()
+        self._set_object_name()
 
     def _set_widget(self):
         self._standard_model.setColumnCount(1)
@@ -81,6 +82,9 @@ class HierarchyTreeView(QTreeView):
         self._game_manager.object_cut.connect(self._on_object_cut)
         self._game_manager.object_showed.connect(self._on_object_showed)
         self._game_manager.object_hidden.connect(self._on_object_hidden)
+
+    def _set_object_name(self):
+        self.setObjectName('hierarchyTreeView')
 
     def _on_item_selection_changed(self, selected, deselected):
         for index in selected.indexes():

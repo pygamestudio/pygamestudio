@@ -44,8 +44,58 @@ QLineEdit {
     padding: 3px;
 }
 
+QLineEdit:hover {
+    border: 1px solid #007acc;
+}
+
 QLineEdit:focus {
     border: 1px solid #007acc;
+}
+
+QSpinBox, QDoubleSpinBox {
+    border-radius: 5px;
+    border: 1px solid #3c3c3c;
+    padding: 3px;
+}
+
+QSpinBox:hover, QDoubleSpinBox:hover {
+    border: 1px solid #007acc;
+}
+
+QSpinBox:focus, QDoubleSpinBox:focus {
+    border: 1px solid #007acc;
+}
+
+QSpinBox::up-button, QDoubleSpinBox::up-button {
+    width: 10px;
+    border: none;
+    border-image: none;
+    padding-right: 2px;
+    subcontrol-position: top right;
+}
+
+QSpinBox::up-button, QDoubleSpinBox::down-button {
+    width: 10px;
+    border: none;
+    border-image: none;
+    padding-right: 2px;
+    subcontrol-position: bottom right;
+}
+
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
+    width: 10px;
+    height: 10px;
+    image: url(./common/res/images/up_arrow.png);
+}
+
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
+    width: 10px;
+    height: 10px;
+    image: url(./common/res/images/down_arrow.png);
+}
+
+QSpinBox QLabel, QDoubleSpinBox QLabel {
+    background-color: #1e1e1e;
 }
 
 QComboBox {
@@ -66,8 +116,8 @@ QComboBox::drop-down {
 
 QComboBox::down-arrow {
     image: url(./common/res/images/down_arrow.png);
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
 }
 
 QMenu {
@@ -322,7 +372,7 @@ QListView#dashboardListView::item:hover:!selected {
 
 /* ----- Asset ----- */
 QTreeView#assetTreeView {
-    padding-top: 5px;
+    padding-top: 2px;
 }
 
 QLineEdit#assetSearchLineEdit {
@@ -347,7 +397,7 @@ QWidget#asset QPushButton:pressed {
 
 /* ----- Hierarchy ----- */
 QTreeView#hierarchyTreeView {
-    padding-top: 5px;
+    padding-top: 2px;
 }
 
 QLineEdit#hierarchySearchLineEdit {
@@ -392,4 +442,37 @@ QPushButton:hover#sceneRunProjectBtn {
 
 QPushButton:pressed#sceneRunProjectBtn {
     background-color: #28292a;
+}
+
+/* ----- Inspector ----- */
+QWidget#inspector, QWidget#inspectorContainer {
+    background-color: #282828;
+}
+
+QWidget#inspector QPushButton {
+    background-color: transparent;
+    border:none;
+    padding: 3px, 3px;
+}
+
+QWidget#inspector QPushButton:hover {
+    background-color: #404142;
+    border-radius: 5px;
+}
+
+QWidget#inspector QPushButton:pressed {
+    background-color: #28292a;
+    border-radius: 5px;
+}
+
+QWidget#inspectorContainer QLabel {
+    background-color: #282828;
+}
+
+QWidget#inspectorContainer QCheckBox::indicator {
+    background-color: #1e1e1e;
+}
+
+QWidget#inspectorContainer QCheckBox::indicator:hover {
+    border: 1px solid #007acc;
 }

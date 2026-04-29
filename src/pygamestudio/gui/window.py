@@ -4,7 +4,6 @@ from PySide6.QtGui import *
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
 
-from pygamestudio.common.utils.path import RES_PATH
 from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.gui.hierarchy.window import HierarchyWindow
 from pygamestudio.gui.asset.window import AssetWindow
@@ -236,7 +235,6 @@ class Editor(WindowBase):
 
     def _set_widget(self):
         self.resize(1420, 930)
-        self.setWindowIcon(QIcon(str(RES_PATH / 'images/folder.png')))
         self._center()
         self.set_window_body(self._editor_body)
 

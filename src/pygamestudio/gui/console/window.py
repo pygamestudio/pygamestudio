@@ -53,10 +53,11 @@ class ConsoleWindow(QWidget):
         h_layout.addWidget(self._warning_check_box)
         h_layout.addSpacerItem(QSpacerItem(10, 0))
         h_layout.addWidget(self._error_check_box)
-        h_layout.setContentsMargins(0, 0, 0, 0)
+        h_layout.setContentsMargins(5, 0, 0, 0)
 
         v_layout.addLayout(h_layout)
         v_layout.addWidget(self._console_log_browser)
+        v_layout.setContentsMargins(0, 6, 0, 0)
 
     def get_ready_for_project(self):
         self._console_log_browser.get_ready_for_project()
