@@ -2,4 +2,4 @@
 
 <br>
 
-Let's create pygame visually. (Coming soon)
+Let's create pygame visually.

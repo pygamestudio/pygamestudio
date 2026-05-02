@@ -4,9 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pygamestudio"
-version = "0.0.0a0"
+version = "0.0.1a0"
 authors = [{ name="Louis Ren", email="louis@pygamestudio.com" }]
-description = "Let's create pygame visually (coming soon)"
+description = "Let's create pygame visually!"
 readme = "README.md"
 license-files = ["LICEN[CS]E*"]
 classifiers=[
