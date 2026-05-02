@@ -23,7 +23,8 @@
         "critical_failed_to_load_content": "加载项目失败：{}",
         "critical_rename_content": "重命名失败：{}",
         "critical_open_project": "打开项目失败，找不到project.pygs。",
-        "critical_find_project": "找不到该项目。"
+        "critical_find_project": "找不到该项目。",
+        "to_be_released": "即将发布，敬请期待！"
     },
 
     "menu": {
@@ -80,6 +81,10 @@
         "text": "文本"
     },
 
+    "gm": {
+        "project_init": "项目初始化成功"
+    },
+
     "asset": {
         "asset": "资源管理器",
         "search_placeholder": "输入名称搜索",
@@ -98,7 +103,8 @@
 
     "scene": {
         "scene": "场景编辑器",
-        "run_project": "运行项目"
+        "run_project": "运行项目{}",
+        "failed_to_run_project": "项目{}运行失败：{}"
     },
 
     "hierarchy": {
@@ -133,7 +139,8 @@
         "bold": "粗体",
         "italic": "斜体",
         "underline": "下划线",
-        "strikethrough": "删除线"
+        "strikethrough": "删除线",
+        "select_color": "选择颜色"
     },
 
     "dashboard": {
@@ -166,5 +173,9 @@
         "screen_height": "窗口高度",
         "general": "通用",
         "language": "语言"
+    },
+
+    "about": {
+        "version": "版本{}"
     }
 }

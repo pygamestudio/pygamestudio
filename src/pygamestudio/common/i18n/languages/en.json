@@ -23,7 +23,8 @@
         "critical_failed_to_load_content": "Failed to load projects: {}",
         "critical_rename_content": "Failed to rename: {}",
         "critical_open_project": "Failed to open the project. Couldn't find project.pygs.",
-        "critical_find_project": "Couldn't find the project."
+        "critical_find_project": "Couldn't find the project.",
+        "to_be_released": "To be released!"
     },
 
     "menu": {
@@ -80,6 +81,10 @@
         "text": "Text"
     },
 
+    "gm": {
+        "project_init": "Project initialized Successfully"
+    },
+
     "asset": {
         "asset": "Asset",
         "search_placeholder": "Search by name",
@@ -98,7 +103,8 @@
 
     "scene": {
         "scene": "Scene",
-        "run_project": "Run Project"
+        "run_project": "Run Project {}",
+        "failed_to_run_project": "Failed to Run Project {}: {}"
     },
 
     "hierarchy": {
@@ -133,7 +139,8 @@
         "bold": "Bold",
         "italic": "Italic",
         "underline": "Underline",
-        "strikethrough": "Strikethrough"
+        "strikethrough": "Strikethrough",
+        "select_color": "Select Color"
     },
 
     "dashboard": {
@@ -166,5 +173,9 @@
         "screen_height": "Screen Height",
         "general": "General",
         "language": "Language"
+    },
+
+    "about": {
+        "version": "Version {}"
     }
 }

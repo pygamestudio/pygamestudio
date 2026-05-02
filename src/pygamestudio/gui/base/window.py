@@ -40,6 +40,7 @@ class WindowTitleBase(QWidget):
         pixmap = QPixmap(str(RES_PATH / 'images/logo.png'))
         scaled_pixmap = pixmap.scaled(self._icon.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         self._icon.setPixmap(scaled_pixmap)
+        self._icon.setScaledContents(True)
         
         self._minimize_btn.setIcon(QIcon(str(RES_PATH / 'images/minimize.png')))
         self._maximize_btn.setIcon(QIcon(str(RES_PATH / 'images/maximize.png')))

@@ -1,3 +1,4 @@
+import webbrowser
 from pathlib import Path
 
 from PySide6.QtGui import *
@@ -13,6 +14,7 @@ from pygamestudio.gui.scene.window import SceneWindow
 from pygamestudio.gui.base.window import WindowBase
 from pygamestudio.gui.settings.project import ProjectSettingsWindow
 from pygamestudio.gui.settings.editor import EditorSettingsWindow
+from pygamestudio.gui.about.window import AboutWindow
 from pygamestudio.game.core.manager import GameManager
 
 
@@ -106,7 +108,7 @@ class EditorBody(QMainWindow):
         save_scene_action = QAction(T.tr('menu.save_scene', 'Save Scene'), self)
         save_as_action = QAction(T.tr('menu.save_as', 'Save As'), self)
         editor_settings_action = QAction(T.tr('menu.editor_settings', 'Editor Settings'), self)
-        quit_editor_action = QAction(T.tr('menu.new_project', 'Quit'), self)
+        quit_editor_action = QAction(T.tr('menu.quit', 'Quit'), self)
 
         new_project_action.triggered.connect(self.new_project_signal.emit)
         open_project_action.triggered.connect(self.open_project_signal.emit)
@@ -130,12 +132,20 @@ class EditorBody(QMainWindow):
     def _set_edit_menu(self):
         self._edit_menu.clear()
 
-        undo_action = QAction(T.tr('menu.undo', 'Undo'), self)
-        redo_action = QAction(T.tr('menu.redo', 'Redo'), self)
-        cut_action = QAction(T.tr('menu.cut', 'Cut'), self)
-        copy_action = QAction(T.tr('menu.copy', 'Copy'), self)
-        paste_action = QAction(T.tr('menu.paste', 'Paste'), self)
-        select_all_action = QAction(T.tr('menu.select_all', 'Select All'), self)
+        undo_action = QAction(T.tr('menu.undo', 'Undo')+'\tCtrl+Z', self)
+        redo_action = QAction(T.tr('menu.redo', 'Redo')+'\tCtrl+Y', self)
+        cut_action = QAction(T.tr('menu.cut', 'Cut')+'\tCtrl+X', self)
+        copy_action = QAction(T.tr('menu.copy', 'Copy')+'\tCtrl+C', self)
+        paste_action = QAction(T.tr('menu.paste', 'Paste')+'\tCtrl+V', self)
+        select_all_action = QAction(T.tr('menu.select_all', 'Select All')+'\tCtrl+A', self)
+
+        undo_action.triggered.connect(lambda: self._on_edit_menu_action_triggered('undo'))
+        redo_action.triggered.connect(lambda: self._on_edit_menu_action_triggered('redo'))
+        cut_action.triggered.connect(lambda: self._on_edit_menu_action_triggered('cut'))
+        copy_action.triggered.connect(lambda: self._on_edit_menu_action_triggered('copy'))
+        paste_action.triggered.connect(lambda: self._on_edit_menu_action_triggered('paste'))
+        select_all_action.triggered.connect(lambda: self._on_edit_menu_action_triggered('select_all'))
+
         self._edit_menu.addAction(undo_action)
         self._edit_menu.addAction(redo_action)
         self._edit_menu.addAction(cut_action)
@@ -153,6 +163,7 @@ class EditorBody(QMainWindow):
 
         project_settings_action.triggered.connect(self._show_project_settings_window)
         run_action.triggered.connect(self._game_manager.run_project)
+        build_action.triggered.connect(self._show_build_window)
 
         self._project_menu.addAction(project_settings_action)
         self._project_menu.addSeparator()
@@ -163,13 +174,17 @@ class EditorBody(QMainWindow):
         self._help_menu.clear()
 
         doc_action = QAction(T.tr('menu.documentation', 'Documentation'), self)
-        update_log_action = QAction(T.tr('menu.release_notes', 'Release Notes'), self)
+        # release_notes_action = QAction(T.tr('menu.release_notes', 'Release Notes'), self)
         github_action = QAction(T.tr('menu.github_repository', 'Github Repository'), self)
         about_action = QAction(T.tr('menu.about_pygamestudio', 'About Pygame Studio'), self)
 
+        github_action.triggered.connect(self._show_github_repository)
+        # release_notes_action.triggered.connect(self._show_release_notes)
+        about_action.triggered.connect(self._show_about_window)
+
         self._help_menu.addAction(doc_action)
-        self._help_menu.addSeparator()
-        self._help_menu.addAction(update_log_action)
+        # self._help_menu.addSeparator()
+        # self._help_menu.addAction(release_notes_action)
         self._help_menu.addAction(github_action)
         self._help_menu.addSeparator()
         self._help_menu.addAction(about_action)
@@ -191,13 +206,48 @@ class EditorBody(QMainWindow):
         self._inspector_window.clean_up()
         self._game_manager.clean_up()
 
+    def _on_edit_menu_action_triggered(self, action_name):
+        if action_name == 'undo':
+            press_event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Z, Qt.KeyboardModifier.ControlModifier)
+            QApplication.sendEvent(self, press_event)
+
+        elif action_name == 'redo':
+            press_event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Y, Qt.KeyboardModifier.ControlModifier)
+            QApplication.sendEvent(self, press_event)
+
+        elif action_name == 'cut':
+            press_event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_X, Qt.KeyboardModifier.ControlModifier)
+            QApplication.sendEvent(self._hierarchy_window.hierarchy_tree_view, press_event)
+
+        elif action_name == 'copy':
+            press_event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_C, Qt.KeyboardModifier.ControlModifier)
+            QApplication.sendEvent(self._hierarchy_window.hierarchy_tree_view, press_event)
+
+        elif action_name == 'paste':
+            press_event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_V, Qt.KeyboardModifier.ControlModifier)
+            QApplication.sendEvent(self._hierarchy_window.hierarchy_tree_view, press_event)
+
+        elif action_name == 'select_all':
+            press_event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_A, Qt.KeyboardModifier.ControlModifier)
+            QApplication.sendEvent(self._hierarchy_window.hierarchy_tree_view, press_event)
+
     def _show_project_settings_window(self):
-        project_settings_window = ProjectSettingsWindow(self, self._game_manager)
+        project_settings_window = ProjectSettingsWindow(self._game_manager)
         project_settings_window.show()
 
+    def _show_build_window(self):
+        QMessageBox.information(self, T.tr('message_box.information_title', 'Info'), T.tr('message_box.to_be_released', 'To be released!'))
+
     def _show_editor_settings_window(self):
-        editor_settings_window = EditorSettingsWindow(self, self._game_manager)
+        editor_settings_window = EditorSettingsWindow(self._game_manager)
         editor_settings_window.show()
+
+    def _show_github_repository(self):
+        webbrowser.open('https://github.com/pygamestudio/pygamestudio')
+
+    def _show_about_window(self):
+        about_window = AboutWindow()
+        about_window.show()
 
     def retranslate(self):
         self.menuBar().clear()
@@ -292,15 +342,15 @@ class Editor(WindowBase):
         super().keyPressEvent(event)
 
     def closeEvent(self, event):
-        # if not self._game_manager.is_current_scene_saved():
-        #     choice = QMessageBox.warning(self, T.tr('message_box.warning_title', 'Warning'), T.tr('message_box.warning_scene_save_content', 'The current scene data has been modified. Do you want to save it?'), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel)
-        #     if choice == QMessageBox.StandardButton.Cancel:
-        #         event.ignore()
-        #         return
+        if not self._game_manager.is_current_scene_saved():
+            choice = QMessageBox.warning(self, T.tr('message_box.warning_title', 'Warning'), T.tr('message_box.warning_scene_save_content', 'The current scene data has been modified. Do you want to save it?'), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel)
+            if choice == QMessageBox.StandardButton.Cancel:
+                event.ignore()
+                return
             
-        #     if choice == QMessageBox.StandardButton.Yes:
-        #         self._game_manager.save_scene()
+            if choice == QMessageBox.StandardButton.Yes:
+                self._game_manager.save_scene()
 
-        # self.clean_up()
-        # self._parent.show_dashboard()
+        self.clean_up()
+        self._parent.show_dashboard()
         event.accept()

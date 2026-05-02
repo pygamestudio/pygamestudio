@@ -1,12 +1,13 @@
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
 from pygamestudio.common.utils.config import *
+from pygamestudio.gui.base.window import WindowBase
 from pygamestudio.common.i18n.translator import Translator as T
 
 
-class ProjectSettingsWindow(QWidget):
-    def __init__(self, parent, game_manager):
-        super().__init__(parent)
+class ProjectSettingsBody(QWidget):
+    def __init__(self, game_manager):
+        super().__init__()
         self._game_manager = game_manager
         self._list_widget = QListWidget()
         self._main_stacked_widget = QStackedWidget()
@@ -14,8 +15,8 @@ class ProjectSettingsWindow(QWidget):
         self._screen_stacked_widget = QWidget()
         self._screen_width_label = QLabel()
         self._screen_height_label = QLabel()
-        self._screen_width_spinbox = QSpinBox()
-        self._screen_height_spinbox = QSpinBox()
+        self._screen_width_spinbox = QDoubleSpinBox()
+        self._screen_height_spinbox = QDoubleSpinBox()
 
         self._set_up()
 
@@ -25,12 +26,13 @@ class ProjectSettingsWindow(QWidget):
         self._set_layout()
 
     def _set_widget(self):
-        self.resize(800, 600)
         self._set_screen_stacked_widget()
 
         self._list_widget.setMaximumWidth(200)
         self._list_widget.addItems([T.tr('settings.game_screen', 'Game Screen')])
         self._list_widget.setCurrentItem(self._list_widget.item(0))
+        self._screen_width_spinbox.setDecimals(0)
+        self._screen_height_spinbox.setDecimals(0)
         self._main_stacked_widget.addWidget(self._screen_stacked_widget)
 
     def _set_signal(self):
@@ -80,3 +82,30 @@ class ProjectSettingsWindow(QWidget):
         self._list_widget.addItems([T.tr('settings.game_screen', 'Game Screen')])
         self._screen_width_label.setText(T.tr('settings.screen_width', 'Screen Width'))
         self._screen_height_label.setText(T.tr('settings.screen_height', 'Screen Height'))
+
+
+class ProjectSettingsWindow(WindowBase):
+    def __init__(self, game_manager):
+        super().__init__()
+        self._project_settings_body = ProjectSettingsBody(game_manager)
+        self._set_up()
+
+    def _set_up(self):
+        self._set_widget()
+        self._set_signal()
+        self._set_object_name()
+
+    def _set_widget(self):
+        self.resize(800, 600)
+        self.set_window_body(self._project_settings_body)
+        self.window_title.set_title_name(T.tr('menu.project_settings', 'Project Settings'))
+
+    def _set_signal(self):
+        T.add_observer(self)
+
+    def _set_object_name(self):
+        self.setObjectName('projectSettings')
+
+    def retranslate(self):
+        self.window_title.set_title_name(T.tr('menu.project_settings', 'Project Settings'))
+

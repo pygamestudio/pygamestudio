@@ -1,4 +1,5 @@
 from PySide6.QtWidgets import *
+from pygamestudio.common.i18n.translator import Translator as T
 
 
 class ColorPicker(QPushButton):
@@ -23,6 +24,6 @@ class ColorPicker(QPushButton):
         """)
     
     def _on_color_picker_clicked(self):
-        color = QColorDialog.getColor(parent=QApplication.activeWindow())
+        color = QColorDialog.getColor(title=T.tr('inspector.select_color'), parent=QApplication.activeWindow())
         if color.isValid():
             self._inspector_container.set_object_color(color.name())

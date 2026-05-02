@@ -488,7 +488,11 @@ class HierarchyTreeView(QTreeView):
 
     def keyPressEvent(self, event):
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
-            if event.key() == Qt.Key.Key_X:
+            if event.key() == Qt.Key.Key_A:
+                self.selectAll()
+                event.accept()
+                return
+            elif event.key() == Qt.Key.Key_X:
                 self._cut()
                 event.accept()
                 return

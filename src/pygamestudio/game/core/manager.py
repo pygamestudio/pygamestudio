@@ -91,6 +91,7 @@ class GameManager(QObject):
     
     def set_project_ready(self):
         self._is_project_ready = True
+        Logger.info(T.tr('gm.project_init', 'Project initialized Successfully'))
     
     def get_ready_for_project(self, project_path):
         self._project_path = project_path
@@ -348,6 +349,7 @@ class GameManager(QObject):
         obj = self._get_object(object_uuid)
         old_underline_state = obj.is_underline
         self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'is_underline', old_underline_state, new_underline_state))
+        print(111)
     
     def set_strikethrough_state(self, object_uuid, new_strikethrough_state):
         obj = self._get_object(object_uuid)
@@ -780,9 +782,9 @@ class GameManager(QObject):
                 stderr=None,
                 shell=False
             )
-            Logger.info(f'Run Project {Path(self._project_path).name}')
+            Logger.info(T.tr('scene.run_project', 'Run Project {}').format(Path(self._project_path).name))
         except Exception as e:
-            Logger.error(f'Failed to run project {Path(self._project_path).name}: {e}')
+            Logger.error(T.tr('scene.failed_to_run_project', 'Failed to Run Project {}: {}').format(Path(self._project_path).name, e))
 
 
 class AddObjectCommand(QUndoCommand):

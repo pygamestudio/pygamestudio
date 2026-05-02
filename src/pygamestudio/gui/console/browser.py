@@ -83,13 +83,16 @@ class ConsoleLogBrowser(QTextBrowser):
         ...
         
     def clean_up(self):
-        self._logs = []
+        self._clear_log()
         self._search_keyword = ''
 
-    def clear_log(self):
+    def _clear_log(self):
         self.clear()
         self._logs = []
         self.clear_log_signal.emit()
+    
+    def clear_log(self):
+        self._clear_log()
 
     def info(self, msg):
         log_level = INFO

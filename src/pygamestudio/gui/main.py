@@ -13,7 +13,6 @@ class PygameStudio:
         self._dashboard = DashboardWindow()
         self._editor = Editor(self)
         self._setup()
-        self._enter_editor("C:/Users/louis/Desktop/111")
 
     def _setup(self):
         self._set_signal()

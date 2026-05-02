@@ -132,6 +132,10 @@ QMenu::item {
     border: 1px solid transparent;
 }
 
+QMenu::item:disabled {
+    color: gray;
+}
+
 QMenu::item:selected {
     background-color: #404142;
     color: #ffffff;
@@ -150,6 +154,7 @@ QMenuBar {
 QMenuBar::item {
     background-color: transparent;
     padding: 4px 12px;
+    margin-bottom: 4px;
     border-radius: 4px;
 }
 
@@ -303,6 +308,14 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
 
 QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
     background-color: #1e1e1e;
+}
+
+QListWidget {
+    background-color: #282828;
+}
+
+QListWidget::item {
+    height: 30px;
 }
 
 /* ----- Window Base ----- */
@@ -475,4 +488,10 @@ QWidget#inspectorContainer QCheckBox::indicator {
 
 QWidget#inspectorContainer QCheckBox::indicator:hover {
     border: 1px solid #007acc;
+}
+
+/* ----- About ----- */
+QLabel#aboutCopyrightLabel {
+    font-size: 10px;
+    color: gray;
 }

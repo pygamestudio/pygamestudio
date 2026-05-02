@@ -36,12 +36,6 @@ class ConsoleWindow(QWidget):
         self._error_check_box.check_box_clicked.connect(self._console_log_browser.on_error_check_box_clicked)
         self._warning_check_box.check_box_clicked.connect(self._console_log_browser.on_warning_check_box_clicked)
 
-        from pygamestudio.gui.console.logger import Logger
-
-        Logger.info('测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试')
-        Logger.error('测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试')
-        Logger.warning('测试测试测试测试测试测试测试测试测试')
-
     def _set_layout(self):
         h_layout = QHBoxLayout()
         v_layout = QVBoxLayout(self)
