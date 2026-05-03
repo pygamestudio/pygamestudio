@@ -178,6 +178,7 @@ class EditorBody(QMainWindow):
         github_action = QAction(T.tr('menu.github_repository', 'Github Repository'), self)
         about_action = QAction(T.tr('menu.about_pygamestudio', 'About Pygame Studio'), self)
 
+        doc_action.triggered.connect(self._show_doc)
         github_action.triggered.connect(self._show_github_repository)
         # release_notes_action.triggered.connect(self._show_release_notes)
         about_action.triggered.connect(self._show_about_window)
@@ -242,6 +243,9 @@ class EditorBody(QMainWindow):
         editor_settings_window = EditorSettingsWindow(self._game_manager)
         editor_settings_window.show()
 
+    def _show_doc(self):
+        webbrowser.open('https://pygamestudio.com/')
+        
     def _show_github_repository(self):
         webbrowser.open('https://github.com/pygamestudio/pygamestudio')
 
