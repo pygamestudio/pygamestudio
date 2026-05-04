@@ -357,13 +357,16 @@ class AssetTreeView(QTreeView):
         # VS Code's install path should be configured in the settings. If not, open the file with txt.
         system = platform.system()
         if system == 'Windows':
-            subprocess.Popen(['notepad', target_path])
-            # subprocess.Popen(['code', target_path])
+            try:
+                subprocess.Popen(['code', target_path])
+            except Exception as e:
+                subprocess.Popen(['notepad', target_path])
         elif system == 'Darwin':
-            subprocess.Popen(['open', '-a', 'TextEdit', target_path])
-            # subprocess.Popen(['open', '-a', 'Visual Studio Code', target_path])
+            try:
+                subprocess.Popen(['open', '-a', 'Visual Studio Code', target_path])
+            except Exception as e:
+                subprocess.Popen(['open', '-a', 'TextEdit', target_path])
         elif system == 'Linux':
-            # subprocess.Popen(['code', target_path])
             try:
                 subprocess.Popen(['gedit', target_path])
             except FileNotFoundError:
