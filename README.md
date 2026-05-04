@@ -39,6 +39,8 @@ If the Pygame Studio editor launches successfully, the installation is complete.
 |-----|-----|
 | pygame-ce | >=2.5.6 |
 | PySide6 | >=6.10.0 | 
+| platformdirs | >=3.5.1 | 
+| numpy | >=1.26.0 | 
 
 <br>
 
