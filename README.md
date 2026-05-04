@@ -24,6 +24,8 @@ pip install --upgrade pygamestudio
 
 > **Note:** Since current releases are development versions, please include `--upgrade` to ensure pip installs the latest development version instead of an older cached one.
 
+<br>
+
 After installation, run the following command in your terminal to launch the editor and verify the installation:
 
 ```bash
