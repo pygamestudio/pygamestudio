@@ -61,6 +61,8 @@ class EditorBody(QMainWindow):
         
     def _set_widget(self):
         self.resize(1420, 900)
+        self.menuBar().setNativeMenuBar(False)
+
         self._left_top_tab_widget.addTab(self._hierarchy_window, T.tr('hierarchy.hierarchy', 'Hierarchy'))
         self._left_bottom_tab_widget.addTab(self._asset_window, T.tr('asset.asset', 'Asset'))
         self._center_top_tab_widget.addTab(self._scene_widnow, T.tr('scene.scene', 'Scene'))
