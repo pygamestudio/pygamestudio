@@ -31,6 +31,7 @@ class InspectorWindow(QWidget):
         h_layout.setContentsMargins(0, 4, 0, 0)
         v_layout.addLayout(h_layout)
         v_layout.addWidget(self._container)
+        v_layout.setSpacing(5)
         v_layout.setContentsMargins(0, 0, 0, 0)
 
     def _set_object_name(self):

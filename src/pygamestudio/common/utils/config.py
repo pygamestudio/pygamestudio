@@ -24,7 +24,7 @@ def get_editor_config() -> dict:
         return json.loads(editor_config_template_content)
     
     with open(editor_config_file_path, 'r', encoding='utf-8') as f:
-        return json.loads(f.read())
+        return json.load(f)
 
     
 def update_editor_config(key:str, value:Union[str, int, float, list, tuple]) -> None:

@@ -1,3 +1,4 @@
+import platform
 from pathlib import Path
 from PySide6.QtGui import *
 from PySide6.QtCore import *
@@ -43,7 +44,8 @@ class DashboardDelegate(QStyledItemDelegate):
 
         name_font = QFont()
         name_font.setBold(True)
-        name_font.setPointSize(12)
+        font_size = 15 if platform.system() == 'Darwin' else 12
+        name_font.setPointSize(font_size)
         painter.setFont(name_font)
         if is_project_existed:
             painter.setPen(QColor(255, 255, 255))
@@ -56,7 +58,8 @@ class DashboardDelegate(QStyledItemDelegate):
         
         path_rect = QRect(name_x, icon_rect.y()+self._icon_size.height()//8*5, name_width, option.rect.height())
         path_font = QFont()
-        path_font.setPointSize(8)
+        font_size = 12 if platform.system() == 'Darwin' else 8
+        path_font.setPointSize(font_size)
         painter.setFont(path_font)
         painter.setPen(QColor(204, 204, 204))
         painter.drawText(path_rect, Qt.AlignmentFlag.AlignTop, 
@@ -64,7 +67,8 @@ class DashboardDelegate(QStyledItemDelegate):
         
         date_rect = QRect(option.rect.right() - 110, icon_rect.y(), 100, 20)
         date_font = QFont()
-        date_font.setPointSize(7)
+        font_size = 9 if platform.system() == 'Darwin' else 7
+        date_font.setPointSize(font_size)
         painter.setFont(date_font)
         painter.setPen(QColor(204, 204, 204))
         painter.drawText(date_rect, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop, project_date)

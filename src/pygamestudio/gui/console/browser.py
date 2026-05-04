@@ -47,7 +47,8 @@ class ConsoleLogBrowser(QTextBrowser):
         self._set_object_name()
 
     def _set_widget(self):
-        font = QFont('Consolas', 10)
+        font = QFont()
+        font.setPointSize(10)
         self.setFont(font)
 
         self.setOpenLinks(False)

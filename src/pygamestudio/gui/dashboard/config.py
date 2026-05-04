@@ -4,7 +4,6 @@ from platformdirs import user_config_dir
 from PySide6.QtWidgets import QApplication, QMessageBox
 from pygamestudio.common.i18n.translator import Translator as T
 
-
 DASHBOARD_PROJECTS_FILE_NAME = 'dashboard.pygs'
 DASHBOARD_CONFIG_DIR_PATH = Path(user_config_dir()) / 'PygameStudio'
 DASHBOARD_PROJECTS_FILE_PATH = DASHBOARD_CONFIG_DIR_PATH / DASHBOARD_PROJECTS_FILE_NAME

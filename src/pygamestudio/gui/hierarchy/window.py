@@ -36,6 +36,7 @@ class HierarchyWindow(QWidget):
 
         v_layout.addLayout(h_layout)
         v_layout.addWidget(self._hierarchy_tree_view)
+        v_layout.setSpacing(5)
         v_layout.setContentsMargins(0, 0, 0, 0)
 
     def _set_object_name(self):

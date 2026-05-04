@@ -185,6 +185,10 @@ QTabBar::tab:hover:!selected {
     color: #cccccc;
 }
 
+QTabWidget::tab-bar {
+    alignment: left;
+}
+
 QTreeView {
     background-color: #282828;
     color: #cccccc;
@@ -368,6 +372,7 @@ QLineEdit#dashboardSearchLineEdit {
 
 QListView#dashboardListView {
     background-color: #282828;
+    outline: none;
 }
 
 QListView#dashboardListView::item {
@@ -377,6 +382,7 @@ QListView#dashboardListView::item {
 
 QListView#dashboardListView::item:selected {
     background-color: #28292a;
+    border: 1px solid #cccccc;
 }
 
 QListView#dashboardListView::item:hover:!selected {
