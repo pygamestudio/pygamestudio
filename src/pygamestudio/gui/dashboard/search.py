@@ -1,7 +1,6 @@
 from PySide6.QtGui import *
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
-from pygamestudio.common.utils.path import RES_PATH
 from pygamestudio.common.i18n.translator import Translator as T
 
 
@@ -23,7 +22,7 @@ class SearchLineEdit(QLineEdit):
         self.setPlaceholderText(T.tr('dashboard.search_placeholder', 'Search by project name'))
         
         self._search_icon.setFixedSize(14, 14)
-        pixmap = QPixmap(str(RES_PATH / 'images/search.png'))
+        pixmap = QPixmap(':/images/search.png')
         pixmap = pixmap.scaled(self._search_icon.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         self._search_icon.setPixmap(pixmap)
         

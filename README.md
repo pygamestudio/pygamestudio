@@ -61,6 +61,8 @@ pygamestudio
 
 <img src="https://i-blog.csdnimg.cn/direct/a627d1820d3145dda30bbd7857fd17b3.png" width="600"/>
 
+<br>
+
 <img src="https://i-blog.csdnimg.cn/direct/b1ef0d71e0f04265b1e77151032e7847.png" width="600"/>
 
 <br>

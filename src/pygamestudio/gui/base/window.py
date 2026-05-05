@@ -37,14 +37,14 @@ class WindowTitleBase(QWidget):
         self._name_label.setText('Pygame Studio')
 
         self._icon.setFixedSize(20, 20)
-        pixmap = QPixmap(str(RES_PATH / 'images/logo.png'))
+        pixmap = QPixmap(':/images/logo.png')
         scaled_pixmap = pixmap.scaled(self._icon.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         self._icon.setPixmap(scaled_pixmap)
         self._icon.setScaledContents(True)
         
-        self._minimize_btn.setIcon(QIcon(str(RES_PATH / 'images/minimize.png')))
-        self._maximize_btn.setIcon(QIcon(str(RES_PATH / 'images/maximize.png')))
-        self._close_btn.setIcon(QIcon(str(RES_PATH / 'images/close.png')))
+        self._minimize_btn.setIcon(QIcon(':/images/minimize.png'))
+        self._maximize_btn.setIcon(QIcon(':/images/maximize.png'))
+        self._close_btn.setIcon(QIcon(':/images/close.png'))
         self._minimize_btn.setFixedSize(20, 20)
         self._maximize_btn.setFixedSize(20, 20)
         self._close_btn.setFixedSize(20, 20)
@@ -88,11 +88,11 @@ class WindowTitleBase(QWidget):
         if self._is_maximized:
             self.window_normalized.emit()
             self._is_maximized = False
-            self._maximize_btn.setIcon(QIcon(str(RES_PATH / 'images/maximize.png')))
+            self._maximize_btn.setIcon(QIcon(':/images/maximize.png'))
         else:
             self.window_maximized.emit()
             self._is_maximized = True
-            self._maximize_btn.setIcon(QIcon(str(RES_PATH / 'images/normalize.png')))
+            self._maximize_btn.setIcon(QIcon(':/images/normalize.png'))
 
     def _close_window(self):
         self.window_closed.emit()
@@ -147,7 +147,7 @@ class WindowBase(QWidget):
         self.setMouseTracking(True)
         self.central_widget.setMouseTracking(True)
         self.setWindowFlag(Qt.WindowType.FramelessWindowHint)
-        self.setWindowIcon(QIcon(str(RES_PATH/'images/logo.png')))
+        self.setWindowIcon(QIcon(':/images/logo.png'))
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
     def __set_signal(self):

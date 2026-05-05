@@ -2,7 +2,6 @@ import uuid
 import random
 import pygame
 from pygamestudio.game.object.type import *
-from pygamestudio.common.utils.path import RES_PATH
 
 
 class ObjectLine:
@@ -37,7 +36,7 @@ class ObjectLine:
         self.scale_y = self._object_data.get('scale_y', 1)
         self.scale = self._object_data.get('scale', (1, 1))
         self.angle = self._object_data.get('angle', 0)
-        self.icon = self._object_data.get('icon', str(RES_PATH/'images/item.png'))
+        self.icon = self._object_data.get('icon', ':/images/item.png')
         self.color = self._object_data.get('color', random.choice(['#ff0000', '#00ff00', '#0000ff']))
         
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)

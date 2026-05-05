@@ -12,7 +12,7 @@ class ObjectBase:
         internal_properties = {
             'is_expanded': True,
             'is_selected': False,
-            'icon': str(RES_PATH/'images/item.png'),
+            'icon': '',
         }
     
         if not self._is_for_api:

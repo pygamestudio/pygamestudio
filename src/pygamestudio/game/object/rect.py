@@ -2,7 +2,6 @@ import uuid
 import pygame
 from pygamestudio.game.object.type import *
 from pygamestudio.game.object.base import ObjectBase
-from pygamestudio.common.utils.path import RES_PATH
 
 
 class ObjectRect(ObjectBase):
@@ -11,7 +10,7 @@ class ObjectRect(ObjectBase):
         self._is_initialized = False
 
         if hasattr(self, 'icon'):
-            self.icon = str(RES_PATH/'images/rect.png')
+            self.icon = ':/images/rect.png'
 
         common_properties = {
             'name': 'Rect',

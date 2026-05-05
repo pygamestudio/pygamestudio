@@ -9,7 +9,6 @@ from pygamestudio.gui.dashboard.menu import ContextMenu
 from pygamestudio.gui.dashboard.delegate import DashboardDelegate
 from pygamestudio.gui.dashboard.dialog import CreatePorjectWindow, RenameProjectWindow
 from pygamestudio.gui.dashboard.model import DashboardSortFilterProxyModel
-from pygamestudio.common.utils.path import RES_PATH
 from pygamestudio.common.i18n.translator import Translator as T
 
 
@@ -108,7 +107,7 @@ class DashboardListView(QListView):
     
     def _create_project(self, project_path):
         project_data = {
-            'icon': str(RES_PATH / 'images/project_icon.png'),
+            'icon': ':/images/project_icon.png',
             'name': Path(project_path).name,
             'path': Path(project_path).as_posix(),
             'date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -138,7 +137,7 @@ class DashboardListView(QListView):
             return
         
         project_data = {
-            'icon': str(RES_PATH / 'images/project_icon.png'),
+            'icon': ':/images/project_icon.png',
             'name': Path(project_path).name,
             'path': project_path,
             'date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')

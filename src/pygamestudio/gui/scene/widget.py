@@ -1,7 +1,6 @@
 from PySide6.QtGui import *
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
-from pygamestudio.common.utils.path import RES_PATH
 from pygamestudio.common.i18n.translator import Translator as T
 
 
@@ -17,7 +16,7 @@ class RunProjectButton(QPushButton):
     
     def _set_widget(self):
         self.setToolTip(T.tr('scene.run_project', 'Run Project'))
-        self.setIcon(QIcon(str(RES_PATH / 'images/run.png')))
+        self.setIcon(QIcon(':/images/run.png'))
 
     def _set_signal(self):
         T.add_observer(self)

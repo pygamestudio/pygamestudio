@@ -2,7 +2,6 @@ import uuid
 import pygame
 from pygamestudio.game.object.type import *
 from pygamestudio.game.object.base import ObjectBase
-from pygamestudio.common.utils.path import RES_PATH
 
 
 class ObjectCanvas(ObjectBase):
@@ -11,7 +10,7 @@ class ObjectCanvas(ObjectBase):
         self._is_initialized = False
                 
         if hasattr(self, 'icon'):
-            self.icon = str(RES_PATH/'images/canvas.png')
+            self.icon = ':/images/canvas.png'
 
         common_properties = {
             'name': 'Canvas',

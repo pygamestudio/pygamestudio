@@ -328,6 +328,9 @@ class Container(QFrame):
         
     def _inspect_object(self, object_uuid):
         obj = self._game_manager.get_object(object_uuid)
+        if not obj:
+            return
+        
         self._object_uuid_in_inspection = object_uuid
         self._clear_layout(self._container_layout)
 

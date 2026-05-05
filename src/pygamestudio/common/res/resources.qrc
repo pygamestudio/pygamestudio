@@ -1,0 +1,37 @@
+<RCC>
+    <qresource prefix="/">
+        <file>images/add_item.png</file>
+        <file>images/add.png</file>
+        <file>images/canvas.png</file>
+        <file>images/check.png</file>
+        <file>images/clear.png</file>
+        <file>images/close.png</file>
+        <file>images/create_project.png</file>
+        <file>images/down_arrow.png</file>
+        <file>images/ellipse.png</file>
+        <file>images/error.png</file>
+        <file>images/expand_or_collapse_all.png</file>
+        <file>images/eye_closed.png</file>
+        <file>images/eye_off.png</file>
+        <file>images/eye_open.png</file>
+        <file>images/import_project.png</file>
+        <file>images/info.png</file>
+        <file>images/left_arrow.png</file>
+        <file>images/logo.png</file>
+        <file>images/maximize.png</file>
+        <file>images/minimize.png</file>
+        <file>images/normalize.png</file>
+        <file>images/project_icon.png</file>
+        <file>images/rect.png</file>
+        <file>images/refresh_asset.png</file>
+        <file>images/right_arrow.png</file>
+        <file>images/run.png</file>
+        <file>images/search.png</file>
+        <file>images/sort.png</file>
+        <file>images/text.png</file>
+        <file>images/tree_arrow_down.png</file>
+        <file>images/tree_arrow_right.png</file>
+        <file>images/up_arrow.png</file>
+        <file>images/warning.png</file>
+    </qresource>
+</RCC>

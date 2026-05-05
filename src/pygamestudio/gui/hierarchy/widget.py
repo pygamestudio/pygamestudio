@@ -2,7 +2,6 @@ from PySide6.QtGui import *
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
 from pygamestudio.game.object.type import *
-from pygamestudio.common.utils.path import RES_PATH
 from pygamestudio.common.i18n.translator import Translator as T
 
 
@@ -17,7 +16,7 @@ class ExpandCollapseAllButton(QPushButton):
 
     def _set_widget(self):
         self.setToolTip(T.tr('hierarchy.expand_or_collapse_all', 'Expand or Collapse All'))
-        self.setIcon(QIcon(str(RES_PATH / 'images/expand_or_collapse_all.png')))
+        self.setIcon(QIcon(':/images/expand_or_collapse_all.png'))
 
     def _set_signal(self):
         T.add_observer(self)
@@ -39,7 +38,7 @@ class AddItemButton(QPushButton):
     
     def _set_widget(self):
         self.setToolTip(T.tr('hierarchy.add', 'Add'))
-        self.setIcon(QIcon(str(RES_PATH / 'images/add_item.png')))
+        self.setIcon(QIcon(':/images/add_item.png'))
 
     def _set_signal(self):
         T.add_observer(self)

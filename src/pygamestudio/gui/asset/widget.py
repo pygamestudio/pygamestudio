@@ -2,7 +2,6 @@ from PySide6.QtGui import *
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
 from pygamestudio.gui.asset.type import *
-from pygamestudio.common.utils.path import RES_PATH
 from pygamestudio.common.utils.config import get_project_config
 from pygamestudio.common.i18n.translator import Translator as T
 
@@ -18,7 +17,7 @@ class RefreshAssetButton(QPushButton):
     
     def _set_widget(self):
         self.setToolTip(T.tr('asset.refresh', 'Refresh'))
-        self.setIcon(QIcon(str(RES_PATH / 'images/refresh_asset.png')))
+        self.setIcon(QIcon(':/images/refresh_asset.png'))
 
     def _set_signal(self):
         T.add_observer(self)
@@ -40,7 +39,7 @@ class SortAssetButton(QPushButton):
     
     def _set_widget(self):
         self.setToolTip(T.tr('asset.sort', 'Sort'))
-        self.setIcon(QIcon(str(RES_PATH / 'images/sort.png')))
+        self.setIcon(QIcon(':/images/sort.png'))
 
     def _set_signal(self):
         T.add_observer(self)
@@ -99,7 +98,7 @@ class AddAssetButton(QPushButton):
     
     def _set_widget(self):
         self.setToolTip(T.tr('asset.add', 'Add'))
-        self.setIcon(QIcon(str(RES_PATH / 'images/add.png')))
+        self.setIcon(QIcon(':/images/add.png'))
 
     def _set_signal(self):
         T.add_observer(self)

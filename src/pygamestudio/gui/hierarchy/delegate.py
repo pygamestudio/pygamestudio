@@ -1,7 +1,6 @@
 from PySide6.QtGui import *
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
-from pygamestudio.common.utils.path import RES_PATH
 
 
 class HierarchyTreeViewDelegate(QStyledItemDelegate):
@@ -12,9 +11,9 @@ class HierarchyTreeViewDelegate(QStyledItemDelegate):
         self._standard_model = standard_model
 
         self._pixmap_size = QSize(16, 16)
-        self._eye_open_pixmap = QPixmap(RES_PATH/'images/eye_open.png')
-        self._eye_off_pixmap = QPixmap(RES_PATH/'images/eye_off.png')
-        self._eye_closed_pixmap = QPixmap(RES_PATH/'images/eye_closed.png')
+        self._eye_open_pixmap = QPixmap(':/images/eye_open.png')
+        self._eye_off_pixmap = QPixmap(':/images/eye_off.png')
+        self._eye_closed_pixmap = QPixmap(':/images/eye_closed.png')
 
         self._hovered_index = None
 

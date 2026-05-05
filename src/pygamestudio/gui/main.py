@@ -2,6 +2,7 @@ import pygame
 from PySide6.QtCore import *
 from pygamestudio.gui.window import Editor
 from pygamestudio.gui.dashboard.window import DashboardWindow
+from pygamestudio.common.res import resources_rc
 from pygamestudio.common.utils.config import get_editor_config
 from pygamestudio.common.i18n.translator import Translator as T
 

@@ -1,7 +1,6 @@
 from PySide6.QtGui import *
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
-from pygamestudio.common.utils.path import RES_PATH
 from pygamestudio.common.i18n.translator import Translator as T
 
 
@@ -17,7 +16,7 @@ class CreateProjectButton(QPushButton):
     
     def _set_widget(self):
         self.setText(T.tr('dashboard.create', 'Create'))
-        self.setIcon(QIcon(str(RES_PATH / 'images/create_project.png')))
+        self.setIcon(QIcon(':/images/create_project.png'))
 
     def _set_signal(self):
         T.add_observer(self)
@@ -41,7 +40,7 @@ class ImportProjectButton(QPushButton):
 
     def _set_widget(self):
         self.setText(T.tr('dashboard.import', 'Import'))
-        self.setIcon(QIcon(str(RES_PATH / 'images/import_project.png')))
+        self.setIcon(QIcon(':/images/import_project.png'))
 
     def _set_signal(self):
         T.add_observer(self)

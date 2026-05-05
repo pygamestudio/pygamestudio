@@ -2,7 +2,6 @@ from PySide6.QtGui import *
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
 from pygamestudio.gui.console.type import *
-from pygamestudio.common.utils.path import RES_PATH
 from pygamestudio.common.i18n.translator import Translator as T
 
 
@@ -40,11 +39,11 @@ class LogCheckBox(QWidget):
     def _set_icon(self):
         pixmap = QPixmap()
         if self._log_level == ERROR:
-            pixmap = QPixmap(RES_PATH/'images/error.png')
+            pixmap = QPixmap(':/images/error.png')
         elif self._log_level == WARNING:
-            pixmap = QPixmap(RES_PATH/'images/warning.png')
+            pixmap = QPixmap(':/images/warning.png')
         else:
-            pixmap = QPixmap(RES_PATH/'images/info.png')
+            pixmap = QPixmap(':/images/info.png')
         pixmap = pixmap.scaled(QSize(20, 20), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         self._log_icon.setPixmap(pixmap)
 
@@ -59,7 +58,7 @@ class LogCheckBox(QWidget):
 class ClearButton(QPushButton):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setIcon(QIcon(str(RES_PATH/'images/clear.png')))
+        self.setIcon(QIcon(':/images/clear.png'))
         self.setText(T.tr('console.clear', 'Clear'))
         T.add_observer(self)
 

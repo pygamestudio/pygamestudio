@@ -24,7 +24,7 @@ class AboutBody(QWidget):
 
     def _set_widget(self):
         self._logo_label.setFixedSize(100, 100)
-        pixmap = QPixmap(str(RES_PATH / 'images/logo.png'))
+        pixmap = QPixmap(':/images/logo.png')
         scaled_pixmap = pixmap.scaled(self._logo_label.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         self._logo_label.setPixmap(scaled_pixmap)
 
