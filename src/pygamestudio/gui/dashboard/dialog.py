@@ -46,6 +46,8 @@ class CreateProjectBody(QWidget):
         self._create_button.setEnabled(False)
         self._cancel_button.setText(T.tr('dashboard.cancel', 'Cancel'))
 
+        self._error_label.hide()
+
     def _set_signal(self):
         self._project_name_edit.textChanged.connect(self._validate_project)
         self._project_dir_path_edit.textChanged.connect(self._validate_project)
@@ -72,8 +74,9 @@ class CreateProjectBody(QWidget):
         main_v_layout.addLayout(h_layout1)
         main_v_layout.addSpacing(5)
         main_v_layout.addLayout(h_layout2)
+        main_v_layout.addSpacing(2.5)
         main_v_layout.addWidget(self._error_label)
-        main_v_layout.addStretch()
+        main_v_layout.addSpacing(2.5)
         main_v_layout.addLayout(h_layout3)
 
     def _set_object_name(self):
@@ -175,9 +178,14 @@ class CreatePorjectWindow(WindowBase):
         self._set_signal()
 
     def _set_widget(self):
-        self.resize(350, 150)
+        self.resize(410, 150)
+        self.setMinimumWidth(300)
+        self.setMaximumWidth(500)
         self.set_window_body(self._create_project_body)
+        self.layout().setVerticalSizeConstraint(QLayout.SizeConstraint.SetFixedSize)
+
         self.window_title.set_title_name(T.tr('dashboard.create', 'Create'))
+        self.window_title.set_maximize_button_disabled()
 
     def _set_signal(self):
         self._create_project_body.create_project_signal.connect(self.create_project_signal.emit)

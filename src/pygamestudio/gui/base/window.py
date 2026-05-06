@@ -97,6 +97,15 @@ class WindowTitleBase(QWidget):
     def _close_window(self):
         self.window_closed.emit()
 
+    def set_minimize_button_disabled(self):
+       self._minimize_btn.setEnabled(False)
+    
+    def set_maximize_button_disabled(self):
+        self._maximize_btn.setEnabled(False)
+
+    def set_close_button_disabled(self):
+        self._close_btn.setEnabled(False)
+
     def set_title_name(self, name):
         self._name_label.setText(name)
 
@@ -165,7 +174,7 @@ class WindowBase(QWidget):
         main_v_layout = QVBoxLayout(self)
         main_v_layout.addWidget(self.central_widget)
         main_v_layout.setContentsMargins(0, 0, 0, 0)
-    
+
     def __set_object_name(self):
         self.central_widget.setObjectName('windowBaseCentralWidget')
 
