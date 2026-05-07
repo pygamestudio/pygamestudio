@@ -227,6 +227,8 @@ class RenameProjectBody(QWidget):
         self._rename_button.setEnabled(False)
         self._cancel_button.setText(T.tr('dashboard.cancel', 'Cancel'))
 
+        self._error_label.hide()
+
     def _set_signal(self):
         self._project_name_edit.textChanged.connect(self._validate_project)
         self._rename_button.clicked.connect(self._rename)
@@ -244,8 +246,9 @@ class RenameProjectBody(QWidget):
         h_layout2.addSpacing(10)
         h_layout2.addWidget(self._cancel_button)
         main_v_layout.addLayout(h_layout1)
+        main_v_layout.addSpacing(2.5)
         main_v_layout.addWidget(self._error_label)
-        main_v_layout.addStretch()
+        main_v_layout.addSpacing(2.5)
         main_v_layout.addLayout(h_layout2)
 
     def _set_object_name(self):
@@ -325,8 +328,13 @@ class RenameProjectWindow(WindowBase):
 
     def _set_widget(self):
         self.resize(350, 80)
-        self.window_title.set_title_name(T.tr('dashboard.rename', 'Rename'))
+        self.setMinimumWidth(300)
+        self.setMaximumWidth(400)
         self.set_window_body(self._rename_project_body)
+        self.layout().setVerticalSizeConstraint(QLayout.SizeConstraint.SetFixedSize)
+
+        self.window_title.set_title_name(T.tr('dashboard.rename', 'Rename'))
+        self.window_title.set_maximize_button_disabled()
 
     def _set_signal(self):
         self._rename_project_body.rename_project_signal.connect(self.rename_project_signal.emit)
