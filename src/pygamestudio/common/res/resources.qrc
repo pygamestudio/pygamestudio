@@ -19,6 +19,7 @@
         <file>images/left_arrow.png</file>
         <file>images/logo.png</file>
         <file>images/maximize.png</file>
+        <file>images/maximize_disabled.png</file>
         <file>images/minimize.png</file>
         <file>images/normalize.png</file>
         <file>images/project_icon.png</file>
