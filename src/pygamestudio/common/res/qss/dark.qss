@@ -120,6 +120,19 @@ QComboBox::down-arrow {
     height: 10px;
 }
 
+QComboBox QAbstractItemView {
+    background-color: #1e1e1e;
+    color: #cccccc;
+    border: 1px solid #3c3c3c;
+    selection-background-color: #007acc;
+    selection-color: #ffffff;
+    outline: 0px;
+}
+
+QComboBox QAbstractItemView::item:selected {
+    background-color: #007acc;
+}
+
 QMenu {
     background-color: #1e1e1e;
     color: #cccccc;
@@ -482,6 +495,10 @@ QWidget#inspector QPushButton:hover {
 QWidget#inspector QPushButton:pressed {
     background-color: #28292a;
     border-radius: 5px;
+}
+
+QWidget#inspectorContainer QLineEdit:disabled {
+    color: gray;
 }
 
 QWidget#inspectorContainer QLabel {
