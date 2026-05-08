@@ -52,12 +52,12 @@ class AddItemButton(QPushButton):
 
     def _show_context_menu(self, pos):
         menu = QMenu(self)
-        # add_line_action = QAction(T.tr('item.line', 'Line'), self)
+        add_line_action = QAction(T.tr('item.line', 'Line'), self)
         add_rect_action = QAction(T.tr('item.rect', 'Rect'), self)
         add_ellipse_action = QAction(T.tr('item.ellipse', 'Ellipse'), self)
         add_text_action = QAction(T.tr('item.text', 'Text'), self)
 
-        # add_line_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_LINE))
+        add_line_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_LINE))
         add_rect_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_RECT))
         add_ellipse_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_ELLIPSE))
         add_text_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_TEXT))
@@ -67,7 +67,7 @@ class AddItemButton(QPushButton):
         menu.addMenu(add_shape_sub_menu)
         menu.addMenu(add_ui_sub_menu)
 
-        # add_shape_sub_menu.addAction(add_line_action)
+        add_shape_sub_menu.addAction(add_line_action)
         add_shape_sub_menu.addAction(add_rect_action)
         add_shape_sub_menu.addAction(add_ellipse_action)
         add_ui_sub_menu.addAction(add_text_action)

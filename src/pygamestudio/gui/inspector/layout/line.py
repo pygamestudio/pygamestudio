@@ -27,6 +27,28 @@ INSPECTOR_LAYOUT_LINE = {
             'widget': [NameLineEdit]
         }
     },
+    'start_point': {
+        'i18n': {
+            'key': 'inspector.start_point',
+            'default': 'Start Point'
+        },
+        'component': {
+            'enabled': [True, True],
+            'attribute': ['start_x', 'start_y'],
+            'widget': [PosSpinBox, PosSpinBox]
+        }
+    },
+    'end_point': {
+        'i18n': {
+            'key': 'inspector.end_point',
+            'default': 'End Point'
+        },
+        'component': {
+            'enabled': [True, True],
+            'attribute': ['end_x', 'end_y'],
+            'widget': [PosSpinBox, PosSpinBox]
+        }
+    },
     'scale': {
         'i18n': {
             'key': 'inspector.scale',
@@ -58,28 +80,6 @@ INSPECTOR_LAYOUT_LINE = {
             'enabled': [True],
             'attribute': ['color'],
             'widget': [ColorPicker]
-        }
-    },
-    'start_point': {
-        'i18n': {
-            'key': 'inspector.start_point',
-            'default': 'Start Point'
-        },
-        'component': {
-            'enabled': [True, True],
-            'attribute': ['start_x', 'start_y'],
-            'widget': [PosSpinBox, PosSpinBox]
-        }
-    },
-    'end_point': {
-        'i18n': {
-            'key': 'inspector.end_point',
-            'default': 'End Point'
-        },
-        'component': {
-            'enabled': [True, True],
-            'attribute': ['end_x', 'end_y'],
-            'widget': [PosSpinBox, PosSpinBox]
         }
     },
     'thickness': {

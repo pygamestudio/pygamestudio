@@ -26,7 +26,7 @@ class ObjectBase:
 
     def get_surface(self):
         return self.surface
-    
+
     def update_surface(self):
         ...
 
@@ -85,15 +85,19 @@ class ObjectBase:
             return
         
         if name == 'pos':
-            self.x = value[0]
-            self.y = value[1]
+            super().__setattr__('x', value[0])
+            super().__setattr__('y', value[1])
+            super().__setattr__('pos', value)
 
         elif name == 'size':
-            self.width = value[0]
-            self.height = value[1]
+            super().__setattr__('width', value[0])
+            super().__setattr__('height', value[1])
+            super().__setattr__('size', value)
 
         elif name == 'scale':
-            self.scale_x = value[0]
-            self.scale_y = value[1]
+            super().__setattr__('scale_x', value[0])
+            super().__setattr__('scale_y', value[1])
+            super().__setattr__('scale', value)
 
-        super().__setattr__(name, value)
+        else:
+            super().__setattr__(name, value)
