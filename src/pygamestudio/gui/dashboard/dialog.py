@@ -53,7 +53,7 @@ class CreateProjectBody(QWidget):
         self._project_dir_path_edit.textChanged.connect(self._validate_project)
         self._create_button.clicked.connect(self._create_project)
         self._browse_button.clicked.connect(self._browse)
-        self._cancel_button.clicked.connect(self._close_window)
+        self._cancel_button.clicked.connect(self.close_window_signal.emit)
         T.add_observer(self)
 
     def _set_layout(self):
@@ -133,11 +133,6 @@ class CreateProjectBody(QWidget):
             self._show_error(T.tr('dashboard.create_project_error', 'Failed to create project: {}').format(e))
             self._create_button.setEnabled(False)
 
-    def _close_window(self):
-        self._project_name_edit.clear()
-        self._project_dir_path_edit.clear()
-        self.close_window_signal.emit()
-
     def _hide_error(self):
         self._error_label.setText('')
         self._error_label.hide()
@@ -150,6 +145,11 @@ class CreateProjectBody(QWidget):
         project_dir_path = QFileDialog.getExistingDirectory(self, T.tr('dashboard.select_project_path', 'Select Project Path'))
         if project_dir_path:
             self._project_dir_path_edit.setText(project_dir_path)
+
+    def clean_up(self):
+        self._project_name_edit.clear()
+        self._project_dir_path_edit.clear()
+        self._hide_error()
 
     def retranslate(self):
         self._project_name_label.setText(T.tr('dashboard.project_name', 'Project Name:'))
@@ -195,7 +195,10 @@ class CreatePorjectWindow(WindowBase):
     def retranslate(self):
         self.window_title.set_title_name(T.tr('dashboard.create', 'Create'))
 
-
+    def closeEvent(self, event):
+        self._create_project_body.clean_up()
+        return super().closeEvent(event)
+    
 class RenameProjectBody(QWidget):
     close_window_signal = Signal()
     rename_project_signal = Signal(QModelIndex, str, str)
@@ -232,7 +235,7 @@ class RenameProjectBody(QWidget):
     def _set_signal(self):
         self._project_name_edit.textChanged.connect(self._validate_project)
         self._rename_button.clicked.connect(self._rename)
-        self._cancel_button.clicked.connect(self._close_window)
+        self._cancel_button.clicked.connect(self.close_window_signal.emit)
         T.add_observer(self)
 
     def _set_layout(self):
@@ -287,10 +290,6 @@ class RenameProjectBody(QWidget):
         else:
             self.rename_project_signal.emit(self._index, self._old_project_path, new_project_path)
 
-    def _close_window(self):
-        self._project_name_edit.clear()
-        self.close_window_signal.emit()
-
     def _hide_error(self):
         self._error_label.setText('')
         self._error_label.hide()
@@ -303,16 +302,16 @@ class RenameProjectBody(QWidget):
         self._index = index
         self._old_project_path = old_project_path
 
+    def clean_up(self):
+        self._project_name_edit.clear()
+        self._hide_error()
+
     def retranslate(self):
         self._project_name_label.setText(T.tr('dashboard.project_name', 'Project Name:'))
         self._project_name_edit.setPlaceholderText(T.tr('dashboard.project_rename_edit_placeholder', 'Please enter the new project name'))
         self._rename_button.setText(T.tr('dashboard.rename', 'Rename'))
         self._cancel_button.setText(T.tr('dashboard.cancel', 'Cancel'))
-    
-    def closeEvent(self, event):
-        self._project_name_edit.clear()
-        return super().closeEvent(event)
-    
+
 
 class RenameProjectWindow(WindowBase):
     rename_project_signal = Signal(QModelIndex, str, str)
@@ -327,9 +326,9 @@ class RenameProjectWindow(WindowBase):
         self._set_signal()
 
     def _set_widget(self):
-        self.resize(350, 80)
+        self.resize(370, 80)
         self.setMinimumWidth(300)
-        self.setMaximumWidth(400)
+        self.setMaximumWidth(410)
         self.set_window_body(self._rename_project_body)
         self.layout().setVerticalSizeConstraint(QLayout.SizeConstraint.SetFixedSize)
 
@@ -346,3 +345,7 @@ class RenameProjectWindow(WindowBase):
 
     def retranslate(self):
         self.window_title.set_title_name(T.tr('menu.rename', 'Rename'))
+
+    def closeEvent(self, event):
+        self._rename_project_body.clean_up()
+        return super().closeEvent(event)
