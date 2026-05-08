@@ -23,11 +23,25 @@ SOFTWARE.
 """
 
 import sys
+import ctypes
 from PySide6.QtWidgets import QApplication
 from pygamestudio.gui.main import PygameStudio
+from pygamestudio.common.utils.constant import VERSION
+
+
+def set_taskbar_icon():
+   if sys.platform == "win32":
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+            f"pygamestudio.{VERSION}"
+        )
 
 
 def main():
+    try:
+        set_taskbar_icon()
+    except Exception as e:
+        pass
+    
     app = QApplication([])
     pygame_studio = PygameStudio()
     pygame_studio.start()
