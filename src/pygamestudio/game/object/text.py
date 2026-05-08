@@ -40,10 +40,7 @@ class ObjectText(ObjectBase):
         for key, value in common_properties.items():
             setattr(self, key, object_data.get(key, value))
 
-        font = self._init_font()
-        text = font.render(self.text, True, self.color)
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
-        self.surface.blit(text, text.get_rect(center=(self.surface.width//2, self.surface.height//2)))
         self._is_initialized = True
 
     def _init_font(self):
@@ -60,7 +57,7 @@ class ObjectText(ObjectBase):
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
         self.surface.blit(text, text.get_rect(center=(self.surface.width//2, self.surface.height//2)))
         
-        scaled_size = (self.width * self.scale_x, self.height * self.scale_y)
+        scaled_size = (self.surface.width * self.scale_x, self.surface.height * self.scale_y)
         scaled_surface = pygame.transform.scale(self.surface, scaled_size)
 
         if not self._is_for_api and self.is_selected:
