@@ -39,5 +39,8 @@ class SearchLineEdit(QLineEdit):
     def _set_object_name(self):
         self.setObjectName('hierarchySearchLineEdit')
 
+    def contextMenuEvent(self, arg__1):
+        pass
+
     def retranslate(self):
         self.setPlaceholderText(T.tr('hierarchy.search_placeholder', 'Search by name or uuid'))

@@ -39,5 +39,8 @@ class SearchLineEdit(QLineEdit):
     def _set_object_name(self):
         self.setObjectName('consoleSearchLineEdit')
 
+    def contextMenuEvent(self, arg__1):
+        pass
+    
     def retranslate(self):
         self.setPlaceholderText(T.tr('console.search_placeholder', 'Search log'))
