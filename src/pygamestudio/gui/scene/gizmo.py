@@ -64,10 +64,11 @@ class MoveGizmo(QWidget):
             color = QColor(255, 255, 255)
         else:
             color = QColor(255, 60, 60)
-        pen_x = QPen(color, 2)
+        pen_x = QPen(color, 4)
+        pen_x.setJoinStyle(Qt.PenJoinStyle.MiterJoin)
         painter.setPen(pen_x)
         painter.setBrush(color)
-        painter.drawLine(self._offset_x, self._offset_y, self._offset_x + self._axis_length, self._offset_y)
+        painter.drawLine(self._offset_x, self._offset_y, self._offset_x + self._axis_length - self._offset_x//2, self._offset_y)
         painter.drawPolygon([
             QPoint(self._offset_x + self._axis_length, self._offset_y),
             QPoint(self._offset_x + self._axis_length - self._arrow_size, self._offset_y - self._arrow_size//2),
@@ -79,10 +80,11 @@ class MoveGizmo(QWidget):
             color = QColor(255, 255, 255)
         else:
             color = QColor(60, 255, 60)
-        pen_y = QPen(color, 2)
+        pen_y = QPen(color, 4)
+        pen_y.setJoinStyle(Qt.PenJoinStyle.MiterJoin)
         painter.setPen(pen_y)
         painter.setBrush(color)
-        painter.drawLine(self._offset_x, self._offset_y+1, self._offset_x, self._offset_y + self._axis_length)
+        painter.drawLine(self._offset_x, self._offset_y+1, self._offset_x, self._offset_y + self._axis_length - self._offset_x//2)
         painter.drawPolygon([
             QPoint(self._offset_x, self._offset_y + self._axis_length),
             QPoint(self._offset_x - self._arrow_size//2, self._offset_y + self._axis_length - self._arrow_size),
