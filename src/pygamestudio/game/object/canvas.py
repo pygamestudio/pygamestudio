@@ -41,4 +41,4 @@ class ObjectCanvas(ObjectBase):
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
         pygame.draw.rect(self.surface, self.color, self.surface.get_rect())
         if not self._is_for_api and self.is_selected:
-            pygame.draw.rect(self.surface, (255, 255, 50), (0, 0, self.surface.width, self.surface.height), 2)
+            pygame.draw.rect(self.surface, (0, 122, 204), (0, 0, self.surface.width, self.surface.height), 2)

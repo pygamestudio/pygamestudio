@@ -44,7 +44,7 @@ class ObjectEllipse(ObjectBase):
         scaled_surface = pygame.transform.scale(self.surface, scaled_size)
 
         if not self._is_for_api and self.is_selected:
-            pygame.draw.ellipse(scaled_surface, (255, 255, 50), scaled_surface.get_rect(), 2)
+            pygame.draw.ellipse(scaled_surface, (0, 122, 204), scaled_surface.get_rect(), 2)
 
         rotated_surface = pygame.transform.rotate(scaled_surface, self.angle)
         self.surface = rotated_surface

@@ -3,7 +3,9 @@ from PySide6.QtGui import *
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
 from pygamestudio.game.object.type import *
+from pygamestudio.gui.scene.gizmo import MoveGizmo
 from pygamestudio.common.utils.config import get_project_config
+
 
 class PygameScreen(QWidget):
     def __init__(self, game_manager=None, scene=None):
@@ -12,7 +14,7 @@ class PygameScreen(QWidget):
         self._scene = scene
         self._screen_width = 800
         self._screen_height = 600
-        self._clock = pygame.time.Clock()
+        self._move_gizmo = MoveGizmo(self, game_manager)
         self._screen_surface = pygame.Surface((self._screen_width, self._screen_height))
 
         self._mouse_x = None
@@ -33,9 +35,9 @@ class PygameScreen(QWidget):
 
     def _set_signal(self):
         self._game_manager.object_added.connect(self._update_scene)
-        self._game_manager.object_deleted.connect(self._update_scene)
-        self._game_manager.object_selected.connect(self._update_scene)
-        self._game_manager.object_deselected.connect(self._update_scene)
+        self._game_manager.object_deleted.connect(self._on_object_deleted)
+        self._game_manager.object_selected.connect(self._on_object_selected)
+        self._game_manager.object_deselected.connect(self._on_object_deselected)
         self._game_manager.object_moved.connect(self._update_scene)
         self._game_manager.object_scaled.connect(self._update_scene)
         self._game_manager.object_rotated.connect(self._update_scene)
@@ -55,15 +57,14 @@ class PygameScreen(QWidget):
         self._game_manager.object_underline_state_changed.connect(self._update_scene)
         self._game_manager.object_strikethrough_state_changed.connect(self._update_scene)
 
-    def _set_pygame_screen_and_clock(self):
+    def _set_pygame_screen(self):
         self._screen_surface = pygame.Surface((self._screen_width, self._screen_height))
-        self._clock.tick(60)
 
     def get_ready_for_project(self):
         self._screen_width = get_project_config()['screen_width']
         self._screen_height = get_project_config()['screen_height']
         self.setFixedSize(self._screen_width, self._screen_height)
-        self._set_pygame_screen_and_clock()
+        self._set_pygame_screen()
         self._update_scene()
 
     def clean_up(self):
@@ -78,6 +79,27 @@ class PygameScreen(QWidget):
         # Delete all selected objects.
         selected_uuids = self._game_manager.get_selected_objects_uuids()
         self._game_manager.delete(selected_uuids)
+    
+    def _on_object_deleted(self, object_uuid):
+        if object_uuid == self._move_gizmo.get_object().uuid:
+            self._move_gizmo.hide()
+        
+        self._update_scene()
+
+    def _on_object_selected(self, object_uuid):
+        if object_uuid == self._game_manager.canvas_object_uuid:
+            self._move_gizmo.hide()
+        else:
+            obj = self._game_manager.get_object(object_uuid)
+            self._final_selected_object = obj
+            self._move_gizmo.set_object(obj)
+
+        self._update_scene()
+
+    def _on_object_deselected(self, object_uuid):
+        if object_uuid == self._move_gizmo.get_object().uuid:
+            self._move_gizmo.hide()
+        self._update_scene()
 
     def _on_object_resized(self, object_uuid):
         if object_uuid == self._game_manager.canvas_object_uuid:
@@ -161,20 +183,21 @@ class PygameScreen(QWidget):
             self._game_manager.select(self._final_selected_object.uuid)
         else:
             # Clear selection if no object is selected.
-            self._game_manager.deselect_all()
-            # self._final_selected_object = None
+            self._move_gizmo.hide()
             self._game_manager.select(self._game_manager.canvas_object_uuid)
 
     def _move_selected_objects(self, pos):
         if not self._final_selected_object:
             return
         
+        self._game_manager.undo_stack.beginMacro('Move')
         selected_objects = self._game_manager.get_objects_to_move()
         for obj in selected_objects:
             new_x = obj.x+pos.x()-self._mouse_x
             new_y = obj.y+pos.y()-self._mouse_y
             self._game_manager.move(obj.uuid, (new_x, new_y))
-            
+        
+        self._game_manager.undo_stack.endMacro()
         self._mouse_x = pos.x()
         self._mouse_y = pos.y()
 

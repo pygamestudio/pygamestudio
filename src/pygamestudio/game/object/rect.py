@@ -50,7 +50,7 @@ class ObjectRect(ObjectBase):
         scaled_surface = pygame.transform.scale(self.surface, scaled_size)
 
         if not self._is_for_api and self.is_selected:
-            pygame.draw.rect(scaled_surface, (255, 255, 50), scaled_surface.get_rect(), width=2,
+            pygame.draw.rect(scaled_surface, (0, 122, 204), scaled_surface.get_rect(), width=2,
                              border_radius=-1, border_top_left_radius=self.border_top_left_radius, border_top_right_radius=self.border_top_right_radius,
                              border_bottom_left_radius=self.border_bottom_left_radius, border_bottom_right_radius=self.border_bottom_right_radius)
 

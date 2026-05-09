@@ -73,12 +73,6 @@ class ObjectBase:
             if key not in exclude_fields
         }
     
-    def __str__(self):
-        return str(self._object_data)
-
-    def __repr__(self):
-        return str(self._object_data)
-    
     def __setattr__(self, name, value):
         if not hasattr(self, '_is_initialized') or not self._is_initialized:
             super().__setattr__(name, value)

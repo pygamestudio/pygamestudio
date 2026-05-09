@@ -102,7 +102,9 @@ class GameManager(QObject):
             current_scene_file_path = (Path(self._project_path) / current_scene_file_relative_path).as_posix()
         else:
             current_scene_file_path = ''
+
         self._load_scene(current_scene_file_path)
+        self.deselect_all()
 
     def clean_up(self):
         self._is_cut = False
@@ -197,8 +199,9 @@ class GameManager(QObject):
             value = list(object_tree_struct.values())[0]
         
             if value['object'].is_selected:
-                objects_to_move.append(value['object'])
-                is_parent_selected = True
+                if value['object'].uuid != self._current_canvas_object_uuid:
+                    objects_to_move.append(value['object'])
+                    is_parent_selected = True
 
             for child_object_tree_struct in value['children']:
                 _get(child_object_tree_struct, objects_to_move, is_parent_selected)
@@ -349,7 +352,6 @@ class GameManager(QObject):
         obj = self._get_object(object_uuid)
         old_underline_state = obj.is_underline
         self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'is_underline', old_underline_state, new_underline_state))
-        print(111)
     
     def set_strikethrough_state(self, object_uuid, new_strikethrough_state):
         obj = self._get_object(object_uuid)
