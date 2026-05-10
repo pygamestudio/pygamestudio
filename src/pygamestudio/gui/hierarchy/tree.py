@@ -282,7 +282,7 @@ class HierarchyTreeView(QTreeView):
             return
     
         content = T.tr('message_box.question_delete_hierarchy_item_content', 'Delete the selected item(s)')
-        reply = QMessageBox.question(self, T.tr('message_box.quesiton_title', 'Confirm'), content, QMessageBox.Yes | QMessageBox.No)
+        reply = QMessageBox.question(QApplication.activeWindow(), T.tr('message_box.quesiton_title', 'Confirm'), content, QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
             
         if reply == QMessageBox.StandardButton.No:
             return

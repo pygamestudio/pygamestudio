@@ -286,7 +286,7 @@ class RenameProjectBody(QWidget):
             self._project_name_edit.clear()
             self.close_window_signal.emit()
         except Exception as e:
-            QMessageBox.critical(self, T.tr('message_box.critical_title'), T.tr('message_box.critical_rename_content', 'Failed to rename: {}').format(e))
+            QMessageBox.critical(QApplication.activeWindow(), T.tr('message_box.critical_title'), T.tr('message_box.critical_rename_content', 'Failed to rename: {}').format(e))
         else:
             self.rename_project_signal.emit(self._index, self._old_project_path, new_project_path)
 

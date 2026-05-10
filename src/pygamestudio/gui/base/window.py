@@ -176,7 +176,7 @@ class WindowBase(QWidget):
     def __set_editor_theme(self, theme='dark'):
         theme_qss_path = RES_PATH / f'qss/{theme}.qss'
         if not theme_qss_path.exists():
-            QMessageBox.critical(self, T.tr('message_box.critical_title', 'Error'), T.tr('message_box.critical_read_qss_content', 'The theme QSS file {}.qss does not exist!').format(theme))
+            QMessageBox.critical(QApplication.activeWindow(), T.tr('message_box.critical_title', 'Error'), T.tr('message_box.critical_read_qss_content', 'The theme QSS file {}.qss does not exist!').format(theme))
             return
         
         with open(theme_qss_path, 'r', encoding='utf-8') as f:

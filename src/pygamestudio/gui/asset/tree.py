@@ -196,7 +196,7 @@ class AssetTreeView(QTreeView):
         index_names = [index.data(Qt.ItemDataRole.DisplayRole) for index in indexes_to_delete]
 
         content = T.tr('message_box.question_delete_asset_item_content', 'Delete {} item(s)? This cannot be undone.\n{}').format(str(len(indexes_to_delete)), ('\n').join(index_names))
-        reply = QMessageBox.question(self, T.tr('message_box.question_title', 'Confirm'), content, QMessageBox.Yes | QMessageBox.No)
+        reply = QMessageBox.question(QApplication.activeWindow(), T.tr('message_box.question_title', 'Confirm'), content, QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
 
         if reply == QMessageBox.StandardButton.No:
             return
@@ -281,7 +281,7 @@ class AssetTreeView(QTreeView):
         
         repetitive_asset_names = [ele[0].name for ele in repetitive_assets_paths]
         content = T.tr('message_box.question_overwrite_content', 'Overwrite the following duplicate resources?\n{}').format(('\n').join(repetitive_asset_names))
-        reply = QMessageBox.question(self, T.tr('message_box.question_title', 'Confirm'), content, QMessageBox.Yes | QMessageBox.No)
+        reply = QMessageBox.question(QApplication.activeWindow(), T.tr('message_box.question_title', 'Confirm'), content, QMessageBox.Yes | QMessageBox.No)
 
         if reply == QMessageBox.StandardButton.Yes:
             for ele in repetitive_assets_paths:
@@ -345,9 +345,9 @@ class AssetTreeView(QTreeView):
             try:
                 subprocess.Popen(['gnome-terminal', '--working-directory', target_path])
             except:
-                QMessageBox.information(self, T.tr('message_box.information_title', 'Info'), T.tr('message_box.information_os_content', 'Unsupported Operating System'))
+                QMessageBox.information(QApplication.activeWindow(), T.tr('message_box.information_title', 'Info'), T.tr('message_box.information_os_content', 'Unsupported Operating System'))
         else:
-            QMessageBox.information(self, T.tr('message_box.information_title', 'Info'), T.tr('message_box.information_os_content', 'Unsupported Operating System'))
+            QMessageBox.information(QApplication.activeWindow(), T.tr('message_box.information_title', 'Info'), T.tr('message_box.information_os_content', 'Unsupported Operating System'))
 
     def _open_externally(self):
         """Open with VS Code by default. If it's not installed, open with txt."""
@@ -372,7 +372,7 @@ class AssetTreeView(QTreeView):
             except FileNotFoundError:
                 subprocess.Popen(['xdg-open', target_path])
         else:
-            QMessageBox.information(self, T.tr('message_box.information_title', 'Info'), T.tr('message_box.information_os_content', 'Unsupported Operating System'))
+            QMessageBox.information(QApplication.activeWindow(), T.tr('message_box.information_title', 'Info'), T.tr('message_box.information_os_content', 'Unsupported Operating System'))
 
     def _show_in_explorer(self):
         selected_indexes = self.selectedIndexes()
@@ -386,7 +386,7 @@ class AssetTreeView(QTreeView):
         elif system == 'Linux':
             subprocess.Popen(["xdg-open", target_path])
         else:
-            QMessageBox.information(self, T.tr('message_box.information_title', 'Info'), T.tr('message_box.information_os_content', 'Unsupported Operating System'))
+            QMessageBox.information(QApplication.activeWindow(), T.tr('message_box.information_title', 'Info'), T.tr('message_box.information_os_content', 'Unsupported Operating System'))
 
     def _drop_indexes(self, parent_path, source_paths, is_internal_drag):
         repetitive_assets_paths = []
@@ -407,7 +407,7 @@ class AssetTreeView(QTreeView):
         
         repetitive_asset_names = [ele[0].name for ele in repetitive_assets_paths]
         content = T.tr('message_box.question_overwrite_content', 'Overwrite the following duplicate resources?\n{}').format(('\n').join(repetitive_asset_names))
-        reply = QMessageBox.question(self, T.tr('message_box.question_title', 'Confirm'), content, QMessageBox.Yes | QMessageBox.No)
+        reply = QMessageBox.question(QApplication.activeWindow(), T.tr('message_box.question_title', 'Confirm'), content, QMessageBox.Yes | QMessageBox.No)
 
         if reply == QMessageBox.StandardButton.Yes:
             for ele in repetitive_assets_paths:

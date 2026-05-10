@@ -239,7 +239,7 @@ class EditorBody(QMainWindow):
         project_settings_window.show()
 
     def _show_build_window(self):
-        QMessageBox.information(self, T.tr('message_box.information_title', 'Info'), T.tr('message_box.to_be_released', 'To be released!'))
+        QMessageBox.information(QApplication.activeWindow(), T.tr('message_box.information_title', 'Info'), T.tr('message_box.to_be_released', 'To be released!'))
 
     def _show_editor_settings_window(self):
         editor_settings_window = EditorSettingsWindow(self._game_manager)
@@ -349,7 +349,7 @@ class Editor(WindowBase):
 
     def closeEvent(self, event):
         if not self._game_manager.is_current_scene_saved():
-            choice = QMessageBox.warning(self, T.tr('message_box.warning_title', 'Warning'), T.tr('message_box.warning_scene_save_content', 'The current scene data has been modified. Do you want to save it?'), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel)
+            choice = QMessageBox.warning(QApplication.activeWindow(), T.tr('message_box.warning_title', 'Warning'), T.tr('message_box.warning_scene_save_content', 'The current scene data has been modified. Do you want to save it?'), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel)
             if choice == QMessageBox.StandardButton.Cancel:
                 event.ignore()
                 return
