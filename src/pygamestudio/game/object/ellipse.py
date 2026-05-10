@@ -46,4 +46,4 @@ class ObjectEllipse(ObjectBase):
         self.surface = rotated_surface
 
         if not self._is_for_api and self.is_selected:
-            pygame.draw.rect(self.surface, (0, 122, 204), self.self.surface.get_rect(), 2)
+            pygame.draw.rect(self.surface, (0, 122, 204), self.surface.get_rect(), 2)
