@@ -1,5 +1,6 @@
 
 import json
+import shutil
 from pathlib import Path
 from PySide6.QtGui import *
 from PySide6.QtCore import *
@@ -115,11 +116,18 @@ class CreateProjectBody(QWidget):
             image_folder_path.mkdir(parents=True, exist_ok=False)
             scene_folder_path.mkdir(parents=True, exist_ok=False)
             script_folder_path.mkdir(parents=True, exist_ok=False)
+
+            shutil.copy2(RES_PATH / 'images/logo.png', image_folder_path)
+
             with open(RES_PATH / 'templates/main_template.py', 'r', encoding='utf-8') as f:
                 main_py_path.write_text(f.read(), encoding='utf-8')
+            
             with open(RES_PATH / 'templates/project_template.pygs', 'r', encoding='utf-8') as f:
                 project_config = json.loads(f.read())
                 project_config['caption'] = project_name
+                project_config['build']['app_name'] = project_name
+                project_config['build']['app_icon'] = (image_folder_path / 'logo.png').as_posix()
+                project_config['build']['output_dir'] = project_path.as_posix()
                 project_json_path.write_text(json.dumps(project_config, indent=4, ensure_ascii=False), encoding='utf-8')
             
             self._project_name_edit.clear()

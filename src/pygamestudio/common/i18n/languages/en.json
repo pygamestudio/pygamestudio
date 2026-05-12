@@ -13,6 +13,8 @@
         "question_delete_hierarchy_item_content": "Sure to delete the selected item(s)?",
         "question_delete_project_content": "Sure to delete the project?",
         "question_overwrite_content": "Sure to overwrite the following duplicate resources?\n{}",
+        "question_stop_build": "Sure to stop the building?",
+        "question_stop_build_close_window": "Sure to stop the building and close the window?",
         "information_title": "Info",
         "information_os_content": "Unsupported Operating System",
         "critical_title": "Error",
@@ -24,6 +26,11 @@
         "critical_rename_content": "Failed to rename: {}",
         "critical_open_project": "Failed to open the project. Couldn't find project.pygs.",
         "critical_find_project": "Couldn't find the project.",
+        "critical_main_not_found": "main.py is not found. Please make sure main.py is in the project root directory.",
+        "critical_app_icon_not_exist": "App icon not exist",
+        "critical_no_output_dir": "Please choose the output dir",
+        "critical_output_dir_not_exist": "Output dir does not exist",
+        "critical_fail_to_build": "Failed to build the project. Please check the log.",
         "to_be_released": "To be released!"
     },
 
@@ -177,5 +184,21 @@
 
     "about": {
         "version": "Version {}"
+    },
+
+    "build": {
+        "app_name": "App Name",
+        "app_name_placeholder": "Please enter the app name",
+        "app_icon": "App Icon",
+        "app_icon_placeholder": "Please choose the app icon (.png/.ico/.icns)",
+        "output_dir": "Output Dir",
+        "output_dir_placeholder": "Please choose the output dir",
+        "clean_cache": "Clean Cache",
+        "build": "Build",
+        "close": "Close",
+        "desktop_app": "Desktop App",
+        "stop": "Stop",
+        "select_app_icon": "Select App Icon",
+        "select_output_dir": "Select Output Dir"
     }
 }

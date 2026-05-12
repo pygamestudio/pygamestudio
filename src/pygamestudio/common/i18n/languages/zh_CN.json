@@ -13,6 +13,8 @@
         "question_delete_hierarchy_item_content": "是否删除选中的对象？",
         "question_delete_project_content": "是否删除该项目？",
         "question_overwrite_content": "是否覆盖以下重复资源？\n{}",
+        "question_stop_build": "是否停止打包？",
+        "question_stop_build_close_window": "是否停止打包并关闭窗口？",
         "information_title": "提示",
         "information_os_content": "不支持的操作系统",
         "critical_title": "错误",
@@ -24,6 +26,11 @@
         "critical_rename_content": "重命名失败：{}",
         "critical_open_project": "打开项目失败，找不到project.pygs。",
         "critical_find_project": "找不到该项目。",
+        "critical_app_icon_not_exist": "图标文件不存在",
+        "critical_no_output_dir": "请选择输出目录",
+        "critical_output_dir_not_exist": "输出目录不存在",
+        "critical_main_not_found": "没有找到main.py，请确保main.py位于项目根目录下。",
+        "critical_fail_to_build": "项目打包失败，请检查日志。",
         "to_be_released": "即将发布，敬请期待！"
     },
 
@@ -66,7 +73,7 @@
         "undo": "撤销",
         "redo": "重做",
         "run": "运行",
-        "build": "构建",
+        "build": "打包",
         "documentation": "在线文档",
         "release_notes": "更新日志",
         "github_repository": "GitHub仓库",
@@ -177,5 +184,21 @@
 
     "about": {
         "version": "版本{}"
+    },
+
+    "build": {
+        "app_name": "应用名称",
+        "app_name_placeholder": "请输入应用名称",
+        "app_icon": "应用图标",
+        "app_icon_placeholder": "请选择应用图标 (.png/.ico/.icns)",
+        "output_dir": "输出目录",
+        "output_dir_placeholder": "请选择输出目录",
+        "clean_cache": "清除缓存",
+        "build": "打包",
+        "close": "关闭",
+        "desktop_app": "桌面应用",
+        "stop": "停止",
+        "select_app_icon": "选择应用图标",
+        "select_output_dir": "选择输出目录"
     }
 }

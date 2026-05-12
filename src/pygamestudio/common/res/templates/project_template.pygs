@@ -6,5 +6,10 @@
     "asset": {
         "current_scene": "",
         "sort_type": 1
+    },
+    "build": {
+        "app_name": "",
+        "app_icon": "",
+        "output_dir": ""
     }
 }

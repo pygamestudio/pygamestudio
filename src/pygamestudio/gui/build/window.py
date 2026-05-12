@@ -1,0 +1,67 @@
+from PySide6.QtGui import *
+from PySide6.QtCore import *
+from PySide6.QtWidgets import *
+from pygamestudio.gui.base.window import WindowBase
+from pygamestudio.gui.build.desktop import DesktopAppBuildWindow
+from pygamestudio.common.i18n.translator import Translator as T
+
+
+class BuildWindowBody(QTabWidget):
+    def __init__(self, game_manager):
+        super().__init__()
+        self._desktop_app_build_window = DesktopAppBuildWindow(game_manager)
+        self._set_up()
+
+    def _set_up(self):
+        self._set_widget()
+        self._set_signal()
+        self._set_layout()
+
+    def _set_widget(self):
+        self.addTab(self._desktop_app_build_window, T.tr('build.desktop_app', 'Desktop App'))
+    
+    def _set_signal(self):
+        T.add_observer(self)
+
+    def _set_layout(self):
+        ...
+
+    def retranslate(self):
+        self.setTabText(0, T.tr('build.desktop_app', 'Desktop App'))
+
+    def close(self):
+        self._desktop_app_build_window.close()
+
+
+class BuildWindow(WindowBase):
+    def __init__(self, game_manager):
+        super().__init__()
+        self._build_window_body = BuildWindowBody(game_manager)
+        self._set_up()
+
+    def _set_up(self):
+        self._set_widget()
+        self._set_signal()
+        self._set_layout()
+        self._set_object_name()
+
+    def _set_widget(self):
+        self.resize(500, 260)
+        self.set_window_body(self._build_window_body)
+        self.window_title.set_title_name(T.tr('build.build', 'Build'))
+    
+    def _set_signal(self):
+        T.add_observer(self)
+        
+    def _set_layout(self):
+        # self.layout().setVerticalSizeConstraint(QLayout.SizeConstraint.SetFixedSize)
+        ...
+        
+    def _set_object_name(self):
+        self.setObjectName('build')
+
+    def retranslate(self):
+        self.window_title.set_title_name(T.tr('build.build', 'Build'))
+
+    def closeEvent(self, event):
+        self._build_window_body.close()

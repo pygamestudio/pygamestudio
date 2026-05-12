@@ -335,6 +335,21 @@ QListWidget::item {
     height: 30px;
 }
 
+QProgressBar {
+    border: 1px solid lightgray;
+    border-radius: 3px;
+    text-align: center;
+    background-color: qlineargradient(x1:1, y1:0, x2:1, y2:0.4, stop:0 white, stop:1 #dedede);
+    color: #1e1e1e;
+    font-weight: bold;
+    height: 10px;
+}
+
+QProgressBar::chunk {
+    background-color: qlineargradient(x1:1, y1:0, x2:1, y2:0.4, stop:0 white, stop:1 #007acc);
+    border-radius： 2px;
+}
+
 /* ----- Window Base ----- */
 QWidget#windowBaseCentralWidget {
     border-radius: 9px;

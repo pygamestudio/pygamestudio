@@ -83,7 +83,7 @@ def set_current_scene_to_project_config(current_scene_file_path) -> None:
     save_project_config(project_config)
 
 
-def update_project_config(key:str, value:Union[str, int, float, list, tuple]) -> None:
+def update_project_config(key:str, value:Union[str, int, float, list, tuple, dict]) -> None:
     project_config = get_project_config()
     keys = key.split('.')
     target = project_config

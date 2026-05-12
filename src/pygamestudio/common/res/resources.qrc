@@ -2,6 +2,7 @@
     <qresource prefix="/">
         <file>images/add_item.png</file>
         <file>images/add.png</file>
+        <file>images/browse.png</file>
         <file>images/canvas.png</file>
         <file>images/check.png</file>
         <file>images/clear.png</file>
