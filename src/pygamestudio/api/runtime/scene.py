@@ -141,23 +141,18 @@ class SceneLoader:
         if not path_parts:
             return None
         
-        print(path_parts)
         for i, part in enumerate(path_parts):
             match = re.fullmatch(r'([^\[\]]+)(?:\[(\d+)\])?', part.strip())
             if not match:
-                print('aaaa')
                 return None
             
             recursion_time = 0
             name = match.group(1)
             target_item_index = int(match.group(2)) if match.group(2) is not None else 0
-            print('name', name)
-            print('target_index', target_item_index)
             object_tree_struct = _get(name, target_item_index, 0, recursion_time, i, self._all_object_tree_struct)
 
             if i < len(path_parts)-1:
                 if object_tree_struct == None:
-                    print('bbbbbb')
                     return None
             else:
                 return object_tree_struct
