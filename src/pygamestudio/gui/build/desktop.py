@@ -251,6 +251,7 @@ class BuildThread(QThread):
         try:
             build_config = self._window.get_build_config()
             cmd = ['pyinstaller', '-w', '-y']
+            cmd.extend(['--exclude-module', 'numpy'])
 
             if build_config.get('app_name'):
                 cmd.extend(['-n', build_config.get('app_name')])
