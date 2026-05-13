@@ -26,6 +26,7 @@
         "critical_rename_content": "重命名失败：{}",
         "critical_open_project": "打开项目失败，找不到project.pygs。",
         "critical_find_project": "找不到该项目。",
+        "critical_delete_project": "无法删除项目：{}",
         "critical_app_icon_not_exist": "图标文件不存在",
         "critical_no_output_dir": "请选择输出目录",
         "critical_output_dir_not_exist": "输出目录不存在",

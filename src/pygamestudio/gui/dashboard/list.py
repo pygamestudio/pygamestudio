@@ -133,7 +133,7 @@ class DashboardListView(QListView):
             return
 
         if not (Path(project_path) / 'project.pygs').exists():
-            QMessageBox.critical(QApplication.activeWindow(), T.tr('message_box.critical_title', 'Error'), T.tr('message_box.critical_open_project', "Failed to open the project. Couldn't find project.pygs."))
+            QMessageBox.critical(self, T.tr('message_box.critical_title', 'Error'), T.tr('message_box.critical_open_project', "Failed to open the project. Couldn't find project.pygs."))
             return
         
         project_data = {
@@ -148,7 +148,7 @@ class DashboardListView(QListView):
     def _open_project(self, index):
         project_path = index.data(self.ProjectPathRole)
         if not Path(project_path).exists():
-            QMessageBox.critical(QApplication.activeWindow(), T.tr('message_box.critical_title', 'Error'), T.tr('message_box.critical_find_project', "Couldn't find the project."))
+            QMessageBox.critical(self, T.tr('message_box.critical_title', 'Error'), T.tr('message_box.critical_find_project', "Couldn't find the project."))
             return
         
         self.open_project_signal.emit(project_path)
@@ -162,7 +162,7 @@ class DashboardListView(QListView):
     def _show_rename_project_window(self, index):
         project_path = index.data(self.ProjectPathRole)
         if not Path(project_path).exists():
-            QMessageBox.critical(QApplication.activeWindow(), T.tr('message_box.critical_title', 'Error'), T.tr('message_box.critical_find_project', "Couldn't find the project."))
+            QMessageBox.critical(self, T.tr('message_box.critical_title', 'Error'), T.tr('message_box.critical_find_project', "Couldn't find the project."))
             return
         
         self._rename_project_window.set_index_and_old_project_path(index, project_path)
@@ -180,15 +180,16 @@ class DashboardListView(QListView):
         chocie = QMessageBox.question(QApplication.activeWindow(), T.tr('message_box.question_title', 'Confirm'), T.tr('message_box.question_delete_project_content', 'Delete the project?'), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if chocie == QMessageBox.StandardButton.No:
             return
-        
+
         project_path = index.data(self.ProjectPathRole)
-        delete_project_from_dashboard_config(project_path)
-        self._delete_item(index.row())
 
         try:
             shutil.rmtree(project_path)
-        except:
-            pass
+        except Exception as e:
+            QMessageBox.critical(self, T.tr('message_box.critical_title', 'Error'), T.tr('message_box.critical_delete_project', "Couldn't delete the project: {}").format(str(e)))
+        else:
+            delete_project_from_dashboard_config(project_path)
+            self._delete_item(index.row())
 
     def search(self, keyword):
         self._proxy_model.setFilterFixedString(keyword)

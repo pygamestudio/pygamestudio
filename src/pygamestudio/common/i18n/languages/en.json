@@ -26,6 +26,7 @@
         "critical_rename_content": "Failed to rename: {}",
         "critical_open_project": "Failed to open the project. Couldn't find project.pygs.",
         "critical_find_project": "Couldn't find the project.",
+        "critical_delete_project": "Couldn't delete the project: {}",
         "critical_main_not_found": "main.py is not found. Please make sure main.py is in the project root directory.",
         "critical_app_icon_not_exist": "App icon not exist",
         "critical_no_output_dir": "Please choose the output dir",
