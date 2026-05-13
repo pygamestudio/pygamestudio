@@ -195,7 +195,7 @@
         "output_dir_placeholder": "Please choose the output dir",
         "clean_cache": "Clean Cache",
         "build": "Build",
-        "close": "Close",
+        "open_output_dir": "Open Output Dir",
         "desktop_app": "Desktop App",
         "stop": "Stop",
         "select_app_icon": "Select App Icon",

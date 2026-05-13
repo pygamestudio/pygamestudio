@@ -33,6 +33,8 @@ class EditorBody(QMainWindow):
         self._hierarchy_window = HierarchyWindow(self, game_manager)
         self._inspector_window = InspectorWindow(self, game_manager)
 
+        self._build_window = BuildWindow(game_manager)
+
         self._left_top_tab_widget = QTabWidget()
         self._left_bottom_tab_widget = QTabWidget()
         self._center_top_tab_widget = QTabWidget()
@@ -200,6 +202,7 @@ class EditorBody(QMainWindow):
         self._console_window.get_ready_for_project()
         self._hierarchy_window.get_ready_for_project()
         self._inspector_window.get_ready_for_project()
+        self._build_window.get_ready_for_project()
         self._game_manager.set_project_ready()
 
     def clean_up(self):
@@ -240,9 +243,7 @@ class EditorBody(QMainWindow):
         project_settings_window.show()
 
     def _show_build_window(self):
-        build_window = BuildWindow(self._game_manager)
-        build_window.show()
-        # QMessageBox.information(QApplication.activeWindow(), T.tr('message_box.information_title', 'Info'), T.tr('message_box.to_be_released', 'To be released!'))
+        self._build_window.show()
 
     def _show_editor_settings_window(self):
         editor_settings_window = EditorSettingsWindow(self._game_manager)

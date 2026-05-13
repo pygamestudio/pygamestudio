@@ -15,7 +15,6 @@ class BuildWindowBody(QTabWidget):
     def _set_up(self):
         self._set_widget()
         self._set_signal()
-        self._set_layout()
 
     def _set_widget(self):
         self.addTab(self._desktop_app_build_window, T.tr('build.desktop_app', 'Desktop App'))
@@ -23,14 +22,15 @@ class BuildWindowBody(QTabWidget):
     def _set_signal(self):
         T.add_observer(self)
 
-    def _set_layout(self):
-        ...
-
     def retranslate(self):
         self.setTabText(0, T.tr('build.desktop_app', 'Desktop App'))
 
-    def close(self):
-        self._desktop_app_build_window.close()
+    def get_ready_for_project(self):
+        self._desktop_app_build_window.get_ready_for_project()
+
+    def enterEvent(self, event):
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+        return super().enterEvent(event)
 
 
 class BuildWindow(WindowBase):
@@ -42,7 +42,6 @@ class BuildWindow(WindowBase):
     def _set_up(self):
         self._set_widget()
         self._set_signal()
-        self._set_layout()
         self._set_object_name()
 
     def _set_widget(self):
@@ -52,16 +51,12 @@ class BuildWindow(WindowBase):
     
     def _set_signal(self):
         T.add_observer(self)
-        
-    def _set_layout(self):
-        # self.layout().setVerticalSizeConstraint(QLayout.SizeConstraint.SetFixedSize)
-        ...
-        
+
     def _set_object_name(self):
         self.setObjectName('build')
 
     def retranslate(self):
         self.window_title.set_title_name(T.tr('build.build', 'Build'))
 
-    def closeEvent(self, event):
-        self._build_window_body.close()
+    def get_ready_for_project(self):
+        self._build_window_body.get_ready_for_project()

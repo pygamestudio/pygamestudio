@@ -1,4 +1,4 @@
-import sys
+import os
 import platform
 import subprocess
 from pathlib import Path
@@ -9,28 +9,6 @@ from pygamestudio.gui.console.logger import Logger
 from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.common.utils.config import get_project_config, update_project_config
 
-
-"""
-名称：从项目路径或配置中获取
-入口程序？
-输出目录：默认选择当前路径下的build文件夹？没有话会创建一个
-程序图标：ico和png格式
-upx压缩，自选upx路径，有个打开upx官网的按钮
-
-添加资源：添加文件或目录（不能让用户自己选）
-日志输出从console中走
-清理缓存
-启动画面
-配置保存（默认到project.pygs)
-
-QWidget加在QScrollArea中
-
-build/desktop/win(macos, linux)
-
-进度条
-
-打包，关闭
-"""
 
 class DesktopAppBuildWindow(QScrollArea):
     def __init__(self, game_manager):
@@ -49,7 +27,7 @@ class DesktopAppBuildWindow(QScrollArea):
         self._clean_cache_checkbox = QCheckBox()
         self._progress_bar = QProgressBar()
         self._build_button = QPushButton()
-        self._close_button = QPushButton()
+        self._open_output_dir_button = QPushButton()
 
         self._build_thread = BuildThread(self, self._game_manager)
         self._is_building = False
@@ -80,18 +58,17 @@ class DesktopAppBuildWindow(QScrollArea):
         self._progress_bar.setValue(0)
         self._progress_bar.hide()
         self._build_button.setText(T.tr('build.build', 'Build'))
-        self._close_button.setText(T.tr('build.close', 'Close'))
+        self._open_output_dir_button.setText(T.tr('build.open_output_dir', 'Open Output Dir'))
         
-        self._init_with_project_config()
-
     def _set_signal(self):
         self._app_icon_browse_button.clicked.connect(self._browse_app_icon)
         self._output_dir_browse_button.clicked.connect(self._browse_output_dir)
         self._build_button.clicked.connect(self._build)
-        self._close_button.clicked.connect(self.close)
+        self._open_output_dir_button.clicked.connect(self._open_output_dir)
 
         self._build_thread.stopped_signal.connect(self._on_build_stopped)
         self._build_thread.finished_signal.connect(self._on_build_finished)
+        self._build_thread.progress_signal.connect(self._on_progress_updated)
 
         T.add_observer(self)
 
@@ -110,7 +87,7 @@ class DesktopAppBuildWindow(QScrollArea):
         button_layout = QHBoxLayout()
         button_layout.addWidget(self._build_button)
         button_layout.addSpacing(5)
-        button_layout.addWidget(self._close_button)
+        button_layout.addWidget(self._open_output_dir_button)
 
         main_g_layout = QGridLayout(self._central_widget)
         main_g_layout.setVerticalSpacing(10)
@@ -129,7 +106,7 @@ class DesktopAppBuildWindow(QScrollArea):
     def _set_object_name(self):
         self._build_button.setObjectName('desktopAppBuildBtn')
 
-    def _init_with_project_config(self):
+    def get_ready_for_project(self):
         project_config = get_project_config()
         try:
             self._app_name_lineedit.setText(project_config['build']['app_name'])
@@ -179,8 +156,8 @@ class DesktopAppBuildWindow(QScrollArea):
         if self._is_building:
             choice = QMessageBox.question(QApplication.activeWindow(), T.tr('message_box.quesiton_title', 'Confirm'), T.tr('message_box.question_stop_build', 'Sure to stop the building?'))
             if choice == QMessageBox.StandardButton.Yes:
-                self._build_thread.stop()
                 self._build_button.setEnabled(False)
+                self._build_thread.stop()
             return
         
         is_ok_to_build = self._check_before_build()
@@ -193,6 +170,26 @@ class DesktopAppBuildWindow(QScrollArea):
         self._is_building = True
         self._build_button.setText(T.tr('build.stop', 'Stop'))
 
+    def _open_output_dir(self):
+        if not self._output_dir_lineedit.text().strip():
+            QMessageBox.critical(self, T.tr('message_box.critical_title', 'Error'), T.tr('message_box.critical_no_output_dir', 'Please choose the output dir'))
+            return
+
+        output_dir_path = Path(self._output_dir_lineedit.text().strip())
+        if not output_dir_path.exists():
+            QMessageBox.critical(self, T.tr('message_box.critical_title', 'Error'), T.tr('message_box.critical_output_dir_not_exist', 'Output dir does not exist'))
+            return
+        
+        system = platform.system()
+        if system == 'Windows':
+            os.startfile(output_dir_path)
+        elif system == 'Darwin':
+            subprocess.Popen(['open', output_dir_path])
+        elif system == 'Linux':
+            subprocess.Popen(["xdg-open", output_dir_path])
+        else:
+            QMessageBox.information(QApplication.activeWindow(), T.tr('message_box.information_title', 'Info'), T.tr('message_box.information_os_content', 'Unsupported Operating System'))
+
     def _on_build_stopped(self):
         self._is_building = False
         self._build_button.setEnabled(True)
@@ -204,6 +201,9 @@ class DesktopAppBuildWindow(QScrollArea):
 
         if not is_successful:
             QMessageBox.critical(self, T.tr('message_box.critical_title', 'Error'), T.tr('message_box.critical_fail_to_build', 'Failed to build the project. Please check the log.'))
+    
+    def _on_progress_updated(self, progress):
+        self._progress_bar.setValue(progress)
 
     def get_build_config(self):
         project_config = get_project_config()
@@ -224,15 +224,6 @@ class DesktopAppBuildWindow(QScrollArea):
 
         return build_config
 
-    def close(self):
-        if self._is_building:
-            choice = QMessageBox.question(self, T.tr('message_box.quesiton_title', 'Confirm'), T.tr('message_box.question_stop_build_close_window', 'Sure to stop the building and close the window?'))
-            if choice == QMessageBox.StandardButton.Yes:
-                self._build_thread.stop()
-                QApplication.activeWindow().close()
-        else:
-            QApplication.activeWindow().close()
-
     def retranslate(self):
         self._app_name_label.setText(T.tr('build.app_name', 'App Name'))
         self._app_name_lineedit.setPlaceholderText(T.tr('build.app_name_placeholder', 'Please enter the app name'))
@@ -242,7 +233,7 @@ class DesktopAppBuildWindow(QScrollArea):
         self._output_dir_lineedit.setPlaceholderText(T.tr('build.output_dir_placeholder', 'Please choose the output dir'))
         self._clean_cache_label.setText(T.tr('build.clean_cache', 'Clean Cache'))
         self._build_button.setText(T.tr('build.build', 'Build'))
-        self._close_button.setText(T.tr('build.close', 'Close'))
+        self._open_output_dir_button.setText(T.tr('build.open_output_dir', 'Open Output Dir'))
 
 
 class BuildThread(QThread):
@@ -252,7 +243,7 @@ class BuildThread(QThread):
 
     def __init__(self, window, game_manager):
         super().__init__()
-        self._flag = False
+        self.process = None
         self._window = window
         self._game_manager = game_manager
 
@@ -274,8 +265,8 @@ class BuildThread(QThread):
             cmd.extend(['--workpath', (output_dir/'_build').as_posix()])
             cmd.extend(['--specpath', output_dir.as_posix()])
             
-            project_path = Path(self._game_manager.get_project_path())
             sep = ';' if system == 'Windows' else ':'
+            project_path = Path(self._game_manager.get_project_path())
             cmd.append(self._get_add_data_param(project_path/'audio', './audio', sep))
             cmd.append(self._get_add_data_param(project_path/'image', './image', sep))
             cmd.append(self._get_add_data_param(project_path/'scene', './scene', sep))
@@ -283,9 +274,9 @@ class BuildThread(QThread):
 
             main_file_path = (project_path / 'main.py').as_posix()
             cmd.append(main_file_path)
-            print(cmd)
+            cmd = [c for c in cmd if c]
 
-            process = subprocess.Popen(
+            self.process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
@@ -294,12 +285,12 @@ class BuildThread(QThread):
                 errors='replace'
             )
 
-            for line in iter(process.stdout.readline, ''):
+            for line in iter(self.process.stdout.readline, ''):
                 line_strip = line.strip()
                 if not line_strip:
                     continue
                     
-                if 'ERROR:' in line_strip:
+                if 'ERROR:' in line_strip or 'pyinstaller: error:' in line_strip:
                     Logger.error(line_strip)
                 elif 'WARNING:' in line_strip:
                     Logger.warning(line_strip)
@@ -310,7 +301,7 @@ class BuildThread(QThread):
                 if progress is not None:
                     self.progress_signal.emit(progress)
 
-            process.wait()
+            self.process.wait()
             self.progress_signal.emit(100)
             self.finished_signal.emit(True)
         except Exception as e:
@@ -334,20 +325,26 @@ class BuildThread(QThread):
         
     def _parse_progress(self, line: str):
         line = line.lower()
-        if "analyzing" in line:
-            return 25
-        elif "collecting" in line and "binary" in line:
-            return 45
-        elif "collecting" in line and "data" in line:
+        if 'module search paths' in line:
+            return 10
+        elif 'checking analysis' in line:
+            return 30
+        elif 'processing standard module hook' in line:
             return 55
-        elif "creating" in line and "pyz" in line:
+        elif 'including run-time hook' in line:
             return 70
-        elif "creating" in line and "exe" in line:
-            return 85
-        elif "successfully" in line or "finished" in line:
+        elif 'creating base_library.zip' in line:
+            return 90
+        elif 'checking exe' in line:
+            return 95
+        elif "completed successfully" in line or "finished" in line:
             return 100
         return None
     
     def stop(self):
-        self._flag = False
         self.stopped_signal.emit()
+        try:
+            self.process.kill()
+            self.terminate()
+        except Exception as e:
+            pass

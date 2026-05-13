@@ -195,7 +195,7 @@
         "output_dir_placeholder": "请选择输出目录",
         "clean_cache": "清除缓存",
         "build": "打包",
-        "close": "关闭",
+        "open_output_dir": "打开输出目录",
         "desktop_app": "桌面应用",
         "stop": "停止",
         "select_app_icon": "选择应用图标",
