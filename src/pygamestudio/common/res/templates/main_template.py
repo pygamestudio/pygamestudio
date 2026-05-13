@@ -6,13 +6,14 @@ from pygamestudio.api.runtime.scene import load_scene
 from pygamestudio.api.runtime.config import get_project_config
 
 # setup pygamestudio project env to get the project config 
-os.environ['PROJECT_PATH'] = Path(__file__).parent.resolve().as_posix()
-PROJECT_CONFIG = get_project_config()
+project_path = Path(__file__).parent.resolve().as_posix()
+os.environ['PROJECT_PATH'] = project_path
+project_config = get_project_config()
 
 # pygame setup
 pygame.init()
-pygame.display.set_caption(PROJECT_CONFIG['caption'])
-screen = pygame.display.set_mode(PROJECT_CONFIG['screen_size'])
+pygame.display.set_caption(project_config['caption'])
+screen = pygame.display.set_mode(project_config['screen_size'])
 clock = pygame.time.Clock()
 
 running = True
