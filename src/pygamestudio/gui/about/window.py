@@ -48,6 +48,10 @@ class AboutBody(QWidget):
     def retranslate(self):
         self._version_label.setText(T.tr('about.version', 'Version {}').format(VERSION))
 
+    def enterEvent(self, event):
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+        return super().enterEvent(event)
+
 
 class AboutWindow(WindowBase):
     def __init__(self):

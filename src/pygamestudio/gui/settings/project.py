@@ -83,7 +83,11 @@ class ProjectSettingsBody(QWidget):
         self._screen_width_label.setText(T.tr('settings.screen_width', 'Screen Width'))
         self._screen_height_label.setText(T.tr('settings.screen_height', 'Screen Height'))
 
-
+    def enterEvent(self, event):
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+        return super().enterEvent(event)
+    
+    
 class ProjectSettingsWindow(WindowBase):
     def __init__(self, game_manager):
         super().__init__()

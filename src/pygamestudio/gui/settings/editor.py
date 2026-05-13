@@ -65,7 +65,10 @@ class EditorSettingsBody(QWidget):
         self._list_widget.addItems([T.tr('settings.general', 'General')])
         self._language_label.setText(T.tr('settings.language', 'Language'))
 
-
+    def enterEvent(self, event):
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+        return super().enterEvent(event)
+    
 
 class EditorSettingsWindow(WindowBase):
     def __init__(self, game_manager):
