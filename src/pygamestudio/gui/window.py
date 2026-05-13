@@ -179,18 +179,18 @@ class EditorBody(QMainWindow):
         self._help_menu.clear()
 
         doc_action = QAction(T.tr('menu.documentation', 'Documentation'), self)
-        # release_notes_action = QAction(T.tr('menu.release_notes', 'Release Notes'), self)
+        release_notes_action = QAction(T.tr('menu.release_notes', 'Release Notes'), self)
         github_action = QAction(T.tr('menu.github_repository', 'Github Repository'), self)
         about_action = QAction(T.tr('menu.about_pygamestudio', 'About Pygame Studio'), self)
 
         doc_action.triggered.connect(self._show_doc)
         github_action.triggered.connect(self._show_github_repository)
-        # release_notes_action.triggered.connect(self._show_release_notes)
+        release_notes_action.triggered.connect(self._show_release_notes)
         about_action.triggered.connect(self._show_about_window)
 
         self._help_menu.addAction(doc_action)
-        # self._help_menu.addSeparator()
-        # self._help_menu.addAction(release_notes_action)
+        self._help_menu.addSeparator()
+        self._help_menu.addAction(release_notes_action)
         self._help_menu.addAction(github_action)
         self._help_menu.addSeparator()
         self._help_menu.addAction(about_action)
@@ -251,7 +251,10 @@ class EditorBody(QMainWindow):
 
     def _show_doc(self):
         webbrowser.open('https://pygamestudio.com/')
-        
+    
+    def _show_release_notes(self):
+        webbrowser.open('https://pygamestudio.com/release_notes')
+
     def _show_github_repository(self):
         webbrowser.open('https://github.com/pygamestudio/pygamestudio')
 
