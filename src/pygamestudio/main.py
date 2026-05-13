@@ -30,7 +30,7 @@ from pygamestudio.common.utils.constant import VERSION
 
 
 def set_taskbar_icon():
-   if sys.platform == "win32":
+   if sys.platform == 'win32':
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
             f"pygamestudio.{VERSION}"
         )
