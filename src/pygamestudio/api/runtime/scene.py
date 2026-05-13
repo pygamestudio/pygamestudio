@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import pygame
 from pathlib import Path
@@ -115,7 +116,53 @@ class SceneLoader:
 
         _update(self._all_object_tree_struct, screen_surface)
 
-    def _get_object_tree_struct(self, object_uuid, parent_object_tree_struct=None):
+    def _get_object_tree_struct_by_path(self, object_path):
+        def _get(name, target_item_index, current_item_index, recursion_time, part_number, object_tree_struct):
+            key = list(object_tree_struct.keys())[0]
+            value = list(object_tree_struct.values())[0]
+        
+            if part_number < recursion_time:
+                return None
+            elif part_number == recursion_time:
+                if name == value['object'].name and target_item_index == current_item_index:
+                    return {key: value}
+                else:
+                    return None
+            else:
+                recursion_time += 1
+                for i, child_object_tree_struct in enumerate(value['children']):
+                    result = _get(name, target_item_index, i, recursion_time, part_number, child_object_tree_struct)
+                    if result:
+                        return result
+                
+            return None
+
+        path_parts = object_path.strip('/').split('/')
+        if not path_parts:
+            return None
+        
+        print(path_parts)
+        for i, part in enumerate(path_parts):
+            match = re.fullmatch(r'([^\[\]]+)(?:\[(\d+)\])?', part.strip())
+            if not match:
+                print('aaaa')
+                return None
+            
+            recursion_time = 0
+            name = match.group(1)
+            target_item_index = int(match.group(2)) if match.group(2) is not None else 0
+            print('name', name)
+            print('target_index', target_item_index)
+            object_tree_struct = _get(name, target_item_index, 0, recursion_time, i, self._all_object_tree_struct)
+
+            if i < len(path_parts)-1:
+                if object_tree_struct == None:
+                    print('bbbbbb')
+                    return None
+            else:
+                return object_tree_struct
+        
+    def _get_object_tree_struct_by_uuid(self, object_uuid, parent_object_tree_struct=None):
         def _get(object_uuid, object_tree_struct):
             key = list(object_tree_struct.keys())[0]
             value = list(object_tree_struct.values())[0]
@@ -134,15 +181,13 @@ class SceneLoader:
         return _get(object_uuid, parent_object_tree_struct)
     
     def get_object_by_path(self, object_path:str):
-        ...
-
+        object_tree_struct = self._get_object_tree_struct_by_path(object_path)
+        return list(object_tree_struct.values())[0]['object'] if object_tree_struct else None
+    
     def get_object_by_uuid(self, object_uuid:str):
-        object_tree_struct = self._get_object_tree_struct(object_uuid)
+        object_tree_struct = self._get_object_tree_struct_by_uuid(object_uuid)
         return object_tree_struct[object_uuid]['object'] if object_tree_struct else None
-
-    def get_object_by_name(self, object_name:str):
-        ...
-
+    
 
 scene_loader = SceneLoader()
 
@@ -154,6 +199,3 @@ def get_object_by_path(object_path:str) -> object:
 
 def get_object_by_uuid(object_uuid:str) -> object:
     return scene_loader.get_object_by_uuid(object_uuid)
-
-def get_object_by_name(object_name:str) -> object:
-    return scene_loader.get_object_by_name(object_name)

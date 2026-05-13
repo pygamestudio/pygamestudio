@@ -321,9 +321,9 @@ class HierarchyTreeView(QTreeView):
     def _copy_path(self):
         def get_path(item):
             current = item
-            path = current.text()
+            path = current.text()+f'[{current.row()}]'
             while current.parent():
-                path = f'{current.parent().text()}/' + path
+                path = f'{current.parent().text()}[{current.parent().row()}]/' + path
                 current = current.parent()
 
             return path
