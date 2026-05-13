@@ -15,6 +15,10 @@ class EditorSettingsBody(QWidget):
         self._general_stacked_widget = QWidget()
         self._language_label = QLabel()
         self._language_combobox = QComboBox()
+        self._lang_dict = {
+            'en': 'English',
+            'zh_CN': '中文简体'
+        }
 
         self._set_up()
 
@@ -48,18 +52,24 @@ class EditorSettingsBody(QWidget):
 
     def _set_general_stacked_widget(self):
         self._language_label.setText(T.tr('settings.language', 'Language'))
-        self._language_combobox.addItems(['en', 'zh_CN'])
+        self._language_combobox.addItems(list(self._lang_dict.values()))
         editor_config = get_editor_config()
-        self._language_combobox.setCurrentText(editor_config['lang'])
+        self._language_combobox.setCurrentText(self._lang_dict.get(editor_config['lang']))
 
     def _toggle_language(self):
-        lang_code = self._language_combobox.currentText()
+        lang_code = self._get_lang_code_by_value(self._language_combobox.currentText())
         T.toggle_language(lang_code)
         update_editor_config('lang', lang_code)
 
     def _change_stacked_widget(self):
         self._main_stacked_widget.setCurrentIndex(self._list_widget.currentIndex().row())
 
+    def _get_lang_code_by_value(self, value):
+        for k, v in self._lang_dict.items():
+            if v == value:
+                return k
+        return None
+    
     def retranslate(self):
         self._list_widget.clear()
         self._list_widget.addItems([T.tr('settings.general', 'General')])
