@@ -42,7 +42,7 @@ class CreateProjectBody(QWidget):
         self._project_dir_path_label.setText(T.tr('dashboard.project_path', 'Project Path:'))
         self._project_dir_path_edit.setPlaceholderText(T.tr('dashboard.project_path_edit_placeholder', 'Please select or enter the project path'))
 
-        self._browse_button.setText(T.tr('dashboard.browse', 'Browse'))
+        self._browse_button.setIcon(QIcon(':/images/browse.png'))
         self._create_button.setText(T.tr('dashboard.create', 'Create'))
         self._create_button.setEnabled(False)
         self._cancel_button.setText(T.tr('dashboard.cancel', 'Cancel'))
@@ -60,25 +60,18 @@ class CreateProjectBody(QWidget):
     def _set_layout(self):
         h_layout1 = QHBoxLayout()
         h_layout2 = QHBoxLayout()
-        h_layout3 = QHBoxLayout()
-        main_v_layout = QVBoxLayout(self)
-
-        h_layout1.addWidget(self._project_name_label)
-        h_layout1.addWidget(self._project_name_edit)
-        h_layout2.addWidget(self._project_dir_path_label)
-        h_layout2.addWidget(self._project_dir_path_edit)
-        h_layout2.addWidget(self._browse_button)
-
-        h_layout3.addWidget(self._create_button)
-        h_layout3.addSpacing(10)
-        h_layout3.addWidget(self._cancel_button)
-        main_v_layout.addLayout(h_layout1)
-        main_v_layout.addSpacing(5)
-        main_v_layout.addLayout(h_layout2)
-        main_v_layout.addSpacing(2.5)
-        main_v_layout.addWidget(self._error_label)
-        main_v_layout.addSpacing(2.5)
-        main_v_layout.addLayout(h_layout3)
+        main_g_layout = QGridLayout(self)
+        
+        main_g_layout.addWidget(self._project_name_label, 0, 0, 1, 1)
+        main_g_layout.addWidget(self._project_name_edit, 0, 1, 1, 1)
+        h_layout1.addWidget(self._project_dir_path_edit)
+        h_layout1.addWidget(self._browse_button)
+        main_g_layout.addWidget(self._project_dir_path_label, 1, 0, 1, 1)
+        main_g_layout.addLayout(h_layout1, 1, 1, 1, 1)
+        main_g_layout.addWidget(self._error_label, 2, 0, 1, 2)
+        h_layout2.addWidget(self._create_button)
+        h_layout2.addWidget(self._cancel_button)
+        main_g_layout.addLayout(h_layout2, 3, 0, 1, 2)
 
     def _set_object_name(self):
         self._error_label.setObjectName('dashboardCreateProjectErrorLabel')
@@ -164,7 +157,6 @@ class CreateProjectBody(QWidget):
         self._project_name_edit.setPlaceholderText(T.tr('dashboard.project_name_edit_placeholder', 'Please enter the project name'))
         self._project_dir_path_label.setText(T.tr('dashboard.project_path', 'Project Path:'))
         self._project_dir_path_edit.setPlaceholderText(T.tr('dashboard.project_path_edit_placeholder', 'Please select or enter the project path'))
-        self._browse_button.setText(T.tr('dashboard.browse', 'Browse'))
         self._create_button.setText(T.tr('dashboard.create', 'Create'))
         self._cancel_button.setText(T.tr('dashboard.cancel', 'Cancel'))
 
