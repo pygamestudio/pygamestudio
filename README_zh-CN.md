@@ -34,7 +34,7 @@ pip install --upgrade pygamestudio
 pygamestudio
 ```
 
-或者也可以使用以下快捷命令：
+也可以使用以下快捷命令：
 
 ```bash
 pygs
@@ -64,7 +64,7 @@ pygs
 pygamestudio
 ```
 
-也可以使用快捷命令：
+也可以使用以下快捷命令：
 
 ```bash
 pygs
