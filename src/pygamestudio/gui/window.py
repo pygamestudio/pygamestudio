@@ -201,23 +201,6 @@ class EditorBody(QMainWindow):
         self._help_menu.addAction(about_action)
         self._help_menu.addAction(support_action)
 
-        # self.setStyleSheet("""
-        #     QMenuBar::item {
-        #         spacing: 4px;
-        #         padding: 4px 10px;
-        #     }
-        #     QMenu::item {
-        #         spacing: 4px;       /* 控制图标文字距离 */
-        #         padding: 6px 12px;
-        #     }
-        #     QMenu::icon {
-        #         margin: 0px;
-        #     }
-        #     QMenu {
-        #         padding-left: 0px;
-        #     }
-        # """)
-
     def get_ready_for_project(self, project_path):
         self._game_manager.get_ready_for_project(project_path)
         self._scene_widnow.get_ready_for_project()
@@ -276,7 +259,7 @@ class EditorBody(QMainWindow):
         webbrowser.open('https://pygamestudio.com/')
     
     def _show_release_notes(self):
-        webbrowser.open('https://pygamestudio.com/release_notes')
+        webbrowser.open('https://pygamestudio.com/updates_and_support/release_notes')
 
     def _show_github_repository(self):
         webbrowser.open('https://github.com/pygamestudio/pygamestudio')
@@ -286,7 +269,7 @@ class EditorBody(QMainWindow):
         about_window.show()
 
     def _show_support_page(self):
-        webbrowser.open('https://pygamestudio.com/support_pygamestudio')
+        webbrowser.open('https://pygamestudio.com/updates_and_support/support_pygame_studio/')
 
     def retranslate(self):
         self.menuBar().clear()
