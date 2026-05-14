@@ -7,11 +7,13 @@
     <img src="https://static.pepy.tech/personalized-badge/pygamestudio?period=total&units=international_system&left_color=grey&right_color=blue&left_text=Downloads" />
     <img src="https://img.shields.io/pypi/v/pygamestudio.svg?maxAge=86400">
     <img src="https://img.shields.io/badge/python-3-red.svg" />
+    <br>
+    <br>
 
 [README (简体中文)](https://github.com/pygamestudio/pygamestudio/README_zh-CN.md)
 </div>
 
-<br>
+
 
 **Pygame Studio** is a visual editor built specifically for **pygame-ce**, designed to help users create pygame-ce projects visually, making it easier for beginners, students, and hobby developers to get started with pygame development.
 
@@ -32,6 +34,12 @@ After installation, run the following command in your terminal to launch the edi
 
 ```bash
 pygamestudio
+```
+
+You may also use the shortcut command:
+
+```bash
+pygs
 ```
 
 If the Pygame Studio editor launches successfully, the installation is complete.
