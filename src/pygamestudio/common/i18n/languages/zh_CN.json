@@ -78,7 +78,8 @@
         "documentation": "在线文档",
         "release_notes": "更新日志",
         "github_repository": "GitHub仓库",
-        "about_pygamestudio": "关于Pygame Studio"
+        "about_pygamestudio": "关于Pygame Studio",
+        "support_pygamestudio": "支持Pygame Studio"
     },
 
     "item": {

@@ -182,11 +182,16 @@ class EditorBody(QMainWindow):
         release_notes_action = QAction(T.tr('menu.release_notes', 'Release Notes'), self)
         github_action = QAction(T.tr('menu.github_repository', 'Github Repository'), self)
         about_action = QAction(T.tr('menu.about_pygamestudio', 'About Pygame Studio'), self)
+        support_action = QAction(T.tr('menu.support_pygamestudio', 'Support Pygame Studio'), self)
+        
+        about_action.setIcon(QIcon(':/images/logo.png'))
+        support_action.setIcon(QIcon(':/images/heart.png'))
 
         doc_action.triggered.connect(self._show_doc)
         github_action.triggered.connect(self._show_github_repository)
         release_notes_action.triggered.connect(self._show_release_notes)
         about_action.triggered.connect(self._show_about_window)
+        support_action.triggered.connect(self._show_support_page)
 
         self._help_menu.addAction(doc_action)
         self._help_menu.addSeparator()
@@ -194,6 +199,24 @@ class EditorBody(QMainWindow):
         self._help_menu.addAction(github_action)
         self._help_menu.addSeparator()
         self._help_menu.addAction(about_action)
+        self._help_menu.addAction(support_action)
+
+        # self.setStyleSheet("""
+        #     QMenuBar::item {
+        #         spacing: 4px;
+        #         padding: 4px 10px;
+        #     }
+        #     QMenu::item {
+        #         spacing: 4px;       /* 控制图标文字距离 */
+        #         padding: 6px 12px;
+        #     }
+        #     QMenu::icon {
+        #         margin: 0px;
+        #     }
+        #     QMenu {
+        #         padding-left: 0px;
+        #     }
+        # """)
 
     def get_ready_for_project(self, project_path):
         self._game_manager.get_ready_for_project(project_path)
@@ -261,6 +284,9 @@ class EditorBody(QMainWindow):
     def _show_about_window(self):
         about_window = AboutWindow()
         about_window.show()
+
+    def _show_support_page(self):
+        webbrowser.open('https://pygamestudio.com/support_pygamestudio')
 
     def retranslate(self):
         self.menuBar().clear()

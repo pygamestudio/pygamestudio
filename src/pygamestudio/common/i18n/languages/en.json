@@ -78,7 +78,8 @@
         "documentation": "Documentation",
         "release_notes": "Release Notes",
         "github_repository": "Github Repository",
-        "about_pygamestudio": "About Pygame Stuido"
+        "about_pygamestudio": "About Pygame Studio",
+        "support_pygamestudio": "Support Pygame Studio"
     },
 
     "item": {

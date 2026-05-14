@@ -141,7 +141,7 @@ QMenu {
 }
 
 QMenu::item {
-    padding: 5px 30px 5px 30px;
+    padding: 5px 20px 5px 20px;
     border: 1px solid transparent;
 }
 
@@ -152,6 +152,11 @@ QMenu::item:disabled {
 QMenu::item:selected {
     background-color: #404142;
     color: #ffffff;
+}
+
+QMenu::icon {
+    position: relative;
+    left: 15px;
 }
 
 QMenu::separator {
