@@ -256,7 +256,7 @@ class EditorBody(QMainWindow):
         editor_settings_window.show()
 
     def _show_doc(self):
-        webbrowser.open('https://pygamestudio.com/')
+        webbrowser.open('https://pygamestudio.com/tutorial/installation/')
     
     def _show_release_notes(self):
         webbrowser.open('https://pygamestudio.com/updates_and_support/release_notes')
