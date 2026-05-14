@@ -7,6 +7,8 @@
     <img src="https://static.pepy.tech/personalized-badge/pygamestudio?period=total&units=international_system&left_color=grey&right_color=blue&left_text=Downloads" />
     <img src="https://img.shields.io/pypi/v/pygamestudio.svg?maxAge=86400">
     <img src="https://img.shields.io/badge/python-3-red.svg" />
+
+[README (简体中文)](https://github.com/pygamestudio/pygamestudio/README_zh-CN.md)
 </div>
 
 <br>
@@ -45,6 +47,7 @@ If the Pygame Studio editor launches successfully, the installation is complete.
 | PySide6 | >=6.10.0 | 
 | platformdirs | >=3.5.1 | 
 | numpy | >=1.26.0 | 
+| pyinstaller | >=6.18.0 |
 
 <br>
 
@@ -55,27 +58,38 @@ If the Pygame Studio editor launches successfully, the installation is complete.
 pygamestudio
 ```
 
+Or use the shortcut command:
+
+```bash
+pygs
+```
+
 <br>
 
 **2.** Click the "Create" button to create a new project.
 
-<img src="https://i-blog.csdnimg.cn/direct/a627d1820d3145dda30bbd7857fd17b3.png" width="600"/>
+<img src="https://i-blog.csdnimg.cn/direct/e60511fa4e344e1faf36fe41f160fa4e.png" width="600"/>
 
 
 Once created, the game project will be displayed in the Dashboard.
 
-<img src="https://i-blog.csdnimg.cn/direct/b1ef0d71e0f04265b1e77151032e7847.png" width="600"/>
+<img src="https://i-blog.csdnimg.cn/direct/167b961ee6c14c0e8ceccdaf81706f57.png" width="600"/>
 
 <br>
 
 **3.** Double-click the created project to open the editing window and start your creation.
 
-<img src="https://i-blog.csdnimg.cn/direct/72f5ae9b15694ffbac8b14db81223ca2.png" width="800"/>
+<img src="https://i-blog.csdnimg.cn/direct/28198f7ded9143f58f866c9a7e8d6dd2.png" width="800"/>
 
 <br>
 
 # Documentation
 🔗 visit https://pygamestudio.com
+
+<br>
+
+# Release Notes
+🔗 visit https://pygamestudio.com/updates_and_support/release_notes
 
 <br>
 
