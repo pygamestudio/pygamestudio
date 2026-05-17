@@ -10,6 +10,7 @@ from pygamestudio.game.object.rect import *
 from pygamestudio.game.object.canvas import *
 from pygamestudio.game.object.text import *
 from pygamestudio.game.object.ellipse import *
+from pygamestudio.game.object.line import *
 
 
 class SceneLoader:
@@ -75,7 +76,8 @@ class SceneLoader:
             obj = ObjectText(self, object_data, is_for_api=True)
         elif object_type == OBJECT_ELLIPSE:
             obj = ObjectEllipse(self, object_data, is_for_api=True)
-
+        elif object_type == OBJECT_LINE:
+            obj = ObjectLine(self, object_data, is_for_api=True)
         return obj
     
     def _add_object_tree_struct(self, parent_uuid, object_tree_struct_to_add): 
@@ -124,7 +126,9 @@ class SceneLoader:
             if part_number < recursion_time:
                 return None
             elif part_number == recursion_time:
-                if name == value['object'].name and target_item_index == current_item_index:
+                if target_item_index == current_item_index and name == value['object'].name:
+                    return {key: value}
+                elif target_item_index is None and name == value['object'].name: 
                     return {key: value}
                 else:
                     return None
@@ -148,7 +152,7 @@ class SceneLoader:
             
             recursion_time = 0
             name = match.group(1)
-            target_item_index = int(match.group(2)) if match.group(2) is not None else 0
+            target_item_index = int(match.group(2)) if match.group(2) is not None else None
             object_tree_struct = _get(name, target_item_index, 0, recursion_time, i, self._all_object_tree_struct)
 
             if i < len(path_parts)-1:
