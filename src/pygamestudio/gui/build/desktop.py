@@ -338,7 +338,7 @@ class BuildThread(QThread):
             return 90
         elif 'checking exe' in line:
             return 95
-        elif "completed successfully" in line or "finished" in line:
+        elif 'build complete' in line or 'finished' in line:
             return 100
         return None
     
