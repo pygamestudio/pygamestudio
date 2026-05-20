@@ -3,14 +3,14 @@ import re
 import json
 import pygame
 from pathlib import Path
-from pygamestudio.api.runtime.config import get_project_config
-
 from pygamestudio.game.object.type import *
 from pygamestudio.game.object.rect import *
 from pygamestudio.game.object.canvas import *
 from pygamestudio.game.object.text import *
 from pygamestudio.game.object.ellipse import *
 from pygamestudio.game.object.line import *
+from pygamestudio.api.runtime.config import get_project_config
+from pygamestudio.common.i18n.translator import Translator as T
 
 
 class SceneLoader:
@@ -31,7 +31,7 @@ class SceneLoader:
             scene_path = Path(os.environ.get('PROJECT_PATH')) / project_config['asset']['current_scene']
 
         if not Path(scene_path).exists():
-            raise RuntimeError(f'没有在scene文件夹下找到名为{scene_path}的场景文件')
+            raise RuntimeError(T.tr('api.no_scene_path', 'The scene path {} does not exist.').format(scene_path))
 
         self._all_object_tree_struct = {}
         self._current_scene_path = scene_path

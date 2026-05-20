@@ -202,5 +202,11 @@
         "stop": "停止",
         "select_app_icon": "选择应用图标",
         "select_output_dir": "选择输出目录"
+    },
+
+    "api": {
+        "no_scene_path": "场景路径{}不存在。",
+        "no_project_pygs": "没有在项目根目录下找到project.pygs配置文件",
+        "fail_to_load_project_pygs": "配置文件project.pygs加载失败：{}"
     }
 }

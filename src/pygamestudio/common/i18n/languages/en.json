@@ -202,5 +202,11 @@
         "stop": "Stop",
         "select_app_icon": "Select App Icon",
         "select_output_dir": "Select Output Dir"
+    },
+
+    "api": {
+        "no_scene_path": "The scene path {} does not exist.",
+        "no_project_pygs": "Failed to find config file project.pygs in the project root directory.",
+        "fail_to_load_project_pygs": "Failed to load config file project.pygs: {}"
     }
 }
