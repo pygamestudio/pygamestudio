@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from PySide6.QtGui import *
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
@@ -67,10 +69,12 @@ class ConsoleLogBrowser(QTextBrowser):
         self.setObjectName('consoleLogBrowser')
 
     def _add_log(self, msg, log_level):
-        self._logs.append((msg, log_level))
+        now = datetime.now()
+        current_time = '[' + now.strftime('%Y-%m-%d %H:%M:%S') + '.%03d' % (now.microsecond // 1000) + ']'
+        self._logs.append((current_time, msg, log_level))
         log_format = self._log_formats[log_level]
         self.moveCursor(QTextCursor.MoveOperation.End)
-        self.textCursor().insertText(f'{msg}\n', log_format)
+        self.textCursor().insertText(f'{current_time} {msg}\n', log_format)
     
     def _show_context_menu(self, pos):
         global_pos = self.mapToGlobal(pos)
