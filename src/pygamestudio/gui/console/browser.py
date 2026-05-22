@@ -116,7 +116,7 @@ class ConsoleLogBrowser(QTextBrowser):
     
     def _filter(self):
         self.clear()
-        for msg, log_level in self._logs:
+        for current_time, msg, log_level in self._logs:
             if not self._log_check_states[log_level]:
                 continue
 

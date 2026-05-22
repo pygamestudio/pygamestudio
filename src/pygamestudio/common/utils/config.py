@@ -5,6 +5,7 @@ from pathlib import Path
 from platformdirs import user_config_dir
 from pygamestudio.gui.console.logger import Logger
 from pygamestudio.common.utils.path import RES_PATH
+from PySide6.QtWidgets import *
 
 
 def get_editor_config() -> dict:

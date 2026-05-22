@@ -21,6 +21,7 @@ class SearchLineEdit(QLineEdit):
     def _set_widget(self):
         self.setPlaceholderText(T.tr('hierarchy.search_placeholder', 'Search by name or uuid'))
 
+        self._search_icon.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self._search_icon.setFixedSize(14, 14)
         pixmap = QPixmap(':/images/search.png')
         pixmap = pixmap.scaled(self._search_icon.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)

@@ -181,7 +181,8 @@
         "screen_width": "Screen Width",
         "screen_height": "Screen Height",
         "general": "General",
-        "language": "Language"
+        "language": "Language",
+        "theme": "Theme"
     },
 
     "about": {
@@ -202,6 +203,11 @@
         "stop": "Stop",
         "select_app_icon": "Select App Icon",
         "select_output_dir": "Select Output Dir"
+    },
+
+    "theme": {
+        "dark": "Dark",
+        "light": "Light"
     },
 
     "api": {

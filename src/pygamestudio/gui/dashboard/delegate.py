@@ -3,6 +3,7 @@ from pathlib import Path
 from PySide6.QtGui import *
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
+from pygamestudio.common.utils.config import get_editor_config
 from pygamestudio.common.i18n.translator import Translator as T
 
 
@@ -23,6 +24,7 @@ class DashboardDelegate(QStyledItemDelegate):
 
     def paint(self, painter, option, index):
         super().paint(painter, option, index)
+        editor_config = get_editor_config()
 
         project_icon = index.data(self._list_view.ProjectIconRole)
         project_name = index.data(self._list_view.ProjectNameRole)
@@ -48,7 +50,10 @@ class DashboardDelegate(QStyledItemDelegate):
         name_font.setPointSize(font_size)
         painter.setFont(name_font)
         if is_project_existed:
-            painter.setPen(QColor(255, 255, 255))
+            if editor_config.get('theme') == 'light':
+                painter.setPen(QColor(0, 0, 0))
+            else:
+                painter.setPen(QColor(255, 255, 255))
         else:
             painter.setPen(QColor(255, 0, 0))
             project_name += T.tr('dashboard.not_found', ' (Not Found)')
@@ -61,7 +66,11 @@ class DashboardDelegate(QStyledItemDelegate):
         font_size = 12 if platform.system() == 'Darwin' else 8
         path_font.setPointSize(font_size)
         painter.setFont(path_font)
-        painter.setPen(QColor(204, 204, 204))
+
+        if editor_config.get('theme') == 'light':
+            painter.setPen(QColor(52, 52, 52))
+        else:
+            painter.setPen(QColor(204, 204, 204))
         painter.drawText(path_rect, Qt.AlignmentFlag.AlignTop, 
                          painter.fontMetrics().elidedText(project_path, Qt.TextElideMode.ElideRight, name_width))
         
@@ -70,7 +79,10 @@ class DashboardDelegate(QStyledItemDelegate):
         font_size = 9 if platform.system() == 'Darwin' else 7
         date_font.setPointSize(font_size)
         painter.setFont(date_font)
-        painter.setPen(QColor(204, 204, 204))
+        if editor_config.get('theme') == 'light':
+            painter.setPen(QColor(52, 52, 52))
+        else:
+            painter.setPen(QColor(204, 204, 204))
         painter.drawText(date_rect, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop, project_date)
         
 

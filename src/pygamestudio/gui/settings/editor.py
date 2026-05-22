@@ -2,6 +2,7 @@ from PySide6.QtCore import *
 from PySide6.QtWidgets import *
 from pygamestudio.common.utils.config import *
 from pygamestudio.gui.base.window import WindowBase
+from pygamestudio.common.utils.theme import set_editor_theme
 from pygamestudio.common.i18n.translator import Translator as T
 
 
@@ -15,9 +16,16 @@ class EditorSettingsBody(QWidget):
         self._general_stacked_widget = QWidget()
         self._language_label = QLabel()
         self._language_combobox = QComboBox()
+        self._theme_label = QLabel()
+        self._theme_combobox = QComboBox()
+
         self._lang_dict = {
             'en': 'English',
             'zh_CN': '中文简体'
+        }
+        self._theme_dict = {
+            'dark': '深色',
+            'light': '浅色'
         }
 
         self._set_up()
@@ -38,12 +46,15 @@ class EditorSettingsBody(QWidget):
     def _set_signal(self):
         self._list_widget.clicked.connect(self._change_stacked_widget)
         self._language_combobox.currentTextChanged.connect(self._toggle_language)
+        self._theme_combobox.currentTextChanged.connect(self._toggle_theme)
         T.add_observer(self)
 
     def _set_layout(self):
         general_stack_grid_layout = QGridLayout(self._general_stacked_widget)
         general_stack_grid_layout.addWidget(self._language_label, 0, 0, 1, 1)
         general_stack_grid_layout.addWidget(self._language_combobox, 0, 1, 1, 1)
+        general_stack_grid_layout.addWidget(self._theme_label, 1, 0, 1, 1)
+        general_stack_grid_layout.addWidget(self._theme_combobox, 1, 1, 1, 1)
         general_stack_grid_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         main_h_layout = QHBoxLayout(self)
@@ -53,13 +64,24 @@ class EditorSettingsBody(QWidget):
     def _set_general_stacked_widget(self):
         self._language_label.setText(T.tr('settings.language', 'Language'))
         self._language_combobox.addItems(list(self._lang_dict.values()))
+        self._theme_label.setText(T.tr('settings.theme', 'Theme'))
+        self._theme_combobox.addItems(list(self._theme_dict.values()))
+
         editor_config = get_editor_config()
-        self._language_combobox.setCurrentText(self._lang_dict.get(editor_config['lang']))
+        lang_code = editor_config.get('lang') if editor_config.get('lang') else 'en'
+        theme_code = editor_config.get('theme') if editor_config.get('theme') else 'dark'
+        self._language_combobox.setCurrentText(self._lang_dict.get(lang_code))
+        self._theme_combobox.setCurrentText(self._theme_dict.get(theme_code))
 
     def _toggle_language(self):
         lang_code = self._get_lang_code_by_value(self._language_combobox.currentText())
         T.toggle_language(lang_code)
         update_editor_config('lang', lang_code)
+
+    def _toggle_theme(self):
+        theme_code = self._get_theme_code_by_value(self._theme_combobox.currentText())
+        set_editor_theme(theme_code)
+        update_editor_config('theme', theme_code)
 
     def _change_stacked_widget(self):
         self._main_stacked_widget.setCurrentIndex(self._list_widget.currentIndex().row())
@@ -70,10 +92,17 @@ class EditorSettingsBody(QWidget):
                 return k
         return None
     
+    def _get_theme_code_by_value(self, value):
+        for k, v in self._theme_dict.items():
+            if v == value:
+                return k
+        return None
+    
     def retranslate(self):
         self._list_widget.clear()
         self._list_widget.addItems([T.tr('settings.general', 'General')])
         self._language_label.setText(T.tr('settings.language', 'Language'))
+        self._theme_label.setText(T.tr('settings.theme', 'Theme'))
 
     def enterEvent(self, event):
         self.setCursor(Qt.CursorShape.ArrowCursor)
