@@ -24,6 +24,7 @@ QPushButton {
     background-color: #2e2f30;
     border-radius: 5px;
     padding: 5px;
+    outline: none;
 }
 
 QPushButton:disabled {
@@ -100,13 +101,25 @@ QSpinBox QLabel, QDoubleSpinBox QLabel {
 
 QComboBox {
     border-radius: 5px;
-    padding: 3px 6px;
+    padding: 0px 6px;
     padding-right: 2px;
     border: 1px solid #3c3c3c;
+    min-height: 26px;
 }
 
 QComboBox:hover {
     border: 1px solid #007acc;
+}
+
+QComboBox::item {
+    width: 20px;
+    height: 26px;
+    padding-left: -20px;
+}
+
+QComboBox::item:hover, QComboBox::item:selected {
+    background-color: #007acc;
+    padding-left: -20px;
 }
 
 QComboBox::drop-down {
@@ -531,6 +544,10 @@ QWidget#inspectorContainer QCheckBox::indicator {
 
 QWidget#inspectorContainer QCheckBox::indicator:hover {
     border: 1px solid #007acc;
+}
+
+QWidget#inspectorContainer QSpinBox:disabled, QWidget#inspectorContainer QDoubleSpinBox:disabled {
+    color: gray;
 }
 
 /* ----- About ----- */
