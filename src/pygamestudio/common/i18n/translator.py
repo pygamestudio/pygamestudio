@@ -23,20 +23,19 @@ class Translator:
 
     @staticmethod
     def load_language(lang_code):
+        instance = Translator.get_instance()
         lang_file = LANG_PATH / f'{lang_code}.json'
         
         if not lang_file.exists():
-            Logger.error(f"Couldn't find {lang_code}.json")
+            Logger.error(instance.tr('translator.no_lang_code_json', "Couldn't find {}.json").format(lang_code))
             return
-        
-        instance = Translator.get_instance()
 
         try:
             with open(lang_file, 'r', encoding='utf-8') as f:
                 instance.lang_dict = json.load(f)
                 instance.current_language = lang_code
         except Exception as e:
-            Logger.error(f'Failed to load {lang_code}.json: {e}')
+            Logger.error(instance.tr('translator.fail_to_load_lang_code_json', 'Failed to load {}.json: {}').format(lang_code, e))
 
     @staticmethod
     def toggle_language(lang_code):

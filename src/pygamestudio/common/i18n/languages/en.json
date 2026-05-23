@@ -214,5 +214,10 @@
         "no_scene_path": "The scene path {} does not exist.",
         "no_project_pygs": "Failed to find config file project.pygs in the project root directory.",
         "fail_to_load_project_pygs": "Failed to load config file project.pygs: {}"
+    },
+
+    "translator": {
+        "no_lang_code_json": "Couldn't find {}.json",
+        "fail_to_load_lang_code_json": "Failed to load {}.json: {}"
     }
 }
