@@ -22,9 +22,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+import os
 import sys
 from PySide6.QtWidgets import QApplication
 from pygamestudio.gui.main import PygameStudio
+
+
+if sys.platform == 'linux':
+    os.environ['QT_QPA_PLATFORM'] = 'xcb'
 
 
 def main():
