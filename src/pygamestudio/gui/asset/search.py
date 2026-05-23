@@ -19,6 +19,7 @@ class SearchLineEdit(QLineEdit):
         self._set_object_name()
 
     def _set_widget(self):
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
         self.setPlaceholderText(T.tr('asset.search_placeholder', 'Search by name'))
 
         self._search_icon.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
