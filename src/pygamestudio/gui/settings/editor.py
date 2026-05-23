@@ -24,8 +24,8 @@ class EditorSettingsBody(QWidget):
             'zh_CN': '中文简体'
         }
         self._theme_dict = {
-            'dark': '深色',
-            'light': '浅色'
+            'dark': T.tr('theme.dark', 'Dark'),
+            'light': T.tr('theme.light', 'Light'),
         }
 
         self._set_up()
@@ -103,6 +103,16 @@ class EditorSettingsBody(QWidget):
         self._list_widget.addItems([T.tr('settings.general', 'General')])
         self._language_label.setText(T.tr('settings.language', 'Language'))
         self._theme_label.setText(T.tr('settings.theme', 'Theme'))
+
+        self._theme_dict = {
+            'dark': T.tr('theme.dark', 'Dark'),
+            'light': T.tr('theme.light', 'Light'),
+        }
+        editor_config = get_editor_config()
+        self._theme_combobox.clear()
+        self._theme_combobox.addItems(list(self._theme_dict.values()))
+        theme_code = editor_config.get('theme') if editor_config.get('theme') else 'dark'
+        self._theme_combobox.setCurrentText(self._theme_dict.get(theme_code))
 
     def enterEvent(self, event):
         self.setCursor(Qt.CursorShape.ArrowCursor)
