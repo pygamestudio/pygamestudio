@@ -26,7 +26,7 @@ class ProjectSettingsBody(QWidget):
         self._set_layout()
 
     def _set_widget(self):
-        self._set_screen_stacked_widget()
+        # self._set_screen_stacked_widget()
 
         self._list_widget.setMaximumWidth(200)
         self._list_widget.addItems([T.tr('settings.game_screen', 'Game Screen')])
@@ -57,12 +57,16 @@ class ProjectSettingsBody(QWidget):
         self._screen_width_label.setText(T.tr('settings.screen_width', 'Screen Width'))
         self._screen_height_label.setText(T.tr('settings.screen_height', 'Screen Height'))
 
+        self._screen_width_spinbox.blockSignals(True)
+        self._screen_height_spinbox.blockSignals(True)
         screen_width = get_project_config()['screen_width']
         screen_height = get_project_config()['screen_height']
         self._screen_width_spinbox.setRange(1, 99999)
         self._screen_height_spinbox.setRange(1, 99999)
         self._screen_width_spinbox.setValue(screen_width)
         self._screen_height_spinbox.setValue(screen_height)
+        self._screen_width_spinbox.blockSignals(False)
+        self._screen_height_spinbox.blockSignals(False)
 
     def _update_screen_size(self):
         screen_width = self._screen_width_spinbox.value()
@@ -76,6 +80,9 @@ class ProjectSettingsBody(QWidget):
 
     def _change_stacked_widget(self):
         self._main_stacked_widget.setCurrentIndex(self._list_widget.currentIndex().row())
+
+    def get_ready_for_project(self):
+        self._set_screen_stacked_widget()
 
     def retranslate(self):
         self._list_widget.clear()
@@ -109,7 +116,10 @@ class ProjectSettingsWindow(WindowBase):
 
     def _set_object_name(self):
         self.setObjectName('projectSettings')
-
+    
+    def get_ready_for_project(self):
+        return self._project_settings_body.get_ready_for_project()
+    
     def retranslate(self):
         self.window_title.set_title_name(T.tr('menu.project_settings', 'Project Settings'))
 

@@ -33,6 +33,8 @@ class EditorBody(QMainWindow):
         self._hierarchy_window = HierarchyWindow(self, game_manager)
         self._inspector_window = InspectorWindow(self, game_manager)
 
+        self._project_settings_window = ProjectSettingsWindow(game_manager)
+        self._editor_settings_window = EditorSettingsWindow(game_manager)
         self._build_window = BuildWindow(game_manager)
 
         self._left_top_tab_widget = QTabWidget()
@@ -91,6 +93,7 @@ class EditorBody(QMainWindow):
         self.setCentralWidget(self._central_widget)
 
     def _set_signal(self):
+        self._editor_settings_window.theme_toggled.connect(self._scene_widnow.update_grid_style)
         T.add_observer(self)
 
     def _set_layout(self):
@@ -208,6 +211,7 @@ class EditorBody(QMainWindow):
         self._console_window.get_ready_for_project()
         self._hierarchy_window.get_ready_for_project()
         self._inspector_window.get_ready_for_project()
+        self._project_settings_window.get_ready_for_project()
         self._build_window.get_ready_for_project()
         self._game_manager.set_project_ready()
 
@@ -245,15 +249,16 @@ class EditorBody(QMainWindow):
             QApplication.sendEvent(self._hierarchy_window.hierarchy_tree_view, press_event)
 
     def _show_project_settings_window(self):
-        project_settings_window = ProjectSettingsWindow(self._game_manager)
-        project_settings_window.show()
+        self._project_settings_window.show()
+        self._project_settings_window.raise_()
 
     def _show_build_window(self):
         self._build_window.show()
+        self._build_window.raise_()
 
     def _show_editor_settings_window(self):
-        editor_settings_window = EditorSettingsWindow(self._game_manager)
-        editor_settings_window.show()
+        self._editor_settings_window.show()
+        self._editor_settings_window.raise_()
 
     def _show_doc(self):
         webbrowser.open('https://pygamestudio.com/tutorial/installation/')

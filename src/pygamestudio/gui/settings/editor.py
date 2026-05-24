@@ -7,6 +7,8 @@ from pygamestudio.common.i18n.translator import Translator as T
 
 
 class EditorSettingsBody(QWidget):
+    theme_toggled = Signal(str)
+    
     def __init__(self, game_manager):
         super().__init__()
         self._game_manager = game_manager
@@ -82,6 +84,7 @@ class EditorSettingsBody(QWidget):
         theme_code = self._get_theme_code_by_value(self._theme_combobox.currentText())
         set_editor_theme(theme_code)
         update_editor_config('theme', theme_code)
+        self.theme_toggled.emit(theme_code)
 
     def _change_stacked_widget(self):
         self._main_stacked_widget.setCurrentIndex(self._list_widget.currentIndex().row())
@@ -97,7 +100,7 @@ class EditorSettingsBody(QWidget):
             if v == value:
                 return k
         return None
-    
+
     def retranslate(self):
         self._list_widget.clear()
         self._list_widget.addItems([T.tr('settings.general', 'General')])
@@ -120,6 +123,8 @@ class EditorSettingsBody(QWidget):
     
 
 class EditorSettingsWindow(WindowBase):
+    theme_toggled = Signal(str)
+
     def __init__(self, game_manager):
         super().__init__()
         self._editor_settings_body = EditorSettingsBody(game_manager)
@@ -136,10 +141,11 @@ class EditorSettingsWindow(WindowBase):
         self.window_title.set_title_name(T.tr('menu.editor_settings', 'Editor Settings'))
 
     def _set_signal(self):
+        self._editor_settings_body.theme_toggled.connect(self.theme_toggled.emit)
         T.add_observer(self)
 
     def _set_object_name(self):
         self.setObjectName('editorSettings')
-
+        
     def retranslate(self):
         self.window_title.set_title_name(T.tr('menu.editor_settings', 'Editor Settings'))
