@@ -6,6 +6,7 @@ from PySide6.QtWidgets import *
 from pygamestudio.gui.console.type import *
 from pygamestudio.gui.console.menu import *
 from pygamestudio.gui.console.logger import Logger
+from pygamestudio.common.utils.config import get_editor_config
 
 
 class ConsoleLogBrowser(QTextBrowser):
@@ -25,9 +26,6 @@ class ConsoleLogBrowser(QTextBrowser):
         info_format = QTextCharFormat()
         error_format = QTextCharFormat()
         warning_format = QTextCharFormat()
-        info_format.setForeground(QColor('#ffffff'))
-        error_format.setForeground(QColor('#ff0000'))
-        warning_format.setForeground(QColor('#ffde66'))
         self._log_formats = {
             INFO: info_format,
             ERROR: error_format,
@@ -47,6 +45,7 @@ class ConsoleLogBrowser(QTextBrowser):
         self._set_signal()
         self._set_logger()
         self._set_object_name()
+        self._update_log_formats()
 
     def _set_widget(self):
         font = QFont()
@@ -113,7 +112,44 @@ class ConsoleLogBrowser(QTextBrowser):
         log_level = WARNING
         self._add_log(msg, log_level)
         self.warning_log_signal.emit(log_level)
-    
+
+    def _update_log_formats(self, theme_code=''):
+        if not theme_code:
+            theme_code = get_editor_config()['theme']
+        
+        info_format = QTextCharFormat()
+        error_format = QTextCharFormat()
+        warning_format = QTextCharFormat()
+        if theme_code == 'dark':
+            info_format.setForeground(QColor("#ffffff"))
+            error_format.setForeground(QColor('#ff0000'))
+            warning_format.setForeground(QColor('#ffde66'))
+        else:
+            info_format.setForeground(QColor("#000000"))
+            error_format.setForeground(QColor('#ff0000'))
+            warning_format.setForeground(QColor("#ffb300"))
+
+        self._log_formats = {
+            INFO: info_format,
+            ERROR: error_format,
+            WARNING: warning_format
+        }
+
+    def reload_logs_on_theme_changed(self, theme_code):
+        scroll_bar = self.verticalScrollBar()
+        current_scroll_value = scroll_bar.value() 
+
+        self.clear()
+        self._update_log_formats(theme_code)
+        
+        for current_time, msg, log_level in self._logs:
+            log_format = self._log_formats[log_level]
+            
+            self.moveCursor(QTextCursor.MoveOperation.End)
+            self.textCursor().insertText(f'{current_time} {msg}\n', log_format)
+
+        QTimer.singleShot(10, lambda: scroll_bar.setValue(current_scroll_value))
+        
     def _filter(self):
         self.clear()
         for current_time, msg, log_level in self._logs:

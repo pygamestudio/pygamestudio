@@ -59,3 +59,6 @@ class ConsoleWindow(QWidget):
 
     def clean_up(self):
         self._console_log_browser.clean_up()
+
+    def reload_logs_on_theme_changed(self, theme_code):
+        return self._console_log_browser.reload_logs_on_theme_changed(theme_code)

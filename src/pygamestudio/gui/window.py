@@ -94,6 +94,7 @@ class EditorBody(QMainWindow):
 
     def _set_signal(self):
         self._editor_settings_window.theme_toggled.connect(self._scene_widnow.update_grid_style)
+        self._editor_settings_window.theme_toggled.connect(self._console_window.reload_logs_on_theme_changed)
         T.add_observer(self)
 
     def _set_layout(self):
