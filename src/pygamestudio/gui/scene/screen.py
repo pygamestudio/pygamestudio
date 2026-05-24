@@ -46,8 +46,8 @@ class PygameScreen(QWidget):
         self._game_manager.object_hidden.connect(self._update_scene)
         self._game_manager.object_color_changed.connect(self._update_scene)
         self._game_manager.object_rect_border_radius_changed.connect(self._update_scene)
-        self._game_manager.object_line_start_point_changed.connect(self._update_scene)
-        self._game_manager.object_line_end_point_changed.connect(self._update_scene)
+        self._game_manager.object_line_start_point_changed.connect(self._on_object_line_start_point_changed)
+        self._game_manager.object_line_end_point_changed.connect(self._on_object_line_end_point_changed)
         self._game_manager.object_line_thickness_changed.connect(self._update_scene)
         self._game_manager.object_text_changed.connect(self._update_scene)
         self._game_manager.object_font_size_changed.connect(self._update_scene)
@@ -108,6 +108,14 @@ class PygameScreen(QWidget):
             self._screen_surface = pygame.Surface((obj.width, obj.height))
 
         self._update_scene()
+
+    def _on_object_line_start_point_changed(self):
+        self._update_scene()
+        self._move_gizmo.update_pos()
+
+    def _on_object_line_end_point_changed(self):
+        self._update_scene()
+        self._move_gizmo.update_pos()
     
     def _update_scene(self):
         if self._game_manager.is_empty():
@@ -147,7 +155,8 @@ class PygameScreen(QWidget):
         self._update_object_selection(pos)
 
     def _on_mouse_move(self, event):
-        self._move_selected_objects(event.position())
+        # self._move_selected_objects(event.position())
+        pass
 
     def _on_mouse_left_button_released(self, event):
         self._mouse_x = None
@@ -201,6 +210,24 @@ class PygameScreen(QWidget):
         self._mouse_x = pos.x()
         self._mouse_y = pos.y()
 
+    def update_selection_by_rubber_band(self, rect_pyside6):
+        def _set(object_tree_struct, rect_pyside6):
+            value = list(object_tree_struct.values())[0]
+
+            rect_pygame = pygame.FRect(rect_pyside6.x(), rect_pyside6.y(), rect_pyside6.width(), rect_pyside6.height())
+            if value['object'].check_rect_collision(rect_pygame):
+                self._game_manager.select(value['object'].uuid)
+            else:
+                self._game_manager.deselect(value['object'].uuid)
+
+            for child_object_tree_struct in value['children']:
+                _set(child_object_tree_struct, rect_pyside6)
+            
+        _set(self._game_manager.all_object_tree_struct, rect_pyside6)
+
+    def is_dragging_by_move_gizmo(self):
+        return self._move_gizmo.is_dragging
+    
     def eventFilter(self, obj, event):
         """Move game objects when QGraphicsView is not being dragged"""
 

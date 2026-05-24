@@ -66,6 +66,9 @@ class ObjectBase:
         local_y = click_pos[1] - self.get_world_pos()[1]
         return rotated_mask.get_at((local_x, local_y))
     
+    def check_rect_collision(self, rect):
+        return self.get_world_rect().colliderect(rect)
+    
     def to_dict(self):
         exclude_fields = ['_is_initialized', '_game_manager', 'surface', 'icon']
         return {

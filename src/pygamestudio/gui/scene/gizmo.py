@@ -17,8 +17,8 @@ class MoveGizmo(QWidget):
         self._plane_size = 20
         self._arrow_size = 10
 
-        self._is_dragging = False
         self._is_hover = False
+        self._is_dragging = False
         self._hit_type = self.HIT_NONE
         self._mouse_start_x = 0
         self._mouse_start_y = 0
@@ -27,6 +27,10 @@ class MoveGizmo(QWidget):
         self._offset_y = 20
 
         self._set_up()
+
+    @property
+    def is_dragging(self):
+        return self._is_dragging
 
     def _set_up(self):
         self._set_widget()
@@ -55,6 +59,9 @@ class MoveGizmo(QWidget):
         
         self.move(round(self._current_object.get_world_rect().x)-self._offset_x, round(self._current_object.get_world_rect().y)-self._offset_y)
 
+    def update_pos(self):
+        return self._update_pos()
+    
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHints(QPainter.RenderHint.Antialiasing)

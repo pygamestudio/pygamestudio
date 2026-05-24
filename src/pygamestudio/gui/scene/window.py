@@ -16,10 +16,14 @@ class SceneWindow(QWidget):
 
     def _setup(self):
         self._set_widget()
+        self._set_signal()
         self._set_layout()
 
     def _set_widget(self):
         self._grid_scene.addWidget(self._pygame_screen)
+
+    def _set_signal(self):
+        self._grid_view.rubber_band_changed.connect(self._pygame_screen.update_selection_by_rubber_band)
 
     def _set_layout(self):
         window_layout = QVBoxLayout(self)

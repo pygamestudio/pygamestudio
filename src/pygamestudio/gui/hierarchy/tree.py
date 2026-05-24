@@ -100,8 +100,8 @@ class HierarchyTreeView(QTreeView):
         item = self._get_matched_item(object_uuid)
         index = self._proxy_model.mapFromSource(self._standard_model.indexFromItem(item))
         self.selectionModel().select(index, QItemSelectionModel.SelectionFlag.Select)
-        self.viewport().update()
         self.selectionModel().blockSignals(False)
+        self.viewport().update()
 
     def _on_object_deselected(self, object_uuid):
         self.selectionModel().blockSignals(True)
@@ -109,6 +109,7 @@ class HierarchyTreeView(QTreeView):
         index = self._proxy_model.mapFromSource(self._standard_model.indexFromItem(item))
         self.selectionModel().select(index, QItemSelectionModel.SelectionFlag.Deselect)
         self.selectionModel().blockSignals(False)
+        self.viewport().update()
 
     def _show_context_menu(self, pos):
         item = self._standard_model.itemFromIndex(self._proxy_model.mapToSource(self.indexAt(pos)))

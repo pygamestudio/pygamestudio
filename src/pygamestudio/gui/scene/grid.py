@@ -6,6 +6,8 @@ from pygamestudio.gui.scene.widget import *
 
 
 class GridGraphicsView(QGraphicsView):
+    rubber_band_changed = Signal(QRectF)
+
     def __init__(self, game_manager, scene, pygame_screen):
         super().__init__()
         self._game_manager = game_manager
@@ -18,6 +20,8 @@ class GridGraphicsView(QGraphicsView):
         self._is_dragging = False
         self._is_first_show = True
         self._run_project_btn = RunProjectButton()
+        self._rubber_band = QRubberBand(QRubberBand.Shape.Rectangle, self.viewport())
+        self._rb_origin = QPoint()
         self._setup()
     
     def _setup(self):
@@ -30,6 +34,7 @@ class GridGraphicsView(QGraphicsView):
         self.setScene(self._scene)
         self._center()
 
+        self.setDragMode(QGraphicsView.NoDrag)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
@@ -71,6 +76,33 @@ class GridGraphicsView(QGraphicsView):
 
     def is_dragging(self):
         return self._is_dragging
+    
+    def _on_mouse_left_button_pressed(self, event):
+        # Deselect all objects if users click outside the Canvas.
+        proxy_screen_widget = self.scene().items()[0]
+        if not proxy_screen_widget.boundingRect().contains(self.mapToScene(event.pos())):
+            self._game_manager.deselect_all()
+
+        self._rb_origin = event.pos()
+        self._rubber_band.setGeometry(QRect(self._rb_origin, QSize()))
+        self._rubber_band.show()
+
+    def _on_mouse_left_button_moved(self, event):
+        proxy_screen_widget = self.scene().items()[0]
+        scene_widget = proxy_screen_widget.widget()
+        if scene_widget.is_dragging_by_move_gizmo():
+            return
+        
+        rb_view_rect = QRect(self._rb_origin, event.pos()).normalized()
+        self._rubber_band.setGeometry(rb_view_rect)
+        rb_scene_rect = self.mapToScene(rb_view_rect).boundingRect()
+        self.rubber_band_changed.emit(rb_scene_rect)
+        self.viewport().update()
+
+    def _on_mouse_left_button_released(self, event):
+        self._rubber_band.hide()
+        self._rb_origin = QPoint()
+        self.viewport().update()
 
     def _on_mouse_mid_button_pressed(self, event):
         self._is_dragging = True
@@ -99,12 +131,21 @@ class GridGraphicsView(QGraphicsView):
         self.scale(zoom_factor, zoom_factor)
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.MiddleButton:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._on_mouse_left_button_pressed(event)
+        elif event.button() == Qt.MouseButton.MiddleButton:
             self._on_mouse_mid_button_pressed(event)
         return super().mousePressEvent(event)
+    
+    def mouseMoveEvent(self, event):
+        if event.buttons() & Qt.MouseButton.LeftButton and not self._rb_origin.isNull():
+            self._on_mouse_left_button_moved(event)
+        return super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
-        if event.button() == Qt.MouseButton.MiddleButton:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._on_mouse_left_button_released(event)
+        elif event.button() == Qt.MouseButton.MiddleButton:
             self._on_mouse_mid_button_released(event)
         return super().mouseReleaseEvent(event)
 
