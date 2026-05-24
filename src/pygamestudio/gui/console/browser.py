@@ -144,12 +144,11 @@ class ConsoleLogBrowser(QTextBrowser):
         
         for current_time, msg, log_level in self._logs:
             log_format = self._log_formats[log_level]
-            
             self.moveCursor(QTextCursor.MoveOperation.End)
             self.textCursor().insertText(f'{current_time} {msg}\n', log_format)
 
         QTimer.singleShot(10, lambda: scroll_bar.setValue(current_scroll_value))
-        
+
     def _filter(self):
         self.clear()
         for current_time, msg, log_level in self._logs:
