@@ -3,6 +3,7 @@ from PySide6.QtGui import *
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
 from pygamestudio.gui.scene.widget import *
+from pygamestudio.common.utils.config import get_editor_config
 
 
 class GridGraphicsView(QGraphicsView):
@@ -88,6 +89,7 @@ class GridGraphicsView(QGraphicsView):
         self._rubber_band.show()
 
     def _on_mouse_left_button_moved(self, event):
+        # Do not show the rubber band when the gizmo is working.
         proxy_screen_widget = self.scene().items()[0]
         scene_widget = proxy_screen_widget.widget()
         if scene_widget.is_dragging_by_move_gizmo():
@@ -163,22 +165,18 @@ class GridGraphicsView(QGraphicsView):
 class GridGraphicsScene(QGraphicsScene):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._bg_color = QColor('#393939')
-        self._line_color_dark = QColor('#292929')
-        self._line_color_light = QColor('#2f2f2f')
-        self._pen_dark = QPen(self._line_color_dark)
-        self._pen_light = QPen(self._line_color_light)
-        self._pen_dark.setWidth(2)
-        self._pen_light.setWidth(1)
-
+        self._bg_color = QColor()
+        self._line_color_bold = QColor()
+        self._line_color_thin = QColor()
+        self._pen_bold = QPen()
+        self._pen_thin = QPen()
         self._grid_square_size = 20
         self._grid_square_num = 5
-
         self._scene_width = 64000
         self._scene_height = 64000
 
-        self.setBackgroundBrush(self._bg_color)
         self.setSceneRect(-self._scene_width//2, -self._scene_height//2, self._scene_width, self._scene_height)
+        self._update_grid_style()
 
     def _get_lines(self, rect):
         top = int(math.floor(rect.top()))
@@ -189,25 +187,49 @@ class GridGraphicsScene(QGraphicsScene):
         first_top = top - (top % self._grid_square_size)
         first_left = left - (left % self._grid_square_size)
         
-        lines_light, lines_dark = [], []
+        lines_thin, lines_bold = [], []
         for x in range(first_left, right, self._grid_square_size):
             if x % (self._grid_square_size * self._grid_square_num) == 0:
-                lines_dark.append(QLine(x, top, x, bottom))
+                lines_bold.append(QLine(x, top, x, bottom))
             else:
-                lines_light.append(QLine(x, top, x, bottom))
+                lines_thin.append(QLine(x, top, x, bottom))
 
         for y in range(first_top, bottom, self._grid_square_size):
             if y % (self._grid_square_size * self._grid_square_num) == 0:
-                lines_dark.append(QLine(left, y, right, y))
+                lines_bold.append(QLine(left, y, right, y))
             else:
-                lines_light.append(QLine(left, y, right, y))
+                lines_thin.append(QLine(left, y, right, y))
 
-        return lines_light, lines_dark
+        return lines_thin, lines_bold
+    
+    def _update_grid_style(self, theme_code=''):
+        if not theme_code:
+            theme_code = get_editor_config()['theme']
 
+        if theme_code == 'dark':
+            self._bg_color = QColor('#393939')
+            self._line_color_bold = QColor('#292929')
+            self._line_color_thin = QColor('#2f2f2f')
+        else:
+            self._bg_color = QColor('#f2f2f2')
+            self._line_color_bold = QColor('#d0d0d0')
+            self._line_color_thin = QColor('#e0e0e0')
+        
+        self._pen_bold = QPen(self._line_color_bold)
+        self._pen_thin = QPen(self._line_color_thin)
+        self._pen_bold.setWidth(2)
+        self._pen_thin.setWidth(1)
+
+        self.setBackgroundBrush(self._bg_color)
+        self.update()
+
+    def update_grid_style(self, theme_code):
+        return self._update_grid_style(theme_code)
+    
     def drawBackground(self, painter, rect):
         super().drawBackground(painter, rect)
-        lines_light, lines_dark = self._get_lines(rect)
-        painter.setPen(self._pen_light)
-        painter.drawLines(lines_light)
-        painter.setPen(self._pen_dark)
-        painter.drawLines(lines_dark)
+        lines_thin, lines_bold = self._get_lines(rect)
+        painter.setPen(self._pen_thin)
+        painter.drawLines(lines_thin)
+        painter.setPen(self._pen_bold)
+        painter.drawLines(lines_bold)

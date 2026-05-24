@@ -155,6 +155,7 @@ class PygameScreen(QWidget):
         self._update_object_selection(pos)
 
     def _on_mouse_move(self, event):
+        # Should move the objecct by gizmo. Otherwise, the rubber band will show up.
         # self._move_selected_objects(event.position())
         pass
 

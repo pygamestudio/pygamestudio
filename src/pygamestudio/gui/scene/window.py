@@ -29,10 +29,6 @@ class SceneWindow(QWidget):
         window_layout = QVBoxLayout(self)
         window_layout.addWidget(self._grid_view)
         window_layout.setContentsMargins(0, 0, 0, 0)
-
-    @property
-    def pygame_widget(self):
-        return self._pygame_screen
     
     def get_ready_for_project(self):
         self._pygame_screen.get_ready_for_project()
@@ -41,3 +37,6 @@ class SceneWindow(QWidget):
     def clean_up(self):
         self._grid_view.clean_up()
         self._pygame_screen.clean_up()
+
+    def update_grid_style(self, theme_code):
+        self._grid_scene.update_grid_style(theme_code)
