@@ -14,7 +14,7 @@ class MoveGizmo(QWidget):
         self._game_manager = game_manager
         self._current_object = None
         self._axis_length = 100
-        self._plane_size = 20
+        self._plane_size = 25
         self._arrow_size = 10
 
         self._is_hover = False
