@@ -56,7 +56,8 @@ class PygameScreen(QWidget):
         self._game_manager.object_italic_state_changed.connect(self._update_scene)
         self._game_manager.object_underline_state_changed.connect(self._update_scene)
         self._game_manager.object_strikethrough_state_changed.connect(self._update_scene)
-
+        self._game_manager.object_image_path_changed.connect(self._update_scene)
+        
     def _set_pygame_screen(self):
         self._screen_surface = pygame.Surface((self._screen_width, self._screen_height))
 

@@ -26,6 +26,7 @@ class ContextMenu(QMenu):
         add_rect_action = QAction(T.tr('item.rect', 'Rect'), self)
         add_ellipse_action = QAction(T.tr('item.ellipse', 'Ellipse'), self)
         add_text_action = QAction(T.tr('item.text', 'Text'), self)
+        add_image_action = QAction(T.tr('item.image', 'Image'), self)
         cut_action = QAction(T.tr('menu.cut', 'Cut'), self)
         copy_action = QAction(T.tr('menu.copy', 'Copy'), self)
         paste_action = QAction(T.tr('menu.paste', 'Paste'), self)
@@ -40,6 +41,7 @@ class ContextMenu(QMenu):
         add_rect_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_RECT))
         add_ellipse_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_ELLIPSE))
         add_text_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_TEXT))
+        add_image_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_IMAGE))
         cut_action.triggered.connect(self.cut_signal.emit)
         copy_action.triggered.connect(self.copy_signal.emit)
         paste_action.triggered.connect(self.paste_signal.emit)
@@ -63,6 +65,7 @@ class ContextMenu(QMenu):
         add_shape_sub_menu.addAction(add_rect_action)
         add_shape_sub_menu.addAction(add_ellipse_action)
         add_ui_sub_menu.addAction(add_text_action)
+        add_ui_sub_menu.addAction(add_image_action)
 
         # Right click on the blank area.
         if item_type is None:

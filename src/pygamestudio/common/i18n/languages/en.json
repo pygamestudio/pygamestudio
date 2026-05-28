@@ -87,7 +87,8 @@
         "line": "Line",
         "rect": "Rect",
         "ellipse": "Ellipse",
-        "text": "Text"
+        "text": "Text",
+        "image": "Image"
     },
 
     "gm": {
@@ -149,7 +150,9 @@
         "italic": "Italic",
         "underline": "Underline",
         "strikethrough": "Strikethrough",
-        "select_color": "Select Color"
+        "select_color": "Select Color",
+        "image_path": "Image Path",
+        "select_image": "Select Image"
     },
 
     "dashboard": {

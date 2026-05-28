@@ -1,3 +1,4 @@
+from pathlib import Path
 from PySide6.QtGui import *
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
@@ -9,6 +10,7 @@ from pygamestudio.gui.inspector.layout.ellipse import INSPECTOR_LAYOUT_ELLIPSE
 from pygamestudio.gui.inspector.layout.line import INSPECTOR_LAYOUT_LINE
 from pygamestudio.gui.inspector.layout.canvas import INSPECTOR_LAYOUT_CANVAS
 from pygamestudio.gui.inspector.layout.text import INSPECTOR_LAYOUT_TEXT
+from pygamestudio.gui.inspector.layout.image import INSPECTOR_LAYOUT_IMAGE
 
 
 class Container(QFrame):
@@ -49,6 +51,7 @@ class Container(QFrame):
         self._game_manager.object_line_start_point_changed.connect(self._on_object_line_start_point_changed)
         self._game_manager.object_line_end_point_changed.connect(self._on_object_line_end_point_changed)
         self._game_manager.object_line_thickness_changed.connect(self._on_object_line_thickness_changed)
+        self._game_manager.object_image_path_changed.connect(self._on_object_image_path_changed)
 
     def _set_layout(self):
         self._container_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
@@ -158,6 +161,10 @@ class Container(QFrame):
         new_strikethrough_state = checkbox_strikethrough.isChecked()
         self._game_manager.set_strikethrough_state(self._object_uuid_in_inspection, new_strikethrough_state)
 
+    def set_object_image_path(self):
+        lineedit = self._find_widget(self._container_layout, 'image_path')
+        self._game_manager.set_image_path(self._object_uuid_in_inspection, lineedit.toolTip())
+        
     def _on_object_added(self, parent_uuid, object_uuid, inserted_pos):
         # Object will be selected when added, and it will be inspected in slot _on_object_selected.
         # self._inspect_object(object_uuid)
@@ -310,6 +317,13 @@ class Container(QFrame):
         spinbox_end_point_x.blockSignals(False)
         spinbox_end_point_y.blockSignals(False)
 
+    def _on_object_image_path_changed(self, object_uuid):
+        obj = self._game_manager.get_object(object_uuid)
+        image_path_lineedit = self._find_widget(self._container_layout, 'image_path')
+        image_path_lineedit.blockSignals(True)
+        image_path_lineedit.setText(Path(obj.image_path).name)
+        image_path_lineedit.blockSignals(False)
+
     def _find_widget(self, layout, widget_name):
         for i in range(layout.count()):
             item = layout.itemAt(i)
@@ -344,6 +358,8 @@ class Container(QFrame):
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_LINE)
         elif obj.type == OBJECT_TEXT:
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_TEXT)
+        elif obj.type == OBJECT_IMAGE:
+            self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_IMAGE)
 
     def _clear_layout(self, layout):
         if layout is None:

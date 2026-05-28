@@ -10,6 +10,7 @@ from pygamestudio.game.object.canvas import *
 from pygamestudio.game.object.text import *
 from pygamestudio.game.object.ellipse import *
 from pygamestudio.game.object.line import *
+from pygamestudio.game.object.image import *
 from pygamestudio.common.utils.config import *
 from pygamestudio.gui.console.logger import Logger
 from pygamestudio.common.i18n.translator import Translator as T
@@ -46,6 +47,7 @@ class GameManager(QObject):
     object_italic_state_changed = Signal(str)
     object_underline_state_changed = Signal(str)
     object_strikethrough_state_changed = Signal(str)
+    object_image_path_changed = Signal(str)
 
     def __init__(self):
         super().__init__()
@@ -150,6 +152,8 @@ class GameManager(QObject):
             obj = ObjectEllipse(self, object_data)
         elif object_type == OBJECT_LINE:
             obj = ObjectLine(self, object_data)
+        elif object_type == OBJECT_IMAGE:
+            obj = ObjectImage(self, object_data)
         return obj
 
     def rename(self, object_uuid, new_name):   
@@ -357,6 +361,11 @@ class GameManager(QObject):
         obj = self._get_object(object_uuid)
         old_strikethrough_state = obj.is_strikethrough
         self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'is_strikethrough', old_strikethrough_state, new_strikethrough_state))
+
+    def set_image_path(self, object_uuid, new_image_path):
+        obj = self._get_object(object_uuid) 
+        old_image_path = obj.image_path
+        self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'image_path', old_image_path, new_image_path))
 
     def _get_object_tree_struct(self, object_uuid, parent_object_tree_struct=None):
         def _get(object_uuid, object_tree_struct):
@@ -876,3 +885,5 @@ class UpdateAttrValueCommand(QUndoCommand):
             self._game_manager.object_underline_state_changed.emit(self._obj.uuid)
         elif attr == 'is_strikethrough':
             self._game_manager.object_strikethrough_state_changed.emit(self._obj.uuid)
+        elif attr == 'image_path':
+            self._game_manager.object_image_path_changed.emit(self._obj.uuid)

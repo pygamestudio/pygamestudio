@@ -9,6 +9,7 @@ from pygamestudio.game.object.canvas import *
 from pygamestudio.game.object.text import *
 from pygamestudio.game.object.ellipse import *
 from pygamestudio.game.object.line import *
+from pygamestudio.game.object.image import *
 from pygamestudio.api.runtime.config import get_project_config
 from pygamestudio.common.i18n.translator import Translator as T
 
@@ -78,6 +79,8 @@ class SceneLoader:
             obj = ObjectEllipse(self, object_data, is_for_api=True)
         elif object_type == OBJECT_LINE:
             obj = ObjectLine(self, object_data, is_for_api=True)
+        elif object_type == OBJECT_IMAGE:
+            obj = ObjectImage(self, object_data, is_for_api=True)
         return obj
     
     def _add_object_tree_struct(self, parent_uuid, object_tree_struct_to_add): 
