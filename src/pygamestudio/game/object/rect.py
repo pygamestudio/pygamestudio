@@ -52,6 +52,4 @@ class ObjectRect(ObjectBase):
         self.surface = rotated_surface
 
         if not self._is_for_api and self.is_selected:
-            pygame.draw.rect(self.surface, (0, 122, 204), self.surface.get_rect(), width=2,
-                             border_radius=-1, border_top_left_radius=self.border_top_left_radius, border_top_right_radius=self.border_top_right_radius,
-                             border_bottom_left_radius=self.border_bottom_left_radius, border_bottom_right_radius=self.border_bottom_right_radius)
+            pygame.draw.rect(self.surface, (0, 122, 204), self.surface.get_rect(), width=2)

@@ -73,15 +73,15 @@ class ObjectImage(ObjectBase):
         radius = [
             self.border_top_left_radius,
             self.border_top_right_radius,
-            self.border_bottom_right_radius,
-            self.border_bottom_left_radius
+            self.border_bottom_left_radius,
+            self.border_bottom_right_radius
         ]
         mask = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         pygame.draw.rect(mask, (255, 255, 255, 255), mask.get_rect(),
                          border_top_left_radius=radius[0],
                          border_top_right_radius=radius[1],
-                         border_bottom_right_radius=radius[2],
-                         border_bottom_left_radius=radius[3])
+                         border_bottom_left_radius=radius[2],
+                         border_bottom_right_radius=radius[3])
         surface.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
         return surface
 
@@ -97,11 +97,7 @@ class ObjectImage(ObjectBase):
         self.surface.fill(self.color, special_flags=pygame.BLEND_RGBA_MULT)
 
         if not self._is_for_api and self.is_selected:
-            pygame.draw.rect(self.surface, (0, 122, 204), self.surface.get_rect(), width=2,
-                             border_top_left_radius=self.border_top_left_radius,
-                             border_top_right_radius=self.border_top_right_radius,
-                             border_bottom_left_radius=self.border_bottom_left_radius,
-                             border_bottom_right_radius=self.border_bottom_right_radius)
+            pygame.draw.rect(self.surface, (0, 122, 204), self.surface.get_rect(), width=2)
 
     def __setattr__(self, name, value):
         if not hasattr(self, '_is_initialized') or not self._is_initialized:
