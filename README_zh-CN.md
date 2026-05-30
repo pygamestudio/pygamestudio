@@ -10,7 +10,7 @@
     <br>
     <br>
 
-[README (English)](https://github.com/pygamestudio/pygamestudio)
+[English](https://github.com/pygamestudio/pygamestudio) &nbsp;|&nbsp; 简体中文
 </div>
 
 **Pygame Studio** 是专为 **pygame-ce** 打造的可视化编辑器，支持以可视化方式制作 pygame-ce 项目，让编程新手、在校学生以及业余开发者都能更轻松地入门 Pygame 游戏开发。
