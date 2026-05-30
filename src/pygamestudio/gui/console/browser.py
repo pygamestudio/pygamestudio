@@ -115,19 +115,19 @@ class ConsoleLogBrowser(QTextBrowser):
 
     def _update_log_formats(self, theme_code=''):
         if not theme_code:
-            theme_code = get_editor_config()['theme']
+            theme_code = get_editor_config().get('theme')
         
         info_format = QTextCharFormat()
         error_format = QTextCharFormat()
         warning_format = QTextCharFormat()
-        if theme_code == 'dark':
-            info_format.setForeground(QColor("#ffffff"))
-            error_format.setForeground(QColor('#ff0000'))
-            warning_format.setForeground(QColor('#ffde66'))
-        else:
+        if theme_code == 'light':
             info_format.setForeground(QColor("#000000"))
             error_format.setForeground(QColor('#ff0000'))
             warning_format.setForeground(QColor("#ffb300"))
+        else:
+            info_format.setForeground(QColor("#ffffff"))
+            error_format.setForeground(QColor('#ff0000'))
+            warning_format.setForeground(QColor('#ffde66'))
 
         self._log_formats = {
             INFO: info_format,

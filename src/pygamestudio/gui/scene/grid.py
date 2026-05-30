@@ -204,16 +204,16 @@ class GridGraphicsScene(QGraphicsScene):
     
     def _update_grid_style(self, theme_code=''):
         if not theme_code:
-            theme_code = get_editor_config()['theme']
+            theme_code = get_editor_config().get('theme')
 
-        if theme_code == 'dark':
-            self._bg_color = QColor('#393939')
-            self._line_color_bold = QColor('#292929')
-            self._line_color_thin = QColor('#2f2f2f')
-        else:
+        if theme_code == 'light':
             self._bg_color = QColor('#f2f2f2')
             self._line_color_bold = QColor('#d0d0d0')
             self._line_color_thin = QColor('#e0e0e0')
+        else:
+            self._bg_color = QColor('#393939')
+            self._line_color_bold = QColor('#292929')
+            self._line_color_thin = QColor('#2f2f2f')
         
         self._pen_bold = QPen(self._line_color_bold)
         self._pen_thin = QPen(self._line_color_thin)
