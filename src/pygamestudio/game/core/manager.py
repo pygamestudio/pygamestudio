@@ -716,7 +716,7 @@ class GameManager(QObject):
         with open(self._current_scene_file_path, 'w', encoding='utf-8') as f:
             json.dump(self._all_object_tree_struct, f, default=_default, indent=4, ensure_ascii=False)
 
-        Logger.info('Scene saved')
+        Logger.info(T.tr('scene.scene_saved', 'Scene saved'))
 
     def save_scene(self):
         return self._save_scene()

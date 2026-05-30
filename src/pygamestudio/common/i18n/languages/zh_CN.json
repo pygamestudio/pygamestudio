@@ -113,6 +113,7 @@
 
     "scene": {
         "scene": "场景编辑器",
+        "scene_saved": "场景已保存",
         "run_project": "运行项目{}",
         "failed_to_run_project": "项目{}运行失败：{}"
     },

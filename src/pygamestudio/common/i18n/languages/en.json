@@ -113,6 +113,7 @@
 
     "scene": {
         "scene": "Scene",
+        "scene_saved": "Scene saved",
         "run_project": "Run Project {}",
         "failed_to_run_project": "Failed to Run Project {}: {}"
     },

@@ -159,7 +159,7 @@ class ConsoleLogBrowser(QTextBrowser):
                 continue
 
             log_format = self._log_formats[log_level]
-            self.textCursor().insertText(f'{msg}\n', log_format)
+            self.textCursor().insertText(f'{current_time} {msg}\n', log_format)
 
     def search(self, keyword):
         self._search_keyword = keyword.strip()
