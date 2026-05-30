@@ -152,7 +152,9 @@
         "strikethrough": "Strikethrough",
         "select_color": "Select Color",
         "image_path": "Image Path",
-        "select_image": "Select Image"
+        "select_image": "Select Image",
+        "font_path": "Font Path",
+        "format": "Format"
     },
 
     "dashboard": {

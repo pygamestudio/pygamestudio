@@ -4,6 +4,7 @@ from pathlib import Path
 from pygamestudio.game.object.type import *
 from pygamestudio.game.object.base import ObjectBase
 from pygamestudio.common.utils.path import RES_PATH
+from pygamestudio.common.utils.path import get_project_path
 
 
 class ObjectImage(ObjectBase):
@@ -18,9 +19,9 @@ class ObjectImage(ObjectBase):
             'name': 'Image',
             'type': OBJECT_IMAGE,
             'uuid': str(uuid.uuid4()),
-            'x': 0,
-            'y': 0,
-            'pos': (0, 0),
+            'x': 20,
+            'y': 20,
+            'pos': (20, 20),
             'width': 128,
             'height': 128,
             'size': (128, 128),
@@ -30,7 +31,7 @@ class ObjectImage(ObjectBase):
             'angle': 0,
             'color': '#ffffff',
             'is_visible': True,
-            'image_path': '',
+            'image_path': './image/logo.png',
             # 'keep_aspect_ratio': False,
             'border_top_left_radius': 0,
             'border_top_right_radius': 0,
@@ -45,12 +46,11 @@ class ObjectImage(ObjectBase):
         self._is_initialized = True
 
     def _load_image(self):
-        if self.image_path and Path(self.image_path).exists():
-            self.surface = pygame.image.load(self.image_path).convert(self.surface)
+        image_absolute_path = Path(get_project_path()) / self.image_path
+        if self.image_path == '' or not image_absolute_path.exists():
+            self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
         else:
-            image_placeholder_path = RES_PATH/'images/image_placeholder.png'
-            if image_placeholder_path.exists():  
-                self.surface = pygame.image.load(image_placeholder_path).convert(self.surface)
+            self.surface = pygame.image.load(image_absolute_path).convert(self.surface)
 
         self.surface = pygame.transform.scale(self.surface, self.size)
 
@@ -102,3 +102,22 @@ class ObjectImage(ObjectBase):
                              border_top_right_radius=self.border_top_right_radius,
                              border_bottom_left_radius=self.border_bottom_left_radius,
                              border_bottom_right_radius=self.border_bottom_right_radius)
+
+    def __setattr__(self, name, value):
+        if not hasattr(self, '_is_initialized') or not self._is_initialized:
+            super().__setattr__(name, value)
+            return
+
+        if name == 'image_path':
+            if value == '':
+                super().__setattr__('image_path', '')
+            else:
+                project_path = Path(get_project_path())
+                new_image_path = Path(value).absolute()
+                try:
+                    super().__setattr__('image_path', new_image_path.relative_to(project_path).as_posix())
+                except ValueError:
+                    super().__setattr__('image_path', new_image_path.as_posix())
+
+        else:
+            super().__setattr__(name, value)

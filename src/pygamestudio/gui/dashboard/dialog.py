@@ -97,6 +97,7 @@ class CreateProjectBody(QWidget):
         project_dir_path = self._project_dir_path_edit.text().strip()
         project_path = Path(project_dir_path) / project_name
         audio_folder_path = project_path / 'audio'
+        font_folder_path = project_path / 'font'
         image_folder_path = project_path / 'image'
         scene_folder_path = project_path / 'scene'
         script_folder_path = project_path / 'script'
@@ -106,10 +107,12 @@ class CreateProjectBody(QWidget):
         try:
             project_path.mkdir(parents=True, exist_ok=False)
             audio_folder_path.mkdir(parents=True, exist_ok=False)
+            font_folder_path.mkdir(parents=True, exist_ok=False)
             image_folder_path.mkdir(parents=True, exist_ok=False)
             scene_folder_path.mkdir(parents=True, exist_ok=False)
             script_folder_path.mkdir(parents=True, exist_ok=False)
 
+            shutil.copy2(RES_PATH / 'fonts/SIMHEI.TTF', font_folder_path)
             shutil.copy2(RES_PATH / 'images/logo.png', image_folder_path)
 
             with open(RES_PATH / 'templates/main_template.py', 'r', encoding='utf-8') as f:

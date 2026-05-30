@@ -152,7 +152,9 @@
         "strikethrough": "删除线",
         "select_color": "选择颜色",
         "image_path": "图片路径",
-        "select_image": "选择图片"
+        "font_path": "字体路径",
+        "select_image": "选择图片",
+        "format": "格式"
     },
 
     "dashboard": {

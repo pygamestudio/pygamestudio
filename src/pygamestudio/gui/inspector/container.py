@@ -52,6 +52,7 @@ class Container(QFrame):
         self._game_manager.object_line_end_point_changed.connect(self._on_object_line_end_point_changed)
         self._game_manager.object_line_thickness_changed.connect(self._on_object_line_thickness_changed)
         self._game_manager.object_image_path_changed.connect(self._on_object_image_path_changed)
+        self._game_manager.object_font_path_changed.connect(self._on_object_font_path_changed)
 
     def _set_layout(self):
         self._container_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
@@ -164,6 +165,10 @@ class Container(QFrame):
     def set_object_image_path(self):
         lineedit = self._find_widget(self._container_layout, 'image_path')
         self._game_manager.set_image_path(self._object_uuid_in_inspection, lineedit.toolTip())
+
+    def set_object_font_path(self):
+        lineedit = self._find_widget(self._container_layout, 'font_path')
+        self._game_manager.set_font_path(self._object_uuid_in_inspection, lineedit.toolTip())
         
     def _on_object_added(self, parent_uuid, object_uuid, inserted_pos):
         # Object will be selected when added, and it will be inspected in slot _on_object_selected.
@@ -216,18 +221,19 @@ class Container(QFrame):
             spinbox_end_x = self._find_widget(self._container_layout, 'end_x')
             spinbox_end_y = self._find_widget(self._container_layout, 'end_y')
 
-            spinbox_start_x.blockSignals(True)
-            spinbox_start_y.blockSignals(True)
-            spinbox_end_x.blockSignals(True)
-            spinbox_end_y.blockSignals(True)
-            spinbox_start_x.setValue(obj.start_x)
-            spinbox_start_y.setValue(obj.start_y)
-            spinbox_end_x.setValue(obj.end_x)
-            spinbox_end_y.setValue(obj.end_y)
-            spinbox_start_x.blockSignals(False)
-            spinbox_start_y.blockSignals(False)
-            spinbox_end_x.blockSignals(False)
-            spinbox_end_y.blockSignals(False)
+            if spinbox_start_x and spinbox_start_y and spinbox_end_x and spinbox_end_y:
+                spinbox_start_x.blockSignals(True)
+                spinbox_start_y.blockSignals(True)
+                spinbox_end_x.blockSignals(True)
+                spinbox_end_y.blockSignals(True)
+                spinbox_start_x.setValue(obj.start_x)
+                spinbox_start_y.setValue(obj.start_y)
+                spinbox_end_x.setValue(obj.end_x)
+                spinbox_end_y.setValue(obj.end_y)
+                spinbox_start_x.blockSignals(False)
+                spinbox_start_y.blockSignals(False)
+                spinbox_end_x.blockSignals(False)
+                spinbox_end_y.blockSignals(False)
 
     def _on_object_scaled(self, object_uuid):
         obj = self._game_manager.get_object(object_uuid)
@@ -323,6 +329,13 @@ class Container(QFrame):
         image_path_lineedit.blockSignals(True)
         image_path_lineedit.setText(Path(obj.image_path).name)
         image_path_lineedit.blockSignals(False)
+
+    def _on_object_font_path_changed(self, object_uuid):
+        obj = self._game_manager.get_object(object_uuid)
+        font_path_lineedit = self._find_widget(self._container_layout, 'font_path')
+        font_path_lineedit.blockSignals(True)
+        font_path_lineedit.setText(Path(obj.font_path).name)
+        font_path_lineedit.blockSignals(False)
 
     def _find_widget(self, layout, widget_name):
         for i in range(layout.count()):

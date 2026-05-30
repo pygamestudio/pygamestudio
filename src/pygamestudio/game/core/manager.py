@@ -48,6 +48,7 @@ class GameManager(QObject):
     object_underline_state_changed = Signal(str)
     object_strikethrough_state_changed = Signal(str)
     object_image_path_changed = Signal(str)
+    object_font_path_changed = Signal(str)
 
     def __init__(self):
         super().__init__()
@@ -366,6 +367,11 @@ class GameManager(QObject):
         obj = self._get_object(object_uuid) 
         old_image_path = obj.image_path
         self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'image_path', old_image_path, new_image_path))
+
+    def set_font_path(self, object_uuid, new_font_path):
+        obj = self._get_object(object_uuid) 
+        old_font_path = obj.font_path
+        self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'font_path', old_font_path, new_font_path))
 
     def _get_object_tree_struct(self, object_uuid, parent_object_tree_struct=None):
         def _get(object_uuid, object_tree_struct):
@@ -887,3 +893,5 @@ class UpdateAttrValueCommand(QUndoCommand):
             self._game_manager.object_strikethrough_state_changed.emit(self._obj.uuid)
         elif attr == 'image_path':
             self._game_manager.object_image_path_changed.emit(self._obj.uuid)
+        elif attr == 'font_path':
+            self._game_manager.object_font_path_changed.emit(self._obj.uuid)

@@ -107,15 +107,26 @@ INSPECTOR_LAYOUT_TEXT = {
             'widget': [FontSizeSpinBox]
         }
     },
-    'font_family': {
+    # 'font_family': {
+    #     'i18n': {
+    #         'key': 'inspector.font_family',
+    #         'default': 'Font Family'
+    #     },
+    #     'component': {
+    #         'enabled': [True],
+    #         'attribute': ['font_family'],
+    #         'widget': [FontFamilyComboBox]
+    #     }
+    # },
+    'font_path': {
         'i18n': {
-            'key': 'inspector.font_family',
-            'default': 'Font Family'
-        },
+            'key': 'inspector.font_path',
+            'default': 'Font Path'
+        },        
         'component': {
             'enabled': [True],
-            'attribute': ['font_family'],
-            'widget': [FontFamilyComboBox]
+            'attribute': ['font_path'],
+            'widget': [FontPathLineEdit]
         }
     },
     'is_bold': {

@@ -1,7 +1,9 @@
 import uuid
 import pygame
+from pathlib import Path
 from pygamestudio.game.object.type import *
 from pygamestudio.game.object.base import ObjectBase
+from pygamestudio.common.utils.path import get_project_path
 
 
 class ObjectText(ObjectBase):
@@ -16,9 +18,9 @@ class ObjectText(ObjectBase):
             'name': 'Text',
             'type': OBJECT_TEXT,
             'uuid': str(uuid.uuid4()),
-            'x': 0,
-            'y': 0,
-            'pos': (0, 0),
+            'x': 20,
+            'y': 20,
+            'pos': (20, 20),
             'width': 60, 
             'height': 40,
             'size': (60, 40),
@@ -30,7 +32,7 @@ class ObjectText(ObjectBase):
             'is_visible': True,
             'text': 'Text',
             'font_size': 30,
-            'font_family': 'Arial',
+            'font_path': './font/SIMHEI.ttf',
             'is_bold': False,
             'is_italic': False,
             'is_underline': False,
@@ -44,7 +46,12 @@ class ObjectText(ObjectBase):
         self._is_initialized = True
 
     def _init_font(self):
-        font = pygame.font.SysFont(self.font_family, self.font_size)
+        font_absolute_path = Path(get_project_path()) / self.font_path
+        if self.font_path == '' or not font_absolute_path:
+            font = pygame.font.Font(None, size=self.font_size)
+        else:
+            font = pygame.font.Font(font_absolute_path, size=self.font_size)
+
         font.set_bold(self.is_bold)
         font.set_italic(self.is_italic)
         font.set_underline(self.is_underline)
@@ -64,3 +71,21 @@ class ObjectText(ObjectBase):
         
         if not self._is_for_api and self.is_selected:
             pygame.draw.rect(self.surface, (0, 122, 204), self.surface.get_rect(), width=2)
+
+    def __setattr__(self, name, value):
+        if not hasattr(self, '_is_initialized') or not self._is_initialized:
+            super().__setattr__(name, value)
+            return
+
+        if name == 'font_path':
+            if value == '':
+                super().__setattr__('font_path', '')
+            else:
+                project_path = Path(get_project_path())
+                new_font_path = Path(value).absolute()
+                try:
+                    super().__setattr__('font_path', new_font_path.relative_to(project_path).as_posix())
+                except ValueError:
+                    super().__setattr__('font_path', new_font_path.as_posix())
+        else:
+            super().__setattr__(name, value)
