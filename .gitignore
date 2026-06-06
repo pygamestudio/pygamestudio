@@ -2,3 +2,5 @@ __pycache__
 pyproject.toml
 /dist
 /src/pygamestudio.egg-info
+.DS_Store
+.idea/
