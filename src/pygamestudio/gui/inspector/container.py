@@ -11,6 +11,7 @@ from pygamestudio.gui.inspector.layout.line import INSPECTOR_LAYOUT_LINE
 from pygamestudio.gui.inspector.layout.canvas import INSPECTOR_LAYOUT_CANVAS
 from pygamestudio.gui.inspector.layout.text import INSPECTOR_LAYOUT_TEXT
 from pygamestudio.gui.inspector.layout.image import INSPECTOR_LAYOUT_IMAGE
+from pygamestudio.gui.inspector.layout.button import INSPECTOR_LAYOUT_BUTTON
 
 
 class Container(QFrame):
@@ -373,6 +374,8 @@ class Container(QFrame):
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_TEXT)
         elif obj.type == OBJECT_IMAGE:
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_IMAGE)
+        elif obj.type == OBJECT_BUTTON:
+            self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_BUTTON)
 
     def _clear_layout(self, layout):
         if layout is None:

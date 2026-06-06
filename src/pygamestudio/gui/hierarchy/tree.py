@@ -58,6 +58,7 @@ class HierarchyTreeView(QTreeView):
 
     def _set_signal(self):
         self.selectionModel().selectionChanged.connect(self._on_item_selection_changed)
+        self.clicked.connect(self._on_item_clicked)
         self.customContextMenuRequested.connect(self._show_context_menu)
         self._standard_model.itemChanged.connect(self._on_item_changed)
         self.expanded.connect(self._on_item_expanded)
@@ -94,6 +95,10 @@ class HierarchyTreeView(QTreeView):
         for index in deselected.indexes():
             index_uuid = index.data(Qt.ItemDataRole.UserRole+1)
             self._game_manager.deselect(index_uuid)
+
+    def _on_item_clicked(self, index):
+        index_uuid = index.data(Qt.ItemDataRole.UserRole+1)
+        self._game_manager.select(index_uuid)
 
     def _on_object_selected(self, object_uuid):
         self.selectionModel().blockSignals(True)

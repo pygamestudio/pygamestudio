@@ -4,6 +4,7 @@ import subprocess
 from PySide6.QtGui import *
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
+from pygamestudio.game.core.command import *
 from pygamestudio.game.object.type import *
 from pygamestudio.game.object.rect import *
 from pygamestudio.game.object.canvas import *
@@ -11,6 +12,7 @@ from pygamestudio.game.object.text import *
 from pygamestudio.game.object.ellipse import *
 from pygamestudio.game.object.line import *
 from pygamestudio.game.object.image import *
+from pygamestudio.game.object.button import *
 from pygamestudio.common.utils.config import *
 from pygamestudio.gui.console.logger import Logger
 from pygamestudio.common.i18n.translator import Translator as T
@@ -126,17 +128,22 @@ class GameManager(QObject):
         return self._add(parent_uuid, object_type, object_data)
     
     def _add(self, parent_uuid, object_type, object_data={}):
-        obj = self._new_object(object_type, object_data)
-
-        object_tree_struct = {
-            obj.uuid: {
-                'object': obj,
-                'children': []
-            }
-        }
+        obj, object_tree_struct = self._new_object(object_type, object_data)
 
         if object_type == OBJECT_CANVAS:
             self._add_object_tree_struct(parent_uuid, object_tree_struct)
+     
+        elif object_type == OBJECT_BUTTON:
+            inserted_pos = -1
+            self._undo_stack.push(AddObjectCommand(self, parent_uuid, object_tree_struct, inserted_pos))
+
+            child_text_object, child_text_object_tree_struct = self._new_object(OBJECT_TEXT, {})
+            child_text_object.pos = (20, 0)
+            child_text_object.color = '#000000'
+            self._add_object_tree_struct(obj.uuid, child_text_object_tree_struct)
+            self.deselect_all()
+            self.select(obj.uuid)
+
         else:
             inserted_pos = -1
             self._undo_stack.push(AddObjectCommand(self, parent_uuid, object_tree_struct, inserted_pos))
@@ -155,7 +162,17 @@ class GameManager(QObject):
             obj = ObjectLine(self, object_data)
         elif object_type == OBJECT_IMAGE:
             obj = ObjectImage(self, object_data)
-        return obj
+        elif object_type == OBJECT_BUTTON:
+            obj = ObjectButton(self, object_data)
+
+        object_tree_struct = {
+            obj.uuid: {
+                'object': obj,
+                'children': []
+            }
+        }
+    
+        return obj, object_tree_struct
 
     def rename(self, object_uuid, new_name):   
         obj = self._get_object(object_uuid)     
@@ -431,8 +448,34 @@ class GameManager(QObject):
         
         return _get(object_uuid, self._all_object_tree_struct)
     
+    def _get_descendant_objects_uuids(self, object_uuid, is_to_get_child_only=False):
+        descendant_objects = self._get_descendant_objects(object_uuid, is_to_get_child_only)
+        descendant_objects_uuids = [obj.uuid for obj in descendant_objects]
+        return descendant_objects_uuids
+
+    def _get_descendant_objects(self, object_uuid, is_to_get_child_only=False):
+        def _get(object_uuid, descendant_objects, object_tree_struct):
+            value = list(object_tree_struct.values())[0]
+            
+            for child_object_tree_struct in value['children']:
+                child_value = list(child_object_tree_struct.values())[0]
+                descendant_objects.append(child_value['object'])
+                
+                if not is_to_get_child_only:
+                    _get(object_uuid, descendant_objects, child_object_tree_struct)
+                        
+        descendant_objects = []
+        _get(object_uuid, descendant_objects, self._get_object_tree_struct(object_uuid))
+        return descendant_objects
+    
+    def get_parent_uuid(self, object_uuid):
+        return self._get_parent_uuid(object_uuid)
+    
     def get_parent_object(self, object_uuid):
         return self._get_parent_object(object_uuid)
+    
+    def get_descendant_objects(self, object_uuid, is_to_get_child_only=False):
+        return self._get_descendant_objects(object_uuid, is_to_get_child_only)
     
     def add_object_tree_struct(self, parent_uuid, object_tree_struct_to_add, inserted_pos=-1):
         return self._add_object_tree_struct(parent_uuid, object_tree_struct_to_add, inserted_pos)
@@ -802,96 +845,3 @@ class GameManager(QObject):
             Logger.info(T.tr('scene.run_project', 'Run Project {}').format(Path(self._project_path).name))
         except Exception as e:
             Logger.error(T.tr('scene.failed_to_run_project', 'Failed to Run Project {}: {}').format(Path(self._project_path).name, e))
-
-
-class AddObjectCommand(QUndoCommand):
-    def __init__(self, game_manager, parent_uuid, object_tree_struct, inserted_pos, description=''):
-        super().__init__(description)
-        self._game_manager = game_manager
-        self._parent_uuid = parent_uuid
-        self._object_tree_struct = object_tree_struct
-        self._inserted_pos = inserted_pos
-
-    def redo(self):
-        self._game_manager.add_object_tree_struct(self._parent_uuid, self._object_tree_struct, self._inserted_pos)
-
-    def undo(self):
-        self._game_manager.delete_object_tree_struct(list(self._object_tree_struct.keys())[0])
-
-
-class DeleteObjectCommand(QUndoCommand):
-    def __init__(self, game_manager, parent_uuid, object_tree_struct, inserted_pos, description=''):
-        super().__init__(description)
-        self._game_manager = game_manager
-        self._parent_uuid = parent_uuid
-        self._object_tree_struct = object_tree_struct
-        self._inserted_pos = inserted_pos
-
-    def redo(self):
-        self._game_manager.delete_object_tree_struct(list(self._object_tree_struct.keys())[0])
-
-    def undo(self):
-        self._game_manager.add_object_tree_struct(self._parent_uuid, self._object_tree_struct, self._inserted_pos)
-
-
-class UpdateAttrValueCommand(QUndoCommand):
-    def __init__(self, game_manager, obj, attr, old_value, new_value, descripton=''):
-        super().__init__(descripton)
-        self._game_manager = game_manager
-        self._obj = obj
-        self._attr = attr
-        self._old_value = old_value
-        self._new_value = new_value
-
-    def redo(self):
-        setattr(self._obj, self._attr, self._new_value)
-        self._emit_signal(self._attr, self._new_value)
-
-    def undo(self):
-        setattr(self._obj, self._attr, self._old_value)
-        self._emit_signal(self._attr, self._old_value)
-
-    def _emit_signal(self, attr, value):
-        if attr == 'name':
-            self._game_manager.object_renamed.emit(self._obj.uuid)
-        elif attr == 'is_visible':
-            if self._new_value == True:
-                self._game_manager.object_showed.emit(self._obj.uuid)  
-            else:
-                self._game_manager.object_hidden.emit(self._obj.uuid)
-        elif attr == 'pos':
-            self._game_manager.object_moved.emit(self._obj.uuid)
-        elif attr == 'size':
-            self._game_manager.object_resized.emit(self._obj.uuid)
-        elif attr == 'scale':
-            self._game_manager.object_scaled.emit(self._obj.uuid)
-        elif attr == 'angle':
-            self._game_manager.object_rotated.emit(self._obj.uuid)
-        elif attr == 'color':
-            self._game_manager.object_color_changed.emit(self._obj.uuid)
-        elif attr=='border_top_left_radius' or attr=='border_top_right_radius' or attr=='border_bottom_left_radius' or attr=='border_bottom_right_radius':
-            self._game_manager.object_rect_border_radius_changed.emit(self._obj.uuid, attr)
-        elif attr == 'start_point':
-            self._game_manager.object_line_start_point_changed.emit(self._obj.uuid)
-        elif attr == 'end_point':
-            self._game_manager.object_line_end_point_changed.emit(self._obj.uuid)
-        elif attr == 'thickness':
-            self._game_manager.object_line_thickness_changed.emit(self._obj.uuid)
-        elif attr == 'text':
-            self._game_manager.object_text_changed.emit(self._obj.uuid)
-        elif attr == 'font_size':
-            self._game_manager.object_font_size_changed.emit(self._obj.uuid)
-        elif attr == 'font_family':
-            self._game_manager.object_font_family_changed.emit(self._obj.uuid)
-        elif attr == 'is_bold':
-            self._game_manager.object_bold_state_changed.emit(self._obj.uuid)
-        elif attr == 'is_italic':
-            self._game_manager.object_italic_state_changed.emit(self._obj.uuid)
-        elif attr == 'is_underline':
-            self._game_manager.object_underline_state_changed.emit(self._obj.uuid)
-        elif attr == 'is_strikethrough':
-            self._game_manager.object_strikethrough_state_changed.emit(self._obj.uuid)
-        elif attr == 'image_path':
-            self._game_manager.object_image_path_changed.emit(self._obj.uuid)
-        elif attr == 'font_path':
-            self._game_manager.object_font_path_changed.emit(self._obj.uuid)

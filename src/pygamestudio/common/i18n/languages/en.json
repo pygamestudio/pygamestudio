@@ -88,7 +88,8 @@
         "rect": "Rect",
         "ellipse": "Ellipse",
         "text": "Text",
-        "image": "Image"
+        "image": "Image",
+        "button": "Button"
     },
 
     "gm": {

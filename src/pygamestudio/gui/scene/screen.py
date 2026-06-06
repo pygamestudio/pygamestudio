@@ -83,9 +83,10 @@ class PygameScreen(QWidget):
         self._game_manager.delete(selected_uuids)
     
     def _on_object_deleted(self, object_uuid):
-        if object_uuid == self._move_gizmo.get_object().uuid:
+        move_gizmo_object = self._move_gizmo.get_object()
+        if not move_gizmo_object or not self._game_manager.get_object(move_gizmo_object.uuid):
             self._move_gizmo.hide()
-        
+            
         self._update_scene()
 
     def _on_object_selected(self, object_uuid):
@@ -99,7 +100,7 @@ class PygameScreen(QWidget):
         self._update_scene()
 
     def _on_object_deselected(self, object_uuid):
-        if object_uuid == self._move_gizmo.get_object().uuid:
+        if self._move_gizmo.get_object() and self._move_gizmo.get_object().uuid == object_uuid:
             self._move_gizmo.hide()
         self._update_scene()
 
@@ -138,10 +139,11 @@ class PygameScreen(QWidget):
 
         _update(self._game_manager.all_object_tree_struct, self._screen_surface)
         self.update()
+        self._move_gizmo.update()
 
     def _convert_screen_surface_to_qimage(self, surface):
         # surarray.shape returns (width, height, depth). However, QImage expects (height, width, depth).
-        # Thats why we need to swap width and height and transform the image here.
+        # That's why we need to swap width and height and transform the image here.
         surarray = pygame.surfarray.pixels3d(surface)
         img_width, img_height, img_depth = surarray.shape
         img = QImage(surarray.tobytes(), img_height, img_width, img_height * img_depth, QImage.Format.Format_RGB888)
@@ -215,18 +217,22 @@ class PygameScreen(QWidget):
 
     def update_selection_by_rubber_band(self, rect_pyside6):
         def _set(object_tree_struct, rect_pyside6):
+            key = list(object_tree_struct.keys())[0]
             value = list(object_tree_struct.values())[0]
+
+            for child_object_tree_struct in value['children']:
+                _set(child_object_tree_struct, rect_pyside6)
 
             rect_pygame = pygame.FRect(rect_pyside6.x(), rect_pyside6.y(), rect_pyside6.width(), rect_pyside6.height())
             if value['object'].check_rect_collision(rect_pygame):
                 self._game_manager.select(value['object'].uuid)
             else:
                 self._game_manager.deselect(value['object'].uuid)
-
-            for child_object_tree_struct in value['children']:
-                _set(child_object_tree_struct, rect_pyside6)
-            
-        _set(self._game_manager.all_object_tree_struct, rect_pyside6)
+        
+        self._game_manager.select(self._game_manager.canvas_object_uuid)
+        value = list(self._game_manager.all_object_tree_struct.values())[0]
+        for child_object_tree_struct in value['children']:
+            _set(child_object_tree_struct, rect_pyside6)
 
     def is_dragging_by_move_gizmo(self):
         return self._move_gizmo.is_dragging
@@ -245,13 +251,13 @@ class PygameScreen(QWidget):
 
         # if QGraphicsView is being dragged, PygameWidget won't receive mouse event.
         if obj == self and self._scene and not self._scene.views()[0].is_dragging():
-            if event.type() == event.Type.MouseButtonPress:
+            if event.type() == event.Type.MouseButtonPress and event.button() == Qt.MouseButton.LeftButton:
                 self._on_mouse_left_button_pressed(event)
                 return True
-            elif event.type() == event.Type.MouseMove:
+            elif event.type() == event.Type.MouseMove and event.buttons() == Qt.MouseButton.LeftButton:
                 self._on_mouse_move(event)
                 return True
-            elif event.type() == event.Type.MouseButtonRelease:
+            elif event.type() == event.Type.MouseButtonRelease and event.button() == Qt.MouseButton.LeftButton:
                 self._on_mouse_left_button_released(event)
                 return True
         return super().eventFilter(obj, event)

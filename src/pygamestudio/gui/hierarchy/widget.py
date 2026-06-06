@@ -57,12 +57,14 @@ class AddItemButton(QPushButton):
         add_ellipse_action = QAction(T.tr('item.ellipse', 'Ellipse'), self)
         add_text_action = QAction(T.tr('item.text', 'Text'), self)
         add_image_action = QAction(T.tr('item.image', 'Image'), self)
+        add_button_action = QAction(T.tr('item.button', 'Button'), self)
 
         add_line_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_LINE))
         add_rect_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_RECT))
         add_ellipse_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_ELLIPSE))
         add_text_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_TEXT))
         add_image_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_IMAGE))
+        add_button_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_BUTTON))
 
         add_shape_sub_menu = QMenu(title=T.tr('item.shape', 'Shape'), parent=self)
         add_ui_sub_menu = QMenu(title='UI', parent=self)
@@ -74,6 +76,7 @@ class AddItemButton(QPushButton):
         add_shape_sub_menu.addAction(add_ellipse_action)
         add_ui_sub_menu.addAction(add_text_action)
         add_ui_sub_menu.addAction(add_image_action)
+        add_ui_sub_menu.addAction(add_button_action)
 
         menu.exec(self.mapToGlobal(pos))
 
