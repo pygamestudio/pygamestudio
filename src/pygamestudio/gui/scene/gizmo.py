@@ -50,6 +50,9 @@ class MoveGizmo(QWidget):
         self._update_pos()
         self.show()
 
+    def remove_object(self):
+        self._current_object = None
+
     def get_object(self):
         return self._current_object
 

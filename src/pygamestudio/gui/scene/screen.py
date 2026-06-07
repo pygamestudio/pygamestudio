@@ -81,10 +81,11 @@ class PygameScreen(QWidget):
         # Delete all selected objects.
         selected_uuids = self._game_manager.get_selected_objects_uuids()
         self._game_manager.delete(selected_uuids)
-    
+
     def _on_object_deleted(self, object_uuid):
         move_gizmo_object = self._move_gizmo.get_object()
         if not move_gizmo_object or not self._game_manager.get_object(move_gizmo_object.uuid):
+            self._move_gizmo.remove_object()
             self._move_gizmo.hide()
             
         self._update_scene()
@@ -101,6 +102,7 @@ class PygameScreen(QWidget):
 
     def _on_object_deselected(self, object_uuid):
         if self._move_gizmo.get_object() and self._move_gizmo.get_object().uuid == object_uuid:
+            self._move_gizmo.remove_object()
             self._move_gizmo.hide()
         self._update_scene()
 

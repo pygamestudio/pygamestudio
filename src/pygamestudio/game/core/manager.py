@@ -406,6 +406,11 @@ class GameManager(QObject):
         
         if not parent_object_tree_struct:
             parent_object_tree_struct = self._all_object_tree_struct
+
+        # self._all_object_tree_struct is {} when a new scene is loaded.
+        if not parent_object_tree_struct:
+            return None
+        
         return _get(object_uuid, parent_object_tree_struct)
     
     def _get_inserted_pos(self, object_uuid, parent_object_tree_struct=None):
