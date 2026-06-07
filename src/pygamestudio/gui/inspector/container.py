@@ -15,11 +15,17 @@ from pygamestudio.gui.inspector.layout.button import INSPECTOR_LAYOUT_BUTTON
 
 
 class Container(QFrame):
+    selection_history_changed = Signal(int, int)
+    selection_index_changed = Signal(int, int)
+
     def __init__(self, parent, game_manager):
         super().__init__(parent)
         self._inspector_window = parent
         self._game_manager = game_manager
-
+        
+        self._is_selected_from_inspector = False
+        self._current_selected_object_uuid_index = -1
+        self._selected_objects_uuids_in_history = []
         self._container_layout = QGridLayout(self)
         self._object_uuid_in_inspection = None
         self._container_row = 0
@@ -37,6 +43,8 @@ class Container(QFrame):
 
     def _set_signal(self):
         T.add_observer(self)
+        self._game_manager.scene_loaded_signal.connect(self._on_scene_loaded)
+
         # self._game_manager.object_added.connect(self._on_object_added)
         self._game_manager.object_deleted.connect(self._on_object_deleted)
         self._game_manager.object_selected.connect(self._on_object_selected)
@@ -64,8 +72,8 @@ class Container(QFrame):
         self.setObjectName('inspectorContainer')
 
     def get_ready_for_project(self):
-        ...
-        
+        self._clear_selection_history()
+
     def clean_up(self):
         self._object_uuid_in_inspection = None
         self._container_row = 0
@@ -170,7 +178,10 @@ class Container(QFrame):
     def set_object_font_path(self):
         lineedit = self._find_widget(self._container_layout, 'font_path')
         self._game_manager.set_font_path(self._object_uuid_in_inspection, lineedit.toolTip())
-        
+    
+    def _on_scene_loaded(self):
+        self._clear_selection_history()
+
     def _on_object_added(self, parent_uuid, object_uuid, inserted_pos):
         # Object will be selected when added, and it will be inspected in slot _on_object_selected.
         # self._inspect_object(object_uuid)
@@ -178,9 +189,15 @@ class Container(QFrame):
 
     def _on_object_deleted(self, object_uuid):
         self._clear_layout(self._container_layout)
+        self._update_selection_history(object_uuid, action='delete')
 
     def _on_object_selected(self, object_uuid):
         self._inspect_object(object_uuid)
+
+        if not self._is_selected_from_inspector:
+            self._update_selection_history(object_uuid, action='add')
+
+        self._is_selected_from_inspector = False
 
     def _on_object_deselected(self, object_uuid):
         ...
@@ -415,6 +432,43 @@ class Container(QFrame):
                 self._container_layout.addWidget(w, self._container_row+row, column, 1, column_stretch)
 
             self._container_row += row+1
+
+    def _clear_selection_history(self):
+        self._current_selected_object_uuid_index = -1
+        self._selected_objects_uuids_in_history = []
+        self.selection_history_changed.emit(len(self._selected_objects_uuids_in_history), self._current_selected_object_uuid_index)
+
+    def _update_selection_history(self, object_uuid, action='add'):
+        if action == 'add':
+            if not self._selected_objects_uuids_in_history or object_uuid != self._selected_objects_uuids_in_history[-1]:
+                self._selected_objects_uuids_in_history.append(object_uuid)
+                self._current_selected_object_uuid_index = len(self._selected_objects_uuids_in_history) - 1
+                self.selection_history_changed.emit(len(self._selected_objects_uuids_in_history), self._current_selected_object_uuid_index)
+        else:
+            if self._selected_objects_uuids_in_history and object_uuid in self._selected_objects_uuids_in_history:
+                self._selected_objects_uuids_in_history = [ele for ele in self._selected_objects_uuids_in_history if ele!=object_uuid]
+                self._current_selected_object_uuid_index = len(self._selected_objects_uuids_in_history) - 1
+                self.selection_history_changed.emit(len(self._selected_objects_uuids_in_history), self._current_selected_object_uuid_index)
+
+    def select_previous_object(self):
+        self._current_selected_object_uuid_index -= 1
+        if self._current_selected_object_uuid_index <= 0:
+            self._current_selected_object_uuid_index = 0
+
+        self._is_selected_from_inspector = True
+        self._game_manager.deselect_all()
+        self._game_manager.select(self._selected_objects_uuids_in_history[self._current_selected_object_uuid_index])
+        self.selection_index_changed.emit(len(self._selected_objects_uuids_in_history), self._current_selected_object_uuid_index)
+
+    def select_next_object(self):
+        self._current_selected_object_uuid_index += 1
+        if self._current_selected_object_uuid_index >= len(self._selected_objects_uuids_in_history) - 1:
+            self._current_selected_object_uuid_index = len(self._selected_objects_uuids_in_history) - 1
+
+        self._is_selected_from_inspector = True
+        self._game_manager.deselect_all()
+        self._game_manager.select(self._selected_objects_uuids_in_history[self._current_selected_object_uuid_index])
+        self.selection_index_changed.emit(len(self._selected_objects_uuids_in_history), self._current_selected_object_uuid_index)
 
     def retranslate(self):
         self._inspect_object(self._object_uuid_in_inspection)
