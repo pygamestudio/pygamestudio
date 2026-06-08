@@ -56,6 +56,7 @@ class GameManager(QObject):
         super().__init__()
         self._is_cut = False
         self._project_path = ''
+        self._is_loading_scene = False
         self._current_scene_file_path = ''
         self._is_current_scene_saved = True
         self._current_canvas_object_uuid = ''
@@ -137,12 +138,13 @@ class GameManager(QObject):
             inserted_pos = -1
             self._undo_stack.push(AddObjectCommand(self, parent_uuid, object_tree_struct, inserted_pos))
 
-            child_text_object, child_text_object_tree_struct = self._new_object(OBJECT_TEXT, {})
-            child_text_object.pos = (20, 0)
-            child_text_object.color = '#000000'
-            self._add_object_tree_struct(obj.uuid, child_text_object_tree_struct)
-            self.deselect_all()
-            self.select(obj.uuid)
+            if not self._is_loading_scene:
+                child_text_object, child_text_object_tree_struct = self._new_object(OBJECT_TEXT, {})
+                child_text_object.pos = (20, 0)
+                child_text_object.color = '#000000'
+                self._add_object_tree_struct(obj.uuid, child_text_object_tree_struct)
+                self.deselect_all()
+                self.select(obj.uuid)
 
         else:
             inserted_pos = -1
@@ -798,13 +800,13 @@ class GameManager(QObject):
             
             elif choice == QMessageBox.StandardButton.Yes:
                 self._save_scene()
-
+        
+        self._is_loading_scene = True
         if self._current_canvas_object_uuid:
             self._delete_object_tree_struct(self._current_canvas_object_uuid)
 
         self._current_scene_file_path = current_scene_file_path
         set_current_scene_to_project_config(current_scene_file_path)
-        self.scene_loaded_signal.emit()
 
         if not current_scene_file_path or not Path(current_scene_file_path).exists():
             data = {}
@@ -830,6 +832,9 @@ class GameManager(QObject):
 
         _l('', data)
         self._undo_stack.clear()
+        self.scene_loaded_signal.emit()
+
+        self._is_loading_scene = False
         self._is_current_scene_saved = True
 
     def is_empty(self):
