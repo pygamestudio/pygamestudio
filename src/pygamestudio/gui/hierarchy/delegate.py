@@ -71,7 +71,7 @@ class HierarchyTreeViewDelegate(QStyledItemDelegate):
             item = self._standard_model.itemFromIndex(self._proxy_model.mapToSource(index))
             if item and self._is_click_on_eye_pixmap(event.pos(), option.rect):
                 self._tree_view.toggle_item_visibility(item)
-                return True
+                return False
 
         # Increate hovered item's size.
         elif event.type() == QMouseEvent.Type.MouseMove:
