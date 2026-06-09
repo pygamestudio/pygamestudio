@@ -597,7 +597,7 @@ class GameManager(QObject):
 
             object_tree_struct = self._get_object_tree_struct(object_uuid)
             self._clipboard_content.append(object_tree_struct)
-
+        
         self.object_copied.emit()
 
     def paste(self, parent_uuid):
@@ -658,14 +658,14 @@ class GameManager(QObject):
             new_uuid = str(uuid.uuid4())
             object_data['uuid'] = new_uuid
             new_object_tree_struct[new_uuid] = {
-                'object': self._new_object(obj.type, object_data),
+                'object': self._new_object(obj.type, object_data)[0],
                 'children': [self._deep_copy_object_tree_struct(child_object_tree_struct, is_new_uuid) for child_object_tree_struct in value['children']]
             }
         else:
             obj = value['object']
             object_data = obj.get_data()
             new_object_tree_struct[key] = {
-                'object': self._new_object(obj.type, object_data),
+                'object': self._new_object(obj.type, object_data)[0],
                 'children': [self._deep_copy_object_tree_struct(child_object_tree_struct, is_new_uuid) for child_object_tree_struct in value['children']]
             }
 

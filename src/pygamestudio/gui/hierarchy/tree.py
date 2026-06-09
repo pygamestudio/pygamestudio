@@ -188,7 +188,6 @@ class HierarchyTreeView(QTreeView):
     
     def _on_object_added(self, parent_uuid, object_uuid, inserted_pos):
         obj = self._game_manager.get_object(object_uuid)
-
         if obj.type == OBJECT_CANVAS:
             self._on_canvas_object_added(obj)
         else:
