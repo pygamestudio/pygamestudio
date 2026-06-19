@@ -29,7 +29,7 @@ class ObjectImage(ObjectBase):
             'scale_y': 1,
             'scale': (1, 1),
             'angle': 0,
-            'color': '#ffffff',
+            'color': (255, 255, 255, 255),
             'is_visible': True,
             'image_path': './image/logo.png',
             # 'keep_aspect_ratio': False,
@@ -53,7 +53,6 @@ class ObjectImage(ObjectBase):
             self.surface = pygame.image.load(image_absolute_path).convert(self.surface)
 
         self.surface = pygame.transform.scale(self.surface, self.size)
-
         # if self.keep_aspect_ratio:
         #     self.surface = self._fit_aspect_ratio(self.surface, self.size)
         # else:
@@ -92,12 +91,9 @@ class ObjectImage(ObjectBase):
         scaled_surface = pygame.transform.scale(self.surface, scaled_size)
         rounded_surface = self._apply_border_radius(scaled_surface)
         rotated_surface = pygame.transform.rotate(rounded_surface, self.angle)
-        self.surface = rotated_surface
+        self.surface = self._apply_alpha(rotated_surface)
 
-        self.surface.fill(self.color, special_flags=pygame.BLEND_RGBA_MULT)
-
-        if not self._is_for_api and self.is_selected:
-            pygame.draw.rect(self.surface, (0, 122, 204), self.surface.get_rect(), width=2)
+        self.surface.fill(self.color[0:3], special_flags=pygame.BLEND_RGBA_MULT)
 
     def __setattr__(self, name, value):
         if not hasattr(self, '_is_initialized') or not self._is_initialized:

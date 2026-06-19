@@ -23,6 +23,9 @@ class ObjectBase:
 
     def draw(self, parent_surface):
         parent_surface.blit(self.surface, self.get_rect())
+        if not self._is_for_api and self.is_selected:
+            pygame.draw.rect(parent_surface, (0, 122, 204), self.get_rect(), width=2)
+
 
     def get_surface(self):
         return self.surface
@@ -75,6 +78,20 @@ class ObjectBase:
             key: value for key, value in self.__dict__.items() 
             if key not in exclude_fields
         }
+    
+    def _apply_alpha(self, surface):
+        if len(self.color) < 4:
+            alpha = 255
+        else:
+            alpha = self.color[-1]
+        
+        if alpha > 255:
+            alpha = 255
+        elif alpha < 0:
+            alpha = 0
+            
+        surface.set_alpha(alpha)
+        return surface
     
     def __setattr__(self, name, value):
         if not hasattr(self, '_is_initialized') or not self._is_initialized:

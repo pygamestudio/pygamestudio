@@ -3,17 +3,19 @@ from pygamestudio.common.i18n.translator import Translator as T
 
 
 class ColorPicker(QPushButton):
-    def __init__(self, inspector_container, color_hex='#ffffff', attr=''):
+    def __init__(self, inspector_container, color_rgba=(255, 255, 255, 255), attr=''):
         super().__init__()
         self._inspector_container = inspector_container
-        self.set_color(color_hex)
+        self._current_color_rgba = color_rgba
+        self.set_color(color_rgba)
 
         self.clicked.connect(self._on_color_picker_clicked)
 
-    def set_color(self, color_hex):
+    def set_color(self, color_rgba):
+        self._current_color_rgba = color_rgba
         self.setStyleSheet(f"""
         QPushButton {{
-            background-color: {color_hex};
+            background-color: rgba{color_rgba[0], color_rgba[1], color_rgba[2], round(color_rgba[-1]/255, 1)};
             border: 2px solid #3c3c3c;
             border-radius: 5px;
         }}
@@ -24,6 +26,4 @@ class ColorPicker(QPushButton):
         """)
     
     def _on_color_picker_clicked(self):
-        color = QColorDialog.getColor(title=T.tr('inspector.select_color'), parent=QApplication.activeWindow())
-        if color.isValid():
-            self._inspector_container.set_object_color(color.name())
+        self._inspector_container.show_color_picker(self._current_color_rgba)

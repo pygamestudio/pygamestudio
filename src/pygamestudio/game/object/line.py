@@ -26,7 +26,7 @@ class ObjectLine(ObjectBase):
             'scale_y': 1,
             'scale': (1, 1),
             'angle': 0,
-            'color': '#ffffff',
+            'color': (255, 255, 255, 255),
             'is_visible': True,
             'thickness': 2,
             'start_x': 20,
@@ -60,15 +60,12 @@ class ObjectLine(ObjectBase):
         self._update_bounding_box()
 
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
-        pygame.draw.line(self.surface, self.color, (0, 0), (self.surface.width-self.thickness, self.surface.height-self.thickness), width=self.thickness)
+        pygame.draw.line(self.surface, self.color[0:3], (0, 0), (self.surface.width-self.thickness, self.surface.height-self.thickness), width=self.thickness)
         
         scaled_size = (self.surface.width * self.scale_x, self.surface.height * self.scale_y)
         scaled_surface = pygame.transform.scale(self.surface, scaled_size)
         rotated_surface = pygame.transform.rotate(scaled_surface, self.angle)
-        self.surface = rotated_surface
-
-        if not self._is_for_api and self.is_selected:
-            pygame.draw.rect(self.surface, (0, 122, 204), self.surface.get_rect(), width=2)
+        self.surface = self._apply_alpha(rotated_surface)
 
     def __setattr__(self, name, value):
         if not hasattr(self, '_is_initialized') or not self._is_initialized:

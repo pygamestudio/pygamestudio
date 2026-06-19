@@ -26,7 +26,7 @@ class ObjectEllipse(ObjectBase):
             'scale_y': 1,
             'scale': (1, 1),
             'angle': 0,
-            'color': '#ffffff',
+            'color': (255, 255, 255, 255),
             'is_visible': True,
         }
 
@@ -38,12 +38,9 @@ class ObjectEllipse(ObjectBase):
 
     def update_surface(self):
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
-        pygame.draw.ellipse(self.surface, self.color, self.surface.get_rect())
+        pygame.draw.ellipse(self.surface, self.color[0:3], self.surface.get_rect())
         
         scaled_size = (self.surface.width * self.scale_x, self.surface.height * self.scale_y)
         scaled_surface = pygame.transform.scale(self.surface, scaled_size)
         rotated_surface = pygame.transform.rotate(scaled_surface, self.angle)
-        self.surface = rotated_surface
-
-        if not self._is_for_api and self.is_selected:
-            pygame.draw.rect(self.surface, (0, 122, 204), self.surface.get_rect(), 2)
+        self.surface = self._apply_alpha(rotated_surface)

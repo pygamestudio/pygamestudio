@@ -1,5 +1,6 @@
 import uuid
 import pygame
+import pygame.freetype
 from pathlib import Path
 from pygamestudio.game.object.type import *
 from pygamestudio.game.object.base import ObjectBase
@@ -28,7 +29,7 @@ class ObjectText(ObjectBase):
             'scale_y': 1,
             'scale': (1, 1),
             'angle': 0,
-            'color': "#ffffff",
+            'color': (255, 255, 255, 255),
             'is_visible': True,
             'text': 'Text',
             'font_size': 30,
@@ -63,14 +64,11 @@ class ObjectText(ObjectBase):
         text = font.render(self.text, True, self.color)
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
         self.surface.blit(text, text.get_rect(center=(self.surface.width//2, self.surface.height//2)))
-        
+
         scaled_size = (self.surface.width * self.scale_x, self.surface.height * self.scale_y)
         scaled_surface = pygame.transform.scale(self.surface, scaled_size)
         rotated_surface = pygame.transform.rotate(scaled_surface, self.angle)
-        self.surface = rotated_surface
-        
-        if not self._is_for_api and self.is_selected:
-            pygame.draw.rect(self.surface, (0, 122, 204), self.surface.get_rect(), width=2)
+        self.surface = self._apply_alpha(rotated_surface)
 
     def __setattr__(self, name, value):
         if not hasattr(self, '_is_initialized') or not self._is_initialized:

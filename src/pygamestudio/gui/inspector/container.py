@@ -4,6 +4,7 @@ from PySide6.QtCore import *
 from PySide6.QtWidgets import *
 from pygamestudio.game.object.type import *
 from pygamestudio.common.i18n.translator import Translator as T
+from pygamestudio.gui.inspector.color import ColorPicker
 from pygamestudio.gui.inspector.component.label import PropertyLabel
 from pygamestudio.gui.inspector.layout.rect import INSPECTOR_LAYOUT_RECT
 from pygamestudio.gui.inspector.layout.ellipse import INSPECTOR_LAYOUT_ELLIPSE
@@ -22,6 +23,7 @@ class Container(QFrame):
         super().__init__(parent)
         self._inspector_window = parent
         self._game_manager = game_manager
+        self._color_picker = ColorPicker()
         
         self._is_selected_from_inspector = False
         self._current_selected_object_uuid_index = -1
@@ -43,6 +45,7 @@ class Container(QFrame):
 
     def _set_signal(self):
         T.add_observer(self)
+        self._color_picker.color_changed.connect(self.set_object_color)
         self._game_manager.scene_loaded_signal.connect(self._on_scene_loaded)
 
         # self._game_manager.object_added.connect(self._on_object_added)
@@ -79,6 +82,7 @@ class Container(QFrame):
         self._container_row = 0
         self._max_column = 1
         self._clear_layout(self._container_layout)
+        self._color_picker.close()
 
     def rename_object(self):
         lineedit = self._find_widget(self._container_layout, 'name')
@@ -179,6 +183,30 @@ class Container(QFrame):
         lineedit = self._find_widget(self._container_layout, 'font_path')
         self._game_manager.set_font_path(self._object_uuid_in_inspection, lineedit.toolTip())
     
+    def show_color_picker(self, color_rgba):
+        screen = QApplication.primaryScreen()
+        screen_width = screen.geometry().width()
+        screen_height = screen.geometry().height()
+
+        pos = QCursor.pos()
+        x = pos.x()
+        y = pos.y()
+        if x + self._color_picker.width() > screen_width:
+            x = screen_width - self._color_picker.width()
+        else:
+            x = int(x - self._color_picker.width()/4)
+        
+        if y + self._color_picker.height() > screen_height:
+            y = screen_height - self._color_picker.height()
+        else:
+            y = y + 20
+
+        self._color_picker.set_rgba(color_rgba)
+        self._color_picker.move(x, y)
+        self._color_picker.show()
+        self._color_picker.raise_()
+        self._color_picker.setFocus(Qt.FocusReason.ActiveWindowFocusReason)
+        
     def _on_scene_loaded(self):
         self._clear_selection_history()
 

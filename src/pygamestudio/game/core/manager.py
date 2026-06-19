@@ -141,7 +141,7 @@ class GameManager(QObject):
             if not self._is_loading_scene:
                 child_text_object, child_text_object_tree_struct = self._new_object(OBJECT_TEXT, {})
                 child_text_object.pos = (20, 0)
-                child_text_object.color = '#000000'
+                child_text_object.color = (0, 0, 0, 255)
                 self._add_object_tree_struct(obj.uuid, child_text_object_tree_struct)
                 self.deselect_all()
                 self.select(obj.uuid)

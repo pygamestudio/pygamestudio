@@ -26,7 +26,7 @@ class ObjectCanvas(ObjectBase):
             'scale_y': 1,
             'scale': (1, 1),
             'angle': 0,
-            'color': '#000000',
+            'color': (0, 0, 0, 255),
             'is_visible': True,
         }
         

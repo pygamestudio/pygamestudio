@@ -29,7 +29,7 @@ class ObjectButton(ObjectBase):
             'scale': (1, 1),
             'angle': 0,
             'is_visible': True,
-            'color': "#cccccc",
+            'color': (255, 255, 255, 255),
             'image_path': '',
             'border_top_left_radius': 10,
             'border_top_right_radius': 10,
@@ -70,9 +70,9 @@ class ObjectButton(ObjectBase):
         
         if self.image_path:
             self._load_image()
-            self.surface.fill(self.color, special_flags=pygame.BLEND_RGBA_MULT)
+            self.surface.fill(self.color[0:3], special_flags=pygame.BLEND_RGBA_MULT)
         else:
-            pygame.draw.rect(self.surface, self.color, self.surface.get_rect(), width=0,
+            pygame.draw.rect(self.surface, self.color[0:3], self.surface.get_rect(), width=0,
                          border_radius=-1, border_top_left_radius=self.border_top_left_radius, border_top_right_radius=self.border_top_right_radius,
                          border_bottom_left_radius=self.border_bottom_left_radius, border_bottom_right_radius=self.border_bottom_right_radius)
         
@@ -80,7 +80,7 @@ class ObjectButton(ObjectBase):
         scaled_surface = pygame.transform.scale(self.surface, scaled_size)
         rounded_surface = self._apply_border_radius(scaled_surface)
         rotated_surface = pygame.transform.rotate(rounded_surface, self.angle)
-        self.surface = rotated_surface
+        self.surface = self._apply_alpha(rotated_surface)
 
         if not self._is_for_api and self.is_selected:
             pygame.draw.rect(self.surface, (0, 122, 204), self.surface.get_rect(), width=2)
