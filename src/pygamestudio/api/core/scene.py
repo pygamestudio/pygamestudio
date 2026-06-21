@@ -11,7 +11,7 @@ from pygamestudio.game.object.ellipse import *
 from pygamestudio.game.object.line import *
 from pygamestudio.game.object.image import *
 from pygamestudio.game.object.button import *
-from pygamestudio.api.runtime.config import get_project_config
+from pygamestudio.api.config.project import get_project_config
 from pygamestudio.common.i18n.translator import Translator as T
 
 
@@ -193,6 +193,22 @@ class SceneLoader:
         object_tree_struct = self._get_object_tree_struct_by_uuid(object_uuid)
         return object_tree_struct[object_uuid]['object'] if object_tree_struct else None
     
+    def get_parent_object(self, object_uuid:str):
+        def _get(object_uuid, object_tree_struct):
+            value = list(object_tree_struct.values())[0]
+
+            if object_uuid in [list(child_object_tree_struct.keys())[0] for child_object_tree_struct in value['children']]:
+                return value['object']
+            
+            for child_object_tree_struct in value['children']:
+                result = _get(object_uuid, child_object_tree_struct)
+                if result:
+                    return result
+                
+            return None
+        
+        return _get(object_uuid, self._all_object_tree_struct)
+    
 
 scene_loader = SceneLoader()
 
@@ -204,3 +220,6 @@ def get_object_by_path(object_path:str) -> object:
 
 def get_object_by_uuid(object_uuid:str) -> object:
     return scene_loader.get_object_by_uuid(object_uuid)
+
+def get_parent_object(object_uuid:str) -> object:
+    return scene_loader.get_parent_object(object_uuid)

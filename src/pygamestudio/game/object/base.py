@@ -21,17 +21,19 @@ class ObjectBase:
 
         self.surface = None
 
+    def is_point_collided(self, pos):
+        return True if self.check_click_collision(pos) else False
+
     def draw(self, parent_surface):
         parent_surface.blit(self.surface, self.get_rect())
         if not self._is_for_api and self.is_selected:
             pygame.draw.rect(parent_surface, (0, 122, 204), self.get_rect(), width=2)
 
-
     def get_surface(self):
         return self.surface
 
     def update_surface(self):
-        ...
+        pass
 
     def get_pos(self):
         return self.pos

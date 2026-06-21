@@ -1,36 +1,46 @@
-import os
-import sys
-import pygame
-from pathlib import Path
-from pygamestudio.api.runtime.scene import load_scene
-from pygamestudio.api.runtime.config import get_project_config
+import pygamestudio as studio
 
-# setup pygamestudio project env to get the project config 
-project_path = Path(__file__).parent.resolve().as_posix()
-os.environ['PROJECT_PATH'] = project_path
-project_config = get_project_config()
 
-# pygame setup
-pygame.init()
-pygame.display.set_caption(project_config['caption'])
-screen = pygame.display.set_mode(project_config['screen_size'])
-clock = pygame.time.Clock()
+class Game(studio.Game):
+    def __init__(self):
+        super().__init__()
 
-running = True
-while running:
-    # poll for events
-    # pygame.QUIT event means the user clicked X to close your window
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
+    def on_start(self):
+        """
+        游戏启动生命周期回调。
+        在游戏初始化完成、主循环开始前仅执行一次。
 
-    # load the scene created in pygamestudio
-    # if no scene_path is provided, the default current_scene from the project config will be loaded
-    load_scene(screen)
+        Game startup lifecycle callback.
+        Executes exactly once after the game initialization and before the main loop starts.
+        """
+        pass
 
-    # flip() the display to put your work on screen and limits FPS to 60
-    pygame.display.flip()
-    clock.tick(60)
+    def on_update(self, dt:float):
+        """
+        每帧更新回调，每一帧循环都会执行。
+        :param dt: 距离上一帧的时间（单位：秒）
 
-pygame.quit()
-sys.exit()
+        Per-frame update callback, runs every single frame in the main loop.
+        :param dt: Time elapsed since last frame (in seconds)
+        """
+        screen = studio.get_screen()
+        studio.load_scene(screen)
+        
+        # Get an object by its path or uuid.
+        # obj = studio.get_object_by_path('')
+        # obj = studio.get_object_by_uuid('')
+
+    def on_quit(self):
+        """
+        游戏退出回调。
+        主循环结束后，资源被销毁前执行一次。
+
+        Game exit lifecycle callback.
+        Executes once after the main loop exits and before all resources are released.
+        """
+        pass
+
+
+if __name__ == '__main__':
+    game = Game()
+    game.run()
