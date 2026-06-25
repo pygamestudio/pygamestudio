@@ -197,6 +197,14 @@ class ColorPicker(QWidget):
 
         self._update_color_preview(255, 0, 0, 255)
 
+        self.focusOutEvent = self._on_foucs_out
+        for slider in [self._r_slider, self._g_slider, self._b_slider, self._a_slider]:
+            slider.focusOutEvent = self._on_foucs_out
+        for lineedit in [self._r_lineedit, self._g_lineedit, self._b_lineedit, self._a_lineedit]:
+            lineedit.focusOutEvent = self._on_foucs_out
+
+        self._hex_lineedit.focusOutEvent = self._on_foucs_out
+
     def _set_signal(self):
         self._r_slider.valueChanged.connect(self._on_slider_changed)
         self._g_slider.valueChanged.connect(self._on_slider_changed)
@@ -608,15 +616,13 @@ class ColorPicker(QWidget):
         self._hex_lineedit.setText(hex_color)
         self._hex_lineedit.blockSignals(False)
 
-    def focusOutEvent(self, event):
-        next_focus = QApplication.focusWidget()
-        
-        if next_focus and self.isAncestorOf(next_focus):
-            self.setFocus(Qt.FocusReason.ActiveWindowFocusReason)
-            return super().focusOutEvent(event)
-        
-        self.close()
-        super().focusOutEvent(event)
+    def _on_foucs_out(self, event):
+        pos = QCursor.pos()
+        x = pos.x()
+        y = pos.y()
+
+        if x < self.geometry().x() or y < self.geometry().y() or x > self.geometry().x() + self.geometry().width() or y > self.geometry().y() + self.geometry().height():
+            self.close()
     
     def closeEvent(self, event):
         r = int(self._r_lineedit.text())
@@ -627,7 +633,7 @@ class ColorPicker(QWidget):
         return super().closeEvent(event)
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.LeftButton:       
             self._start_x = event.x()
             self._start_y = event.y()
     
