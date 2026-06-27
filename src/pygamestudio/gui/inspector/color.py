@@ -93,6 +93,8 @@ class ColorPicker(QWidget):
 
     def _set_widget(self):
         self.resize(286, 356)
+        self.setWindowTitle('Pygame Studio')
+        self.setWindowIcon(QIcon(':/images/logo.png'))
         self.setWindowFlag(Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self._central_widget.setStyleSheet("""
@@ -497,7 +499,6 @@ class ColorPicker(QWidget):
         self._current_saturation = saturation
         self._current_value = value
 
-        self._set_rgba((r, g, b, self._current_alpha))
         hex_color = self._rgb2hex(r, g, b, self._current_alpha)
         self._set_hex(hex_color)
         self._update_all_visuals(r, g, b, self._current_alpha, hue, saturation, value)
