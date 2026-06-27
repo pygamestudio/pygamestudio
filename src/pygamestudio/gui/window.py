@@ -313,6 +313,7 @@ class Editor(WindowBase):
 
     def _set_widget(self):
         self.resize(1420, 930)
+        self.setWindowTitle('Pygame Studio')
         self._center()
         self.set_window_body(self._editor_body)
 
