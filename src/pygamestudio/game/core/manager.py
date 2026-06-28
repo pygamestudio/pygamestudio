@@ -654,7 +654,7 @@ class GameManager(QObject):
         
         if is_new_uuid:
             obj = value['object']
-            object_data = obj.get_data()
+            object_data = obj._get_data()
             new_uuid = str(uuid.uuid4())
             object_data['uuid'] = new_uuid
             new_object_tree_struct[new_uuid] = {
@@ -663,7 +663,7 @@ class GameManager(QObject):
             }
         else:
             obj = value['object']
-            object_data = obj.get_data()
+            object_data = obj._get_data()
             new_object_tree_struct[key] = {
                 'object': self._new_object(obj.type, object_data)[0],
                 'children': [self._deep_copy_object_tree_struct(child_object_tree_struct, is_new_uuid) for child_object_tree_struct in value['children']]
@@ -759,8 +759,8 @@ class GameManager(QObject):
         self.scene_saved_signal.emit()
 
         def _default(obj):
-            if hasattr(obj, 'to_dict'):
-                return obj.to_dict()
+            if hasattr(obj, '_to_dict'):
+                return obj._to_dict()
             raise TypeError(f'Object of type {obj.__class__.__name__} is not JSON serializable')
     
         with open(self._current_scene_file_path, 'w', encoding='utf-8') as f:

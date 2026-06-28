@@ -40,7 +40,31 @@ class ObjectRect(ObjectBase):
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
         self._is_initialized = True
 
-    def update_surface(self):
+    def get_border_top_left_radius(self) -> int:
+        return self.border_top_left_radius
+
+    def get_border_top_right_radius(self) -> int:
+        return self.border_top_right_radius
+    
+    def get_border_bottom_left_radius(self) -> int:
+        return self.border_bottom_left_radius 
+
+    def get_border_bottom_right_radius(self) -> int:
+        return self.border_bottom_right_radius
+    
+    def set_border_top_left_radius(self,  radius:int):
+        self.border_top_left_radius = radius
+
+    def set_border_top_right_radius(self,  radius:int):
+        self.border_top_right_radius = radius
+    
+    def set_border_bottom_left_radius(self,  radius:int):
+        self.border_bottom_left_radius = radius
+
+    def set_border_bottom_right_radius(self,  radius:int):
+        self.border_top_right_radius = radius
+
+    def _update_surface(self):
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
         pygame.draw.rect(self.surface, self.color[0:3], self.surface.get_rect(), width=0,
                          border_radius=-1, border_top_left_radius=self.border_top_left_radius, border_top_right_radius=self.border_top_right_radius,

@@ -114,13 +114,13 @@ class SceneLoader:
         def _update(object_tree_struct, parent_surface):
             value = list(object_tree_struct.values())[0]
             obj = value['object']
-            obj.update_surface()
+            obj._update_surface()
             
             if obj.is_visible:
                 for child_object_tree_struct in value['children']:
-                    _update(child_object_tree_struct, obj.get_surface())
+                    _update(child_object_tree_struct, obj._get_surface())
 
-                obj.draw(parent_surface)
+                obj._draw(parent_surface)
 
         _update(self._all_object_tree_struct, screen_surface)
 

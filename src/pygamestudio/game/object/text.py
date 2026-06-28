@@ -46,6 +46,60 @@ class ObjectText(ObjectBase):
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
         self._is_initialized = True
 
+    def is_bold(self):
+        return self.is_bold
+
+    def is_italic(self):
+        return self.is_italic
+    
+    def is_underline(self):
+        return self.is_underline
+    
+    def is_strikethrough(self):
+        return self.is_strikethrough
+    
+    def get_text(self) -> str:
+        return self.text
+
+    def get_font_size(self) -> int:
+        return self.font_size
+
+    def get_font_path(self) -> str:
+        return self.font_path
+    
+    def get_bold(self):
+        return self.is_bold
+
+    def get_italic(self):
+        return self.is_italic
+    
+    def get_underline(self):
+        return self.is_underline
+    
+    def get_strikethrough(self):
+        return self.is_strikethrough
+    
+    def set_text(self, text:str):
+        self.text = text
+
+    def set_font_size(self, font_size:int):
+        self.font_size = font_size
+
+    def set_font_path(self, font_path:str):
+        self.font_path = font_path
+
+    def set_bold(self, is_bold:bool):
+        self.is_bold = is_bold
+
+    def set_italic(self, is_italic:bool):
+        self.is_italic = is_italic
+    
+    def set_underline(self, is_underline:bool):
+        self.is_underline = is_underline
+    
+    def set_strikethrough(self, is_strikethrough:bool):
+        self.is_strikethrough = is_strikethrough
+    
     def _init_font(self):
         font_absolute_path = Path(get_project_path()) / self.font_path
         if self.font_path == '' or not font_absolute_path:
@@ -59,7 +113,7 @@ class ObjectText(ObjectBase):
         font.set_strikethrough(self.is_strikethrough)
         return font
     
-    def update_surface(self):
+    def _update_surface(self):
         font = self._init_font()
         text = font.render(self.text, True, self.color)
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)

@@ -61,7 +61,7 @@ class MoveGizmo(QWidget):
             return
         
         object_hightlight_line_width = 2
-        self.move(round(self._current_object.get_world_rect().x)-self._offset_x-object_hightlight_line_width, round(self._current_object.get_world_rect().y)-self._offset_y-object_hightlight_line_width)
+        self.move(round(self._current_object._get_world_rect().x)-self._offset_x-object_hightlight_line_width, round(self._current_object._get_world_rect().y)-self._offset_y-object_hightlight_line_width)
 
     def update_pos(self):
         return self._update_pos()

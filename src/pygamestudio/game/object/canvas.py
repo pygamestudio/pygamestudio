@@ -37,7 +37,7 @@ class ObjectCanvas(ObjectBase):
         pygame.draw.rect(self.surface, self.color, self.surface.get_rect())
         self._is_initialized = True
 
-    def update_surface(self):
+    def _update_surface(self):
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
         pygame.draw.rect(self.surface, self.color, self.surface.get_rect())
         if not self._is_for_api and self.is_selected:

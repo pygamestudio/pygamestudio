@@ -26,6 +26,7 @@ class Game(studio.Game):
         screen = studio.get_screen()
         studio.load_scene(screen)
         
+        # 可通过路径或uuid获取对象。
         # Get an object by its path or uuid.
         # obj = studio.get_object_by_path('')
         # obj = studio.get_object_by_uuid('')

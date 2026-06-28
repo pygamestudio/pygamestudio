@@ -131,13 +131,13 @@ class PygameScreen(QWidget):
         def _update(object_tree_struct, parent_surface):
             value = list(object_tree_struct.values())[0]
             obj = value['object']
-            obj.update_surface()
+            obj._update_surface()
             
             if obj.is_visible:
                 for child_object_tree_struct in value['children']:
-                    _update(child_object_tree_struct, obj.get_surface())
+                    _update(child_object_tree_struct, obj._get_surface())
 
-                obj.draw(parent_surface)
+                obj._draw(parent_surface)
 
         _update(self._game_manager.all_object_tree_struct, self._screen_surface)
         self.update()
@@ -191,7 +191,7 @@ class PygameScreen(QWidget):
                 if self._final_selected_object:
                     return
                 
-            if value['object'].type != OBJECT_CANVAS and value['object'].check_click_collision((pos.x(), pos.y())):
+            if value['object'].type != OBJECT_CANVAS and value['object']._check_click_collision((pos.x(), pos.y())):
                 self._final_selected_object = value['object']
 
         _set(self._game_manager.all_object_tree_struct, pos)
@@ -226,7 +226,7 @@ class PygameScreen(QWidget):
                 _set(child_object_tree_struct, rect_pyside6)
 
             rect_pygame = pygame.FRect(rect_pyside6.x(), rect_pyside6.y(), rect_pyside6.width(), rect_pyside6.height())
-            if value['object'].check_rect_collision(rect_pygame):
+            if value['object']._check_rect_collision(rect_pygame):
                 self._game_manager.select(value['object'].uuid)
             else:
                 self._game_manager.deselect(value['object'].uuid)

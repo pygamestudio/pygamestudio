@@ -43,6 +43,36 @@ class ObjectButton(ObjectBase):
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
         self._is_initialized = True
 
+    def get_image_path(self) -> str:
+        return self.image_path
+
+    def get_border_top_left_radius(self) -> int:
+        return self.border_top_left_radius
+
+    def get_border_top_right_radius(self) -> int:
+        return self.border_top_right_radius
+    
+    def get_border_bottom_left_radius(self) -> int:
+        return self.border_bottom_left_radius 
+
+    def get_border_bottom_right_radius(self) -> int:
+        return self.border_bottom_right_radius
+    
+    def set_image_path(self, image_path:str):
+        self.image_path = image_path
+
+    def set_border_top_left_radius(self,  radius:int):
+        self.border_top_left_radius = radius
+
+    def set_border_top_right_radius(self,  radius:int):
+        self.border_top_right_radius = radius
+    
+    def set_border_bottom_left_radius(self,  radius:int):
+        self.border_bottom_left_radius = radius
+
+    def set_border_bottom_right_radius(self,  radius:int):
+        self.border_top_right_radius = radius
+    
     def _load_image(self):
         image_absolute_path = Path(get_project_path()) / self.image_path
         if self.image_path == '' or not image_absolute_path.exists():
@@ -65,7 +95,7 @@ class ObjectButton(ObjectBase):
         surface.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
         return surface
 
-    def update_surface(self):
+    def _update_surface(self):
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
         
         if self.image_path:

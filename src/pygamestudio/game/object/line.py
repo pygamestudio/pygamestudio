@@ -43,6 +43,48 @@ class ObjectLine(ObjectBase):
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
         self._is_initialized = True
 
+    def get_thickness(self) -> int:
+        return self.thickness
+
+    def get_start_x(self) -> int:
+        return self.start_x
+    
+    def get_start_y(self) -> int:
+        return self.start_y
+    
+    def get_start_point(self) -> tuple:
+        return self.start_point
+    
+    def get_end_x(self) -> int:
+        return self.end_x
+    
+    def get_end_y(self) -> int:
+        return self.end_y
+
+    def get_end_point(self) -> tuple:
+        return self.end_point
+    
+    def set_thickness(self, thickness:int):
+        self.thickness = thickness
+
+    def set_start_x(self, start_x:int):
+        self.start_x = start_x
+
+    def set_start_y(self, start_y:int):
+        self.start_y = start_y
+
+    def set_start_point(self, start_x:int, start_y:int):
+        self.start_point = (start_x, start_y)
+
+    def set_end_x(self, end_x:int):
+        self.end_x = end_x
+
+    def set_end_y(self, end_y:int):
+        self.end_y = end_y
+
+    def set_end_point(self, end_x:int, end_y:int):
+        self.end_point = (end_x, end_y)
+
     def _update_bounding_box(self):
         x = min(self.start_x, self.end_x)
         y = min(self.start_y, self.end_y)
@@ -56,7 +98,7 @@ class ObjectLine(ObjectBase):
         super().__setattr__('height', h)
         super().__setattr__('size', (w, h))
 
-    def update_surface(self):
+    def _update_surface(self):
         self._update_bounding_box()
 
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
