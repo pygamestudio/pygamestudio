@@ -45,6 +45,8 @@ class ObjectImage(ObjectBase):
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)        
         self._is_initialized = True
 
+        self._start()
+
     def get_image_path(self) -> str:
         return self.image_path
 
@@ -100,6 +102,8 @@ class ObjectImage(ObjectBase):
         self.surface = self._apply_alpha(rotated_surface)
 
         self.surface.fill(self.color[0:3], special_flags=pygame.BLEND_RGBA_MULT)
+
+        super()._update_surface()
 
     def __setattr__(self, name, value):
         if not hasattr(self, '_is_initialized') or not self._is_initialized:

@@ -40,6 +40,8 @@ class ObjectRect(ObjectBase):
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
         self._is_initialized = True
 
+        self._start()
+
     def get_border_top_left_radius(self) -> int:
         return self.border_top_left_radius
 
@@ -74,3 +76,5 @@ class ObjectRect(ObjectBase):
         scaled_surface = pygame.transform.scale(self.surface, scaled_size)
         rotated_surface = pygame.transform.rotate(scaled_surface, self.angle)
         self.surface = self._apply_alpha(rotated_surface)
+
+        super()._update_surface()

@@ -46,6 +46,8 @@ class ObjectText(ObjectBase):
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
         self._is_initialized = True
 
+        self._start()
+
     def is_bold(self):
         return self.is_bold
 
@@ -123,6 +125,8 @@ class ObjectText(ObjectBase):
         scaled_surface = pygame.transform.scale(self.surface, scaled_size)
         rotated_surface = pygame.transform.rotate(scaled_surface, self.angle)
         self.surface = self._apply_alpha(rotated_surface)
+
+        super()._update_surface()
 
     def __setattr__(self, name, value):
         if not hasattr(self, '_is_initialized') or not self._is_initialized:

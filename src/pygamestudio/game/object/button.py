@@ -43,6 +43,8 @@ class ObjectButton(ObjectBase):
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
         self._is_initialized = True
 
+        self._start()
+
     def get_image_path(self) -> str:
         return self.image_path
 
@@ -115,6 +117,8 @@ class ObjectButton(ObjectBase):
         if not self._is_for_api and self.is_selected:
             pygame.draw.rect(self.surface, (0, 122, 204), self.surface.get_rect(), width=2)
         
+        super()._update_surface()
+
     def __setattr__(self, name, value):
         if not hasattr(self, '_is_initialized') or not self._is_initialized:
             super().__setattr__(name, value)

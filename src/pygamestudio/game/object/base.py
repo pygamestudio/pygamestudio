@@ -116,6 +116,21 @@ class ObjectBase:
     def set_color(self, color:tuple):
         self.color = color
 
+    def on_start(self):
+        ...
+
+    def on_destroy(self):
+        ...
+    
+    def on_update(self):
+        ...
+
+    def _start(self):
+        self.on_start()
+
+    def _destroy(self):
+        self.on_destroy()
+
     def _draw(self, parent_surface):
         parent_surface.blit(self.surface, self._get_rect())
         if not self._is_for_api and self.is_selected:
@@ -125,7 +140,7 @@ class ObjectBase:
         return self.surface
 
     def _update_surface(self):
-        pass
+        self.on_update()
 
     def _get_world_pos(self):
         return self._get_world_rect().topleft

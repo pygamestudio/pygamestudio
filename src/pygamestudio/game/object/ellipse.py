@@ -36,6 +36,8 @@ class ObjectEllipse(ObjectBase):
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
         self._is_initialized = True
 
+        self._start()
+
     def _update_surface(self):
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
         pygame.draw.ellipse(self.surface, self.color[0:3], self.surface.get_rect())
@@ -44,3 +46,5 @@ class ObjectEllipse(ObjectBase):
         scaled_surface = pygame.transform.scale(self.surface, scaled_size)
         rotated_surface = pygame.transform.rotate(scaled_surface, self.angle)
         self.surface = self._apply_alpha(rotated_surface)
+
+        super()._update_surface()
