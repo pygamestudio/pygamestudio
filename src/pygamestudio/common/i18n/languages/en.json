@@ -156,6 +156,8 @@
         "image_path": "Image Path",
         "select_image": "Select Image",
         "font_path": "Font Path",
+        "script_path": "Script Path",
+        "select_script": "Select Script",
         "format": "Format"
     },
 
@@ -219,6 +221,14 @@
 
     "api": {
         "no_scene_path": "The scene path {} does not exist.",
+        "no_script_path": "The script path {} does not exist.",
+        "fail_to_load_script": "Failed to load script {}: {}",
+        "no_script_class": "No script class found in {}.",
+        "fail_to_init_script": "Failed to initialize script {}: {}",
+        "unknown_object_type": "Unknown object type: {}",
+        "script_start_error": "Script on_start error for {}: {}",
+        "script_update_error": "Script on_update error for {}: {}",
+        "script_destroy_error": "Script on_destroy error for {}: {}",
         "no_project_pygs": "Failed to find config file project.pygs in the project root directory.",
         "fail_to_load_project_pygs": "Failed to load config file project.pygs: {}"
     },

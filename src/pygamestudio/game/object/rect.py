@@ -64,7 +64,7 @@ class ObjectRect(ObjectBase):
         self.border_bottom_left_radius = radius
 
     def set_border_bottom_right_radius(self,  radius:int):
-        self.border_top_right_radius = radius
+        self.border_bottom_right_radius = radius
 
     def _update_surface(self):
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)

@@ -105,4 +105,15 @@ INSPECTOR_LAYOUT_BUTTON = {
             'widget': [ImagePathLineEdit]
         }
     },
+    'script_path': {
+        'i18n': {
+            'key': 'inspector.script_path',
+            'default': 'Script Path'
+        },
+        'component': {
+            'enabled': [True],
+            'attribute': ['script_path'],
+            'widget': [ScriptPathLineEdit]
+        }
+    },
 }

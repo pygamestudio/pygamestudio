@@ -150,8 +150,8 @@ class FontPathLineEdit(QLineEdit):
 
     def _set_signal(self):
         self._browse_button.clicked.connect(self._choose_font)
-        self._delete_button.clicked.connect(self._delete_image)
-        self.textChanged.connect(self._inspector_container.set_object_image_path)
+        self._delete_button.clicked.connect(self._delete_font)
+        self.textChanged.connect(self._inspector_container.set_object_font_path)
 
     def _set_layout(self):
         h_layout = QHBoxLayout(self)
@@ -171,7 +171,7 @@ class FontPathLineEdit(QLineEdit):
 
         self.setStyleSheet('')
 
-    def _delete_image(self):
+    def _delete_font(self):
         self._font_path = Path('')
         self.setToolTip('')
         self._inspector_container.set_object_font_path()
@@ -183,6 +183,87 @@ class FontPathLineEdit(QLineEdit):
             self._delete_button.show()
         return super().enterEvent(event)
     
+    def leaveEvent(self, event):
+        self._delete_button.hide()
+        return super().leaveEvent(event)
+
+
+class ScriptPathLineEdit(QLineEdit):
+    def __init__(self, inspector_container, script_path='', attr=''):
+        super().__init__()
+        self._inspector_container = inspector_container
+        self._browse_button = QPushButton(self)
+        self._delete_button = QPushButton(self)
+        self._script_path = Path(script_path)
+        self._set_up()
+
+    def _set_up(self):
+        self._set_widget()
+        self._set_signal()
+        self._set_layout()
+
+    def _set_widget(self):
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
+        self.setTextMargins(0, 0, 24, 0)
+        self.setReadOnly(True)
+
+        if not str(self._script_path) == '.':
+            project_path = Path(get_project_path())
+            script_absolute_path = project_path / self._script_path
+            self.setToolTip(script_absolute_path.as_posix())
+            self.setText(self._script_path.name)
+
+            if not script_absolute_path.exists():
+                self.setStyleSheet('color: rgb(255, 0, 0);')
+
+        self._browse_button.setFixedSize(18, 18)
+        self._browse_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        pixmap = QPixmap(':/images/browse.png')
+        scaled_pixmap = pixmap.scaled(self._browse_button.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        self._browse_button.setIcon(QIcon(scaled_pixmap))
+
+        self._delete_button.setFixedSize(18, 18)
+        self._delete_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        pixmap = QPixmap(':/images/close.png')
+        scaled_pixmap = pixmap.scaled(self._delete_button.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        self._delete_button.setIcon(QIcon(scaled_pixmap))
+        self._delete_button.hide()
+
+    def _set_signal(self):
+        self._browse_button.clicked.connect(self._choose_script)
+        self._delete_button.clicked.connect(self._delete_script)
+        self.textChanged.connect(self._inspector_container.set_object_script_path)
+
+    def _set_layout(self):
+        h_layout = QHBoxLayout(self)
+        h_layout.addStretch(1)
+        h_layout.addWidget(self._delete_button)
+        h_layout.addWidget(self._browse_button)
+        h_layout.setContentsMargins(0, 2, 5, 0)
+
+    def _choose_script(self):
+        script_path, _ = QFileDialog.getOpenFileName(self, T.tr('inspector.select_script', 'Select Script'), os.environ.get('__PYGAMESTUDIO_PROJECT_PATH'), T.tr('inspector.format', 'Format') + ' (*.py)')
+        if not script_path:
+            return
+
+        self._script_path = Path(script_path)
+        self.setToolTip(self._script_path.as_posix())
+        self._inspector_container.set_object_script_path()
+
+        self.setStyleSheet('')
+
+    def _delete_script(self):
+        self._script_path = Path('')
+        self.setToolTip('')
+        self._inspector_container.set_object_script_path()
+
+        self.setStyleSheet('')
+
+    def enterEvent(self, event):
+        if not str(self._script_path) == '.':
+            self._delete_button.show()
+        return super().enterEvent(event)
+
     def leaveEvent(self, event):
         self._delete_button.hide()
         return super().leaveEvent(event)

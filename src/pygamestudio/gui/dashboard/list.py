@@ -7,7 +7,7 @@ from pygamestudio.gui.dashboard.type import *
 from pygamestudio.gui.dashboard.config import *
 from pygamestudio.gui.dashboard.menu import ContextMenu
 from pygamestudio.gui.dashboard.delegate import DashboardDelegate
-from pygamestudio.gui.dashboard.dialog import CreatePorjectWindow, RenameProjectWindow
+from pygamestudio.gui.dashboard.dialog import CreateProjectWindow, RenameProjectWindow
 from pygamestudio.gui.dashboard.model import DashboardSortFilterProxyModel
 from pygamestudio.common.i18n.translator import Translator as T
 
@@ -27,7 +27,7 @@ class DashboardListView(QListView):
         self._proxy_model = DashboardSortFilterProxyModel(self)
         self._delegate = DashboardDelegate(self)
         self._context_menu = ContextMenu('', self)
-        self._create_project_window = CreatePorjectWindow()
+        self._create_project_window = CreateProjectWindow()
         self._rename_project_window = RenameProjectWindow()
 
         self._sort_type = SORT_BY_TIME
@@ -139,11 +139,20 @@ class DashboardListView(QListView):
         project_data = {
             'icon': ':/images/project_icon.png',
             'name': Path(project_path).name,
-            'path': project_path,
+            'path': Path(project_path).as_posix(),
             'date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }
 
+        # Avoid duplicate rows when re-importing a project that is already in
+        # the list (the config entry is moved to the top).
+        for row in range(self._standard_model.rowCount()):
+            item = self._standard_model.item(row)
+            if item and item.data(self.ProjectPathRole) == project_data['path']:
+                self._standard_model.removeRow(row)
+                break
+
         add_project_to_dashboard_config(project_data)
+        self._add_item(project_data)
 
     def _open_project(self, index):
         project_path = index.data(self.ProjectPathRole)
@@ -177,11 +186,19 @@ class DashboardListView(QListView):
         item.setData(Path(new_project_path).as_posix(), self.ProjectPathRole)
         
     def _delete_project(self, index):
-        chocie = QMessageBox.question(QApplication.activeWindow(), T.tr('message_box.question_title', 'Confirm'), T.tr('message_box.question_delete_project_content', 'Delete the project?'), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-        if chocie == QMessageBox.StandardButton.No:
+        choice = QMessageBox.question(QApplication.activeWindow(), T.tr('message_box.question_title', 'Confirm'), T.tr('message_box.question_delete_project_content', 'Delete the project?'), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if choice == QMessageBox.StandardButton.No:
             return
 
         project_path = index.data(self.ProjectPathRole)
+
+        # The project folder may already be missing (e.g. it was moved or
+        # deleted outside the editor). In that case there is nothing to remove
+        # on disk, so just drop the entry from the list and the config.
+        if not project_path or not Path(project_path).exists():
+            delete_project_from_dashboard_config(project_path)
+            self._delete_item(index.row())
+            return
 
         try:
             shutil.rmtree(project_path)

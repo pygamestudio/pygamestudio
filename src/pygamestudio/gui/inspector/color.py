@@ -199,13 +199,13 @@ class ColorPicker(QWidget):
 
         self._update_color_preview(255, 0, 0, 255)
 
-        self.focusOutEvent = self._on_foucs_out
+        self.focusOutEvent = self._on_focus_out
         for slider in [self._r_slider, self._g_slider, self._b_slider, self._a_slider]:
-            slider.focusOutEvent = self._on_foucs_out
+            slider.focusOutEvent = self._on_focus_out
         for lineedit in [self._r_lineedit, self._g_lineedit, self._b_lineedit, self._a_lineedit]:
-            lineedit.focusOutEvent = self._on_foucs_out
+            lineedit.focusOutEvent = self._on_focus_out
 
-        self._hex_lineedit.focusOutEvent = self._on_foucs_out
+        self._hex_lineedit.focusOutEvent = self._on_focus_out
 
     def _set_signal(self):
         self._r_slider.valueChanged.connect(self._on_slider_changed)
@@ -617,7 +617,7 @@ class ColorPicker(QWidget):
         self._hex_lineedit.setText(hex_color)
         self._hex_lineedit.blockSignals(False)
 
-    def _on_foucs_out(self, event):
+    def _on_focus_out(self, event):
         pos = QCursor.pos()
         x = pos.x()
         y = pos.y()

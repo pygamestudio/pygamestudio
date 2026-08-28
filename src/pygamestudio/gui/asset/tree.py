@@ -11,6 +11,7 @@ from pygamestudio.gui.asset.menu import ContextMenu
 from pygamestudio.gui.asset.delegate import AssetTreeWidgetDelegate
 from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.common.utils.config import get_project_config, update_project_config
+from pygamestudio.common.utils.path import RES_PATH
 
 
 class AssetTreeView(QTreeView):
@@ -135,11 +136,11 @@ class AssetTreeView(QTreeView):
         self._highlight_indexes_paths = []
 
         if index_type == INDEX_FOLDER:
-            self._add_folder()
+            item_path = self._add_folder()
         else:
-            self._add_file(index_type)
+            item_path = self._add_file(index_type)
 
-        self._rename()
+        QTimer.singleShot(20, lambda: self._select_and_scroll_to_new_item(item_path, on_selected=self._rename))
 
     def _add_folder(self):
         parent_index = self._get_parent_index_for_creation()
@@ -150,11 +151,9 @@ class AssetTreeView(QTreeView):
         new_folder_name = INDEX_FOLDER
         folder_path = self._get_unique_path(new_folder_name, parent_path)
         folder_path.mkdir()
-        
-        new_index = self._proxy_model.mapFromSource(self._file_model.index(str(folder_path)))
-        self.setCurrentIndex(new_index)
-        QTimer().singleShot(10, lambda:self.scrollTo(new_index))
+
         self._highlight_indexes_paths.append(folder_path)
+        return folder_path
 
     def _add_file(self, index_type):
         parent_index = self._get_parent_index_for_creation()
@@ -164,16 +163,35 @@ class AssetTreeView(QTreeView):
         # Make sure the added file name does not exist in the current directory.
         new_file_name = index_type
         file_path = self._get_unique_path(new_file_name, parent_path)
-        file_path.touch()
 
         if index_type == INDEX_SCENE:
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write('{}')
+        elif index_type == INDEX_SCRIPT:
+            # Fill the new script file with the object script template.
+            template_path = RES_PATH / 'templates/object_script_template.py'
+            with open(template_path, 'r', encoding='utf-8') as f:
+                template_content = f.read()
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(template_content)
+        else:
+            file_path.touch()
 
-        new_index = self._proxy_model.mapFromSource(self._file_model.index(str(file_path)))
-        self.setCurrentIndex(new_index)
-        QTimer().singleShot(10, lambda:self.scrollTo(new_index))
         self._highlight_indexes_paths.append(file_path)
+        return file_path
+
+    def _select_and_scroll_to_new_item(self, item_path, retry_count=0, on_selected=None):
+        source_index = self._file_model.index(str(item_path))
+        index = self._proxy_model.mapFromSource(source_index)
+
+        if index.isValid():
+            self.setCurrentIndex(index)
+            self.scrollTo(index)
+            if on_selected:
+                on_selected()
+        elif retry_count < 40:
+            # The directory is still loading; try again shortly.
+            QTimer.singleShot(25, lambda: self._select_and_scroll_to_new_item(item_path, retry_count + 1, on_selected))
 
     def _delete(self):
         selected_indexes = self.selectedIndexes()

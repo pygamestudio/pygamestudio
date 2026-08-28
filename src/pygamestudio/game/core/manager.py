@@ -51,6 +51,7 @@ class GameManager(QObject):
     object_strikethrough_state_changed = Signal(str)
     object_image_path_changed = Signal(str)
     object_font_path_changed = Signal(str)
+    object_script_path_changed = Signal(str)
 
     def __init__(self):
         super().__init__()
@@ -391,6 +392,11 @@ class GameManager(QObject):
         obj = self._get_object(object_uuid) 
         old_font_path = obj.font_path
         self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'font_path', old_font_path, new_font_path))
+
+    def set_script_path(self, object_uuid, new_script_path):
+        obj = self._get_object(object_uuid) 
+        old_script_path = obj.script_path
+        self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'script_path', old_script_path, new_script_path))
 
     def _get_object_tree_struct(self, object_uuid, parent_object_tree_struct=None):
         def _get(object_uuid, object_tree_struct):

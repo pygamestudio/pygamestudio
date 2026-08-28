@@ -22,6 +22,7 @@ class MoveGizmo(QWidget):
         self._hit_type = self.HIT_NONE
         self._mouse_start_x = 0
         self._mouse_start_y = 0
+        self._is_macro_open = False
 
         self._offset_x = 20
         self._offset_y = 20
@@ -133,21 +134,26 @@ class MoveGizmo(QWidget):
         return self.HIT_NONE
     
     def _move_selected_objects(self, dx, dy):
-        self._game_manager.undo_stack.beginMacro('Move')
         selected_objects = self._game_manager.get_objects_to_move()
         for obj in selected_objects:
             new_x = obj.x + dx
             new_y = obj.y + dy
             self._game_manager.move(obj.uuid, (new_x, new_y))
-        self._game_manager.undo_stack.endMacro()
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self._hit_type = self._get_hit_type(event.position())
             if self._hit_type != self.HIT_NONE:
+                # Safety: close any macro left open by an interrupted previous
+                # drag, so a new drag always starts from a clean undo state.
+                if self._is_macro_open:
+                    self._game_manager.undo_stack.endMacro()
+                    self._is_macro_open = False
+
                 self._is_dragging = True
                 self._mouse_start_x = event.position().x()
                 self._mouse_start_y = event.position().y()
+                self._is_macro_open = False
                 return
 
         return super().mousePressEvent(event)
@@ -160,6 +166,13 @@ class MoveGizmo(QWidget):
         
         dx = int(event.position().x() - self._mouse_start_x)
         dy = int(event.position().y() - self._mouse_start_y)
+
+        if dx == 0 and dy == 0:
+            return
+
+        if not self._is_macro_open:
+            self._is_macro_open = True
+            self._game_manager.undo_stack.beginMacro('Move')
 
         if self._hit_type == self.HIT_AXIS_X:
             self.move(self.x()+dx, self.y())
@@ -180,4 +193,8 @@ class MoveGizmo(QWidget):
         self._mouse_start_x = 0
         self._mouse_start_y = 0
         self._hit_type = self.HIT_NONE
+        if self._is_macro_open:
+            self._is_macro_open = False
+            self._game_manager.undo_stack.endMacro()
+
 

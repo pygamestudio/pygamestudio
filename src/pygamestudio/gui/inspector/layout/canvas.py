@@ -50,4 +50,15 @@ INSPECTOR_LAYOUT_CANVAS = {
             'widget': [ColorPicker]
         }
     },
+    'script_path': {
+        'i18n': {
+            'key': 'inspector.script_path',
+            'default': 'Script Path'
+        },
+        'component': {
+            'enabled': [True],
+            'attribute': ['script_path'],
+            'widget': [ScriptPathLineEdit]
+        }
+    },
 }

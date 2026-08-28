@@ -14,7 +14,7 @@ def ensure_config_dir_exists():
         DASHBOARD_CONFIG_DIR_PATH.mkdir(parents=True)
 
 
-def save_projects_to_dashbaord_config(project_list):
+def save_projects_to_dashboard_config(project_list):
     ensure_config_dir_exists()
 
     try:
@@ -36,7 +36,7 @@ def add_project_to_dashboard_config(project_data):
             break
 
     project_list.append(project_data)
-    save_projects_to_dashbaord_config(project_list)
+    save_projects_to_dashboard_config(project_list)
 
 
 def delete_project_from_dashboard_config(project_path):
@@ -46,7 +46,7 @@ def delete_project_from_dashboard_config(project_path):
             del project_list[i]
             break
 
-    save_projects_to_dashbaord_config(project_list)
+    save_projects_to_dashboard_config(project_list)
 
 
 def load_projects_from_dashboard_config():
@@ -75,7 +75,7 @@ def update_project_date_in_dashboard_config(project_path, new_project_date):
             project_list[i]['date'] = new_project_date
             break
             
-    save_projects_to_dashbaord_config(project_list)
+    save_projects_to_dashboard_config(project_list)
 
 
 def update_project_name_in_dashboard_config(old_project_path, new_project_path):
@@ -86,4 +86,4 @@ def update_project_name_in_dashboard_config(old_project_path, new_project_path):
             project_list[i]['path'] = new_project_path
             break
         
-    save_projects_to_dashbaord_config(project_list)
+    save_projects_to_dashboard_config(project_list)

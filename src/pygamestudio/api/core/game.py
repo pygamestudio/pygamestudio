@@ -4,6 +4,7 @@ import pygame
 import inspect
 from pathlib import Path
 from pygamestudio.api.config.project import get_project_config
+from pygamestudio.api.core.scene import scene_loader
 
 
 class Game:
@@ -181,6 +182,9 @@ class Game:
 
 
             delta_time = self._clock.tick(self._fps) / 1000
+            # Make the current frame's delta time available to the scene's
+            # scripts (their on_update(delta_time) hooks).
+            scene_loader.set_delta_time(delta_time)
             self.on_update(delta_time)
             pygame.display.flip()
 

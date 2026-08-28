@@ -48,18 +48,6 @@ class ObjectText(ObjectBase):
 
         self._start()
 
-    def is_bold(self):
-        return self.is_bold
-
-    def is_italic(self):
-        return self.is_italic
-    
-    def is_underline(self):
-        return self.is_underline
-    
-    def is_strikethrough(self):
-        return self.is_strikethrough
-    
     def get_text(self) -> str:
         return self.text
 
@@ -104,7 +92,7 @@ class ObjectText(ObjectBase):
     
     def _init_font(self):
         font_absolute_path = Path(get_project_path()) / self.font_path
-        if self.font_path == '' or not font_absolute_path:
+        if self.font_path == '' or not font_absolute_path.exists():
             font = pygame.font.Font(None, size=self.font_size)
         else:
             font = pygame.font.Font(font_absolute_path, size=self.font_size)

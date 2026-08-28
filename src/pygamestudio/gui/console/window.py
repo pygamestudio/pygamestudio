@@ -26,15 +26,18 @@ class ConsoleWindow(QWidget):
         self._console_log_browser.clear_log_signal.connect(self._info_check_box.reset_log_num)
         self._console_log_browser.clear_log_signal.connect(self._error_check_box.reset_log_num)
         self._console_log_browser.clear_log_signal.connect(self._warning_check_box.reset_log_num)
-        self._console_log_browser.info_log_signal.connect(self._info_check_box.increase_one_log_num)
-        self._console_log_browser.error_log_signal.connect(self._error_check_box.increase_one_log_num)
-        self._console_log_browser.warning_log_signal.connect(self._warning_check_box.increase_one_log_num)
+        self._console_log_browser.log_counts_changed.connect(self._on_log_counts_changed)
 
         self._clear_btn.clicked.connect(self._console_log_browser.clear_log)
         self._search_line_edit.search_signal.connect(self._console_log_browser.search)
         self._info_check_box.check_box_clicked.connect(self._console_log_browser.on_info_check_box_clicked)
         self._error_check_box.check_box_clicked.connect(self._console_log_browser.on_error_check_box_clicked)
         self._warning_check_box.check_box_clicked.connect(self._console_log_browser.on_warning_check_box_clicked)
+
+    def _on_log_counts_changed(self, info_count, error_count, warning_count):
+        self._info_check_box.set_log_num(info_count)
+        self._error_check_box.set_log_num(error_count)
+        self._warning_check_box.set_log_num(warning_count)
 
     def _set_layout(self):
         h_layout = QHBoxLayout()

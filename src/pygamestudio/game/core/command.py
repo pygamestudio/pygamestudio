@@ -92,3 +92,5 @@ class UpdateAttrValueCommand(QUndoCommand):
             self._game_manager.object_image_path_changed.emit(self._obj.uuid)
         elif attr == 'font_path':
             self._game_manager.object_font_path_changed.emit(self._obj.uuid)
+        elif attr == 'script_path':
+            self._game_manager.object_script_path_changed.emit(self._obj.uuid)

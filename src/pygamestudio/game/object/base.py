@@ -1,7 +1,9 @@
 
 import pygame
+from pathlib import Path
 from pygamestudio.game.object.type import *
 from pygamestudio.common.utils.system import get_system_lang
+from pygamestudio.common.utils.path import get_project_path
 from pygamestudio.common.i18n.translator import Translator as T
 
 
@@ -21,12 +23,18 @@ class ObjectBase:
                 setattr(self, key, object_data.get(key, value))
 
         self.surface = None
+        # The behavior script instance attached to this object at runtime
+        # (created from script_path). None when no script is attached.
+        self.script_instance = None
+
+        # Path of the object script (a .py file inside the project, e.g.
+        # './script/new.py', relative to the project path). Empty string means
+        # no script is attached. It is serialized into the .scene file and used
+        # by the runtime to attach a behavior script to the object.
+        self.script_path = object_data.get('script_path', '')
 
     def is_pressed(self, x:int, y:int) -> bool:
         return True if self._check_click_collision((x, y)) else False
-    
-    def is_visible(self) -> bool:
-        return self.is_visible
     
     def get_name(self) -> str:
         return self.name
@@ -189,7 +197,7 @@ class ObjectBase:
         return self._get_world_rect().colliderect(rect)
     
     def _to_dict(self):
-        exclude_fields = ['_is_initialized', '_game_manager', 'surface', 'icon']
+        exclude_fields = ['_is_initialized', '_is_for_api', '_game_manager', 'surface', 'icon', 'script_instance']
         return {
             key: value for key, value in self.__dict__.items() 
             if key not in exclude_fields
@@ -233,6 +241,18 @@ class ObjectBase:
             super().__setattr__('scale_x', value[0])
             super().__setattr__('scale_y', value[1])
             super().__setattr__('scale', value)
+
+        elif name == 'script_path':
+            # Store the script path relative to the project (e.g. './script/x.py').
+            if value == '':
+                super().__setattr__('script_path', '')
+            else:
+                project_path = Path(get_project_path())
+                new_script_path = Path(value).absolute()
+                try:
+                    super().__setattr__('script_path', new_script_path.relative_to(project_path).as_posix())
+                except ValueError:
+                    super().__setattr__('script_path', new_script_path.as_posix())
 
         else:
             super().__setattr__(name, value)

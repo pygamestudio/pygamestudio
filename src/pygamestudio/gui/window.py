@@ -360,12 +360,18 @@ class Editor(WindowBase):
             if event.key() == Qt.Key.Key_S:
                 self._game_manager.save_scene()
             elif event.key() == Qt.Key.Key_Z:
+                # endMacro() is a no-op when no macro is open, but if a drag
+                # left one dangling it is closed first, so undo() can never be
+                # rejected with "cannot undo in the middle of a macro".
+                self._game_manager.undo_stack.endMacro()
                 self._game_manager.undo_stack.undo()
             elif event.key() == Qt.Key.Key_Y:
+                self._game_manager.undo_stack.endMacro()
                 self._game_manager.undo_stack.redo()
 
         elif event.modifiers() == (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier):
             if event.key() == Qt.Key.Key_Z:
+                self._game_manager.undo_stack.endMacro()
                 self._game_manager.undo_stack.redo()
 
         super().keyPressEvent(event)

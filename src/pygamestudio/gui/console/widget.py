@@ -47,9 +47,8 @@ class LogCheckBox(QWidget):
         pixmap = pixmap.scaled(QSize(20, 20), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         self._log_icon.setPixmap(pixmap)
 
-    def increase_one_log_num(self):
-        num = int(self._log_text.text())
-        self._log_text.setText(str(num+1))
+    def set_log_num(self, count):
+        self._log_text.setText(str(count))
 
     def reset_log_num(self):
         self._log_text.setText('0')

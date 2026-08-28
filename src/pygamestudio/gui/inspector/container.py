@@ -65,6 +65,7 @@ class Container(QFrame):
         self._game_manager.object_line_thickness_changed.connect(self._on_object_line_thickness_changed)
         self._game_manager.object_image_path_changed.connect(self._on_object_image_path_changed)
         self._game_manager.object_font_path_changed.connect(self._on_object_font_path_changed)
+        self._game_manager.object_script_path_changed.connect(self._on_object_script_path_changed)
 
     def _set_layout(self):
         self._container_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
@@ -182,6 +183,12 @@ class Container(QFrame):
     def set_object_font_path(self):
         lineedit = self._find_widget(self._container_layout, 'font_path')
         self._game_manager.set_font_path(self._object_uuid_in_inspection, lineedit.toolTip())
+
+    def set_object_script_path(self):
+        lineedit = self._find_widget(self._container_layout, 'script_path')
+        if not lineedit:
+            return
+        self._game_manager.set_script_path(self._object_uuid_in_inspection, lineedit.toolTip())
     
     def show_color_picker(self, color_rgba):
         screen = QApplication.primaryScreen()
@@ -236,8 +243,8 @@ class Container(QFrame):
         spinbox_height = self._find_widget(self._container_layout, 'height')
         spinbox_width.blockSignals(True)
         spinbox_height.blockSignals(True)
-        spinbox_width.setValue(obj.x)
-        spinbox_height.setValue(obj.y)
+        spinbox_width.setValue(obj.width)
+        spinbox_height.setValue(obj.height)
         spinbox_width.blockSignals(False)
         spinbox_height.blockSignals(False)
 
@@ -382,6 +389,20 @@ class Container(QFrame):
         font_path_lineedit.blockSignals(True)
         font_path_lineedit.setText(Path(obj.font_path).name)
         font_path_lineedit.blockSignals(False)
+
+    def _on_object_script_path_changed(self, object_uuid):
+        if object_uuid != self._object_uuid_in_inspection:
+            return
+
+        obj = self._game_manager.get_object(object_uuid)
+        script_path_lineedit = self._find_widget(self._container_layout, 'script_path')
+        if not script_path_lineedit:
+            return
+
+        script_path_lineedit.blockSignals(True)
+        script_path_lineedit.setText(Path(obj.script_path).name)
+        script_path_lineedit.setToolTip(Path(obj.script_path).as_posix())
+        script_path_lineedit.blockSignals(False)
 
     def _find_widget(self, layout, widget_name):
         for i in range(layout.count()):

@@ -26,8 +26,6 @@ class ProjectSettingsBody(QWidget):
         self._set_layout()
 
     def _set_widget(self):
-        # self._set_screen_stacked_widget()
-
         self._list_widget.setMaximumWidth(200)
         self._list_widget.addItems([T.tr('settings.game_screen', 'Game Screen')])
         self._list_widget.setCurrentItem(self._list_widget.item(0))

@@ -93,4 +93,15 @@ INSPECTOR_LAYOUT_LINE = {
             'widget': [ThicknessSpinBox]
         }
     },
+    'script_path': {
+        'i18n': {
+            'key': 'inspector.script_path',
+            'default': 'Script Path'
+        },
+        'component': {
+            'enabled': [True],
+            'attribute': ['script_path'],
+            'widget': [ScriptPathLineEdit]
+        }
+    },
 }

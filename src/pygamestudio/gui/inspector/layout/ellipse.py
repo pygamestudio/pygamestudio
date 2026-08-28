@@ -83,4 +83,15 @@ INSPECTOR_LAYOUT_ELLIPSE = {
             'widget': [ColorPicker]
         }
     },
+    'script_path': {
+        'i18n': {
+            'key': 'inspector.script_path',
+            'default': 'Script Path'
+        },
+        'component': {
+            'enabled': [True],
+            'attribute': ['script_path'],
+            'widget': [ScriptPathLineEdit]
+        }
+    },
 }

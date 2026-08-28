@@ -154,7 +154,6 @@ class PygameScreen(QWidget):
         return img
 
     def _on_mouse_left_button_pressed(self, event):
-        self._game_manager.undo_stack.beginMacro('Move')
         pos = event.position()
         self._mouse_x = pos.x()
         self._mouse_y = pos.y()
@@ -168,7 +167,6 @@ class PygameScreen(QWidget):
     def _on_mouse_left_button_released(self, event):
         self._mouse_x = None
         self._mouse_y = None
-        self._game_manager.undo_stack.endMacro()
 
     def _update_object_selection(self, pos):
         if self._game_manager.is_empty():

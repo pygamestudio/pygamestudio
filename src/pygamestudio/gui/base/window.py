@@ -136,6 +136,8 @@ class WindowBase(QWidget):
         self._stretch_type = None
         self._is_stretching = False
         self._stretch_area_offset = 10
+        self._start_geometry = None
+        self._start_global_pos = None
 
         self.__setup()
 
@@ -233,53 +235,98 @@ class WindowBase(QWidget):
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton and self._stretch_type:
             self._is_stretching = True
+            self._start_geometry = self.geometry()
+            self._start_global_pos = event.globalPosition().toPoint()
 
     def mouseMoveEvent(self, event):
         self._stretch_type = self._get_stretch_type(event.position().x(), event.position().y())
 
         if self._is_stretching and self._stretch_type:
-            if self._stretch_type == 'RIGHT':
-                self.resize(event.position().x(), self.height())
+            self._resize_window(event.globalPosition().toPoint())
 
-            if self._stretch_type == 'LEFT':
-                if self.width()-event.position().x() < self.minimumWidth():
-                    self.setGeometry(self.geometry().x(), self.geometry().y(), self.minimumWidth(), self.height())
-                else:
-                    self.setGeometry(self.geometry().x()+event.position().x(), self.geometry().y(), self.width()-event.position().x(), self.height())
+    def _resize_window(self, global_pos):
+        start = self._start_geometry
+        if start is None or self._start_global_pos is None:
+            return
 
-            elif self._stretch_type == 'BOTTOM':
-                self.resize(self.width(), event.position().y())
-            
-            elif self._stretch_type == 'TOP':
-                if self.height()-event.position().y() < self.minimumHeight():
-                    self.setGeometry(self.geometry().x(), self.geometry().y(), self.width(), self.minimumHeight())
-                else:
-                    self.setGeometry(self.geometry().x(), self.geometry().y()+event.position().y(), self.width(), self.height()-event.position().y())
-            
-            elif self._stretch_type == 'BOTTOM_RIGHT':
-                self.resize(event.position().x(), event.position().y())
-            
-            elif self._stretch_type == 'BOTTOM_LEFT':
-                if self.width()-event.position().x() < self.minimumWidth():
-                    self.setGeometry(self.geometry().x(), self.geometry().y(), self.minimumWidth(), event.position().y())
-                else:
-                    self.setGeometry(self.geometry().x()+event.position().x(), self.geometry().y(), self.width()-event.position().x(), event.position().y())
+        min_w = self.minimumWidth() or 200
+        min_h = self.minimumHeight() or 150
 
-            elif self._stretch_type == 'TOP_LEFT':
-                if self.width()-event.position().x() < self.minimumWidth() and  self.height()-event.position().y() >= self.minimumHeight():
-                    self.setGeometry(self.geometry().x(), self.geometry().y()+event.position().y(), self.minimumWidth(), self.height()-event.position().y())                
-                elif self.height()-event.position().y() < self.minimumHeight() and self.width()-event.position().x() >= self.minimumWidth():
-                    self.setGeometry(self.geometry().x()+event.position().x(), self.geometry().y(), self.width()-event.position().x(), self.minimumHeight())                
-                elif self.width()-event.position().x() < self.minimumWidth() and self.height()-event.position().y() < self.minimumHeight():
-                    self.setGeometry(self.geometry().x(), self.geometry().y(), self.minimumWidth(), self.minimumHeight())                
-                else:
-                    self.setGeometry(self.geometry().x()+event.position().x(), self.geometry().y()+event.position().y(), self.width()-event.position().x(), self.height()-event.position().y())                
-            
-            elif self._stretch_type == 'TOP_RIGHT':
-                if self.height()-event.position().y() < self.minimumHeight():
-                    self.setGeometry(self.geometry().x(), self.geometry().y(), event.position().x(), self.minimumHeight())
-                else:
-                    self.setGeometry(self.geometry().x(), self.geometry().y()+event.position().y(), event.position().x(), self.height()-event.position().y())
+        dx = global_pos.x() - self._start_global_pos.x()
+        dy = global_pos.y() - self._start_global_pos.y()
+
+        new_rect = QRect(start)
+
+        if self._stretch_type == 'RIGHT':
+            new_rect.setWidth(max(min_w, start.width() + dx))
+
+        elif self._stretch_type == 'LEFT':
+            new_x = start.x() + dx
+            new_width = start.width() - dx
+            if new_width < min_w:
+                new_width = min_w
+                new_x = start.x() + start.width() - min_w
+            new_rect.setX(new_x)
+            new_rect.setWidth(new_width)
+
+        elif self._stretch_type == 'BOTTOM':
+            new_rect.setHeight(max(min_h, start.height() + dy))
+
+        elif self._stretch_type == 'TOP':
+            new_y = start.y() + dy
+            new_height = start.height() - dy
+            if new_height < min_h:
+                new_height = min_h
+                new_y = start.y() + start.height() - min_h
+            new_rect.setY(new_y)
+            new_rect.setHeight(new_height)
+
+        elif self._stretch_type == 'BOTTOM_RIGHT':
+            new_rect.setWidth(max(min_w, start.width() + dx))
+            new_rect.setHeight(max(min_h, start.height() + dy))
+
+        elif self._stretch_type == 'BOTTOM_LEFT':
+            new_x = start.x() + dx
+            new_width = start.width() - dx
+            if new_width < min_w:
+                new_width = min_w
+                new_x = start.x() + start.width() - min_w
+            new_rect.setX(new_x)
+            new_rect.setWidth(new_width)
+            new_rect.setHeight(max(min_h, start.height() + dy))
+
+        elif self._stretch_type == 'TOP_LEFT':
+            new_x = start.x() + dx
+            new_width = start.width() - dx
+            if new_width < min_w:
+                new_width = min_w
+                new_x = start.x() + start.width() - min_w
+            new_rect.setX(new_x)
+            new_rect.setWidth(new_width)
+
+            new_y = start.y() + dy
+            new_height = start.height() - dy
+            if new_height < min_h:
+                new_height = min_h
+                new_y = start.y() + start.height() - min_h
+            new_rect.setY(new_y)
+            new_rect.setHeight(new_height)
+
+        elif self._stretch_type == 'TOP_RIGHT':
+            new_rect.setWidth(max(min_w, start.width() + dx))
+
+            new_y = start.y() + dy
+            new_height = start.height() - dy
+            if new_height < min_h:
+                new_height = min_h
+                new_y = start.y() + start.height() - min_h
+            new_rect.setY(new_y)
+            new_rect.setHeight(new_height)
+
+        self.setGeometry(new_rect)
 
     def mouseReleaseEvent(self, event):
         self._is_stretching = False
+        self._stretch_type = None
+        self._start_geometry = None
+        self._start_global_pos = None

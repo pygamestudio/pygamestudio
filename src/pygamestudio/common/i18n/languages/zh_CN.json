@@ -155,7 +155,9 @@
         "select_color": "选择颜色",
         "image_path": "图片路径",
         "font_path": "字体路径",
+        "script_path": "脚本路径",
         "select_image": "选择图片",
+        "select_script": "选择脚本",
         "format": "格式"
     },
 
@@ -219,6 +221,14 @@
 
     "api": {
         "no_scene_path": "场景路径{}不存在。",
+        "no_script_path": "脚本路径{}不存在。",
+        "fail_to_load_script": "脚本{}加载失败：{}",
+        "no_script_class": "在{}中没有找到脚本类。",
+        "fail_to_init_script": "脚本{}初始化失败：{}",
+        "unknown_object_type": "未知对象类型：{}",
+        "script_start_error": "脚本{}的on_start错误：{}",
+        "script_update_error": "脚本{}的on_update错误：{}",
+        "script_destroy_error": "脚本{}的on_destroy错误：{}",
         "no_project_pygs": "没有在项目根目录下找到project.pygs配置文件。",
         "fail_to_load_project_pygs": "配置文件project.pygs加载失败：{}"
     },

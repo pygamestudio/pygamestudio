@@ -168,7 +168,7 @@ class CreateProjectBody(QWidget):
         return super().enterEvent(event)
 
 
-class CreatePorjectWindow(WindowBase):
+class CreateProjectWindow(WindowBase):
     create_project_signal = Signal(str)
 
     def __init__(self):

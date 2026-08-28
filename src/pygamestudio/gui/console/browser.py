@@ -14,6 +14,13 @@ class ConsoleLogBrowser(QTextBrowser):
     info_log_signal = Signal(str)
     error_log_signal = Signal(str)
     warning_log_signal = Signal(str)
+    # Carries the actual per-level log counts (info, error, warning) currently
+    # held in the log list, emitted whenever the log list changes.
+    log_counts_changed = Signal(int, int, int)
+
+    # Upper bound for the in-memory log list, to avoid unbounded memory growth
+    # during long-running sessions. Oldest entries are dropped first.
+    _max_log_count = 5000
 
     def __init__(self, parent=None, game_manager=None):
         super().__init__(parent)
@@ -71,9 +78,47 @@ class ConsoleLogBrowser(QTextBrowser):
         now = datetime.now()
         current_time = '[' + now.strftime('%Y-%m-%d %H:%M:%S') + '.%03d' % (now.microsecond // 1000) + ']'
         self._logs.append((current_time, msg, log_level))
+
+        # Keep the in-memory log list bounded; drop the oldest entries first.
+        if len(self._logs) > self._max_log_count:
+            removed_count = len(self._logs) - self._max_log_count
+            del self._logs[:removed_count]
+            self._remove_oldest_displayed_logs(removed_count)
+
         log_format = self._log_formats[log_level]
         self.moveCursor(QTextCursor.MoveOperation.End)
         self.textCursor().insertText(f'{current_time} {msg}\n', log_format)
+        self._emit_log_counts()
+
+    def _emit_log_counts(self):
+        """Push the actual per-level log counts (from the log list) to the UI."""
+        info_count = 0
+        error_count = 0
+        warning_count = 0
+        for _, _, log_level in self._logs:
+            if log_level == INFO:
+                info_count += 1
+            elif log_level == ERROR:
+                error_count += 1
+            elif log_level == WARNING:
+                warning_count += 1
+        self.log_counts_changed.emit(info_count, error_count, warning_count)
+
+    def _remove_oldest_displayed_logs(self, count):
+        """Remove the oldest `count` lines from the displayed log text."""
+        if count <= 0:
+            return
+
+        count = min(count, self.document().blockCount() - 1)
+        if count <= 0:
+            return
+
+        cursor = self.textCursor()
+        cursor.beginEditBlock()
+        cursor.movePosition(QTextCursor.MoveOperation.Start)
+        cursor.movePosition(QTextCursor.MoveOperation.Down, QTextCursor.MoveMode.KeepAnchor, count)
+        cursor.removeSelectedText()
+        cursor.endEditBlock()
     
     def _show_context_menu(self, pos):
         global_pos = self.mapToGlobal(pos)
@@ -94,6 +139,7 @@ class ConsoleLogBrowser(QTextBrowser):
         self.clear()
         self._logs = []
         self.clear_log_signal.emit()
+        self._emit_log_counts()
     
     def clear_log(self):
         self._clear_log()
