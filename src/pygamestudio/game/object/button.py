@@ -28,7 +28,7 @@ class ObjectButton(ObjectBase):
             'scale_y': 1,
             'scale': (1, 1),
             'angle': 0,
-            'is_visible': True,
+            'visible': True,
             'color': (255, 255, 255, 255),
             'image_path': '',
             'border_top_left_radius': 10,
@@ -59,6 +59,11 @@ class ObjectButton(ObjectBase):
 
     def get_border_bottom_right_radius(self) -> int:
         return self.border_bottom_right_radius
+
+    def get_border_radius(self) -> tuple:
+        """All four corner radii as (top_left, top_right, bottom_left, bottom_right)."""
+        return (self.border_top_left_radius, self.border_top_right_radius,
+                self.border_bottom_left_radius, self.border_bottom_right_radius)
     
     def set_image_path(self, image_path:str):
         self.image_path = image_path
@@ -74,7 +79,19 @@ class ObjectButton(ObjectBase):
 
     def set_border_bottom_right_radius(self,  radius:int):
         self.border_bottom_right_radius = radius
-    
+
+    def set_border_radius(self, radius):
+        """Set all four corners at once: pass a single int, or a 4-item
+        tuple/list (top_left, top_right, bottom_left, bottom_right)."""
+        if isinstance(radius, (tuple, list)):
+            (self.border_top_left_radius, self.border_top_right_radius,
+             self.border_bottom_left_radius, self.border_bottom_right_radius) = radius
+        else:
+            self.border_top_left_radius = radius
+            self.border_top_right_radius = radius
+            self.border_bottom_left_radius = radius
+            self.border_bottom_right_radius = radius
+
     def _load_image(self):
         image_absolute_path = Path(get_project_path()) / self.image_path
         if self.image_path == '' or not image_absolute_path.exists():
@@ -114,7 +131,7 @@ class ObjectButton(ObjectBase):
         rotated_surface = pygame.transform.rotate(rounded_surface, self.angle)
         self.surface = self._apply_alpha(rotated_surface)
 
-        if not self._is_for_api and self.is_selected:
+        if not self._is_for_api and self.selected:
             pygame.draw.rect(self.surface, (0, 122, 204), self.surface.get_rect(), width=2)
         
         super()._update_surface()

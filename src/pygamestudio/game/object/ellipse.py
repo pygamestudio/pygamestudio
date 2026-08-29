@@ -27,7 +27,7 @@ class ObjectEllipse(ObjectBase):
             'scale': (1, 1),
             'angle': 0,
             'color': (255, 255, 255, 255),
-            'is_visible': True,
+            'visible': True,
         }
 
         for key, value in common_properties.items():

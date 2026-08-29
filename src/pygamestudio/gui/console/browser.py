@@ -20,7 +20,13 @@ class ConsoleLogBrowser(QTextBrowser):
 
     # Upper bound for the in-memory log list, to avoid unbounded memory growth
     # during long-running sessions. Oldest entries are dropped first.
-    _max_log_count = 5000
+    _max_log_count = 100000
+
+    # Number of oldest lines removed from the text browser at once when the
+    # cap is exceeded. Removing lines from the top forces a full document
+    # re-layout, so trimming in batches amortizes that cost: without this, a
+    # re-layout would run for every single log line once the cap is reached.
+    _display_trim_batch = 200
 
     def __init__(self, parent=None, game_manager=None):
         super().__init__(parent)
@@ -28,6 +34,10 @@ class ConsoleLogBrowser(QTextBrowser):
         self._context_menu = ContextMenu('', self)
         
         self._logs = []
+        # Incrementally tracked per-level log counts (info/error/warning).
+        # Kept in sync when a log is added or trimmed instead of recounting
+        # the whole list from scratch on every append.
+        self._log_counts = {INFO: 0, ERROR: 0, WARNING: 0}
         self._search_keyword = ''
 
         info_format = QTextCharFormat()
@@ -78,10 +88,18 @@ class ConsoleLogBrowser(QTextBrowser):
         now = datetime.now()
         current_time = '[' + now.strftime('%Y-%m-%d %H:%M:%S') + '.%03d' % (now.microsecond // 1000) + ']'
         self._logs.append((current_time, msg, log_level))
+        self._log_counts[log_level] += 1
 
-        # Keep the in-memory log list bounded; drop the oldest entries first.
-        if len(self._logs) > self._max_log_count:
+        # Keep the in-memory log list bounded. Deletion is batched (only once
+        # the list grows a whole batch past the cap), because removing lines
+        # from the top of the text browser triggers a full document re-layout
+        # that is expensive to run on every single append.
+        if len(self._logs) >= self._max_log_count + self._display_trim_batch:
             removed_count = len(self._logs) - self._max_log_count
+            # Decrement the counter of every trimmed log so the counts stay
+            # accurate without recounting the list.
+            for _, _, removed_log_level in self._logs[:removed_count]:
+                self._log_counts[removed_log_level] -= 1
             del self._logs[:removed_count]
             self._remove_oldest_displayed_logs(removed_count)
 
@@ -91,18 +109,8 @@ class ConsoleLogBrowser(QTextBrowser):
         self._emit_log_counts()
 
     def _emit_log_counts(self):
-        """Push the actual per-level log counts (from the log list) to the UI."""
-        info_count = 0
-        error_count = 0
-        warning_count = 0
-        for _, _, log_level in self._logs:
-            if log_level == INFO:
-                info_count += 1
-            elif log_level == ERROR:
-                error_count += 1
-            elif log_level == WARNING:
-                warning_count += 1
-        self.log_counts_changed.emit(info_count, error_count, warning_count)
+        """Push the per-level log counts to the UI."""
+        self.log_counts_changed.emit(self._log_counts[INFO], self._log_counts[ERROR], self._log_counts[WARNING])
 
     def _remove_oldest_displayed_logs(self, count):
         """Remove the oldest `count` lines from the displayed log text."""
@@ -138,6 +146,7 @@ class ConsoleLogBrowser(QTextBrowser):
     def _clear_log(self):
         self.clear()
         self._logs = []
+        self._log_counts = {INFO: 0, ERROR: 0, WARNING: 0}
         self.clear_log_signal.emit()
         self._emit_log_counts()
     

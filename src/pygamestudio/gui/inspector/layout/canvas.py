@@ -13,7 +13,7 @@ INSPECTOR_LAYOUT_CANVAS = {
         },
         'component': {
             'enabled': [True],
-            'attribute': ['is_visible'],
+            'attribute': ['visible'],
             'widget': [VisibilityCheckBox]
         }
     },

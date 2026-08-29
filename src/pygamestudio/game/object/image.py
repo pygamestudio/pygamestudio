@@ -30,7 +30,7 @@ class ObjectImage(ObjectBase):
             'scale': (1, 1),
             'angle': 0,
             'color': (255, 255, 255, 255),
-            'is_visible': True,
+            'visible': True,
             'image_path': './image/logo.png',
             # 'keep_aspect_ratio': False,
             'border_top_left_radius': 0,

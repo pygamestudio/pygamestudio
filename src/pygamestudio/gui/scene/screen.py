@@ -133,7 +133,7 @@ class PygameScreen(QWidget):
             obj = value['object']
             obj._update_surface()
             
-            if obj.is_visible:
+            if obj.visible:
                 for child_object_tree_struct in value['children']:
                     _update(child_object_tree_struct, obj._get_surface())
 

@@ -12,7 +12,7 @@ INSPECTOR_LAYOUT_LINE = {
         },
         'component': {
             'enabled': [True],
-            'attribute': ['is_visible'],
+            'attribute': ['visible'],
             'widget': [VisibilityCheckBox]
         }
     },

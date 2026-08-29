@@ -72,7 +72,7 @@ class UpdateAttrValueCommand(QUndoCommand):
         # UI reflects the (possibly undone/redone) value immediately.
         if attr == 'name':
             self._game_manager.object_renamed.emit(self._obj.uuid)
-        elif attr == 'is_visible':
+        elif attr == 'visible':
             if self._new_value == True:
                 self._game_manager.object_showed.emit(self._obj.uuid)  
             else:
@@ -101,13 +101,13 @@ class UpdateAttrValueCommand(QUndoCommand):
             self._game_manager.object_font_size_changed.emit(self._obj.uuid)
         elif attr == 'font_family':
             self._game_manager.object_font_family_changed.emit(self._obj.uuid)
-        elif attr == 'is_bold':
+        elif attr == 'bold':
             self._game_manager.object_bold_state_changed.emit(self._obj.uuid)
-        elif attr == 'is_italic':
+        elif attr == 'italic':
             self._game_manager.object_italic_state_changed.emit(self._obj.uuid)
-        elif attr == 'is_underline':
+        elif attr == 'underline':
             self._game_manager.object_underline_state_changed.emit(self._obj.uuid)
-        elif attr == 'is_strikethrough':
+        elif attr == 'strikethrough':
             self._game_manager.object_strikethrough_state_changed.emit(self._obj.uuid)
         elif attr == 'image_path':
             self._game_manager.object_image_path_changed.emit(self._obj.uuid)

@@ -1,3 +1,4 @@
+import math
 import uuid
 import pygame
 from pygamestudio.game.object.type import *
@@ -27,7 +28,7 @@ class ObjectLine(ObjectBase):
             'scale': (1, 1),
             'angle': 0,
             'color': (255, 255, 255, 255),
-            'is_visible': True,
+            'visible': True,
             'thickness': 2,
             'start_x': 20,
             'start_y': 20,
@@ -65,6 +66,10 @@ class ObjectLine(ObjectBase):
 
     def get_end_point(self) -> tuple:
         return self.end_point
+
+    def get_length(self) -> float:
+        """Length of the line (distance between its two endpoints)."""
+        return math.hypot(self.end_x - self.start_x, self.end_y - self.start_y)
     
     def set_thickness(self, thickness:int):
         self.thickness = thickness
@@ -86,6 +91,11 @@ class ObjectLine(ObjectBase):
 
     def set_end_point(self, end_x:int, end_y:int):
         self.end_point = (end_x, end_y)
+
+    def set_points(self, start_point: tuple, end_point: tuple):
+        """Set both endpoints at once, e.g. set_points((0, 0), (100, 50))."""
+        self.start_point = start_point
+        self.end_point = end_point
 
     def _update_bounding_box(self):
         x = min(self.start_x, self.end_x)

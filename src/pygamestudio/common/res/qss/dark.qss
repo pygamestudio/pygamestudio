@@ -53,6 +53,14 @@ QLineEdit:focus {
     border: 1px solid #007acc;
 }
 
+QLineEdit[drop_state="valid"] {
+    border: 1px solid #007acc;
+}
+
+QLineEdit[drop_state="invalid"] {
+    border: 1px solid #ff0000;
+}
+
 QSpinBox, QDoubleSpinBox {
     border-radius: 5px;
     border: 1px solid #3c3c3c;

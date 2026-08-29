@@ -277,6 +277,15 @@ class EditorBody(QMainWindow):
     def _show_support_page(self):
         webbrowser.open('https://pygamestudio.com/updates_and_support/support_pygame_studio/')
 
+    def _update_scene_tab_unsaved_marker(self):
+        """Prefix the scene tab label with '*' while the scene has unsaved
+        changes, so the unsaved state is visible at a glance."""
+        scene_tab_name = T.tr('scene.scene', 'Scene')
+        if self._game_manager.is_current_scene_saved:
+            self._center_top_tab_widget.setTabText(0, scene_tab_name)
+        else:
+            self._center_top_tab_widget.setTabText(0, f'*{scene_tab_name}')
+
     def retranslate(self):
         self.menuBar().clear()
         self._file_menu = self.menuBar().addMenu(T.tr('menu.file', 'File'))
@@ -287,7 +296,7 @@ class EditorBody(QMainWindow):
 
         self._left_top_tab_widget.setTabText(0, T.tr('hierarchy.hierarchy', 'Hierarchy'))
         self._left_bottom_tab_widget.setTabText(0, T.tr('asset.asset', 'Asset'))
-        self._center_top_tab_widget.setTabText(0, T.tr('scene.scene', 'Scene'))
+        self._update_scene_tab_unsaved_marker()
         self._center_bottom_tab_widget.setTabText(0, T.tr('console.console', 'Console'))
         self._right_top_tab_widget.setTabText(0, T.tr('inspector.inspector', 'Inspector'))
 
@@ -325,6 +334,7 @@ class Editor(WindowBase):
         self._game_manager.scene_saved_signal.connect(self._update_window_title)
         self._game_manager.scene_loaded_signal.connect(self._update_window_title)
         self._game_manager.scene_renamed_signal.connect(self._update_window_title)
+        self._game_manager.scene_dirty_state_changed.connect(self._on_scene_dirty_state_changed)
 
     def _new_project(self):
         self._parent.show_dashboard_and_create_project_window()
@@ -343,10 +353,19 @@ class Editor(WindowBase):
         self.move(int(pos_x), int(pos_y))
 
     def _update_window_title(self):
-        """Set the window title (Pygame Studio + current scene name + project path)"""
+        """Set the window title (Pygame Studio + current scene name + project path).
+
+        Appends ' - *unsaved' when the current scene has unsaved changes."""
         project_path = self._game_manager.get_project_path()
         current_scene_name = Path(self._game_manager.current_scene_file_path).name if self._game_manager.current_scene_file_path else 'untitled.scene'
-        self.window_title.set_title_name(f'Pygame Studio - {current_scene_name} - {project_path}')
+        unsaved_suffix = ' - *unsaved' if not self._game_manager.is_current_scene_saved else ''
+        self.window_title.set_title_name(f'Pygame Studio - {current_scene_name} - {project_path}{unsaved_suffix}')
+
+    def _on_scene_dirty_state_changed(self, is_saved):
+        """Refresh the unsaved indicators (window title suffix + scene tab '*'
+        marker) whenever the scene's saved state flips."""
+        self._update_window_title()
+        self._editor_body._update_scene_tab_unsaved_marker()
 
     def get_ready_for_project(self, project_path):
         self._editor_body.get_ready_for_project(project_path)
@@ -374,7 +393,7 @@ class Editor(WindowBase):
 
     def closeEvent(self, event):
         # Guard against losing unsaved scene changes before closing the editor.
-        if not self._game_manager.is_current_scene_saved():
+        if not self._game_manager.is_current_scene_saved:
             choice = QMessageBox.warning(self, T.tr('message_box.warning_title', 'Warning'), T.tr('message_box.warning_scene_save_content', 'The current scene data has been modified. Do you want to save it?'), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel)
             if choice == QMessageBox.StandardButton.Cancel:
                 event.ignore()

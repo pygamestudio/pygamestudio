@@ -27,7 +27,7 @@ class ObjectRect(ObjectBase):
             'scale': (1, 1),
             'angle': 0,
             'color': (255, 255, 255, 255),
-            'is_visible': True,
+            'visible': True,
             'border_top_left_radius': 0,
             'border_top_right_radius': 0,
             'border_bottom_left_radius': 0,
@@ -53,7 +53,12 @@ class ObjectRect(ObjectBase):
 
     def get_border_bottom_right_radius(self) -> int:
         return self.border_bottom_right_radius
-    
+
+    def get_border_radius(self) -> tuple:
+        """All four corner radii as (top_left, top_right, bottom_left, bottom_right)."""
+        return (self.border_top_left_radius, self.border_top_right_radius,
+                self.border_bottom_left_radius, self.border_bottom_right_radius)
+
     def set_border_top_left_radius(self,  radius:int):
         self.border_top_left_radius = radius
 
@@ -65,6 +70,18 @@ class ObjectRect(ObjectBase):
 
     def set_border_bottom_right_radius(self,  radius:int):
         self.border_bottom_right_radius = radius
+
+    def set_border_radius(self, radius):
+        """Set all four corners at once: pass a single int, or a 4-item
+        tuple/list (top_left, top_right, bottom_left, bottom_right)."""
+        if isinstance(radius, (tuple, list)):
+            (self.border_top_left_radius, self.border_top_right_radius,
+             self.border_bottom_left_radius, self.border_bottom_right_radius) = radius
+        else:
+            self.border_top_left_radius = radius
+            self.border_top_right_radius = radius
+            self.border_bottom_left_radius = radius
+            self.border_bottom_right_radius = radius
 
     def _update_surface(self):
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)

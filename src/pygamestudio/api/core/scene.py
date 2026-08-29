@@ -189,7 +189,7 @@ class SceneLoader:
             obj._update_surface()
             self._update_script(obj)
             
-            if obj.is_visible:
+            if obj.visible:
                 for child_object_tree_struct in value['children']:
                     _update(child_object_tree_struct, obj._get_surface())
 

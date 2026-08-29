@@ -158,22 +158,22 @@ class Container(QFrame):
         self._game_manager.set_font_size(self._object_uuid_in_inspection, new_font_size)
 
     def set_object_bold_state(self):
-        checkbox_bold = self._find_widget(self._container_layout, 'is_bold')
+        checkbox_bold = self._find_widget(self._container_layout, 'bold')
         new_bold_state = checkbox_bold.isChecked()
         self._game_manager.set_bold_state(self._object_uuid_in_inspection, new_bold_state)
 
     def set_object_italic_state(self):
-        checkbox_italic = self._find_widget(self._container_layout, 'is_italic')
+        checkbox_italic = self._find_widget(self._container_layout, 'italic')
         new_italic_state = checkbox_italic.isChecked()
         self._game_manager.set_italic_state(self._object_uuid_in_inspection, new_italic_state)
 
     def set_object_underline_state(self):
-        checkbox_underline = self._find_widget(self._container_layout, 'is_underline')
+        checkbox_underline = self._find_widget(self._container_layout, 'underline')
         new_underline_state = checkbox_underline.isChecked()
         self._game_manager.set_underline_state(self._object_uuid_in_inspection, new_underline_state)
 
     def set_object_strikethrough_state(self):
-        checkbox_strikethrough = self._find_widget(self._container_layout, 'is_strikethrough')
+        checkbox_strikethrough = self._find_widget(self._container_layout, 'strikethrough')
         new_strikethrough_state = checkbox_strikethrough.isChecked()
         self._game_manager.set_strikethrough_state(self._object_uuid_in_inspection, new_strikethrough_state)
 
@@ -309,14 +309,14 @@ class Container(QFrame):
         if object_uuid != self._object_uuid_in_inspection:
             return
         
-        checkbox = self._find_widget(self._container_layout, 'is_visible')
+        checkbox = self._find_widget(self._container_layout, 'visible')
         checkbox.setChecked(True)
 
     def _on_object_hidden(self, object_uuid):
         if object_uuid != self._object_uuid_in_inspection:
             return
         
-        checkbox = self._find_widget(self._container_layout, 'is_visible')
+        checkbox = self._find_widget(self._container_layout, 'visible')
         checkbox.setChecked(False)
 
     def _on_object_color_changed(self, object_uuid):

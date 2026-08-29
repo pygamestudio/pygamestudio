@@ -1,4 +1,5 @@
 
+import math
 import pygame
 from pathlib import Path
 from pygamestudio.game.object.type import *
@@ -25,8 +26,8 @@ class ObjectBase:
 
         # Editor-only bookkeeping (never serialized to disk).
         internal_properties = {
-            'is_expanded': True,
-            'is_selected': False,
+            'expanded': True,
+            'selected': False,
             'icon': '',
         }
     
@@ -46,7 +47,31 @@ class ObjectBase:
         self.script_path = object_data.get('script_path', '')
 
     def is_pressed(self, x:int, y:int) -> bool:
+        """Pixel-perfect hit test: True when (x, y) (world coords) hits a
+        non-transparent pixel of the object. More expensive than
+        is_point_inside(); prefer it for clicks, not per-frame checks."""
         return True if self._check_click_collision((x, y)) else False
+
+    def is_visible(self) -> bool:
+        return self.visible
+
+    def is_shown(self) -> bool:
+        return self.visible
+
+    def is_hidden(self) -> bool:
+        return not self.visible
+
+    def is_point_inside(self, x: int, y: int) -> bool:
+            """Cheap rect-based hit test (unlike is_pressed, no pixel mask)."""
+            return self._get_world_rect().collidepoint(x, y)
+    
+    def is_colliding_with_rect(self, x: int, y: int, width: int, height: int) -> bool:
+        """True if the object overlaps the given rectangle (world coords)."""
+        return self._get_world_rect().colliderect((x, y, width, height))
+
+    def is_colliding_with_object(self, other) -> bool:
+        """True if the object overlaps another scene object (world rects)."""
+        return self._get_world_rect().colliderect(other._get_world_rect())
     
     def get_name(self) -> str:
         return self.name
@@ -87,8 +112,8 @@ class ObjectBase:
     def get_scale(self) -> tuple:
         return self.scale
     
-    def get_visibility(self) -> bool:
-        return self.is_visible
+    def get_visible_state(self) -> bool:
+        return self.visible
     
     def get_color(self) -> tuple:
         return self.color
@@ -130,11 +155,73 @@ class ObjectBase:
     def set_angle(self, angle:float):
         self.angle = angle
 
-    def set_visibility(self, visibility:bool):
-        self.is_visible = visibility
+    def set_visible_state(self, visible:bool):
+        self.visible = visible
     
     def set_color(self, color:tuple):
         self.color = color
+
+    def get_rect(self) -> pygame.Rect:
+        """Local bounding rect (x, y, width, height) of the object."""
+        return self._get_rect()
+
+    def get_world_rect(self) -> pygame.Rect:
+        """Bounding rect of the object in scene (world) coordinates."""
+        return self._get_world_rect()
+
+    def get_collision_rect(self, x: int, y: int, width: int, height: int):
+        """Return the overlapping pygame.Rect with the given rectangle, or
+        None when they don't overlap."""
+        overlap = self._get_world_rect().clip(pygame.Rect(x, y, width, height))
+        if overlap.width > 0 and overlap.height > 0:
+            return overlap
+        return None
+
+    def get_center(self) -> tuple:
+        """Center of the object in world coordinates."""
+        world_rect = self._get_world_rect()
+        return (world_rect.centerx, world_rect.centery)
+
+    def set_center(self, x: int, y: int):
+        """Move the object so its center is at (x, y) (world coordinates)."""
+        world_rect = self._get_world_rect()
+        self._set_world_rect(x - world_rect.width // 2, y - world_rect.height // 2)
+
+    def move(self, dx: int, dy: int):
+        """Move the object by (dx, dy) pixels (world coordinates)."""
+        world_x, world_y = self._get_world_pos()
+        self._set_world_rect(world_x + dx, world_y + dy)
+
+    def distance_to(self, x: int, y: int) -> float:
+        """Euclidean distance from the object's center to the point (x, y)."""
+        center_x, center_y = self.get_center()
+        return math.hypot(x - center_x, y - center_y)
+
+    def distance_to_object(self, other) -> float:
+        """Euclidean distance between this object's center and another
+        object's center."""
+        center_x, center_y = self.get_center()
+        other_x, other_y = other.get_center()
+        return math.hypot(other_x - center_x, other_y - center_y)
+
+    def get_direction_to(self, x: int, y: int) -> tuple:
+        """Normalized (unit) direction vector from the object's center to
+        (x, y). Returns (0.0, 0.0) when the target equals the center."""
+        center_x, center_y = self.get_center()
+        dx = x - center_x
+        dy = y - center_y
+        length = math.hypot(dx, dy)
+        if length == 0:
+            return (0.0, 0.0)
+        return (dx / length, dy / length)
+
+    def show(self):
+        """Make the object visible."""
+        self.visible = True
+
+    def hide(self):
+        """Hide the object."""
+        self.visible = False
 
     def on_start(self):
         """User hook: called once when the object enters the scene at runtime."""
@@ -162,7 +249,7 @@ class ObjectBase:
         In editor mode a blue selection outline is drawn around the object.
         """
         parent_surface.blit(self.surface, self._get_rect())
-        if not self._is_for_api and self.is_selected:
+        if not self._is_for_api and self.selected:
             pygame.draw.rect(parent_surface, (0, 122, 204), self._get_rect(), width=2)
 
     def _get_surface(self):
@@ -228,10 +315,11 @@ class ObjectBase:
         """Serialize the object for the .scene JSON file.
 
         Runtime-only / non-persistent fields (surface, script instance, the
-        manager reference, editor selection state, ...) are excluded so the
-        file stays small and reloadable.
+        manager reference, editor selection/expansion state, ...) are excluded
+        so the file stays small, reloadable, and comparable against the saved
+        snapshot regardless of transient UI state.
         """
-        exclude_fields = ['_is_initialized', '_is_for_api', '_game_manager', 'surface', 'icon', 'script_instance']
+        exclude_fields = ['_is_initialized', '_is_for_api', '_game_manager', 'surface', 'icon', 'script_instance', 'selected', 'expanded']
         return {
             key: value for key, value in self.__dict__.items() 
             if key not in exclude_fields

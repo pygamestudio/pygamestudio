@@ -7,6 +7,66 @@ from pygamestudio.common.utils.path import get_project_path
 from pygamestudio.common.i18n.translator import Translator as T
 
 
+def _is_valid_dropped_file(mime_data, extensions):
+    """Return True when the dragged data carries a local file whose suffix is
+    in `extensions`. Used to accept/reject drag-and-drop in the path line edits."""
+    if not mime_data.hasUrls():
+        return False
+    urls = mime_data.urls()
+    if not urls:
+        return False
+    file_path = urls[0].toLocalFile()
+    if not file_path:
+        return False
+    return Path(file_path).suffix.lower() in extensions
+
+
+class _PathLineEditDropMixin:
+    """Drag-and-drop handling shared by the path line edits (image/font/script).
+
+    While a file is dragged over the widget the border gives instant feedback:
+    blue (drop_state="valid") when the file type is accepted, red
+    (drop_state="invalid") otherwise (see the QSS rules in dark.qss/light.qss).
+    The feedback clears on drag leave or after a drop.
+    """
+
+    # Set of accepted file suffixes; each subclass defines its own.
+    _drop_extensions = ()
+
+    def _set_drop_feedback(self, state):
+        """Apply the drop feedback property (True=valid, False=invalid,
+        None=default) and repolish so the QSS rules take effect."""
+        self.setProperty('drop_state', {True: 'valid', False: 'invalid'}.get(state, ''))
+        self.style().unpolish(self)
+        self.style().polish(self)
+
+    def dragEnterEvent(self, event):
+        if not event.mimeData().hasUrls():
+            event.ignore()
+            return
+        if _is_valid_dropped_file(event.mimeData(), self._drop_extensions):
+            self._set_drop_feedback(True)
+            event.acceptProposedAction()
+        else:
+            self._set_drop_feedback(False)
+            # Accept the enter (not ignore) so dragLeaveEvent still fires and
+            # clears the red feedback; the drop itself is rejected in dropEvent.
+            event.accept()
+
+    def dragLeaveEvent(self, event):
+        self._set_drop_feedback(None)
+        super().dragLeaveEvent(event)
+
+    def dropEvent(self, event):
+        if not event.mimeData().hasUrls():
+            event.ignore()
+            return
+        if _is_valid_dropped_file(event.mimeData(), self._drop_extensions):
+            self._set_path_from_file(event.mimeData().urls()[0].toLocalFile())
+        self._set_drop_feedback(None)
+        event.acceptProposedAction()
+
+
 class NameLineEdit(QLineEdit):
     def __init__(self, inspector_container, text='',  attr=''):
         super().__init__()
@@ -26,7 +86,10 @@ class NameLineEdit(QLineEdit):
         self.textChanged.connect(self._inspector_container.rename_object)
 
 
-class ImagePathLineEdit(QLineEdit):
+class ImagePathLineEdit(_PathLineEditDropMixin, QLineEdit):
+    # Accepted file suffixes for drag-and-drop.
+    _drop_extensions = {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.lbm', '.pcx', '.qoi', '.svg', '.tga', '.tiff', '.webp', '.xpm', '.xcf'}
+
     def __init__(self, inspector_container, image_path='',  attr=''):
         super().__init__()
         self._inspector_container = inspector_container
@@ -44,6 +107,7 @@ class ImagePathLineEdit(QLineEdit):
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
         self.setTextMargins(0, 0, 24, 0)
         self.setReadOnly(True)
+        self.setAcceptDrops(True)
         
         if not str(self._image_path) == '.':
             project_path = Path(get_project_path())
@@ -79,16 +143,20 @@ class ImagePathLineEdit(QLineEdit):
         h_layout.addWidget(self._browse_button)
         h_layout.setContentsMargins(0, 2, 5, 0)
 
+    def _set_path_from_file(self, file_path):
+        """Apply a chosen/dropped image file: update the display and notify the
+        inspector so the object's image_path is set (same as picking it)."""
+        self._image_path = Path(file_path)
+        self.setToolTip(self._image_path.as_posix())
+        self._inspector_container.set_object_image_path()
+        self.setStyleSheet('')
+
     def _choose_image(self):
         image_path, _ = QFileDialog.getOpenFileName(self, T.tr('inspector.select_image', 'Select Image'), os.environ.get('__PYGAMESTUDIO_PROJECT_PATH'), T.tr('inspector.format', 'Format') + ' (*.png *.jpg *.jpeg *.gif *.bmp *.lbm *.pcx *.qoi *.svg *.tga *.tiff *.webp *.xpm *.xcf)')
         if not image_path:
             return
 
-        self._image_path = Path(image_path)
-        self.setToolTip(self._image_path.as_posix())
-        self._inspector_container.set_object_image_path()
-
-        self.setStyleSheet('')
+        self._set_path_from_file(image_path)
 
     def _delete_image(self):
         self._image_path = Path('')
@@ -107,7 +175,10 @@ class ImagePathLineEdit(QLineEdit):
         return super().leaveEvent(event)
 
 
-class FontPathLineEdit(QLineEdit):
+class FontPathLineEdit(_PathLineEditDropMixin, QLineEdit):
+    # Accepted file suffixes for drag-and-drop.
+    _drop_extensions = {'.ttf'}
+
     def __init__(self, inspector_container, font_path='',  attr=''):
         super().__init__()
         self._inspector_container = inspector_container
@@ -125,6 +196,7 @@ class FontPathLineEdit(QLineEdit):
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
         self.setTextMargins(0, 0, 24, 0)
         self.setReadOnly(True)
+        self.setAcceptDrops(True)
         
         if not str(self._font_path) == '.':
             project_path = Path(get_project_path())
@@ -160,16 +232,20 @@ class FontPathLineEdit(QLineEdit):
         h_layout.addWidget(self._browse_button)
         h_layout.setContentsMargins(0, 0, 5, 0)
 
+    def _set_path_from_file(self, file_path):
+        """Apply a chosen/dropped font file: update the display and notify the
+        inspector so the object's font_path is set (same as picking it)."""
+        self._font_path = Path(file_path)
+        self.setToolTip(self._font_path.as_posix())
+        self._inspector_container.set_object_font_path()
+        self.setStyleSheet('')
+
     def _choose_font(self):
         font_path, _ = QFileDialog.getOpenFileName(self, T.tr('inspector.select_font', 'Select Font'), os.environ.get('__PYGAMESTUDIO_PROJECT_PATH'), T.tr('inspector.format', 'Format') + ' (*.ttf)')
         if not font_path:
             return
 
-        self._font_path = Path(font_path)
-        self.setToolTip(self._font_path.as_posix())
-        self._inspector_container.set_object_font_path()
-
-        self.setStyleSheet('')
+        self._set_path_from_file(font_path)
 
     def _delete_font(self):
         self._font_path = Path('')
@@ -188,7 +264,10 @@ class FontPathLineEdit(QLineEdit):
         return super().leaveEvent(event)
 
 
-class ScriptPathLineEdit(QLineEdit):
+class ScriptPathLineEdit(_PathLineEditDropMixin, QLineEdit):
+    # Accepted file suffixes for drag-and-drop.
+    _drop_extensions = {'.py'}
+
     def __init__(self, inspector_container, script_path='', attr=''):
         super().__init__()
         self._inspector_container = inspector_container
@@ -206,6 +285,7 @@ class ScriptPathLineEdit(QLineEdit):
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
         self.setTextMargins(0, 0, 24, 0)
         self.setReadOnly(True)
+        self.setAcceptDrops(True)
 
         if not str(self._script_path) == '.':
             project_path = Path(get_project_path())
@@ -241,16 +321,20 @@ class ScriptPathLineEdit(QLineEdit):
         h_layout.addWidget(self._browse_button)
         h_layout.setContentsMargins(0, 2, 5, 0)
 
+    def _set_path_from_file(self, file_path):
+        """Apply a chosen/dropped script file: update the display and notify
+        the inspector so the object's script_path is set (same as picking it)."""
+        self._script_path = Path(file_path)
+        self.setToolTip(self._script_path.as_posix())
+        self._inspector_container.set_object_script_path()
+        self.setStyleSheet('')
+
     def _choose_script(self):
         script_path, _ = QFileDialog.getOpenFileName(self, T.tr('inspector.select_script', 'Select Script'), os.environ.get('__PYGAMESTUDIO_PROJECT_PATH'), T.tr('inspector.format', 'Format') + ' (*.py)')
         if not script_path:
             return
 
-        self._script_path = Path(script_path)
-        self.setToolTip(self._script_path.as_posix())
-        self._inspector_container.set_object_script_path()
-
-        self.setStyleSheet('')
+        self._set_path_from_file(script_path)
 
     def _delete_script(self):
         self._script_path = Path('')

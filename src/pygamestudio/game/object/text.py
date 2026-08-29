@@ -30,14 +30,14 @@ class ObjectText(ObjectBase):
             'scale': (1, 1),
             'angle': 0,
             'color': (255, 255, 255, 255),
-            'is_visible': True,
+            'visible': True,
             'text': 'Text',
             'font_size': 30,
             'font_path': './font/SIMHEI.ttf',
-            'is_bold': False,
-            'is_italic': False,
-            'is_underline': False,
-            'is_strikethrough': False
+            'bold': False,
+            'italic': False,
+            'underline': False,
+            'strikethrough': False
         }
         
         for key, value in common_properties.items():
@@ -57,18 +57,23 @@ class ObjectText(ObjectBase):
     def get_font_path(self) -> str:
         return self.font_path
     
-    def get_bold(self):
-        return self.is_bold
+    def get_bold_state(self):
+        return self.bold
 
-    def get_italic(self):
-        return self.is_italic
+    def get_italic_state(self):
+        return self.italic
     
-    def get_underline(self):
-        return self.is_underline
+    def get_underline_state(self):
+        return self.underline
     
-    def get_strikethrough(self):
-        return self.is_strikethrough
-    
+    def get_strikethrough_state(self):
+        return self.strikethrough
+
+    def get_text_size(self) -> tuple:
+        """Return the (width, height) the current text renders at, using the
+        current font settings (unscaled by scale_x/scale_y)."""
+        return self._init_font().size(self.text)
+
     def set_text(self, text:str):
         self.text = text
 
@@ -78,18 +83,23 @@ class ObjectText(ObjectBase):
     def set_font_path(self, font_path:str):
         self.font_path = font_path
 
-    def set_bold(self, is_bold:bool):
-        self.is_bold = is_bold
+    def set_bold_state(self, bold:bool):
+        self.bold = bold
 
-    def set_italic(self, is_italic:bool):
-        self.is_italic = is_italic
+    def set_italic_state(self, italic:bool):
+        self.italic = italic
     
-    def set_underline(self, is_underline:bool):
-        self.is_underline = is_underline
+    def set_underline_state(self, underline:bool):
+        self.underline = underline
     
-    def set_strikethrough(self, is_strikethrough:bool):
-        self.is_strikethrough = is_strikethrough
-    
+    def set_strikethrough_state(self, strikethrough:bool):
+        self.strikethrough = strikethrough
+
+    def set_font(self, font_path: str, font_size: int):
+        """Set the font file and size in one call."""
+        self.font_path = font_path
+        self.font_size = font_size
+
     def _init_font(self):
         font_absolute_path = Path(get_project_path()) / self.font_path
         if self.font_path == '' or not font_absolute_path.exists():
@@ -97,10 +107,10 @@ class ObjectText(ObjectBase):
         else:
             font = pygame.font.Font(font_absolute_path, size=self.font_size)
 
-        font.set_bold(self.is_bold)
-        font.set_italic(self.is_italic)
-        font.set_underline(self.is_underline)
-        font.set_strikethrough(self.is_strikethrough)
+        font.set_bold(self.bold)
+        font.set_italic(self.italic)
+        font.set_underline(self.underline)
+        font.set_strikethrough(self.strikethrough)
         return font
     
     def _update_surface(self):

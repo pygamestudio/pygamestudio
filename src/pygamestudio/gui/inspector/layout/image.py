@@ -13,7 +13,7 @@ INSPECTOR_LAYOUT_IMAGE = {
         },
         'component': {
             'enabled': [True],
-            'attribute': ['is_visible'],
+            'attribute': ['visible'],
             'widget': [VisibilityCheckBox]
         }
     },

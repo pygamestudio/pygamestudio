@@ -15,7 +15,7 @@ INSPECTOR_LAYOUT_TEXT = {
         },
         'component': {
             'enabled': [True],
-            'attribute': ['is_visible'],
+            'attribute': ['visible'],
             'widget': [VisibilityCheckBox]
         }
     },
@@ -129,47 +129,47 @@ INSPECTOR_LAYOUT_TEXT = {
             'widget': [FontPathLineEdit]
         }
     },
-    'is_bold': {
+    'bold': {
         'i18n': {
             'key': 'inspector.bold',
             'default': 'Bold'
         },
         'component': {
             'enabled': [True],
-            'attribute': ['is_bold'],
+            'attribute': ['bold'],
             'widget': [BoldCheckBox]
         }
     },
-    'is_italic': {
+    'italic': {
         'i18n': {
             'key': 'inspector.italic',
             'default': 'Italic'
         },
         'component': {
             'enabled': [True],
-            'attribute': ['is_italic'],
+            'attribute': ['italic'],
             'widget': [ItalicCheckBox]
         }
     },
-    'is_underline': {
+    'underline': {
         'i18n': {
             'key': 'inspector.underline',
             'default': 'Underline'
         },
         'component': {
             'enabled': [True],
-            'attribute': ['is_underline'],
+            'attribute': ['underline'],
             'widget': [UnderlineCheckBox]
         }
     },
-    'is_strikethrough': {
+    'strikethrough': {
         'i18n': {
             'key': 'inspector.strikethrough',
             'default': 'Strikethrough'
         },
         'component': {
             'enabled': [True],
-            'attribute': ['is_strikethrough'],
+            'attribute': ['strikethrough'],
             'widget': [StrikethroughCheckBox]
         }
     },

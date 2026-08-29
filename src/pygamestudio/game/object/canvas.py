@@ -27,7 +27,7 @@ class ObjectCanvas(ObjectBase):
             'scale': (1, 1),
             'angle': 0,
             'color': (0, 0, 0, 255),
-            'is_visible': True,
+            'visible': True,
         }
         
         for key, value in common_properties.items():
@@ -42,7 +42,7 @@ class ObjectCanvas(ObjectBase):
     def _update_surface(self):
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
         pygame.draw.rect(self.surface, self.color, self.surface.get_rect())
-        if not self._is_for_api and self.is_selected:
+        if not self._is_for_api and self.selected:
             pygame.draw.rect(self.surface, (0, 122, 204), (0, 0, self.surface.width, self.surface.height), 2)
 
         super()._update_surface()

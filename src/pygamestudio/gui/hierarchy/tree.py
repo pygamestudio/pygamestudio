@@ -143,7 +143,7 @@ class HierarchyTreeView(QTreeView):
         item_uuid = item.data(Qt.ItemDataRole.UserRole+1)
         obj = self._game_manager.get_object(item_uuid)
 
-        if obj.is_expanded == False:
+        if obj.expanded == False:
             self._game_manager.expand(item_uuid)
 
     def _on_item_collapsed(self, index):
@@ -151,7 +151,7 @@ class HierarchyTreeView(QTreeView):
         item_uuid = item.data(Qt.ItemDataRole.UserRole+1)
         obj = self._game_manager.get_object(item_uuid)
 
-        if obj.is_expanded == True:
+        if obj.expanded == True:
             self._game_manager.collapse(item_uuid)
 
     def get_ready_for_project(self):
@@ -221,7 +221,7 @@ class HierarchyTreeView(QTreeView):
 
         index = self._proxy_model.mapFromSource(self._standard_model.indexFromItem(item))
 
-        # Ensure that the is_selected property of objects is not changed while loading the scene file.
+        # Ensure that the selected property of objects is not changed while loading the scene file.
         # if self._game_manager.is_project_ready:
         self.setCurrentIndex(index)
         self.scrollTo(index)
@@ -348,7 +348,7 @@ class HierarchyTreeView(QTreeView):
         def _restore(parent_item):
             item_uuid = parent_item.data(Qt.ItemDataRole.UserRole+1)
             obj = self._game_manager.get_object(item_uuid)
-            if not obj.is_expanded:
+            if not obj.expanded:
                 index = self._proxy_model.mapFromSource(self._standard_model.indexFromItem(parent_item))
                 self.collapse(index)
 
@@ -383,7 +383,7 @@ class HierarchyTreeView(QTreeView):
     def _is_item_visible(self, item):
         item_uuid = item.data(Qt.ItemDataRole.UserRole+1)
         obj = self._game_manager.get_object(item_uuid)
-        return obj.is_visible
+        return obj.visible
     
     def is_ancestor_item_visible(self, item):
         current = item.parent()
@@ -410,7 +410,7 @@ class HierarchyTreeView(QTreeView):
         index_uuid = current_index.data(Qt.ItemDataRole.UserRole+1)
         obj = self._game_manager.get_object(index_uuid)
 
-        if obj.is_expanded:
+        if obj.expanded:
             def collapse_recursively(parent_index):
                 self.setExpanded(parent_index, False)
                 parent_index_uuid = parent_index.data(Qt.ItemDataRole.UserRole+1)
