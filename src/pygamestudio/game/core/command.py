@@ -2,6 +2,12 @@ from PySide6.QtGui import QUndoCommand
 
 
 class AddObjectCommand(QUndoCommand):
+    """Undoable command that inserts an object (subtree) into the scene tree.
+
+    redo(): attach the object_tree_struct to its parent.
+    undo(): detach it again (the whole subtree is removed at once).
+    """
+
     def __init__(self, game_manager, parent_uuid, object_tree_struct, inserted_pos, description=''):
         super().__init__(description)
         self._game_manager = game_manager
@@ -17,6 +23,12 @@ class AddObjectCommand(QUndoCommand):
 
 
 class DeleteObjectCommand(QUndoCommand):
+    """Undoable command that removes an object (subtree) from the scene tree.
+
+    The exact inverse of AddObjectCommand: redo() detaches the subtree,
+    undo() re-attaches it at the original parent and position.
+    """
+
     def __init__(self, game_manager, parent_uuid, object_tree_struct, inserted_pos, description=''):
         super().__init__(description)
         self._game_manager = game_manager
@@ -32,6 +44,13 @@ class DeleteObjectCommand(QUndoCommand):
 
 
 class UpdateAttrValueCommand(QUndoCommand):
+    """Undoable command that changes a single attribute of an object.
+
+    Both redo() and undo() write the attribute directly through setattr() and
+    then emit the matching GameManager signal so every panel (inspector,
+    hierarchy, scene view, ...) stays in sync with the new value.
+    """
+
     def __init__(self, game_manager, obj, attr, old_value, new_value, descripton=''):
         super().__init__(descripton)
         self._game_manager = game_manager
@@ -49,6 +68,8 @@ class UpdateAttrValueCommand(QUndoCommand):
         self._emit_signal(self._attr, self._old_value)
 
     def _emit_signal(self, attr, value):
+        # Dispatch the changed attribute to the panel that displays it, so the
+        # UI reflects the (possibly undone/redone) value immediately.
         if attr == 'name':
             self._game_manager.object_renamed.emit(self._obj.uuid)
         elif attr == 'is_visible':

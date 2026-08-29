@@ -9,7 +9,7 @@
         "warning_title": "警告",
         "warning_scene_save_content": "当前场景数据已被修改，是否保存？",
         "quesiton_title": "确认",
-        "question_delete_asset_item_content": "是否删除这{}项？此操作无法撤销。\n{}",
+        "question_delete_asset_item_content": "是否删除这{}项？\n{}",
         "question_delete_hierarchy_item_content": "是否删除选中的对象？",
         "question_delete_project_content": "是否删除该项目？",
         "question_overwrite_content": "是否覆盖以下重复资源？\n{}",
@@ -27,6 +27,7 @@
         "critical_open_project": "打开项目失败，找不到project.pygs。",
         "critical_find_project": "找不到该项目。",
         "critical_delete_project": "无法删除项目：{}",
+        "critical_move_to_trash": "无法将项目移入回收站。",
         "critical_app_icon_not_exist": "图标文件不存在",
         "critical_no_output_dir": "请选择输出目录",
         "critical_output_dir_not_exist": "输出目录不存在",
@@ -116,7 +117,8 @@
         "scene": "场景编辑器",
         "scene_saved": "场景已保存",
         "run_project": "运行项目{}",
-        "failed_to_run_project": "项目{}运行失败：{}"
+        "failed_to_run_project": "项目{}运行失败：{}",
+        "run_project_finished": "项目{}已退出，退出码：{}"
     },
 
     "hierarchy": {
@@ -229,6 +231,11 @@
         "script_start_error": "脚本{}的on_start错误：{}",
         "script_update_error": "脚本{}的on_update错误：{}",
         "script_destroy_error": "脚本{}的on_destroy错误：{}",
+        "fail_to_init_mixer": "音频混音器初始化失败：{}",
+        "no_sound_path": "音频路径{}不存在。",
+        "fail_to_load_sound": "音频{}加载失败：{}",
+        "fail_to_play_sound": "音频{}播放失败：{}",
+        "fail_to_play_music": "音乐{}播放失败：{}",
         "no_project_pygs": "没有在项目根目录下找到project.pygs配置文件。",
         "fail_to_load_project_pygs": "配置文件project.pygs加载失败：{}"
     },

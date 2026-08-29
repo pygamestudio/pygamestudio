@@ -11,6 +11,7 @@ from pygamestudio.gui.asset.menu import ContextMenu
 from pygamestudio.gui.asset.delegate import AssetTreeWidgetDelegate
 from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.common.utils.config import get_project_config, update_project_config
+from pygamestudio.common.utils.system import send_to_trash
 from pygamestudio.common.utils.path import RES_PATH
 
 
@@ -156,6 +157,13 @@ class AssetTreeView(QTreeView):
         return folder_path
 
     def _add_file(self, index_type):
+        """Create a new file of the given type inside the current folder.
+
+        Scene files are written with an empty JSON document, script files are
+        filled with the object script template, and any other file is created
+        empty via touch(). The new path is remembered so it can be selected
+        and renamed after the file system finishes loading.
+        """
         parent_index = self._get_parent_index_for_creation()
         self.setExpanded(parent_index, True)
         parent_path = Path(self._file_model.filePath(self._proxy_model.mapToSource(parent_index)))
@@ -181,6 +189,12 @@ class AssetTreeView(QTreeView):
         return file_path
 
     def _select_and_scroll_to_new_item(self, item_path, retry_count=0, on_selected=None):
+        """Select, scroll to, and optionally rename a just-created file.
+
+        The file system model may still be loading the new entry when this is
+        called, so if the index is not valid yet we retry a few times (25 ms
+        apart) instead of giving up immediately.
+        """
         source_index = self._file_model.index(str(item_path))
         index = self._proxy_model.mapFromSource(source_index)
 
@@ -213,7 +227,7 @@ class AssetTreeView(QTreeView):
         indexes_to_delete = [index for index in selected_indexes if is_to_delete(index, selected_indexes)]
         index_names = [index.data(Qt.ItemDataRole.DisplayRole) for index in indexes_to_delete]
 
-        content = T.tr('message_box.question_delete_asset_item_content', 'Delete {} item(s)? This cannot be undone.\n{}').format(str(len(indexes_to_delete)), ('\n').join(index_names))
+        content = T.tr('message_box.question_delete_asset_item_content', 'Delete {} item(s)?\n{}').format(str(len(indexes_to_delete)), ('\n').join(index_names))
         reply = QMessageBox.question(QApplication.activeWindow(), T.tr('message_box.question_title', 'Confirm'), content, QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
 
         if reply == QMessageBox.StandardButton.No:
@@ -222,7 +236,8 @@ class AssetTreeView(QTreeView):
         for index in indexes_to_delete:
             index_path = Path(self._file_model.filePath(self._proxy_model.mapToSource(index)))
             if index_path.exists():
-                shutil.rmtree(index_path) if index_path.is_dir() else index_path.unlink()
+                # Move to the system recycle bin instead of deleting permanently.
+                send_to_trash(index_path)
 
     def _cut(self):
         selected_indexes = self.selectedIndexes()

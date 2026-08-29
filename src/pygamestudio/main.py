@@ -24,6 +24,7 @@ SOFTWARE.
 
 import os
 import sys
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 from pygamestudio.gui.main import PygameStudio
 
@@ -32,8 +33,23 @@ if sys.platform == 'linux':
     os.environ['QT_QPA_PLATFORM'] = 'xcb'
 
 
+def set_application_icon(app):
+    """Set the application (taskbar / system menu) icon to the Pygame Studio logo."""
+    if sys.platform == 'win32':
+        import ctypes
+        try:
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('PygameStudio')
+        except Exception:
+            pass
+
+    # The icon is registered in resources_rc (loaded when gui.main is imported),
+    # so the resource path works in both the source tree and packaged builds.
+    app.setWindowIcon(QIcon(':/images/logo.png'))
+
+
 def main():
     app = QApplication([])
+    set_application_icon(app)
     pygame_studio = PygameStudio()
     pygame_studio.start()
     sys.exit(app.exec())

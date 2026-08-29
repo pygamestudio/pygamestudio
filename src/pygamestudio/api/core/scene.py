@@ -19,6 +19,13 @@ from pygamestudio.common.i18n.translator import Translator as T
 
 
 class SceneLoader:
+    """Runtime mirror of the editor's scene tree.
+
+    Reads the .scene JSON produced by the editor and rebuilds the same object
+    tree with is_for_api=True objects, rendering them each frame and driving
+    the attached behavior scripts (on_start / on_update / on_destroy).
+    """
+
     def __init__(self):
         self._current_scene_path = ''
         self._all_object_tree_struct = {}
@@ -190,7 +197,7 @@ class SceneLoader:
 
         _update(self._all_object_tree_struct, screen_surface)
 
-    def set_delta_time(self, delta_time):
+    def _set_delta_time(self, delta_time):
         """Set the per-frame delta time (seconds) passed to scripts' on_update."""
         self._delta_time = delta_time
 

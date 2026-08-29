@@ -112,6 +112,7 @@ class CreateProjectBody(QWidget):
             scene_folder_path.mkdir(parents=True, exist_ok=False)
             script_folder_path.mkdir(parents=True, exist_ok=False)
 
+            shutil.copy2(RES_PATH / 'audios/game_start.mp3', audio_folder_path)
             shutil.copy2(RES_PATH / 'fonts/SIMHEI.ttf', font_folder_path)
             shutil.copy2(RES_PATH / 'images/logo.png', image_folder_path)
 

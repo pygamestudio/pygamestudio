@@ -4,6 +4,7 @@ from PySide6.QtCore import *
 from PySide6.QtWidgets import *
 from pygamestudio.game.object.type import *
 from pygamestudio.common.i18n.translator import Translator as T
+from pygamestudio.common.utils.path import get_project_path
 from pygamestudio.gui.inspector.color import ColorPicker
 from pygamestudio.gui.inspector.component.label import PropertyLabel
 from pygamestudio.gui.inspector.layout.rect import INSPECTOR_LAYOUT_RECT
@@ -186,8 +187,6 @@ class Container(QFrame):
 
     def set_object_script_path(self):
         lineedit = self._find_widget(self._container_layout, 'script_path')
-        if not lineedit:
-            return
         self._game_manager.set_script_path(self._object_uuid_in_inspection, lineedit.toolTip())
     
     def show_color_picker(self, color_rgba):
@@ -381,6 +380,7 @@ class Container(QFrame):
         image_path_lineedit = self._find_widget(self._container_layout, 'image_path')
         image_path_lineedit.blockSignals(True)
         image_path_lineedit.setText(Path(obj.image_path).name)
+        image_path_lineedit.setToolTip(Path(obj.image_path).as_posix() if obj.image_path else '')
         image_path_lineedit.blockSignals(False)
 
     def _on_object_font_path_changed(self, object_uuid):
@@ -388,20 +388,15 @@ class Container(QFrame):
         font_path_lineedit = self._find_widget(self._container_layout, 'font_path')
         font_path_lineedit.blockSignals(True)
         font_path_lineedit.setText(Path(obj.font_path).name)
+        font_path_lineedit.setToolTip(Path(obj.font_path).as_posix() if obj.font_path else '')
         font_path_lineedit.blockSignals(False)
 
     def _on_object_script_path_changed(self, object_uuid):
-        if object_uuid != self._object_uuid_in_inspection:
-            return
-
         obj = self._game_manager.get_object(object_uuid)
         script_path_lineedit = self._find_widget(self._container_layout, 'script_path')
-        if not script_path_lineedit:
-            return
-
         script_path_lineedit.blockSignals(True)
         script_path_lineedit.setText(Path(obj.script_path).name)
-        script_path_lineedit.setToolTip(Path(obj.script_path).as_posix())
+        script_path_lineedit.setToolTip(Path(obj.script_path).as_posix() if obj.script_path else '')
         script_path_lineedit.blockSignals(False)
 
     def _find_widget(self, layout, widget_name):

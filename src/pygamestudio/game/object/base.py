@@ -8,10 +8,22 @@ from pygamestudio.common.i18n.translator import Translator as T
 
 
 class ObjectBase:
+    """Base class for every scene object (rect, text, image, ...).
+
+    Used in two modes:
+    - Editor mode (is_for_api=False): driven by GameManager, properties are
+      serialized to the .scene file, and pygame surfaces are rendered into the
+      editor's scene view.
+    - Runtime mode (is_for_api=True): driven by SceneLoader, the object is
+      rendered into the game window and a behavior script (script_path) can be
+      attached.
+    """
+
     def __init__(self, game_manager, object_data={}, is_for_api=False):
         self._is_for_api = is_for_api
         self._game_manager = game_manager
 
+        # Editor-only bookkeeping (never serialized to disk).
         internal_properties = {
             'is_expanded': True,
             'is_selected': False,
@@ -125,21 +137,30 @@ class ObjectBase:
         self.color = color
 
     def on_start(self):
+        """User hook: called once when the object enters the scene at runtime."""
         ...
 
     def on_destroy(self):
+        """User hook: called when the object leaves the scene at runtime."""
         ...
     
     def on_update(self):
+        """User hook: called every frame (before drawing) at runtime."""
         ...
 
     def _start(self):
+        """Internal wrapper for on_start (driven by the script system)."""
         self.on_start()
 
     def _destroy(self):
+        """Internal wrapper for on_destroy (driven by the script system)."""
         self.on_destroy()
 
     def _draw(self, parent_surface):
+        """Blit this object onto its parent surface at its local position.
+
+        In editor mode a blue selection outline is drawn around the object.
+        """
         parent_surface.blit(self.surface, self._get_rect())
         if not self._is_for_api and self.is_selected:
             pygame.draw.rect(parent_surface, (0, 122, 204), self._get_rect(), width=2)
@@ -158,6 +179,8 @@ class ObjectBase:
         return pygame.Rect(self.x, self.y, self.surface.width, self.surface.height)
 
     def _get_world_rect(self):
+        """Rect in scene coordinates: local rect shifted up the parent chain
+        until the canvas root, so nested objects report absolute positions."""
         world_rect = self._get_rect()
         parent_object = self._game_manager.get_parent_object(self.uuid)
 
@@ -169,6 +192,8 @@ class ObjectBase:
         return world_rect
     
     def _set_world_rect(self, world_x, world_y):
+        """Inverse of _get_world_rect: convert a scene (world) position back
+        into the object's local position by subtracting parent offsets."""
         px, py = 0, 0
         parent_object = self._game_manager.get_parent_object(self.uuid)
 
@@ -182,9 +207,12 @@ class ObjectBase:
         self.y = world_y - py
 
     def _get_data(self):
+        """Return the object's full attribute dict (used to clone objects)."""
         return self.__dict__.copy()
 
     def _check_click_collision(self, click_pos):
+        """Pixel-perfect hit test: first a cheap world-rect test, then a
+        per-pixel alpha mask so transparent pixels don't count as a hit."""
         if not self._get_world_rect().collidepoint(click_pos):
             return False
 
@@ -197,6 +225,12 @@ class ObjectBase:
         return self._get_world_rect().colliderect(rect)
     
     def _to_dict(self):
+        """Serialize the object for the .scene JSON file.
+
+        Runtime-only / non-persistent fields (surface, script instance, the
+        manager reference, editor selection state, ...) are excluded so the
+        file stays small and reloadable.
+        """
         exclude_fields = ['_is_initialized', '_is_for_api', '_game_manager', 'surface', 'icon', 'script_instance']
         return {
             key: value for key, value in self.__dict__.items() 
@@ -218,6 +252,12 @@ class ObjectBase:
         return surface
     
     def __setattr__(self, name, value):
+        """Intercept attribute writes to keep derived fields in sync.
+
+        - pos/size/scale also update their x/y/width/height components.
+        - script_path is stored relative to the project path.
+        - At runtime, name/uuid/type are read-only (identity fields).
+        """
         if not hasattr(self, '_is_initialized') or not self._is_initialized:
             super().__setattr__(name, value)
             return

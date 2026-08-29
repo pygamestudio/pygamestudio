@@ -3,11 +3,18 @@ import sys
 import pygame
 import inspect
 from pathlib import Path
-from pygamestudio.api.config.project import get_project_config
 from pygamestudio.api.core.scene import scene_loader
+from pygamestudio.api.config.project import get_project_config
 
 
 class Game:
+    """Runtime game class used by every built/exported project.
+
+    Subclass it in the project's main.py and override the on_* hooks. run()
+    starts the main loop: it auto-detects the project root from the caller's
+    file, initializes pygame, dispatches every pygame event to the matching
+    on_* hook, then calls on_update(delta_time) and flips the display.
+    """
     _instance = None
 
     def __init__(self):
@@ -18,6 +25,11 @@ class Game:
         self._running = False
 
     def _init_game(self):
+        """Set up pygame and resolve the project root from the calling file.
+
+        The project path is derived from the stack frame of whoever created
+        the Game (the project's main.py), so no path config is required.
+        """
         caller_frame = inspect.stack()[-1]
         caller_file_path = caller_frame.filename
         self._project_path = Path(caller_file_path).parent.resolve().as_posix()
@@ -30,6 +42,7 @@ class Game:
         self._clock = pygame.time.Clock()
 
     def run(self):
+        """Start the game loop. Blocks until the window is closed."""
         Game._instance = self
         self._init_game()
         self._running = True
@@ -37,6 +50,7 @@ class Game:
         self.on_start()
 
         while self._running:
+            # --- 1. Dispatch all pending pygame events to the on_* hooks. ---
             for event in pygame.event.get():
                 # ---------- Quit Event ----------
                 if event.type == pygame.QUIT:
@@ -56,7 +70,7 @@ class Game:
                 elif event.type == pygame.MOUSEBUTTONUP:
                     self.on_mouse_button_up(event.pos, event.button, getattr(event, 'touch', 0), getattr(event, "clicks", 1), getattr(event, 'window', None))
                 elif event.type == pygame.MOUSEWHEEL:
-                    self.on_mouse_wheel(event.which, event.flipped, event.x, event.y, getattr(event, 'touch', 0), event.precise_x, event.precise_y, getattr(event, 'window', None))
+                    self.on_mouse_wheel(event.flipped, event.x, event.y, getattr(event, 'touch', 0), event.precise_x, event.precise_y, getattr(event, 'window', None))
 
                 # ---------- Joystick Event ----------
                 elif event.type == pygame.JOYAXISMOTION:
@@ -184,10 +198,14 @@ class Game:
             delta_time = self._clock.tick(self._fps) / 1000
             # Make the current frame's delta time available to the scene's
             # scripts (their on_update(delta_time) hooks).
-            scene_loader.set_delta_time(delta_time)
+            scene_loader._set_delta_time(delta_time)
+            # --- 2. Fixed/step logic: user update + draw, then present. ---
             self.on_update(delta_time)
             pygame.display.flip()
 
+        # Let every attached behavior script run its on_destroy() cleanup hook
+        # before the game exits (mirrors on_start fired on scene load).
+        scene_loader._destroy_scripts()
         self.on_quit()
         pygame.quit()
         sys.exit()
@@ -219,7 +237,7 @@ class Game:
     def on_mouse_button_up(self, pos, btn, touch=0, clicks=1, window=None):
         pass
 
-    def on_mouse_wheel(self, which, flipped, x, y, touch=0, precise_x=0.0, precise_y=0.0, window=None):
+    def on_mouse_wheel(self, flipped, x, y, touch=0, precise_x=0.0, precise_y=0.0, window=None):
         pass
 
     # ---------- Joystick Event Hooks ----------

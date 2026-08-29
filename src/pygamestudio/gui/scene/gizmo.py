@@ -4,6 +4,15 @@ from PySide6.QtWidgets import *
 
 
 class MoveGizmo(QWidget):
+    """On-canvas move gizmo (the two-axis arrow shown on the selected object).
+
+    The widget floats above the scene view at the selected object's position.
+    Dragging its X axis, Y axis or the center plane moves the selected objects
+    along that direction. The whole drag is wrapped in ONE undo macro so that
+    Ctrl+Z undoes the entire drag instead of every tiny mouse step.
+    """
+
+    # Hit-test result: which part of the gizmo is under the cursor.
     HIT_NONE = 0
     HIT_AXIS_X = 1
     HIT_AXIS_Y = 2
@@ -22,7 +31,7 @@ class MoveGizmo(QWidget):
         self._hit_type = self.HIT_NONE
         self._mouse_start_x = 0
         self._mouse_start_y = 0
-        self._is_macro_open = False
+        self._is_macro_open = False  # True while an undo macro is open for the current drag.
 
         self._offset_x = 20
         self._offset_y = 20
@@ -58,7 +67,9 @@ class MoveGizmo(QWidget):
         return self._current_object
 
     def _update_pos(self):
-        if self._is_dragging:
+        """Keep the gizmo glued to the selected object's top-left corner
+        (skipped while dragging so it doesn't fight the user's cursor)."""
+        if self._is_dragging or not self._current_object:
             return
         
         object_hightlight_line_width = 2
@@ -115,6 +126,8 @@ class MoveGizmo(QWidget):
         painter.drawRect(QRect(self._offset_x-half, self._offset_y-half, self._plane_size, self._plane_size))
 
     def _get_hit_type(self, pos):
+        """Decide which part of the gizmo (plane / X axis / Y axis / none) is
+        under the cursor, using a small hit radius around each handle."""
         px, py = pos.x(), pos.y()
         hit_radius = 5
 
@@ -134,6 +147,8 @@ class MoveGizmo(QWidget):
         return self.HIT_NONE
     
     def _move_selected_objects(self, dx, dy):
+        """Move every selected object (respecting parent-selection pruning) by
+        the given pixel delta through the manager's undoable move()."""
         selected_objects = self._game_manager.get_objects_to_move()
         for obj in selected_objects:
             new_x = obj.x + dx
@@ -148,32 +163,39 @@ class MoveGizmo(QWidget):
                 # drag, so a new drag always starts from a clean undo state.
                 if self._is_macro_open:
                     self._game_manager.undo_stack.endMacro()
-                    self._is_macro_open = False
 
+                # Record the press position; the drag delta is measured from it.
                 self._is_dragging = True
+                self._is_macro_open = False
                 self._mouse_start_x = event.position().x()
                 self._mouse_start_y = event.position().y()
-                self._is_macro_open = False
                 return
 
         return super().mousePressEvent(event)
     
     def mouseMoveEvent(self, event):
         if not self._is_dragging:
+            # Hover: only update the highlighted handle and repaint.
             self._hit_type = self._get_hit_type(event.position())
             self.update()
             return super().mouseMoveEvent(event)
         
+        # Drag: delta is measured from the press position (cumulative), which
+        # keeps the movement stable regardless of mouse-event jitter.
         dx = int(event.position().x() - self._mouse_start_x)
         dy = int(event.position().y() - self._mouse_start_y)
 
         if dx == 0 and dy == 0:
             return
 
+        # Open the undo macro lazily on the first real move, so a simple click
+        # without movement doesn't pollute the undo history with an empty macro.
         if not self._is_macro_open:
             self._is_macro_open = True
             self._game_manager.undo_stack.beginMacro('Move')
 
+        # Only the handle being dragged moves; the gizmo itself follows the
+        # cursor along that axis so it never detaches from the drag point.
         if self._hit_type == self.HIT_AXIS_X:
             self.move(self.x()+dx, self.y())
             self._move_selected_objects(dx, 0)
@@ -189,6 +211,8 @@ class MoveGizmo(QWidget):
         self.update()
 
     def mouseReleaseEvent(self, event):
+        # End of the drag: reset the drag state and close the undo macro so
+        # the whole drag becomes a single undoable step.
         self._is_dragging = False
         self._mouse_start_x = 0
         self._mouse_start_y = 0

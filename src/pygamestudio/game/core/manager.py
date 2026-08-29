@@ -1,6 +1,5 @@
 import sys
 import json
-import subprocess
 from PySide6.QtGui import *
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
@@ -19,10 +18,22 @@ from pygamestudio.common.i18n.translator import Translator as T
 
 
 class GameManager(QObject):
+    """Central editor hub that owns the scene object tree and the undo stack.
+
+    The whole scene is stored in ``_all_object_tree_struct``, a dict shaped
+    like ``{uuid: {'object': <ObjectBase>, 'children': [<same shape>, ...]}}``.
+    Every mutation that must be undoable goes through a QUndoCommand pushed
+    onto ``_undo_stack`` (Ctrl+Z / Ctrl+Y). After a command runs, the matching
+    Qt signal below is emitted so all panels (hierarchy, scene, inspector)
+    refresh the affected object.
+    """
+
+    # Life cycle / whole-scene events.
     scene_saved_signal = Signal()
     scene_loaded_signal = Signal()
     scene_renamed_signal = Signal()
 
+    # Generic object events (uuid of the affected object is always the payload).
     object_added = Signal(str, str, int)
     object_deleted = Signal(str)
     object_selected = Signal(str)
@@ -38,6 +49,7 @@ class GameManager(QObject):
     object_copied = Signal()
     object_color_changed = Signal(str)
 
+    # Attribute-specific events (only fired when that attribute changes).
     object_rect_border_radius_changed = Signal(str, str)
     object_line_start_point_changed = Signal(str)
     object_line_end_point_changed = Signal(str)
@@ -65,6 +77,9 @@ class GameManager(QObject):
         self._all_object_tree_struct = {}
         self._is_project_ready = False
         self._undo_stack = QUndoStack(self)
+        # Running game processes. Kept referenced so a running game is not
+        # killed by garbage collection; removed again when it exits.
+        self._game_processes = []
 
     @property
     def all_object_tree_struct(self):
@@ -101,9 +116,12 @@ class GameManager(QObject):
         Logger.info(T.tr('gm.project_init', 'Project initialized Successfully'))
     
     def get_ready_for_project(self, project_path):
+        """Open a project: remember its path, then load the last scene in it."""
         self._project_path = project_path
         set_env('__PYGAMESTUDIO_PROJECT_PATH', project_path)
 
+        # Re-open the scene the user was editing last time (stored in the
+        # project config), or start from an empty canvas if there is none.
         current_scene_file_relative_path = get_current_scene_from_project_config()
         if current_scene_file_relative_path:
             current_scene_file_path = (Path(self._project_path) / current_scene_file_relative_path).as_posix()
@@ -114,6 +132,7 @@ class GameManager(QObject):
         self.deselect_all()
 
     def clean_up(self):
+        """Reset every editor state back to "no project loaded"."""
         self._is_cut = False
         self._project_path = ''
         self._current_scene_file_path = ''
@@ -130,9 +149,12 @@ class GameManager(QObject):
         return self._add(parent_uuid, object_type, object_data)
     
     def _add(self, parent_uuid, object_type, object_data={}):
+        """Create an object of the given type and insert it (undoably) into the tree."""
         obj, object_tree_struct = self._new_object(object_type, object_data)
 
         if object_type == OBJECT_CANVAS:
+            # A canvas is the root of the whole scene; it is not tracked by
+            # the undo stack because there is always exactly one.
             self._add_object_tree_struct(parent_uuid, object_tree_struct)
      
         elif object_type == OBJECT_BUTTON:
@@ -140,6 +162,8 @@ class GameManager(QObject):
             self._undo_stack.push(AddObjectCommand(self, parent_uuid, object_tree_struct, inserted_pos))
 
             if not self._is_loading_scene:
+                # A button spawns with a default child text label so the user
+                # can immediately see (and edit) its caption.
                 child_text_object, child_text_object_tree_struct = self._new_object(OBJECT_TEXT, {})
                 child_text_object.pos = (20, 0)
                 child_text_object.color = (0, 0, 0, 255)
@@ -152,6 +176,11 @@ class GameManager(QObject):
             self._undo_stack.push(AddObjectCommand(self, parent_uuid, object_tree_struct, inserted_pos))
 
     def _new_object(self, object_type, object_data={}):
+        """Instantiate the right ObjectBase subclass for an object type.
+
+        The canvas is special: creating one also makes it the current canvas
+        (the coordinate space every other object lives in).
+        """
         if object_type == OBJECT_CANVAS:
             obj = ObjectCanvas(self, object_data)
             self._current_canvas_object_uuid = obj.uuid
@@ -178,6 +207,7 @@ class GameManager(QObject):
         return obj, object_tree_struct
 
     def rename(self, object_uuid, new_name):   
+        """Rename an object. The change is undoable (UpdateAttrValueCommand)."""
         obj = self._get_object(object_uuid)     
         old_name = obj.name
         obj.name = new_name
@@ -189,6 +219,7 @@ class GameManager(QObject):
         self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'name', old_name, new_name))
 
     def resize(self, object_uuid, new_size):
+        """Resize an object (undoable). The old size is restored by undo()."""
         self._is_current_scene_saved = False
         obj = self._get_object(object_uuid)
         old_size = (obj.width, obj.height)    
@@ -217,6 +248,12 @@ class GameManager(QObject):
         return selected_objects
     
     def get_objects_to_move(self):
+        """Return the selected objects that should move together.
+
+        When a parent is selected, its whole subtree moves implicitly, so
+        children are pruned out (is_parent_selected short-circuits the walk).
+        The canvas itself is never moved.
+        """
         def _get(object_tree_struct, objects_to_move, is_parent_selected):
             if is_parent_selected:
                 return
@@ -236,6 +273,7 @@ class GameManager(QObject):
         return objects_to_move
     
     def select(self, object_uuid):
+        """Select an object and notify the panels via object_selected."""
         obj = self._get_object(object_uuid)
         if not obj:
             return
@@ -268,6 +306,7 @@ class GameManager(QObject):
         _de(self._all_object_tree_struct)
 
     def move(self, object_uuid, new_pos):
+        """Move an object (undoable). Each call pushes one undo entry."""
         obj = self._get_object(object_uuid)
         old_pos = (obj.x, obj.y)
 
@@ -278,6 +317,7 @@ class GameManager(QObject):
         self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'pos', old_pos, new_pos))
 
     def scale(self, object_uuid, new_scale):
+        """Scale an object (undoable)."""
         obj = self._get_object(object_uuid)
         old_scale = (obj.scale_x, obj.scale_y)
 
@@ -288,6 +328,7 @@ class GameManager(QObject):
         self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'scale', old_scale, new_scale))
 
     def rotate(self, object_uuid, new_angle):
+        """Rotate an object (undoable)."""
         obj = self._get_object(object_uuid)
         old_angle = obj.angle
 
@@ -399,6 +440,8 @@ class GameManager(QObject):
         self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'script_path', old_script_path, new_script_path))
 
     def _get_object_tree_struct(self, object_uuid, parent_object_tree_struct=None):
+        """Depth-first search for a subtree by uuid. Returns the one-node
+        dict {uuid: {'object':..., 'children': [...]}} or None if not found."""
         def _get(object_uuid, object_tree_struct):
             key = list(object_tree_struct.keys())[0]
             value = list(object_tree_struct.values())[0]
@@ -415,13 +458,15 @@ class GameManager(QObject):
         if not parent_object_tree_struct:
             parent_object_tree_struct = self._all_object_tree_struct
 
-        # self._all_object_tree_struct is {} when a new scene is loaded.
+        # _all_object_tree_struct is {} when a new scene is loaded.
         if not parent_object_tree_struct:
             return None
         
         return _get(object_uuid, parent_object_tree_struct)
     
     def _get_inserted_pos(self, object_uuid, parent_object_tree_struct=None):
+        """Index of object_uuid among its siblings; -1 if not found. Used to
+        restore the exact position when an undo re-inserts a deleted object."""
         def _get(object_uuid, object_tree_struct):
             value = list(object_tree_struct.values())[0]
 
@@ -446,6 +491,7 @@ class GameManager(QObject):
         return None
 
     def _get_parent_object(self, object_uuid):
+        """Return the direct parent ObjectBase of object_uuid, or None for the root."""
         def _get(object_uuid, object_tree_struct):
             value = list(object_tree_struct.values())[0]
 
@@ -467,6 +513,8 @@ class GameManager(QObject):
         return descendant_objects_uuids
 
     def _get_descendant_objects(self, object_uuid, is_to_get_child_only=False):
+        """Collect the descendants of object_uuid (children only, or the whole
+        subtree when is_to_get_child_only is False)."""
         def _get(object_uuid, descendant_objects, object_tree_struct):
             value = list(object_tree_struct.values())[0]
             
@@ -494,9 +542,12 @@ class GameManager(QObject):
         return self._add_object_tree_struct(parent_uuid, object_tree_struct_to_add, inserted_pos)
 
     def _add_object_tree_struct(self, parent_uuid, object_tree_struct_to_add, inserted_pos=-1): 
+        """Attach a subtree to a parent and emit object_added for every node
+        that became visible, so the hierarchy tree can animate the insertion."""
         self._is_current_scene_saved = False
 
         if not self._all_object_tree_struct:
+            # Empty scene: the first node becomes the root.
             self._all_object_tree_struct.update(object_tree_struct_to_add)
             self.object_added.emit(parent_uuid, list(object_tree_struct_to_add.keys())[0], 0)
             return
@@ -565,6 +616,11 @@ class GameManager(QObject):
         return all_object_uuid_list
     
     def cut(self, object_uuid_list):
+        """Mark the selected objects as cut and remember their subtrees.
+
+        Pasting later removes the originals and re-adds copies under the new
+        parent (all in one undo macro, so cut+paste undoes as a single step).
+        """
         def is_to_discard(object_uuid):
             for object_tree_struct in self._clipboard_content:
                 return self._get_object_tree_struct(object_uuid, object_tree_struct)
@@ -586,6 +642,7 @@ class GameManager(QObject):
         self.object_cut.emit()
 
     def copy(self, object_uuid_list):
+        """Remember the selected subtrees for a later paste (no originals removed)."""
         def is_to_discard(object_uuid):
             for object_tree_struct in self._clipboard_content:
                 return self._get_object_tree_struct(object_uuid, object_tree_struct)
@@ -654,6 +711,12 @@ class GameManager(QObject):
         self._undo_stack.endMacro()
 
     def _deep_copy_object_tree_struct(self, object_tree_struct, is_new_uuid):
+        """Deep-copy a subtree by re-creating every object from its data.
+
+        When is_new_uuid is True (paste/duplicate) every node gets a fresh
+        uuid; when False (cut-paste) the original uuids are preserved so the
+        delete/add pair keeps object identity.
+        """
         new_object_tree_struct = {}
         key = list(object_tree_struct.keys())[0]
         value = list(object_tree_struct.values())[0]        
@@ -760,6 +823,11 @@ class GameManager(QObject):
         _delete(object_uuid, self._all_object_tree_struct)
 
     def _save(self):
+        """Write the whole scene tree to the current .scene file as JSON.
+
+        Objects are serialized through their _to_dict() method (see
+        ObjectBase); _default handles nested objects transparently.
+        """
         self._is_current_scene_saved = True
         set_current_scene_to_project_config(self._current_scene_file_path)
         self.scene_saved_signal.emit()
@@ -799,6 +867,13 @@ class GameManager(QObject):
         return self._load_scene(current_scene_file_path)
     
     def _load_scene(self, current_scene_file_path):
+        """Load a .scene file and rebuild the whole object tree.
+
+        Unsaved changes trigger a save prompt first. The canvas is replaced
+        first, then every node is re-created recursively via _add() so the
+        same signal flow as interactive editing runs. The undo stack is cleared
+        because the new tree has no history.
+        """
         if not self._is_current_scene_saved:
             choice = QMessageBox.warning(QApplication.activeWindow(), T.tr('message_box.warning_title', 'Warning'), T.tr('message_box.warning_scene_save_content', 'The current scene data has been modified. Do you want to save it?'), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel)
             if choice == QMessageBox.StandardButton.Cancel:
@@ -850,14 +925,78 @@ class GameManager(QObject):
         self._all_object_tree_struct = {}
 
     def run_project(self):
+        """Launch the project's main.py in a separate process and forward its
+        stdout/stderr to the editor console (info for stdout, error for stderr)."""
         try:
-            subprocess.Popen(
-                [sys.executable, Path(self._project_path)/'main.py'],
-                cwd=self._project_path,
-                stdout=None,
-                stderr=None,
-                shell=False
-            )
+            # QProcess integrates with the Qt event loop, so the game's output
+            # is read asynchronously without ever blocking the editor UI.
+            process = QProcess(self)
+            process.setProcessChannelMode(QProcess.ProcessChannelMode.SeparateChannels)
+            process.setWorkingDirectory(self._project_path)
+            process.readyReadStandardOutput.connect(lambda: self._on_game_stdout_ready(process))
+            process.readyReadStandardError.connect(lambda: self._on_game_stderr_ready(process))
+            process.finished.connect(lambda code, status: self._on_game_finished(process, code, status))
+            process.errorOccurred.connect(lambda error: self._on_game_error(process, error))
+
+            # Force UTF-8 and unbuffered I/O in the child process so its piped
+            # output decodes reliably AND arrives in real time (Python
+            # block-buffers stdout when it is a pipe, which would otherwise
+            # batch the logs into chunks).
+            process_env = QProcess.systemEnvironment()
+            process_env.append('PYTHONIOENCODING=utf-8')
+            process_env.append('PYTHONUTF8=1')
+            process_env.append('PYTHONUNBUFFERED=1')
+            process.setEnvironment(process_env)
+
+            process.start(sys.executable, [str(Path(self._project_path) / 'main.py')])
+            self._game_processes.append(process)
             Logger.info(T.tr('scene.run_project', 'Run Project {}').format(Path(self._project_path).name))
         except Exception as e:
             Logger.error(T.tr('scene.failed_to_run_project', 'Failed to Run Project {}: {}').format(Path(self._project_path).name, e))
+
+    def _on_game_stdout_ready(self, process):
+        """Forward the game's stdout lines to the console as info logs."""
+        self._forward_game_output(process, process.readAllStandardOutput(), is_error=False)
+
+    def _on_game_stderr_ready(self, process):
+        """Forward the game's stderr lines to the console as error logs."""
+        self._forward_game_output(process, process.readAllStandardError(), is_error=True)
+
+    def _forward_game_output(self, process, data, is_error=False):
+        """Decode a chunk of the game's output and log it line by line.
+
+        A partial line that may span two reads is buffered on the process
+        until the rest of the line arrives.
+        """
+        if not data:
+            return
+
+        text = bytes(data).decode('utf-8', errors='replace')
+        buffer = getattr(process, '_game_output_buffer', '') + text
+        lines = buffer.split('\n')
+        # The last element may be an incomplete line; keep it for the next read.
+        process._game_output_buffer = lines.pop()
+        for line in lines:
+            line = line.strip()
+            if line:
+                if is_error:
+                    Logger.error(line)
+                else:
+                    Logger.info(line)
+
+    def _on_game_finished(self, process, exit_code, exit_status):
+        """Flush any leftover output and log the game's exit code."""
+        remaining = getattr(process, '_game_output_buffer', '').strip()
+        if remaining:
+            Logger.info(remaining)
+        Logger.info(T.tr('scene.run_project_finished', 'Project {} exited with code {}').format(Path(self._project_path).name, exit_code))
+        if process in self._game_processes:
+            self._game_processes.remove(process)
+        process.deleteLater()
+
+    def _on_game_error(self, process, error):
+        """Log when the game process fails to start or crashes."""
+        Logger.error(T.tr('scene.failed_to_run_project', 'Failed to Run Project {}: {}').format(Path(self._project_path).name, error))
+        if process in self._game_processes:
+            self._game_processes.remove(process)
+        process.deleteLater()

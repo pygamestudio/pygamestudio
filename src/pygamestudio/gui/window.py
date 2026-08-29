@@ -356,27 +356,24 @@ class Editor(WindowBase):
         self._editor_body.clean_up()
 
     def keyPressEvent(self, event):
+        """Global editor shortcuts (work regardless of which panel has focus):
+        Ctrl+S save, Ctrl+Z undo, Ctrl+Y / Ctrl+Shift+Z redo."""
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
             if event.key() == Qt.Key.Key_S:
                 self._game_manager.save_scene()
             elif event.key() == Qt.Key.Key_Z:
-                # endMacro() is a no-op when no macro is open, but if a drag
-                # left one dangling it is closed first, so undo() can never be
-                # rejected with "cannot undo in the middle of a macro".
-                self._game_manager.undo_stack.endMacro()
                 self._game_manager.undo_stack.undo()
             elif event.key() == Qt.Key.Key_Y:
-                self._game_manager.undo_stack.endMacro()
                 self._game_manager.undo_stack.redo()
 
         elif event.modifiers() == (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier):
             if event.key() == Qt.Key.Key_Z:
-                self._game_manager.undo_stack.endMacro()
                 self._game_manager.undo_stack.redo()
 
         super().keyPressEvent(event)
 
     def closeEvent(self, event):
+        # Guard against losing unsaved scene changes before closing the editor.
         if not self._game_manager.is_current_scene_saved():
             choice = QMessageBox.warning(self, T.tr('message_box.warning_title', 'Warning'), T.tr('message_box.warning_scene_save_content', 'The current scene data has been modified. Do you want to save it?'), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel)
             if choice == QMessageBox.StandardButton.Cancel:

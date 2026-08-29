@@ -1,4 +1,3 @@
-import shutil
 from datetime import datetime
 from PySide6.QtGui import *
 from PySide6.QtCore import *
@@ -10,6 +9,7 @@ from pygamestudio.gui.dashboard.delegate import DashboardDelegate
 from pygamestudio.gui.dashboard.dialog import CreateProjectWindow, RenameProjectWindow
 from pygamestudio.gui.dashboard.model import DashboardSortFilterProxyModel
 from pygamestudio.common.i18n.translator import Translator as T
+from pygamestudio.common.utils.system import send_to_trash
 
 
 class DashboardListView(QListView):
@@ -200,13 +200,14 @@ class DashboardListView(QListView):
             self._delete_item(index.row())
             return
 
-        try:
-            shutil.rmtree(project_path)
-        except Exception as e:
-            QMessageBox.critical(self, T.tr('message_box.critical_title', 'Error'), T.tr('message_box.critical_delete_project', "Couldn't delete the project: {}").format(str(e)))
-        else:
+        # Move the project folder to the system recycle bin instead of
+        # permanently deleting it, so the user can restore it on mistake.
+        if send_to_trash(project_path):
             delete_project_from_dashboard_config(project_path)
             self._delete_item(index.row())
+            return
+
+        QMessageBox.critical(self, T.tr('message_box.critical_title', 'Error'), T.tr('message_box.critical_move_to_trash', 'Failed to move the project to the recycle bin.'))
 
     def search(self, keyword):
         self._proxy_model.setFilterFixedString(keyword)

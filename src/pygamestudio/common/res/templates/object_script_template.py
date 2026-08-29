@@ -1,6 +1,6 @@
-class NewScript:
-    def __init__(self, owner):
-        self.owner = owner
+class ObjectScript:
+    def __init__(self, obj):
+        self.obj = obj
     
     def on_start(self):
         pass

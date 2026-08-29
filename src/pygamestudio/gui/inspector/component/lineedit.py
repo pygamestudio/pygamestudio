@@ -48,7 +48,7 @@ class ImagePathLineEdit(QLineEdit):
         if not str(self._image_path) == '.':
             project_path = Path(get_project_path())
             image_absolute_path = project_path / self._image_path
-            self.setToolTip(image_absolute_path.as_posix())
+            self.setToolTip(self._image_path.as_posix())
             self.setText(self._image_path.name)
 
             if not image_absolute_path.exists():
@@ -129,7 +129,7 @@ class FontPathLineEdit(QLineEdit):
         if not str(self._font_path) == '.':
             project_path = Path(get_project_path())
             font_absolute_path = project_path / self._font_path
-            self.setToolTip(font_absolute_path.as_posix())
+            self.setToolTip(self._font_path.as_posix())
             self.setText(self._font_path.name)
 
             if not font_absolute_path.exists():
@@ -210,7 +210,7 @@ class ScriptPathLineEdit(QLineEdit):
         if not str(self._script_path) == '.':
             project_path = Path(get_project_path())
             script_absolute_path = project_path / self._script_path
-            self.setToolTip(script_absolute_path.as_posix())
+            self.setToolTip(self._script_path.as_posix())
             self.setText(self._script_path.name)
 
             if not script_absolute_path.exists():
