@@ -9,6 +9,7 @@ from pygamestudio.gui.inspector.color import ColorPicker
 from pygamestudio.gui.inspector.component.label import PropertyLabel
 from pygamestudio.gui.inspector.layout.rect import INSPECTOR_LAYOUT_RECT
 from pygamestudio.gui.inspector.layout.ellipse import INSPECTOR_LAYOUT_ELLIPSE
+from pygamestudio.gui.inspector.layout.polygon import INSPECTOR_LAYOUT_POLYGON
 from pygamestudio.gui.inspector.layout.line import INSPECTOR_LAYOUT_LINE
 from pygamestudio.gui.inspector.layout.canvas import INSPECTOR_LAYOUT_CANVAS
 from pygamestudio.gui.inspector.layout.text import INSPECTOR_LAYOUT_TEXT
@@ -67,6 +68,7 @@ class Container(QFrame):
         self._game_manager.object_image_path_changed.connect(self._on_object_image_path_changed)
         self._game_manager.object_font_path_changed.connect(self._on_object_font_path_changed)
         self._game_manager.object_script_path_changed.connect(self._on_object_script_path_changed)
+        self._game_manager.object_points_changed.connect(self._on_object_points_changed)
 
     def _set_layout(self):
         self._container_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
@@ -188,6 +190,9 @@ class Container(QFrame):
     def set_object_script_path(self):
         lineedit = self._find_widget(self._container_layout, 'script_path')
         self._game_manager.set_script_path(self._object_uuid_in_inspection, lineedit.toolTip())
+
+    def set_object_points(self, new_points):
+        self._game_manager.set_points(self._object_uuid_in_inspection, new_points)
     
     def show_color_picker(self, color_rgba):
         screen = QApplication.primaryScreen()
@@ -287,6 +292,15 @@ class Container(QFrame):
                 spinbox_end_x.blockSignals(False)
                 spinbox_end_y.blockSignals(False)
 
+        elif obj.type == OBJECT_POLYGON:
+            # Moving a polygon translates every vertex (see ObjectPolygon), so
+            # the vertex editor must show the translated values too.
+            points_widget = self._find_widget(self._container_layout, 'points')
+            if points_widget:
+                points_widget.blockSignals(True)
+                points_widget.set_points(obj.points)
+                points_widget.blockSignals(False)
+
     def _on_object_scaled(self, object_uuid):
         obj = self._game_manager.get_object(object_uuid)
         spinbox_scale_x = self._find_widget(self._container_layout, 'scale_x')
@@ -361,6 +375,11 @@ class Container(QFrame):
         spinbox_start_point_x.blockSignals(False)
         spinbox_start_point_y.blockSignals(False)
 
+        if hasattr(obj, '_update_bounding_box'):
+            obj._update_bounding_box()
+        self._on_object_resized(object_uuid)
+        self._on_object_moved(object_uuid)
+
     def _on_object_line_end_point_changed(self, object_uuid):
         if object_uuid != self._object_uuid_in_inspection:
             return
@@ -374,6 +393,11 @@ class Container(QFrame):
         spinbox_end_point_y.setValue(getattr(obj, 'end_y'))
         spinbox_end_point_x.blockSignals(False)
         spinbox_end_point_y.blockSignals(False)
+
+        if hasattr(obj, '_update_bounding_box'):
+            obj._update_bounding_box()
+        self._on_object_resized(object_uuid)
+        self._on_object_moved(object_uuid)
 
     def _on_object_image_path_changed(self, object_uuid):
         obj = self._game_manager.get_object(object_uuid)
@@ -399,17 +423,39 @@ class Container(QFrame):
         script_path_lineedit.setToolTip(Path(obj.script_path).as_posix() if obj.script_path else '')
         script_path_lineedit.blockSignals(False)
 
-    def _find_widget(self, layout, widget_name):
+    def _on_object_points_changed(self, object_uuid):
+        if object_uuid != self._object_uuid_in_inspection:
+            return
+        obj = self._game_manager.get_object(object_uuid)
+
+        # Keep the vertex editor in sync with the (possibly undone/redone)
+        # vertex list.
+        points_widget = self._find_widget(self._container_layout, 'points')
+        if points_widget:
+            points_widget.blockSignals(True)
+            points_widget.set_points(obj.points)
+            points_widget.blockSignals(False)
+
+        # A polygon's size is derived from its vertices, so the (read-only)
+        # size spin boxes must follow. Recompute the bounding box here so the
+        # displayed values don't depend on signal-handler ordering with the
+        # scene view.
+        if hasattr(obj, '_update_bounding_box'):
+            obj._update_bounding_box()
+        self._on_object_resized(object_uuid)
+        self._on_object_moved(object_uuid)
+
+    def _find_widget(self, layout, component_attribute):
         for i in range(layout.count()):
             item = layout.itemAt(i)
             
             widget = item.widget()
-            if widget and widget.objectName() == widget_name:
+            if widget and widget.property('component_attribute') == component_attribute:
                 return widget
             
             sub_layout = item.layout()
             if sub_layout:
-                result = self._find_widget(sub_layout, widget_name)
+                result = self._find_widget(sub_layout, component_attribute)
                 if result:
                     return result
         
@@ -429,6 +475,8 @@ class Container(QFrame):
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_RECT)
         elif obj.type == OBJECT_ELLIPSE:
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_ELLIPSE)
+        elif obj.type == OBJECT_POLYGON:
+            self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_POLYGON)
         elif obj.type == OBJECT_LINE:
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_LINE)
         elif obj.type == OBJECT_TEXT:
@@ -464,9 +512,14 @@ class Container(QFrame):
             label = PropertyLabel(self, text)
             self._container_layout.addWidget(label, self._container_row, 0, 1, 1)
 
+            if property_detail['i18n']['default'] == 'Points':
+                label.setAlignment(Qt.AlignmentFlag.AlignTop)
+                label.setContentsMargins(0, 4, 0, 0)
+
             for i, widget in enumerate(widget_list):
                 w = widget(self, getattr(obj, attribute_list[i]), attribute_list[i])
-                w.setObjectName(attribute_list[i])
+                if not w.property('component_attribute'):
+                    w.setProperty('component_attribute', attribute_list[i])
                 w.setEnabled(enabled_list[i])
 
                 row = i // 2

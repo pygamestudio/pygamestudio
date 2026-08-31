@@ -10,6 +10,7 @@ from pygamestudio.game.object.canvas import *
 from pygamestudio.game.object.text import *
 from pygamestudio.game.object.ellipse import *
 from pygamestudio.game.object.line import *
+from pygamestudio.game.object.polygon import *
 from pygamestudio.game.object.image import *
 from pygamestudio.game.object.button import *
 from pygamestudio.common.utils.config import *
@@ -64,6 +65,7 @@ class GameManager(QObject):
     object_image_path_changed = Signal(str)
     object_font_path_changed = Signal(str)
     object_script_path_changed = Signal(str)
+    object_points_changed = Signal(str)
 
     # Emitted whenever the "current scene has unsaved changes" flag flips
     # (True = saved, False = unsaved), so the UI can show unsaved indicators.
@@ -142,12 +144,14 @@ class GameManager(QObject):
 
     def _serialize_tree(self, object_tree_struct):
         """Recursively convert the scene tree into a comparable snapshot of its
-        persistent state (only the fields that would be written to the .scene
-        file), used to tell whether the scene actually differs from disk."""
+        persistent state, used to tell whether the scene actually differs from
+        disk. UI-only state ('selected', 'expanded') is already dropped by
+        ObjectBase._to_dict, so it never counts as scene content."""
         serialized = {}
         for key, value in object_tree_struct.items():
+            object_data = value['object']._to_dict()
             serialized[key] = {
-                'object': value['object']._to_dict(),
+                'object': object_data,
                 'children': [self._serialize_tree(child) for child in value['children']],
             }
         return serialized
@@ -246,6 +250,8 @@ class GameManager(QObject):
             obj = ObjectText(self, object_data)
         elif object_type == OBJECT_ELLIPSE:
             obj = ObjectEllipse(self, object_data)
+        elif object_type == OBJECT_POLYGON:
+            obj = ObjectPolygon(self, object_data)
         elif object_type == OBJECT_LINE:
             obj = ObjectLine(self, object_data)
         elif object_type == OBJECT_IMAGE:
@@ -556,6 +562,15 @@ class GameManager(QObject):
             return
 
         self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'script_path', old_script_path, new_script_path))
+
+    def set_points(self, object_uuid, new_points):
+        obj = self._get_object(object_uuid)
+        old_points = obj.points
+
+        if old_points == new_points:
+            return
+
+        self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'points', old_points, new_points))
 
     def _get_object_tree_struct(self, object_uuid, parent_object_tree_struct=None):
         """Depth-first search for a subtree by uuid. Returns the one-node

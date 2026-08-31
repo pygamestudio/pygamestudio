@@ -115,3 +115,5 @@ class UpdateAttrValueCommand(QUndoCommand):
             self._game_manager.object_font_path_changed.emit(self._obj.uuid)
         elif attr == 'script_path':
             self._game_manager.object_script_path_changed.emit(self._obj.uuid)
+        elif attr == 'points':
+            self._game_manager.object_points_changed.emit(self._obj.uuid)

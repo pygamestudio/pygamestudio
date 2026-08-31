@@ -46,8 +46,8 @@ class PygameScreen(QWidget):
         self._game_manager.object_hidden.connect(self._update_scene)
         self._game_manager.object_color_changed.connect(self._update_scene)
         self._game_manager.object_rect_border_radius_changed.connect(self._update_scene)
-        self._game_manager.object_line_start_point_changed.connect(self._on_object_line_start_point_changed)
-        self._game_manager.object_line_end_point_changed.connect(self._on_object_line_end_point_changed)
+        self._game_manager.object_line_start_point_changed.connect(self._update_scene)
+        self._game_manager.object_line_end_point_changed.connect(self._update_scene)
         self._game_manager.object_line_thickness_changed.connect(self._update_scene)
         self._game_manager.object_text_changed.connect(self._update_scene)
         self._game_manager.object_font_size_changed.connect(self._update_scene)
@@ -58,6 +58,7 @@ class PygameScreen(QWidget):
         self._game_manager.object_strikethrough_state_changed.connect(self._update_scene)
         self._game_manager.object_image_path_changed.connect(self._update_scene)
         self._game_manager.object_font_path_changed.connect(self._update_scene)
+        self._game_manager.object_points_changed.connect(self._update_scene)
         
     def _set_pygame_screen(self):
         self._screen_surface = pygame.Surface((self._screen_width, self._screen_height))
@@ -113,14 +114,6 @@ class PygameScreen(QWidget):
             self._screen_surface = pygame.Surface((obj.width, obj.height))
 
         self._update_scene()
-
-    def _on_object_line_start_point_changed(self):
-        self._update_scene()
-        self._move_gizmo.update_pos()
-
-    def _on_object_line_end_point_changed(self):
-        self._update_scene()
-        self._move_gizmo.update_pos()
     
     def _update_scene(self):
         if self._game_manager.is_empty():
@@ -141,7 +134,7 @@ class PygameScreen(QWidget):
 
         _update(self._game_manager.all_object_tree_struct, self._screen_surface)
         self.update()
-        self._move_gizmo.update()
+        self._move_gizmo.update_pos()
 
     def _convert_screen_surface_to_qimage(self, surface):
         # surarray.shape returns (width, height, depth). However, QImage expects (height, width, depth).

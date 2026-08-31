@@ -130,6 +130,9 @@ class ObjectLine(ObjectBase):
 
         if name =='pos':
             # attrs like x, y, pos will be updated in _update_bounding_box()
+            # Recompute the current box first so the delta stays correct even
+            # when no redraw happened since the last change.
+            self._update_bounding_box()
             dx = value[0] - self.x
             dy = value[1] - self.y
 

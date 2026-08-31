@@ -88,6 +88,7 @@
         "line": "Line",
         "rect": "Rect",
         "ellipse": "Ellipse",
+        "polygon": "Polygon",
         "text": "Text",
         "image": "Image",
         "button": "Button"
@@ -143,6 +144,7 @@
         "scale": "Scale",
         "color": "Color",
         "angle": "Angle",
+        "points": "Points",
         "start_point": "Start Point",
         "end_point": "End Point",
         "thickness": "Thickness",

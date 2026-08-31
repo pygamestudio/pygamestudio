@@ -552,6 +552,14 @@ QWidget#inspectorContainer QLabel {
     background-color: #ffffff;
 }
 
+QWidget#inspectorContainer QWidget#polygonPointsWidget {
+    background-color: #ffffff;
+}
+
+QWidget#inspectorContainer QWidget#polygonPointsWidget QWidget#polygonPointsWidgetPairs {
+    background-color: #ffffff;
+}
+
 QWidget#inspectorContainer QCheckBox::indicator {
     background-color: #ffffff;
 }

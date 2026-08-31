@@ -12,6 +12,7 @@ from pygamestudio.game.object.canvas import *
 from pygamestudio.game.object.text import *
 from pygamestudio.game.object.ellipse import *
 from pygamestudio.game.object.line import *
+from pygamestudio.game.object.polygon import *
 from pygamestudio.game.object.image import *
 from pygamestudio.game.object.button import *
 from pygamestudio.api.config.project import get_project_config
@@ -96,6 +97,8 @@ class SceneLoader:
             obj = ObjectText(self, object_data, is_for_api=True)
         elif object_type == OBJECT_ELLIPSE:
             obj = ObjectEllipse(self, object_data, is_for_api=True)
+        elif object_type == OBJECT_POLYGON:
+            obj = ObjectPolygon(self, object_data, is_for_api=True)
         elif object_type == OBJECT_LINE:
             obj = ObjectLine(self, object_data, is_for_api=True)
         elif object_type == OBJECT_IMAGE:

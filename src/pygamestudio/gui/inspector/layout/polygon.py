@@ -1,10 +1,13 @@
+from PySide6.QtCore import Qt
 from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.gui.inspector.component.spinbox import *
 from pygamestudio.gui.inspector.component.lineedit import *
 from pygamestudio.gui.inspector.component.picker import *
 from pygamestudio.gui.inspector.component.checkbox import *
+from pygamestudio.gui.inspector.component.widget import *
 
-INSPECTOR_LAYOUT_LINE = {
+
+INSPECTOR_LAYOUT_POLYGON = {
     'visibility': {
         'i18n': {
             'key': 'inspector.visibility',
@@ -31,7 +34,7 @@ INSPECTOR_LAYOUT_LINE = {
         'i18n': {
             'key': 'inspector.pos',
             'default': 'Pos'
-        },
+        },        
         'component': {
             'enabled': [True, True],
             'attribute': ['x', 'y'],
@@ -47,28 +50,6 @@ INSPECTOR_LAYOUT_LINE = {
             'enabled': [False, False],
             'attribute': ['width', 'height'],
             'widget': [SizeSpinBox, SizeSpinBox]
-        }
-    },
-    'start_point': {
-        'i18n': {
-            'key': 'inspector.start_point',
-            'default': 'Start Point'
-        },
-        'component': {
-            'enabled': [True, True],
-            'attribute': ['start_x', 'start_y'],
-            'widget': [PosSpinBox, PosSpinBox]
-        }
-    },
-    'end_point': {
-        'i18n': {
-            'key': 'inspector.end_point',
-            'default': 'End Point'
-        },
-        'component': {
-            'enabled': [True, True],
-            'attribute': ['end_x', 'end_y'],
-            'widget': [PosSpinBox, PosSpinBox]
         }
     },
     'scale': {
@@ -104,15 +85,15 @@ INSPECTOR_LAYOUT_LINE = {
             'widget': [ColorPicker]
         }
     },
-    'thickness': {
+    'points': {
         'i18n': {
-            'key': 'inspector.thickness',
-            'default': 'Thickness'
+            'key': 'inspector.points',
+            'default': 'Points'
         },
         'component': {
             'enabled': [True],
-            'attribute': ['thickness'],
-            'widget': [ThicknessSpinBox]
+            'attribute': ['points'],
+            'widget': [PolygonPointsWidget]
         }
     },
     'script_path': {
