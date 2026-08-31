@@ -122,6 +122,18 @@
         "run_project_finished": "Project {} exited with code {}"
     },
 
+    "code": {
+        "editor": "Code Editor",
+        "untitled": "Untitled",
+        "detach": "Detach",
+        "attach": "Attach to Tabs",
+        "saved": "Saved",
+        "unsaved": "Unsaved",
+        "save_failed": "Save failed",
+        "zoom_in": "Zoom In",
+        "zoom_out": "Zoom Out"
+    },
+
     "hierarchy": {
         "hierarchy": "Hierarchy",
         "search_placeholder": "Search by name or uuid",

@@ -577,3 +577,62 @@ QLabel#aboutCopyrightLabel {
     font-size: 10px;
     color: #888888;
 }
+
+/* ----- Code Editor ----- */
+QPlainTextEdit#codeEditor {
+    background-color: #ffffff;
+    color: #000000;
+    border: none;
+    selection-background-color: #cce4ff;
+}
+
+QWidget#codeEditorWindow QLabel#codeEditorStatus {
+    color: #008000;
+    background-color: transparent;
+}
+
+QPushButton#codeEditorDetachBtn {
+    background-color: transparent;
+    border: none;
+    color: #333333;
+    padding: 4px 10px;
+    border-radius: 4px;
+}
+
+QPushButton#codeEditorDetachBtn:hover {
+    background-color: #e0e0e0;
+}
+
+QPushButton#codeEditorDetachBtn:pressed {
+    background-color: #c0c0c0;
+}
+
+QPushButton#codeEditorZoomInBtn, QPushButton#codeEditorZoomOutBtn {
+    background-color: transparent;
+    border: none;
+    border-radius: 4px;
+}
+
+QPushButton#codeEditorZoomInBtn:hover, QPushButton#codeEditorZoomOutBtn:hover {
+    background-color: #e0e0e0;
+}
+
+QPushButton#codeEditorZoomInBtn:pressed, QPushButton#codeEditorZoomOutBtn:pressed {
+    background-color: #c0c0c0;
+}
+
+QListView#codeEditorCompletionPopup {
+    background-color: #f5f5f5;
+    color: #333333;
+    border: 1px solid #c0c0c0;
+    outline: none;
+}
+
+QListView#codeEditorCompletionPopup::item {
+    padding: 2px 6px;
+}
+
+QListView#codeEditorCompletionPopup::item:selected {
+    background-color: #007acc;
+    color: #ffffff;
+}

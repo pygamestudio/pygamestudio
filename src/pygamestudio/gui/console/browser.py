@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 
 from PySide6.QtGui import *
@@ -17,6 +18,9 @@ class ConsoleLogBrowser(QTextBrowser):
     # Carries the actual per-level log counts (info, error, warning) currently
     # held in the log list, emitted whenever the log list changes.
     log_counts_changed = Signal(int, int, int)
+    # Emitted when the user Ctrl+clicks an error log that references a source
+    # file location (file path + 1-based line number).
+    open_file_at_line_signal = Signal(str, int)
 
     # Upper bound for the in-memory log list, to avoid unbounded memory growth
     # during long-running sessions. Oldest entries are dropped first.
@@ -34,6 +38,8 @@ class ConsoleLogBrowser(QTextBrowser):
         self._context_menu = ContextMenu('', self)
         
         self._logs = []
+        # Block that currently shows the hover underline (jumpable log line).
+        self._hovered_block = None
         # Incrementally tracked per-level log counts (info/error/warning).
         # Kept in sync when a log is added or trimmed instead of recounting
         # the whole list from scratch on every append.
@@ -83,6 +89,75 @@ class ConsoleLogBrowser(QTextBrowser):
 
     def _set_object_name(self):
         self.setObjectName('consoleLogBrowser')
+
+    def mousePressEvent(self, event):
+        """Ctrl+click on an error log jumps to its source location."""
+        if (event.button() == Qt.MouseButton.LeftButton
+                and event.modifiers() & Qt.KeyboardModifier.ControlModifier):
+            match = self._match_file_location(event.pos())
+            if match:
+                self.open_file_at_line_signal.emit(match[0], match[1])
+                event.accept()
+                return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        """Hand cursor + underline while Ctrl-hovering a jumpable log line."""
+        if (event.modifiers() & Qt.KeyboardModifier.ControlModifier
+                and self._match_file_location(event.pos())):
+            self._apply_underline(self.cursorForPosition(event.pos()).block())
+            self.viewport().setCursor(Qt.CursorShape.PointingHandCursor)
+        else:
+            self._clear_underline()
+            self.viewport().setCursor(Qt.CursorShape.IBeamCursor)
+        super().mouseMoveEvent(event)
+
+    def leaveEvent(self, event):
+        self._clear_underline()
+        self.viewport().setCursor(Qt.CursorShape.IBeamCursor)
+        super().leaveEvent(event)
+
+    def _apply_underline(self, block):
+        """Underline a log block to hint that Ctrl+click jumps to its source."""
+        if self._hovered_block == block:
+            return
+        self._clear_underline()
+        cursor = QTextCursor(block)
+        cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor)
+        fmt = QTextCharFormat()
+        fmt.setFontUnderline(True)
+        cursor.mergeCharFormat(fmt)
+        self._hovered_block = block
+
+    def _clear_underline(self):
+        """Remove the hover underline from the previously hovered block."""
+        if self._hovered_block is None:
+            return
+        cursor = QTextCursor(self._hovered_block)
+        cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor)
+        fmt = QTextCharFormat()
+        fmt.setFontUnderline(False)
+        cursor.mergeCharFormat(fmt)
+        self._hovered_block = None
+
+    def _match_file_location(self, pos):
+        """Return (file_path, line) referenced by the clicked log line, or
+        None. Handles Python tracebacks (File "...", line N) and common
+        'path.py:N' style locations."""
+        cursor = self.cursorForPosition(pos)
+        block_text = cursor.block().text()
+
+        # Python traceback:   File "C:/.../main.py", line 12, in <module>
+        match = re.search(r'File "([^"]+)", line (\d+)', block_text)
+        if match:
+            return (match.group(1), int(match.group(2)))
+
+        # Generic: C:/path/file.py:12 or /path/file.py:12 or ./file.py:12
+        match = re.search(r'([A-Za-z]:[\\/][^:\s]+\.py|[\\/][^:\s]+\.py|\.{1,2}[\\/][^:\s]+\.py):(\d+)', block_text)
+        if match:
+            return (match.group(1), int(match.group(2)))
+
+        return None
 
     def _add_log(self, msg, log_level):
         now = datetime.now()

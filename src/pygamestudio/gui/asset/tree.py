@@ -15,7 +15,16 @@ from pygamestudio.common.utils.system import send_to_trash
 from pygamestudio.common.utils.path import RES_PATH
 
 
+# File suffixes the built-in code editor can open as plain text.
+TEXT_FILE_EXTENSIONS = {
+    '.py', '.txt', '.json', '.md', '.pygs', '.qss', '.qrc', '.cfg', '.ini',
+    '.toml', '.yaml', '.yml', '.log', '.html', '.css', '.js', '.ts', '.csv', '.xml',
+}
+
+
 class AssetTreeView(QTreeView):
+    edit_file_signal = Signal(str)
+
     def __init__(self, parent=None, game_manager=None):
         super().__init__(parent)
         self._game_manager = game_manager
@@ -83,6 +92,9 @@ class AssetTreeView(QTreeView):
         self._context_menu.open_in_terminal_signal.connect(self._open_in_terminal)
         self._context_menu.open_externally_signal.connect(self._open_externally)
         self._context_menu.show_in_explorer_signal.connect(self._show_in_explorer)
+        self._context_menu.edit_signal.connect(self._edit_file)
+        self._context_menu.run_signal.connect(self._run_project)
+        self.doubleClicked.connect(self._on_double_clicked)
 
     def _set_object_name(self):
         self.setObjectName('assetTreeView')
@@ -93,12 +105,15 @@ class AssetTreeView(QTreeView):
 
         if not index.isValid():
             index_type = INDEX_INVALID
+            file_path = ''
         elif self._file_model.isDir(self._proxy_model.mapToSource(index)):
             index_type = INDEX_FOLDER
+            file_path = ''
         else:
             index_type = INDEX_FILE
+            file_path = self._file_model.filePath(self._proxy_model.mapToSource(index))
 
-        self._context_menu.show(global_pos, index_type)
+        self._context_menu.show(global_pos, index_type, file_path)
 
     def _get_parent_index_for_creation(self):
         selected_indexes = self.selectedIndexes()
@@ -406,6 +421,38 @@ class AssetTreeView(QTreeView):
                 subprocess.Popen(['xdg-open', target_path])
         else:
             QMessageBox.information(QApplication.activeWindow(), T.tr('message_box.information_title', 'Info'), T.tr('message_box.information_os_content', 'Unsupported Operating System'))
+
+    def _get_selected_file_path(self):
+        """Return the path of the currently selected file (or None)."""
+        selected_indexes = self.selectedIndexes()
+        if not selected_indexes:
+            return None
+        return Path(self._file_model.filePath(self._proxy_model.mapToSource(selected_indexes[-1])))
+
+    @staticmethod
+    def _is_text_file(path):
+        return path.is_file() and path.suffix.lower() in TEXT_FILE_EXTENSIONS
+
+    def _edit_file(self):
+        """Open the selected file in the built-in code editor (text files),
+        falling back to the external editor for non-text files."""
+        target_path = self._get_selected_file_path()
+        if not target_path:
+            return
+        if self._is_text_file(target_path):
+            self.edit_file_signal.emit(str(target_path))
+        else:
+            self._open_externally()
+
+    def _on_double_clicked(self, index):
+        """Double-clicking a text file opens it in the code editor."""
+        target_path = Path(self._file_model.filePath(self._proxy_model.mapToSource(index)))
+        if self._is_text_file(target_path):
+            self.edit_file_signal.emit(str(target_path))
+
+    def _run_project(self):
+        """Run the project (same as the Run Project button)."""
+        self._game_manager.run_project()
 
     def _show_in_explorer(self):
         selected_indexes = self.selectedIndexes()

@@ -1,3 +1,4 @@
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import *
 from pygamestudio.gui.asset.widget import *
 from pygamestudio.gui.asset.tree import AssetTreeView
@@ -5,6 +6,8 @@ from pygamestudio.gui.asset.search import SearchLineEdit
 
 
 class AssetWindow(QWidget):
+    edit_file_signal = Signal(str)
+
     def __init__(self, parent=None, game_manager=None):
         super().__init__(parent)
         self._asset_tree_view = AssetTreeView(self, game_manager)
@@ -27,6 +30,7 @@ class AssetWindow(QWidget):
         self._add_asset_button.add_signal.connect(self._asset_tree_view.add)
         self._sort_asset_button.sort_signal.connect(self._asset_tree_view.set_sort_type)
         self._refresh_asset_button.clicked.connect(self._asset_tree_view.refresh)
+        self._asset_tree_view.edit_file_signal.connect(self.edit_file_signal.emit)
 
     def _set_layout(self):
         h_layout = QHBoxLayout()

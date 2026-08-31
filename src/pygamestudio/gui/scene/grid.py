@@ -44,6 +44,9 @@ class GridGraphicsView(QGraphicsView):
 
     def _set_signal(self):
         self._run_project_btn.clicked.connect(self._game_manager.run_project)
+        self._run_shortcut = QShortcut(QKeySequence('Ctrl+R'), self)
+        self._run_shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        self._run_shortcut.activated.connect(self._game_manager.run_project)
 
     def _set_layout(self):
         v_layout = QVBoxLayout(self)

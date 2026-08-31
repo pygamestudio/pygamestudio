@@ -1,3 +1,4 @@
+from pathlib import Path
 from PySide6.QtGui import QAction
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QMenu
@@ -19,13 +20,16 @@ class ContextMenu(QMenu):
     open_in_terminal_signal = Signal()
     open_externally_signal = Signal()
     show_in_explorer_signal = Signal()
+    edit_signal = Signal()
+    run_signal = Signal()
 
     def __init__(self, title='', parent=None):
         super().__init__(title, parent)
         self._tree_view = parent
 
-    def _add_actions(self, index_type):
+    def _add_actions(self, index_type, file_path=''):
         edit_action = QAction(T.tr('menu.edit', 'Edit'), self)
+        run_action = QAction(T.tr('menu.run', 'Run'), self)
         add_folder_action = QAction(T.tr('menu.folder', 'Folder'), self)
         add_script_action = QAction(T.tr('menu.script', 'Script'), self)
         add_scene_action = QAction(T.tr('menu.scene', 'Scene'), self)
@@ -44,7 +48,8 @@ class ContextMenu(QMenu):
         open_externally_action = QAction(T.tr('menu.open_externally', 'Open Externally'), self)
         show_in_explorer_action = QAction(T.tr('menu.show_in_explorer', 'Show in Explorer'), self)
 
-        edit_action.triggered.connect(self.open_externally_signal.emit)
+        edit_action.triggered.connect(self.edit_signal.emit)
+        run_action.triggered.connect(self.run_signal.emit)
         add_folder_action.triggered.connect(lambda: self.add_signal.emit(INDEX_FOLDER))
         add_script_action.triggered.connect(lambda: self.add_signal.emit(INDEX_SCRIPT))
         add_scene_action.triggered.connect(lambda: self.add_signal.emit(INDEX_SCENE))
@@ -109,10 +114,26 @@ class ContextMenu(QMenu):
         # Right click on the specific file index.
         if index_type == INDEX_FILE:
             self.insertAction(add_menu.menuAction(), edit_action)
+            # The run action only applies to the project's root main.py.
+            if self._is_project_main_script(file_path):
+                self.insertAction(edit_action, run_action)
+                self.insertSeparator(edit_action)
             self.insertSeparator(add_menu.menuAction())
             self.insertAction(show_in_explorer_action, open_externally_action)
         
         self._set_paste_action_status(paste_action)
+
+    def _is_project_main_script(self, file_path):
+        """True only for the project root's main.py (other scripts can't be
+        run as the project entry point)."""
+        if not file_path:
+            return False
+        path = Path(file_path)
+        if path.name.lower() != 'main.py':
+            return False
+        game_manager = getattr(self._tree_view, '_game_manager', None)
+        project_path = game_manager.get_project_path() if game_manager else None
+        return bool(project_path) and Path(project_path) == path.parent
 
     def _set_paste_action_status(self, paste_action):
         if self._tree_view.get_clipboard_content():
@@ -120,7 +141,7 @@ class ContextMenu(QMenu):
         else:
             paste_action.setEnabled(False)
         
-    def show(self, pos, index_type):
+    def show(self, pos, index_type, file_path=''):
         self.clear()
-        self._add_actions(index_type)
+        self._add_actions(index_type, file_path)
         self.exec(pos)

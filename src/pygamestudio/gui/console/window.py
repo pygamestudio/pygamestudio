@@ -1,3 +1,4 @@
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import *
 from pygamestudio.gui.console.type import *
 from pygamestudio.gui.console.widget import *
@@ -6,6 +7,8 @@ from pygamestudio.gui.console.browser import ConsoleLogBrowser
 
 
 class ConsoleWindow(QWidget):
+    open_file_at_line_signal = Signal(str, int)
+
     def __init__(self, parent=None, game_manager=None):
         super().__init__(parent)
         self._console_log_browser = ConsoleLogBrowser(self, game_manager)
@@ -27,6 +30,7 @@ class ConsoleWindow(QWidget):
         self._console_log_browser.clear_log_signal.connect(self._error_check_box.reset_log_num)
         self._console_log_browser.clear_log_signal.connect(self._warning_check_box.reset_log_num)
         self._console_log_browser.log_counts_changed.connect(self._on_log_counts_changed)
+        self._console_log_browser.open_file_at_line_signal.connect(self.open_file_at_line_signal.emit)
 
         self._clear_btn.clicked.connect(self._console_log_browser.clear_log)
         self._search_line_edit.search_signal.connect(self._console_log_browser.search)

@@ -16,7 +16,9 @@ from pygamestudio.gui.settings.project import ProjectSettingsWindow
 from pygamestudio.gui.settings.editor import EditorSettingsWindow
 from pygamestudio.gui.about.window import AboutWindow
 from pygamestudio.gui.build.window import BuildWindow
+from pygamestudio.gui.code.window import CodeEditorWindow
 from pygamestudio.game.core.manager import GameManager
+from pygamestudio.common.utils.config import get_editor_config
 
 
 class EditorBody(QMainWindow):
@@ -36,6 +38,7 @@ class EditorBody(QMainWindow):
         self._project_settings_window = ProjectSettingsWindow(game_manager)
         self._editor_settings_window = EditorSettingsWindow(game_manager)
         self._build_window = BuildWindow(game_manager)
+        self._code_editor_window = CodeEditorWindow(game_manager)
 
         self._left_top_tab_widget = QTabWidget()
         self._left_bottom_tab_widget = QTabWidget()
@@ -71,6 +74,8 @@ class EditorBody(QMainWindow):
         self._left_top_tab_widget.addTab(self._hierarchy_window, T.tr('hierarchy.hierarchy', 'Hierarchy'))
         self._left_bottom_tab_widget.addTab(self._asset_window, T.tr('asset.asset', 'Asset'))
         self._center_top_tab_widget.addTab(self._scene_widnow, T.tr('scene.scene', 'Scene'))
+        self._center_top_tab_widget.addTab(self._code_editor_window, T.tr('code.editor', 'Code Editor'))
+        self._code_editor_window.set_tab_widget(self._center_top_tab_widget)
         self._center_bottom_tab_widget.addTab(self._console_window, T.tr('console.console', 'Console'))
         self._right_top_tab_widget.addTab(self._inspector_window, T.tr('inspector.inspector', 'Inspector'))
         self._right_bottom_tab_widget.setHidden(True)
@@ -95,7 +100,14 @@ class EditorBody(QMainWindow):
     def _set_signal(self):
         self._editor_settings_window.theme_toggled.connect(self._scene_widnow.update_grid_style)
         self._editor_settings_window.theme_toggled.connect(self._console_window.reload_logs_on_theme_changed)
+        self._editor_settings_window.theme_toggled.connect(lambda theme_code: self._code_editor_window.apply_theme(theme_code == 'dark'))
+        self._asset_window.edit_file_signal.connect(self._code_editor_window.open_file)
+        self._console_window.open_file_at_line_signal.connect(self._code_editor_window.open_file_at_line)
         T.add_observer(self)
+
+        # Match the code editor's highlight colors with the startup theme.
+        theme_code = get_editor_config().get('theme', 'dark')
+        self._code_editor_window.apply_theme(theme_code == 'dark')
 
     def _set_layout(self):
         main_layout = QHBoxLayout(self._central_widget)
@@ -214,6 +226,7 @@ class EditorBody(QMainWindow):
         self._inspector_window.get_ready_for_project()
         self._project_settings_window.get_ready_for_project()
         self._build_window.get_ready_for_project()
+        self._code_editor_window.get_ready_for_project()
         self._game_manager.set_project_ready()
 
     def clean_up(self):
@@ -222,6 +235,7 @@ class EditorBody(QMainWindow):
         self._console_window.clean_up()
         self._hierarchy_window.clean_up()
         self._inspector_window.clean_up()
+        self._code_editor_window.clean_up()
         self._game_manager.clean_up()
 
     def _on_edit_menu_action_triggered(self, action_name):
@@ -299,6 +313,7 @@ class EditorBody(QMainWindow):
         self._update_scene_tab_unsaved_marker()
         self._center_bottom_tab_widget.setTabText(0, T.tr('console.console', 'Console'))
         self._right_top_tab_widget.setTabText(0, T.tr('inspector.inspector', 'Inspector'))
+        self._code_editor_window.retranslate()
 
     def enterEvent(self, event):
         self.setCursor(Qt.CursorShape.ArrowCursor)

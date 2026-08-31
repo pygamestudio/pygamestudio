@@ -122,6 +122,18 @@
         "run_project_finished": "项目{}已退出，退出码：{}"
     },
 
+    "code": {
+        "editor": "代码编辑器",
+        "untitled": "未命名",
+        "detach": "独立窗口",
+        "attach": "回到标签页",
+        "saved": "已保存",
+        "unsaved": "未保存",
+        "save_failed": "保存失败",
+        "zoom_in": "放大字体",
+        "zoom_out": "缩小字体"
+    },
+
     "hierarchy": {
         "hierarchy": "层级管理器",
         "search_placeholder": "输入名称或UUID搜索",
