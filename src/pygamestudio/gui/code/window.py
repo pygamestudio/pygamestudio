@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 
@@ -200,7 +200,7 @@ class CodeEditorWindow(QWidget):
         return T.tr('code.editor', 'Code Editor')
 
     def _window_title(self):
-        return f'{self._tab_title()} - Pygame Studio'
+        return f' Pygame Studio - {self._tab_title()}'
 
     def _update_titles(self):
         if self._is_detached:

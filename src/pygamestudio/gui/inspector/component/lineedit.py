@@ -134,7 +134,7 @@ class ImagePathLineEdit(_PathLineEditDropMixin, QLineEdit):
     def _set_signal(self):
         self._browse_button.clicked.connect(self._choose_image)
         self._delete_button.clicked.connect(self._delete_image)
-        self.textChanged.connect(self._inspector_container.set_object_image_path)
+        self.textChanged.connect(self._notify_container)
 
     def _set_layout(self):
         h_layout = QHBoxLayout(self)
@@ -143,12 +143,19 @@ class ImagePathLineEdit(_PathLineEditDropMixin, QLineEdit):
         h_layout.addWidget(self._browse_button)
         h_layout.setContentsMargins(0, 2, 5, 0)
 
+    def _notify_container(self):
+        """Tell the inspector which path attribute changed and its value, so
+        it can be routed to the right object property (image_path or
+        particle_image) even when called directly (not via a signal)."""
+        attr = self.property('component_attribute') or 'image_path'
+        self._inspector_container.set_object_path(attr, self.toolTip())
+
     def _set_path_from_file(self, file_path):
         """Apply a chosen/dropped image file: update the display and notify the
-        inspector so the object's image_path is set (same as picking it)."""
+        inspector so the object's path attribute is set (same as picking it)."""
         self._image_path = Path(file_path)
         self.setToolTip(self._image_path.as_posix())
-        self._inspector_container.set_object_image_path()
+        self._notify_container()
         self.setStyleSheet('')
 
     def _choose_image(self):
@@ -161,7 +168,7 @@ class ImagePathLineEdit(_PathLineEditDropMixin, QLineEdit):
     def _delete_image(self):
         self._image_path = Path('')
         self.setToolTip('')
-        self._inspector_container.set_object_image_path()
+        self._notify_container()
 
         self.setStyleSheet('')
 

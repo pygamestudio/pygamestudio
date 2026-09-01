@@ -67,8 +67,11 @@ class CodeCompleter(QCompleter):
     def complete_prefix(self):
         """Show the popup under the cursor for the identifier being typed."""
         cursor = self._editor.textCursor()
-        text_before = self._editor.toPlainText()[:cursor.position()]
-        match = re.search(r'[A-Za-z_]\w*$', text_before)
+        # Only look at the current line up to the cursor, so a word on a
+        # previous line can never act as the completion prefix (e.g. right
+        # after deleting a word on an empty line).
+        line_prefix = cursor.block().text()[:cursor.positionInBlock()]
+        match = re.search(r'[A-Za-z_]\w*$', line_prefix)
         if not match:
             self.popup().hide()
             return False

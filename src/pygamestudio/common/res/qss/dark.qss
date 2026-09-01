@@ -626,6 +626,11 @@ QListView#codeEditorCompletionPopup::item {
     padding: 2px 6px;
 }
 
+QListView#codeEditorCompletionPopup::item:hover {
+    background-color: #282828;
+    color: #cccccc;
+}
+
 QListView#codeEditorCompletionPopup::item:selected {
     background-color: #007acc;
     color: #ffffff;

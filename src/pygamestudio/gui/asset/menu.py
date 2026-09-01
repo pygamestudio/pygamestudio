@@ -20,7 +20,7 @@ class ContextMenu(QMenu):
     open_in_terminal_signal = Signal()
     open_externally_signal = Signal()
     show_in_explorer_signal = Signal()
-    edit_signal = Signal()
+    open_signal = Signal()
     run_signal = Signal()
 
     def __init__(self, title='', parent=None):
@@ -28,7 +28,7 @@ class ContextMenu(QMenu):
         self._tree_view = parent
 
     def _add_actions(self, index_type, file_path=''):
-        edit_action = QAction(T.tr('menu.edit', 'Edit'), self)
+        open_action = QAction(T.tr('menu.open', 'Open'), self)
         run_action = QAction(T.tr('menu.run', 'Run'), self)
         add_folder_action = QAction(T.tr('menu.folder', 'Folder'), self)
         add_script_action = QAction(T.tr('menu.script', 'Script'), self)
@@ -48,7 +48,7 @@ class ContextMenu(QMenu):
         open_externally_action = QAction(T.tr('menu.open_externally', 'Open Externally'), self)
         show_in_explorer_action = QAction(T.tr('menu.show_in_explorer', 'Show in Explorer'), self)
 
-        edit_action.triggered.connect(self.edit_signal.emit)
+        open_action.triggered.connect(self.open_signal.emit)
         run_action.triggered.connect(self.run_signal.emit)
         add_folder_action.triggered.connect(lambda: self.add_signal.emit(INDEX_FOLDER))
         add_script_action.triggered.connect(lambda: self.add_signal.emit(INDEX_SCRIPT))
@@ -113,11 +113,11 @@ class ContextMenu(QMenu):
 
         # Right click on the specific file index.
         if index_type == INDEX_FILE:
-            self.insertAction(add_menu.menuAction(), edit_action)
+            self.insertAction(add_menu.menuAction(), open_action)
             # The run action only applies to the project's root main.py.
             if self._is_project_main_script(file_path):
-                self.insertAction(edit_action, run_action)
-                self.insertSeparator(edit_action)
+                self.insertAction(open_action, run_action)
+                self.insertSeparator(open_action)
             self.insertSeparator(add_menu.menuAction())
             self.insertAction(show_in_explorer_action, open_externally_action)
         

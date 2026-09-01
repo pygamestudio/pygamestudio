@@ -29,6 +29,7 @@ class ContextMenu(QMenu):
         add_text_action = QAction(T.tr('item.text', 'Text'), self)
         add_image_action = QAction(T.tr('item.image', 'Image'), self)
         add_button_action = QAction(T.tr('item.button', 'Button'), self)
+        add_particle_action = QAction(T.tr('item.particle', 'Particle Emitter'), self)
         cut_action = QAction(T.tr('menu.cut', 'Cut'), self)
         copy_action = QAction(T.tr('menu.copy', 'Copy'), self)
         paste_action = QAction(T.tr('menu.paste', 'Paste'), self)
@@ -46,6 +47,7 @@ class ContextMenu(QMenu):
         add_text_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_TEXT))
         add_image_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_IMAGE))
         add_button_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_BUTTON))
+        add_particle_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_PARTICLE))
         cut_action.triggered.connect(self.cut_signal.emit)
         copy_action.triggered.connect(self.copy_signal.emit)
         paste_action.triggered.connect(self.paste_signal.emit)
@@ -60,10 +62,12 @@ class ContextMenu(QMenu):
         add_menu = QMenu(title=T.tr('menu.add', 'Add'), parent=self)
         add_shape_sub_menu = QMenu(title=T.tr('item.shape', 'Shape'), parent=self)
         add_ui_sub_menu = QMenu(title='UI', parent=self)
+        add_effects_sub_menu = QMenu(title=T.tr('item.effects', 'Effects'), parent=self)
 
         self.addMenu(add_menu)
         add_menu.addMenu(add_shape_sub_menu)
         add_menu.addMenu(add_ui_sub_menu)
+        add_menu.addMenu(add_effects_sub_menu)
 
         add_shape_sub_menu.addAction(add_line_action)
         add_shape_sub_menu.addAction(add_rect_action)
@@ -72,6 +76,7 @@ class ContextMenu(QMenu):
         add_ui_sub_menu.addAction(add_text_action)
         add_ui_sub_menu.addAction(add_image_action)
         add_ui_sub_menu.addAction(add_button_action)
+        add_effects_sub_menu.addAction(add_particle_action)
 
         # Right click on the blank area.
         if item_type is None:

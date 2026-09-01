@@ -91,7 +91,9 @@
         "polygon": "多边形",
         "text": "文本",
         "image": "图片",
-        "button": "按钮"
+        "button": "按钮",
+        "effects": "特效",
+        "particle": "粒子发射器"
     },
 
     "gm": {
@@ -174,7 +176,15 @@
         "script_path": "脚本路径",
         "select_image": "选择图片",
         "select_script": "选择脚本",
-        "format": "格式"
+        "format": "格式",
+        "emission_rate": "发射速率",
+        "max_particles": "最大粒子数",
+        "particle_lifetime": "粒子寿命",
+        "particle_speed": "粒子速度",
+        "particle_size": "粒子大小",
+        "particle_image": "粒子图片",
+        "gravity": "重力",
+        "spread_angle": "发射角度"
     },
 
     "dashboard": {

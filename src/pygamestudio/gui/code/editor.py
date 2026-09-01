@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from PySide6.QtCore import QRect, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QTextFormat, QTextCursor
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QTextCharFormat, QTextFormat, QTextCursor
 from PySide6.QtWidgets import QPlainTextEdit, QTextEdit, QWidget
 
 from pygamestudio.gui.code.highlighter import CodeHighlighter
@@ -40,6 +40,13 @@ class CodeEditor(QPlainTextEdit):
     MAX_FONT_SIZE = 26
     INDENT_WIDTH = 4
 
+    # Characters that auto-complete a closing counterpart while typing.
+    _AUTO_PAIRS = {
+        '(': ')',
+        "'": "'",
+        '"': '"',
+    }
+
     def __init__(self):
         super().__init__()
         self._file_path = None
@@ -47,6 +54,7 @@ class CodeEditor(QPlainTextEdit):
         self._is_loading = False
         self._font_size = self._load_font_size_from_config()
         self._current_line_color = QColor('#282828')
+        self._error_start = None
 
         self._highlighter = CodeHighlighter(self.document())
         self._completer = CodeCompleter(self)
@@ -56,6 +64,10 @@ class CodeEditor(QPlainTextEdit):
         self._auto_save_timer.setSingleShot(True)
         self._auto_save_timer.setInterval(self.AUTO_SAVE_DELAY_MS)
         self._auto_save_timer.timeout.connect(self.auto_save)
+        self._syntax_check_timer = QTimer(self)
+        self._syntax_check_timer.setSingleShot(True)
+        self._syntax_check_timer.setInterval(500)
+        self._syntax_check_timer.timeout.connect(self._check_syntax)
 
         self._set_up()
 
@@ -88,6 +100,7 @@ class CodeEditor(QPlainTextEdit):
         self.document().setModified(False)
         self._set_modified(False)
         self._update_status(T.tr('code.saved', 'Saved'))
+        self._check_syntax()
 
     def save(self):
         """Write the current content to disk (Ctrl+S or auto-save)."""
@@ -115,6 +128,7 @@ class CodeEditor(QPlainTextEdit):
         self._is_loading = False
         self.document().setModified(False)
         self._set_modified(False)
+        self._set_error(None)
         self._update_status('')
 
     # ------------------------------------------------------------------ theme
@@ -164,6 +178,46 @@ class CodeEditor(QPlainTextEdit):
         self.setTabStopDistance(QFontMetrics(self.font()).horizontalAdvance(' ') * 4)
         self._update_line_number_area_width()
         self._line_number_area.update()
+
+    # ------------------------------------------------------------------ syntax check
+    def _check_syntax(self):
+        """Parse the current Python source and remember the position of the
+        first syntax error so it can be underlined."""
+        if self._file_path is None or self._file_path.suffix.lower() != '.py':
+            self._set_error(None)
+            return
+        source = self.toPlainText()
+        try:
+            compile(source, str(self._file_path), 'exec')
+        except SyntaxError as e:
+            self._set_error(self._syntax_error_position(e, source))
+            return
+        self._set_error(None)
+
+    def _syntax_error_position(self, error, source):
+        """Return the document position where the syntax error starts, or
+        None when the error points past the end of the file.
+
+        An error at the very end of the file usually means the user is still
+        typing that statement (a bare 'import', an open parenthesis, an
+        unclosed string...), so it is not flagged yet - mirroring how VS Code
+        avoids red-squiggling incomplete code while it is being typed."""
+        if error.lineno is None or error.offset is None:
+            return None
+        block = self.document().findBlockByNumber(error.lineno - 1)
+        line_start = block.position() if block.isValid() else len(source)
+        position = line_start + max(0, error.offset - 1)
+        if position >= len(source.rstrip(' \t\n\r')):
+            return None
+        # Skip indentation so the underline starts on the offending token.
+        while position < len(source) and source[position] in ' \t':
+            position += 1
+        return position
+
+    def _set_error(self, start_position):
+        if start_position != self._error_start:
+            self._error_start = start_position
+            self._update_current_line()
 
     # ------------------------------------------------------------------ indentation
     def _indent(self):
@@ -257,6 +311,88 @@ class CodeEditor(QPlainTextEdit):
             block = block.next()
         cursor.endEditBlock()
 
+    # ------------------------------------------------------------------ auto pairing
+    def _handle_auto_pair(self, char):
+        """Handle auto-pairing for '(' and quotes, plus smart-close for ')'
+        (step over the closing char when it is already right of the cursor)."""
+        cursor = self.textCursor()
+        if char == '(':
+            if cursor.hasSelection():
+                self._wrap_selection(cursor, '(', ')')
+                return True
+            return self._handle_paren(cursor, '(', ')')
+        if char in ("'", '"'):
+            if cursor.hasSelection():
+                self._wrap_selection(cursor, char, char)
+                return True
+            if self.document().characterAt(cursor.position()) == char:
+                # The closing quote is already right of the cursor: step over it.
+                cursor.movePosition(QTextCursor.MoveOperation.Right)
+                self.setTextCursor(cursor)
+                return True
+            return self._handle_quote(cursor, char)
+        if char == ')':
+            if self.document().characterAt(cursor.position()) == ')':
+                cursor.movePosition(QTextCursor.MoveOperation.Right)
+                self.setTextCursor(cursor)
+                return True
+            return False
+        return False
+
+    def _handle_paren(self, cursor, open_char, close_char):
+        """'(' inserts '()' with the cursor in between; if the closing paren
+        is already right of the cursor, just move past it."""
+        if self.document().characterAt(cursor.position()) == close_char:
+            cursor.movePosition(QTextCursor.MoveOperation.Right)
+            self.setTextCursor(cursor)
+            return True
+        cursor.insertText(open_char + close_char)
+        cursor.movePosition(QTextCursor.MoveOperation.Left)
+        self.setTextCursor(cursor)
+        return True
+
+    def _handle_quote(self, cursor, char):
+        """Auto-pair a quote, keep it plain when adjacent to an existing
+        quote or right after a word character (apostrophes), and build a
+        triple quote when the third quote is typed."""
+        doc = self.document()
+        pos = cursor.position()
+        prev = doc.characterAt(pos - 1)
+        prev2 = doc.characterAt(pos - 2)
+
+        if prev == char and prev2 == char:
+            before = doc.characterAt(pos - 3)
+            if not (before.isalnum() or before == '_'):
+                # Third quote of an opening triple: complete it as 3 + 3.
+                cursor.insertText(char * 4)
+                cursor.movePosition(QTextCursor.MoveOperation.Left,
+                                    QTextCursor.MoveMode.MoveAnchor, 3)
+                self.setTextCursor(cursor)
+                return True
+            # Otherwise it is the closing quote of a triple already being
+            # typed - keep it plain.
+            cursor.insertText(char)
+            return True
+        if prev == char:
+            # Second quote in a row: type it manually, do not pair.
+            cursor.insertText(char)
+            return True
+        if prev.isalnum() or prev == '_':
+            # A quote right after a word is likely an apostrophe.
+            cursor.insertText(char)
+            return True
+        cursor.insertText(char + char)
+        cursor.movePosition(QTextCursor.MoveOperation.Left)
+        self.setTextCursor(cursor)
+        return True
+
+    def _wrap_selection(self, cursor, open_char, close_char):
+        """Wrap the current selection in the given bracket/quote pair."""
+        start = cursor.selectionStart()
+        end = cursor.selectionEnd()
+        selected = self.toPlainText()[start:end]
+        cursor.insertText(open_char + selected + close_char)
+
     # ------------------------------------------------------------------ events
     def _on_text_changed(self):
         if self._is_loading:
@@ -265,6 +401,7 @@ class CodeEditor(QPlainTextEdit):
         self._update_status(T.tr('code.unsaved', 'Unsaved'))
         self._completer.update_words()
         self._auto_save_timer.start()
+        self._syntax_check_timer.start()
 
     def keyPressEvent(self, event):
         if self._completer.popup().isVisible():
@@ -319,6 +456,15 @@ class CodeEditor(QPlainTextEdit):
                 and not (event.modifiers() & Qt.KeyboardModifier.ControlModifier):
             if self._backspace_unindent():
                 return
+
+        # Auto-complete bracket and quote pairs while typing.
+        text = event.text()
+        if text and not (event.modifiers() & (Qt.KeyboardModifier.ControlModifier
+                                              | Qt.KeyboardModifier.AltModifier
+                                              | Qt.KeyboardModifier.MetaModifier)) \
+                and (text in self._AUTO_PAIRS or text == ')'):
+            if self._handle_auto_pair(text):
+                return
         super().keyPressEvent(event)
 
         # Show completion only while actually typing a word character (not on
@@ -328,6 +474,15 @@ class CodeEditor(QPlainTextEdit):
                                               | Qt.KeyboardModifier.AltModifier
                                               | Qt.KeyboardModifier.MetaModifier)) \
                 and (text.isalnum() or text == '_'):
+            self._completer.update_words()
+            self._completer.complete_prefix()
+        elif event.key() in (Qt.Key.Key_Backspace, Qt.Key.Key_Delete) \
+                and not (event.modifiers() & (Qt.KeyboardModifier.ControlModifier
+                                              | Qt.KeyboardModifier.AltModifier
+                                              | Qt.KeyboardModifier.MetaModifier)):
+            # Deleting a character may shorten the identifier being typed, so
+            # refresh the completion list (or dismiss it when no prefix is
+            # left before the cursor).
             self._completer.update_words()
             self._completer.complete_prefix()
 
@@ -357,13 +512,34 @@ class CodeEditor(QPlainTextEdit):
 
     # ------------------------------------------------------------------ current line
     def _update_current_line(self):
-        """Highlight the full line that currently holds the text cursor."""
+        """Highlight the full line that currently holds the text cursor and
+        draw a red wave underline under any syntax-error line."""
+        selections = []
+
+        # Current line highlight.
         selection = QTextEdit.ExtraSelection()
         selection.format.setBackground(self._current_line_color)
         selection.format.setProperty(QTextFormat.Property.FullWidthSelection, True)
         selection.cursor = self.textCursor()
         selection.cursor.clearSelection()
-        self.setExtraSelections([selection])
+        selections.append(selection)
+
+        # Red wave underline on the syntax-error token (not the whole line).
+        if self._error_start is not None:
+            block = self.document().findBlock(self._error_start)
+            if block.isValid():
+                error_selection = QTextEdit.ExtraSelection()
+                error_format = QTextCharFormat()
+                error_format.setUnderlineStyle(QTextCharFormat.UnderlineStyle.WaveUnderline)
+                error_format.setUnderlineColor(QColor('#f14c4c'))
+                error_selection.format = error_format
+                error_selection.cursor = QTextCursor(block)
+                error_selection.cursor.setPosition(self._error_start)
+                error_selection.cursor.movePosition(
+                    QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor)
+                selections.append(error_selection)
+
+        self.setExtraSelections(selections)
 
     def jump_to_line(self, line):
         """Move the cursor to a 1-based line, scroll it to center and focus."""

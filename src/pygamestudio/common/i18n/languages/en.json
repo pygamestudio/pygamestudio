@@ -91,7 +91,9 @@
         "polygon": "Polygon",
         "text": "Text",
         "image": "Image",
-        "button": "Button"
+        "button": "Button",
+        "effects": "Effects",
+        "particle": "Particle Emitter"
     },
 
     "gm": {
@@ -174,7 +176,15 @@
         "font_path": "Font Path",
         "script_path": "Script Path",
         "select_script": "Select Script",
-        "format": "Format"
+        "format": "Format",
+        "emission_rate": "Emission Rate",
+        "max_particles": "Max Particles",
+        "particle_lifetime": "Lifetime",
+        "particle_speed": "Speed",
+        "particle_size": "Particle Size",
+        "particle_image": "Particle Image",
+        "gravity": "Gravity",
+        "spread_angle": "Spread Angle"
     },
 
     "dashboard": {

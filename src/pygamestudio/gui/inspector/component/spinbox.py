@@ -163,3 +163,33 @@ class FontSizeSpinBox(QDoubleSpinBox):
         self.setDecimals(0)
 
         self.valueChanged.connect(self._inspector_container.set_object_font_size)
+
+
+class ParticleParameterSpinBox(SuffixSpinBox):
+    """Spinbox for one particle-emitter parameter (emission rate, lifetime,
+    speed, gravity, ...)."""
+
+    _SUFFIXES = {
+        'emission_rate': '/s',
+        'max_particles': '',
+        'particle_lifetime': 's',
+        'particle_speed': 'px/s',
+        'particle_size': 'px',
+        'gravity': 'px/s2',
+        'spread_angle': '°',
+    }
+
+    def __init__(self, inspector_container, value, attr=''):
+        super().__init__()
+        self._inspector_container = inspector_container
+        self._attr = attr
+        self.setRange(0, 999999)
+        self.setSingleStep(1)
+        self.setDecimals(0)
+        self.setValue(value)
+        self.set_suffix(self._SUFFIXES.get(attr, ''))
+
+        self.valueChanged.connect(self._on_value_changed)
+
+    def _on_value_changed(self):
+        self._inspector_container.set_object_particle_parameter(self._attr, int(self.value()))

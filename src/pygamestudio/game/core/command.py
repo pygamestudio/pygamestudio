@@ -117,3 +117,7 @@ class UpdateAttrValueCommand(QUndoCommand):
             self._game_manager.object_script_path_changed.emit(self._obj.uuid)
         elif attr == 'points':
             self._game_manager.object_points_changed.emit(self._obj.uuid)
+        elif attr in ('emission_rate', 'max_particles', 'particle_lifetime',
+                      'particle_speed', 'particle_size', 'particle_image',
+                      'gravity', 'spread_angle'):
+            self._game_manager.object_particle_parameter_changed.emit(self._obj.uuid)

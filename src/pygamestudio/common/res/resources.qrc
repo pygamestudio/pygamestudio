@@ -42,6 +42,7 @@
         <file>images/tree_arrow_right.png</file>
         <file>images/up_arrow.png</file>
         <file>images/warning.png</file>
+        <file>images/particle.png</file>
         <file>images/zoom_in.png</file>
         <file>images/zoom_out.png</file>
     </qresource>

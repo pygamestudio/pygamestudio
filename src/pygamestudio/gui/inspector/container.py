@@ -15,6 +15,7 @@ from pygamestudio.gui.inspector.layout.canvas import INSPECTOR_LAYOUT_CANVAS
 from pygamestudio.gui.inspector.layout.text import INSPECTOR_LAYOUT_TEXT
 from pygamestudio.gui.inspector.layout.image import INSPECTOR_LAYOUT_IMAGE
 from pygamestudio.gui.inspector.layout.button import INSPECTOR_LAYOUT_BUTTON
+from pygamestudio.gui.inspector.layout.particle import INSPECTOR_LAYOUT_PARTICLE
 
 
 class Container(QFrame):
@@ -69,6 +70,7 @@ class Container(QFrame):
         self._game_manager.object_font_path_changed.connect(self._on_object_font_path_changed)
         self._game_manager.object_script_path_changed.connect(self._on_object_script_path_changed)
         self._game_manager.object_points_changed.connect(self._on_object_points_changed)
+        self._game_manager.object_particle_parameter_changed.connect(self._on_object_particle_parameter_changed)
 
     def _set_layout(self):
         self._container_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
@@ -183,6 +185,17 @@ class Container(QFrame):
         lineedit = self._find_widget(self._container_layout, 'image_path')
         self._game_manager.set_image_path(self._object_uuid_in_inspection, lineedit.toolTip())
 
+    def set_object_path(self, attr='', tooltip=''):
+        """Set an image-path style attribute (image_path or particle_image)
+        from the line edit that triggered this slot."""
+        if not attr:
+            sender = self.sender()
+            attr = sender.property('component_attribute') if sender else ''
+        if attr == 'image_path':
+            self._game_manager.set_image_path(self._object_uuid_in_inspection, tooltip)
+        elif attr:
+            self._game_manager.set_particle_parameter(self._object_uuid_in_inspection, attr, tooltip)
+
     def set_object_font_path(self):
         lineedit = self._find_widget(self._container_layout, 'font_path')
         self._game_manager.set_font_path(self._object_uuid_in_inspection, lineedit.toolTip())
@@ -193,6 +206,32 @@ class Container(QFrame):
 
     def set_object_points(self, new_points):
         self._game_manager.set_points(self._object_uuid_in_inspection, new_points)
+
+    def set_object_particle_parameter(self, attr, new_value):
+        self._game_manager.set_particle_parameter(self._object_uuid_in_inspection, attr, new_value)
+
+    def _on_object_particle_parameter_changed(self, object_uuid):
+        """Keep the particle parameter editors in sync with an undone/redone
+        parameter change."""
+        if object_uuid != self._object_uuid_in_inspection:
+            return
+        obj = self._game_manager.get_object(object_uuid)
+        for attr in ('emission_rate', 'max_particles', 'particle_lifetime',
+                     'particle_speed', 'particle_size', 'gravity',
+                     'spread_angle'):
+            widget = self._find_widget(self._container_layout, attr)
+            if widget:
+                widget.blockSignals(True)
+                widget.setValue(getattr(obj, attr))
+                widget.blockSignals(False)
+
+        image_edit = self._find_widget(self._container_layout, 'particle_image')
+        if image_edit:
+            image_edit.blockSignals(True)
+            image_path = getattr(obj, 'particle_image', '')
+            image_edit.setText(Path(image_path).name if image_path else '')
+            image_edit.setToolTip(Path(image_path).as_posix() if image_path else '')
+            image_edit.blockSignals(False)
     
     def show_color_picker(self, color_rgba):
         screen = QApplication.primaryScreen()
@@ -485,6 +524,8 @@ class Container(QFrame):
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_IMAGE)
         elif obj.type == OBJECT_BUTTON:
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_BUTTON)
+        elif obj.type == OBJECT_PARTICLE:
+            self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_PARTICLE)
 
     def _clear_layout(self, layout):
         if layout is None:

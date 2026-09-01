@@ -1,3 +1,4 @@
+import os
 import shutil
 import platform
 import subprocess
@@ -18,7 +19,7 @@ from pygamestudio.common.utils.path import RES_PATH
 # File suffixes the built-in code editor can open as plain text.
 TEXT_FILE_EXTENSIONS = {
     '.py', '.txt', '.json', '.md', '.pygs', '.qss', '.qrc', '.cfg', '.ini',
-    '.toml', '.yaml', '.yml', '.log', '.html', '.css', '.js', '.ts', '.csv', '.xml',
+    '.toml', '.yaml', '.yml', '.log', '.html', '.css', '.js', '.ts', '.csv', '.xml', '.scene'
 }
 
 
@@ -92,7 +93,7 @@ class AssetTreeView(QTreeView):
         self._context_menu.open_in_terminal_signal.connect(self._open_in_terminal)
         self._context_menu.open_externally_signal.connect(self._open_externally)
         self._context_menu.show_in_explorer_signal.connect(self._show_in_explorer)
-        self._context_menu.edit_signal.connect(self._edit_file)
+        self._context_menu.open_signal.connect(self._open_file)
         self._context_menu.run_signal.connect(self._run_project)
         self.doubleClicked.connect(self._on_double_clicked)
 
@@ -398,27 +399,25 @@ class AssetTreeView(QTreeView):
             QMessageBox.information(QApplication.activeWindow(), T.tr('message_box.information_title', 'Info'), T.tr('message_box.information_os_content', 'Unsupported Operating System'))
 
     def _open_externally(self):
-        """Open with VS Code by default. If it's not installed, open with txt."""
+        """Open the selected item with the operating system's default
+        application: images with the default viewer, audio/video with the
+        default player, folders in the file manager, etc."""
         selected_indexes = self.selectedIndexes()
-        target_path = Path(self._file_model.filePath(self._proxy_model.mapToSource(selected_indexes[-1]))) if selected_indexes else Path(self._file_model.filePath(self._proxy_model.mapToSource(self.rootIndex())))
+        if selected_indexes:
+            target_path = Path(self._file_model.filePath(self._proxy_model.mapToSource(selected_indexes[-1])))
+        else:
+            target_path = Path(self._file_model.filePath(self._proxy_model.mapToSource(self.rootIndex())))
 
-        # VS Code's install path should be configured in the settings. If not, open the file with txt.
         system = platform.system()
         if system == 'Windows':
             try:
-                subprocess.Popen(['code', target_path])
-            except Exception as e:
-                subprocess.Popen(['notepad', target_path])
+                os.startfile(str(target_path))
+            except OSError as e:
+                QMessageBox.warning(QApplication.activeWindow(), T.tr('message_box.warning_title', 'Warning'), str(e))
         elif system == 'Darwin':
-            try:
-                subprocess.Popen(['open', '-a', 'Visual Studio Code', target_path])
-            except Exception as e:
-                subprocess.Popen(['open', '-a', 'TextEdit', target_path])
+            subprocess.Popen(['open', str(target_path)])
         elif system == 'Linux':
-            try:
-                subprocess.Popen(['gedit', target_path])
-            except FileNotFoundError:
-                subprocess.Popen(['xdg-open', target_path])
+            subprocess.Popen(['xdg-open', str(target_path)])
         else:
             QMessageBox.information(QApplication.activeWindow(), T.tr('message_box.information_title', 'Info'), T.tr('message_box.information_os_content', 'Unsupported Operating System'))
 
@@ -433,9 +432,9 @@ class AssetTreeView(QTreeView):
     def _is_text_file(path):
         return path.is_file() and path.suffix.lower() in TEXT_FILE_EXTENSIONS
 
-    def _edit_file(self):
-        """Open the selected file in the built-in code editor (text files),
-        falling back to the external editor for non-text files."""
+    def _open_file(self):
+        """Open the selected file: text files in the built-in code editor,
+        everything else with the system's default application."""
         target_path = self._get_selected_file_path()
         if not target_path:
             return
@@ -445,10 +444,20 @@ class AssetTreeView(QTreeView):
             self._open_externally()
 
     def _on_double_clicked(self, index):
-        """Double-clicking a text file opens it in the code editor."""
+        """Double-clicking a folder toggles expand/collapse, a text file
+        opens in the code editor, and any other file opens with the system's
+        default application."""
         target_path = Path(self._file_model.filePath(self._proxy_model.mapToSource(index)))
+        if target_path.is_dir():
+            # Let the tree's default behavior expand/collapse the folder.
+            return
         if self._is_text_file(target_path):
             self.edit_file_signal.emit(str(target_path))
+        else:
+            # Make sure the double-clicked item is the one that gets opened
+            # (the default app opener reads the current selection).
+            self.setCurrentIndex(index)
+            self._open_externally()
 
     def _run_project(self):
         """Run the project (same as the Run Project button)."""
