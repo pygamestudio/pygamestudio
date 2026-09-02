@@ -17,6 +17,7 @@ from pygamestudio.gui.inspector.layout.image import INSPECTOR_LAYOUT_IMAGE
 from pygamestudio.gui.inspector.layout.button import INSPECTOR_LAYOUT_BUTTON
 from pygamestudio.gui.inspector.layout.particle import INSPECTOR_LAYOUT_PARTICLE
 from pygamestudio.gui.inspector.layout.frame_sequence import INSPECTOR_LAYOUT_FRAME_SEQUENCE
+from pygamestudio.gui.inspector.layout.collision import build_collision_layout
 
 
 class Container(QFrame):
@@ -58,6 +59,7 @@ class Container(QFrame):
         # self._game_manager.object_deselected.connect(self._on_object_deselected)
         self._game_manager.object_renamed.connect(self._on_object_renamed)
         self._game_manager.object_moved.connect(self._on_object_moved)
+        self._game_manager.object_resized.connect(self._on_object_resized)
         self._game_manager.object_scaled.connect(self._on_object_scaled)
         self._game_manager.object_rotated.connect(self._on_object_rotated)
         self._game_manager.object_showed.connect(self._on_object_showed)
@@ -73,6 +75,7 @@ class Container(QFrame):
         self._game_manager.object_points_changed.connect(self._on_object_points_changed)
         self._game_manager.object_particle_parameter_changed.connect(self._on_object_particle_parameter_changed)
         self._game_manager.object_frame_sequence_parameter_changed.connect(self._on_object_frame_sequence_parameter_changed)
+        self._game_manager.object_collision_parameter_changed.connect(self._on_object_collision_parameter_changed)
 
     def _set_layout(self):
         self._container_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
@@ -219,6 +222,81 @@ class Container(QFrame):
     def set_object_frame_sequence_parameter(self, attr, new_value):
         self._game_manager.set_frame_sequence_parameter(self._object_uuid_in_inspection, attr, new_value)
 
+    def set_object_collision_parameter(self, attr, new_value):
+        # The first time collision is switched on, materialize concrete
+        # object-sized defaults so the fields never read as 0 x 0 (0 really
+        # means a zero-sized shape, there is no "auto").
+        if attr == 'collision_enabled' and new_value:
+            obj = self._game_manager.get_object(self._object_uuid_in_inspection)
+            if obj is not None:
+                obj._ensure_collision_defaults(force=True, for_type=getattr(obj, 'collision_type', 'rect'))
+        self._game_manager.set_collision_parameter(self._object_uuid_in_inspection, attr, new_value)
+
+    def set_object_collision_type(self, type_code):
+        """Change the collision shape type. The parameter-change handler
+        rebuilds the inspector so only the fields relevant to the new type are
+        shown; defaults for the new type are materialized first."""
+        obj = self._game_manager.get_object(self._object_uuid_in_inspection)
+        if obj is not None:
+            obj._ensure_collision_defaults(force=True, for_type=type_code)
+        self._game_manager.set_collision_parameter(
+            self._object_uuid_in_inspection, 'collision_type', type_code)
+
+    def _on_object_collision_parameter_changed(self, object_uuid):
+        """Keep the collision editors in sync with an undone/redone change."""
+        if object_uuid != self._object_uuid_in_inspection:
+            return
+        obj = self._game_manager.get_object(object_uuid)
+        if obj is None:
+            return
+
+        enabled = self._find_widget(self._container_layout, 'collision_enabled')
+        if enabled:
+            enabled.blockSignals(True)
+            enabled.setChecked(bool(getattr(obj, 'collision_enabled', False)))
+            enabled.blockSignals(False)
+
+        combo = self._find_widget(self._container_layout, 'collision_type')
+        if combo:
+            combo.set_collision_type(getattr(obj, 'collision_type', 'rect'))
+
+        # Sync every numeric field that is currently shown (offset + box size
+        # for rect/ellipse, offset for polygon). Stored values are concrete.
+        for attr in ('collision_offset_x', 'collision_offset_y',
+                     'collision_width', 'collision_height'):
+            widget = self._find_widget(self._container_layout, attr)
+            if widget:
+                widget.blockSignals(True)
+                widget.setValue(getattr(obj, attr, 0))
+                widget.blockSignals(False)
+
+        points = self._find_widget(self._container_layout, 'collision_points')
+        if points:
+            points.blockSignals(True)
+            points.set_points(getattr(obj, 'collision_points', []))
+            points.blockSignals(False)
+
+        # Rebuild the inspector when the visible section no longer matches the
+        # object's state - e.g. the enable checkbox was toggled (hide/show the
+        # whole section) or the type changed through undo/redo (bypasses the
+        # combo box).
+        enabled = bool(getattr(obj, 'collision_enabled', False))
+        ctype = getattr(obj, 'collision_type', 'rect')
+
+        def shown(attr):
+            return self._find_widget(self._container_layout, attr) is not None
+
+        want_combo = enabled
+        want_box_fields = enabled and ctype in ('rect', 'ellipse')
+        want_polygon = enabled and ctype == 'polygon'
+        mismatch = (
+            (shown('collision_type') != want_combo) or
+            (shown('collision_width') != want_box_fields) or
+            (shown('collision_points') != want_polygon)
+        )
+        if mismatch:
+            self._inspect_object(self._object_uuid_in_inspection)
+
     def _on_object_particle_parameter_changed(self, object_uuid):
         """Keep the particle parameter editors in sync with an undone/redone
         parameter change."""
@@ -322,12 +400,14 @@ class Container(QFrame):
         obj = self._game_manager.get_object(object_uuid)
         spinbox_width = self._find_widget(self._container_layout, 'width')
         spinbox_height = self._find_widget(self._container_layout, 'height')
-        spinbox_width.blockSignals(True)
-        spinbox_height.blockSignals(True)
-        spinbox_width.setValue(obj.width)
-        spinbox_height.setValue(obj.height)
-        spinbox_width.blockSignals(False)
-        spinbox_height.blockSignals(False)
+        if spinbox_width:
+            spinbox_width.blockSignals(True)
+            spinbox_width.setValue(obj.width)
+            spinbox_width.blockSignals(False)
+        if spinbox_height:
+            spinbox_height.blockSignals(True)
+            spinbox_height.setValue(obj.height)
+            spinbox_height.blockSignals(False)
 
     def _on_object_renamed(self, object_uuid):
         obj = self._game_manager.get_object(object_uuid)
@@ -567,6 +647,15 @@ class Container(QFrame):
         elif obj.type == OBJECT_FRAME_SEQUENCE:
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_FRAME_SEQUENCE)
 
+        # Every object (except the canvas root) can carry a collision body.
+        if obj.type != OBJECT_CANVAS:
+            # Materialize defaults on first use only (never force): explicit
+            # values - including a deliberate 0 - are never overwritten.
+            if obj.collision_enabled:
+                obj._ensure_collision_defaults()
+            self._add_layout_for_specific_object(
+                obj, build_collision_layout(obj.collision_enabled, obj.collision_type))
+
     def _clear_layout(self, layout):
         if layout is None:
             return
@@ -593,7 +682,7 @@ class Container(QFrame):
             label = PropertyLabel(self, text)
             self._container_layout.addWidget(label, self._container_row, 0, 1, 1)
 
-            if property_detail['i18n']['default'] == 'Points':
+            if property_detail['i18n']['default'] in ('Points', 'Collision Points'):
                 label.setAlignment(Qt.AlignmentFlag.AlignTop)
                 label.setContentsMargins(0, 4, 0, 0)
 

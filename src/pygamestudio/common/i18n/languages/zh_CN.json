@@ -191,7 +191,16 @@
         "loop": "循环播放",
         "frame_rate": "帧率",
         "frame_folder": "帧文件夹",
-        "select_folder": "选择帧文件夹"
+        "select_folder": "选择帧文件夹",
+        "collision_enabled": "启用碰撞",
+        "collision_type": "碰撞类型",
+        "collision_type_bbox": "包围盒",
+        "collision_type_rect": "矩形",
+        "collision_type_ellipse": "椭圆",
+        "collision_type_polygon": "多边形",
+        "collision_offset": "碰撞偏移",
+        "collision_size": "碰撞大小",
+        "collision_points": "碰撞顶点"
     },
 
     "dashboard": {

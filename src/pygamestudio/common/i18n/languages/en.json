@@ -191,7 +191,16 @@
         "loop": "Loop",
         "frame_rate": "Frame Rate",
         "frame_folder": "Frame Folder",
-        "select_folder": "Select Frame Folder"
+        "select_folder": "Select Frame Folder",
+        "collision_enabled": "Enable Collision",
+        "collision_type": "Collision Type",
+        "collision_type_bbox": "Bounding Box",
+        "collision_type_rect": "Rect",
+        "collision_type_ellipse": "Ellipse",
+        "collision_type_polygon": "Polygon",
+        "collision_offset": "Collision Offset",
+        "collision_size": "Collision Size",
+        "collision_points": "Collision Points"
     },
 
     "dashboard": {

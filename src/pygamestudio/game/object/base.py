@@ -3,6 +3,7 @@ import math
 import pygame
 from pathlib import Path
 from pygamestudio.game.object.type import *
+from pygamestudio.game.core.collision import collide, collide_point, rect_shape
 from pygamestudio.common.utils.system import get_system_lang
 from pygamestudio.common.utils.path import get_project_path
 from pygamestudio.common.i18n.translator import Translator as T
@@ -46,6 +47,53 @@ class ObjectBase:
         # by the runtime to attach a behavior script to the object.
         self.script_path = object_data.get('script_path', '')
 
+        # ------------------------------------------------------------------
+        # Collision configuration (default: disabled).
+        #   collision_enabled: master switch. When False the object takes NO
+        #       part in any collision test (is_colliding_with_* / collides_with_*
+        #       always return False) and no shape is drawn in the editor.
+        #   collision_type: 'bbox' | 'rect' | 'ellipse' | 'polygon'
+        #       'bbox'    = always the object's rendered world bounding box.
+        #       'rect'    = a box; uses collision_width/height (full size).
+        #       'ellipse' = an ellipse inscribed in the collision box
+        #                   (collision_width/height is its full size).
+        #       'polygon' = free vertices in collision_points.
+        #   collision_offset_x/y shift the shape from the object's local
+        #       centre (content pixels); available for every type but bbox.
+        #   All sizes are CONCRETE: a stored 0 really means a zero-sized shape
+        #       (no collision). The first time a shape type is used its
+        #       still-zero fields are filled from the object's own size.
+        # ------------------------------------------------------------------
+        # Legacy scenes may still hold 'circle' or radius fields: migrate them
+        # to the ellipse model (a circle is an ellipse with equal axes).
+        _data_type = object_data.get('collision_type', 'rect')
+        _legacy_radius = float(object_data.get('collision_radius', 0))
+        _legacy_rx = float(object_data.get('collision_radius_x', 0))
+        _legacy_ry = float(object_data.get('collision_radius_y', 0))
+        _collision_width = float(object_data.get('collision_width', 0))
+        _collision_height = float(object_data.get('collision_height', 0))
+        if _data_type == 'circle':
+            _data_type = 'ellipse'
+            if _legacy_radius > 0:
+                _collision_width = _legacy_radius * 2
+                _collision_height = _legacy_radius * 2
+        elif _data_type == 'ellipse':
+            if _legacy_rx > 0:
+                _collision_width = _legacy_rx * 2
+            if _legacy_ry > 0:
+                _collision_height = _legacy_ry * 2
+
+        self.collision_enabled = bool(object_data.get('collision_enabled', False))
+        self.collision_type = _data_type if _data_type in ('bbox', 'rect', 'ellipse', 'polygon') else 'rect'
+        self.collision_offset_x = float(object_data.get('collision_offset_x', 0))
+        self.collision_offset_y = float(object_data.get('collision_offset_y', 0))
+        self.collision_width = _collision_width
+        self.collision_height = _collision_height
+        self.collision_points = list(object_data.get('collision_points', []))
+        # Becomes True once the shape fields carry explicit values (never
+        # serialized).
+        self._collision_configured = False
+
     def is_pressed(self, x:int, y:int) -> bool:
         """Pixel-perfect hit test: True when (x, y) (world coords) hits a
         non-transparent pixel of the object. More expensive than
@@ -66,13 +114,286 @@ class ObjectBase:
             return self._get_world_rect().collidepoint(x, y)
     
     def is_colliding_with_rect(self, x: int, y: int, width: int, height: int) -> bool:
-        """True if the object overlaps the given rectangle (world coords)."""
-        return self._get_world_rect().colliderect((x, y, width, height))
+        """True when the object's collision shape overlaps the given rectangle
+        (world coords). Returns False when collision is not enabled."""
+        shape = self._collision_shape()
+        if shape is None:
+            return False
+        return collide(shape, rect_shape(pygame.Rect(x, y, width, height)))
 
     def is_colliding_with_object(self, other) -> bool:
-        """True if the object overlaps another scene object (world rects)."""
-        return self._get_world_rect().colliderect(other._get_world_rect())
-    
+        """True when BOTH objects have collision enabled and their collision
+        shapes overlap. Returns False when either side is disabled."""
+        shape = self._collision_shape()
+        other_shape = other._collision_shape() if hasattr(other, '_collision_shape') else None
+        if shape is None or other_shape is None:
+            return False
+        return collide(shape, other_shape)
+
+    # ------------------------------------------------------------ collision API
+    def is_collision_enabled(self) -> bool:
+        """Whether this object takes part in shape-based collision tests."""
+        return bool(self.collision_enabled)
+
+    def set_collision_enabled(self, enabled: bool):
+        """Enable/disable collision detection for this object."""
+        self.collision_enabled = bool(enabled)
+
+    def get_collision_type(self) -> str:
+        """One of 'bbox', 'rect', 'ellipse' or 'polygon'."""
+        return self.collision_type
+
+    def set_collision_type(self, collision_type: str):
+        """Set the collision shape type: 'bbox' (rendered bounding box),
+        'rect', 'ellipse' or 'polygon'."""
+        if collision_type in ('bbox', 'rect', 'ellipse', 'polygon'):
+            self.collision_type = collision_type
+            self._collision_configured = True
+
+    def set_collision_offset(self, x: float, y: float):
+        """Offset of the shape's centre from the object's local centre, in
+        unscaled content pixels. The offset follows the object's scale/rotate."""
+        self.collision_offset_x = float(x)
+        self.collision_offset_y = float(y)
+        self._collision_configured = True
+
+    def get_collision_offset(self) -> tuple:
+        """(offset_x, offset_y) of the shape centre vs the object centre."""
+        return (self.collision_offset_x, self.collision_offset_y)
+
+    def get_collision_size(self) -> tuple:
+        """The stored (width, height) of the collision shape: full box size for
+        a rect, and the full bounding-box size for an ellipse."""
+        return (self.collision_width, self.collision_height)
+
+    def get_collision_radius(self) -> float:
+        """Radius of an ellipse shape (half of the smaller side of its box)."""
+        return min(self.collision_width, self.collision_height) / 2.0
+
+    def set_collision_size(self, width: int, height: int):
+        """Collision box size in content pixels (used by rect and ellipse)."""
+        self.collision_width = float(int(width))
+        self.collision_height = float(int(height))
+        self._collision_configured = True
+
+    def set_collision_ellipse(self, radius_x: float, radius_y: float):
+        """Convenience: set the two radii of an ellipse (content pixels) and
+        switch to the 'ellipse' type."""
+        self.collision_width = float(radius_x) * 2
+        self.collision_height = float(radius_y) * 2
+        self.collision_type = 'ellipse'
+        self._collision_configured = True
+
+    def set_collision_polygon(self, points):
+        """Set explicit polygon vertices (local content pixels, top-left
+        origin) and switch the shape type to 'polygon'."""
+        self.collision_points = [(float(px), float(py)) for (px, py) in points]
+        self.collision_type = 'polygon'
+        self._collision_configured = True
+
+    def get_collision_polygon(self) -> list:
+        """The explicit polygon vertices, or [] when using auto (box)."""
+        return list(self.collision_points)
+
+    def reset_collision_shape(self):
+        """Reset every editable field back to the object-sized default (all
+        stored values are made concrete, matching the object)."""
+        self.collision_offset_x = 0
+        self.collision_offset_y = 0
+        self.collision_width = 0
+        self.collision_height = 0
+        self.collision_points = []
+        self._collision_configured = False
+        self._ensure_collision_defaults(force=True)
+
+    def collides_with_point(self, x: int, y: int) -> bool:
+        """True when (x, y) (world coords) is inside the collision shape.
+        Returns False when collision is not enabled."""
+        shape = self._collision_shape()
+        if shape is None:
+            return False
+        return collide_point(shape, x, y)
+
+    def collides_with_rect(self, rect) -> bool:
+        """True when the collision shape overlaps ``rect`` (pygame.Rect or
+        (x, y, w, h) tuple, world coords). False when collision is disabled."""
+        shape = self._collision_shape()
+        if shape is None:
+            return False
+        if not isinstance(rect, pygame.Rect):
+            rect = pygame.Rect(*rect)
+        return collide(shape, rect_shape(rect))
+
+    def collides_with_object(self, other) -> bool:
+        """Alias for is_colliding_with_object (shape-aware)."""
+        return self.is_colliding_with_object(other)
+
+    def get_collision_center(self) -> tuple:
+        """World coordinates of the centre of the collision shape (the object
+        centre for auto / centred shapes)."""
+        cw = self.collision_width if self.collision_width > 0 else self.width
+        ch = self.collision_height if self.collision_height > 0 else self.height
+        # Centre of the shape in local content coordinates.
+        cx = self.width / 2.0 + self.collision_offset_x
+        cy = self.height / 2.0 + self.collision_offset_y
+        if self.collision_type == 'polygon' and self.collision_points:
+            xs = [px for (px, py) in self.collision_points]
+            ys = [py for (px, py) in self.collision_points]
+            if xs and ys:
+                cx = sum(xs) / len(xs)
+                cy = sum(ys) / len(ys)
+        return self._point_to_world(cx, cy)
+
+    # ---------------------------------------------------- collision internals
+    def _get_local_origin_world(self):
+        """World coordinates of the object's local content origin (its top-left
+        before scaling/rotation): own (x, y) shifted up the parent chain."""
+        ox, oy = self.x, self.y
+        parent_object = self._game_manager.get_parent_object(self.uuid)
+        while parent_object:
+            ox += parent_object.x
+            oy += parent_object.y
+            parent_object = self._game_manager.get_parent_object(parent_object.uuid)
+        return ox, oy
+
+    def _points_to_world(self, local_points):
+        """Map local content points to world coordinates replicating EXACTLY
+        how the object is rendered: scale about the content origin, then a
+        pygame-style rotation about the scaled content centre whose result is
+        blitted so its bounding-box top-left lands on the object's (x, y)."""
+        sx, sy = self.scale_x, self.scale_y
+        ox, oy = self._get_local_origin_world()
+        angle = float(self.angle) % 360.0
+        if not angle:
+            return [(ox + px * sx, oy + py * sy) for (px, py) in local_points]
+
+        rad = math.radians(angle)
+        cos_a, sin_a = math.cos(rad), math.sin(rad)
+        # Scaled content size/centre.
+        sw = self.width * sx
+        sh = self.height * sy
+        cx, cy = sw / 2.0, sh / 2.0
+        # Bounding box of the rotated (scaled) content - identical to the size
+        # pygame.transform.rotate returns.
+        rw = abs(sw * cos_a) + abs(sh * sin_a)
+        rh = abs(sw * sin_a) + abs(sh * cos_a)
+        # pygame.rotate keeps the input centre at the centre of the rotated
+        # surface, whose top-left is blitted at (x, y) (+parents).
+        wcx = ox + rw / 2.0
+        wcy = oy + rh / 2.0
+
+        world = []
+        for (px, py) in local_points:
+            dx = px * sx - cx
+            dy = py * sy - cy
+            # pygame.transform.rotate uses a POSITIVE angle for a clockwise
+            # rotation on screen (y grows downwards), hence the -/+ signs.
+            world.append((wcx + dx * cos_a + dy * sin_a,
+                          wcy - dx * sin_a + dy * cos_a))
+        return world
+
+    def _point_to_world(self, x, y):
+        """Map one local content point to world coordinates."""
+        return self._points_to_world([(x, y)])[0]
+
+    def _collision_geometry_world(self):
+        """Return the collision shape as a world-space descriptor, or None
+        when the object has no usable shape (see core/collision.py). 'bbox'
+        always returns the rendered world bounding box."""
+        ctype = self.collision_type if self.collision_type in ('bbox', 'rect', 'ellipse', 'polygon') else 'rect'
+
+        if ctype == 'bbox':
+            return rect_shape(self._get_world_rect())
+
+        # First use of a fresh shape fills its still-zero fields from the
+        # object's own size (see _ensure_collision_defaults).
+        self._ensure_collision_defaults()
+
+        cw = float(self.collision_width)
+        ch = float(self.collision_height)
+        if cw <= 0 or ch <= 0:
+            return None
+
+        # Centre of the shape in local content coordinates (offset shifts the
+        # shape away from the object centre for every non-bbox type).
+        cx = self.width / 2.0 + self.collision_offset_x
+        cy = self.height / 2.0 + self.collision_offset_y
+        sx = abs(self.scale_x)
+        sy = abs(self.scale_y)
+
+        if ctype == 'ellipse':
+            rx, ry = cw / 2.0, ch / 2.0
+            if abs(rx - ry) < 1e-9:
+                # Equal radii + (possibly) uniform scale -> exact circle.
+                return self._circle_or_poly(rx, cx, cy, sx, sy)
+            local = [(cx + rx * math.cos(2 * math.pi * i / 24),
+                      cy + ry * math.sin(2 * math.pi * i / 24))
+                     for i in range(24)]
+            return {'kind': 'poly', 'points': self._points_to_world(local)}
+
+        if ctype == 'rect':
+            hw, hh = cw / 2.0, ch / 2.0
+            local = [(cx - hw, cy - hh), (cx + hw, cy - hh),
+                     (cx + hw, cy + hh), (cx - hw, cy + hh)]
+            world = self._points_to_world(local)
+            if not self.angle:
+                xs = [p[0] for p in world]
+                ys = [p[1] for p in world]
+                return rect_shape(pygame.Rect(round(min(xs)), round(min(ys)),
+                                              round(max(xs) - min(xs)),
+                                              round(max(ys) - min(ys))))
+            return {'kind': 'poly', 'points': world}
+
+        # 'polygon': explicit vertices (absolute local pixels + offset shift)
+        # or the collision box.
+        if self.collision_points:
+            local = [(float(px) + self.collision_offset_x,
+                      float(py) + self.collision_offset_y)
+                     for (px, py) in self.collision_points]
+        else:
+            hw, hh = cw / 2.0, ch / 2.0
+            local = [(cx - hw, cy - hh), (cx + hw, cy - hh),
+                     (cx + hw, cy + hh), (cx - hw, cy + hh)]
+        world = self._points_to_world(local)
+        if len(world) < 3:
+            return None
+        return {'kind': 'poly', 'points': world}
+
+    def _circle_or_poly(self, radius, cx, cy, sx, sy):
+        """World descriptor for a circle of ``radius`` centred at local (cx,
+        cy): an exact circle when scale is uniform, otherwise a sampled
+        ellipse polygon."""
+        if abs(sx - sy) < 1e-6:
+            wcx, wcy = self._point_to_world(cx, cy)
+            return {'kind': 'circle', 'cx': wcx, 'cy': wcy, 'r': radius * sx}
+        local = [(cx + radius * math.cos(2 * math.pi * i / 24),
+                  cy + radius * math.sin(2 * math.pi * i / 24))
+                 for i in range(24)]
+        return {'kind': 'poly', 'points': self._points_to_world(local)}
+
+    def _ensure_collision_defaults(self, force=False, for_type=None):
+        """Fill still-zero size fields with object-sized defaults (concrete
+        numbers, no 'auto' semantics). Called when the inspector enables a
+        shape or switches its type, and defensively from the geometry code on
+        first use. Afterwards a stored 0 really means a zero-sized shape."""
+        ctype = for_type
+        if ctype not in ('rect', 'ellipse', 'polygon'):
+            ctype = self.collision_type if self.collision_type in ('rect', 'ellipse', 'polygon') else 'rect'
+
+        if force or not self._collision_configured:
+            if self.collision_width <= 0:
+                self.collision_width = float(self.width)
+            if self.collision_height <= 0:
+                self.collision_height = float(self.height)
+            self._collision_configured = True
+
+    def _collision_shape(self):
+        """The world-space descriptor used by collision tests, or None when
+        collision is not enabled (the object then never collides)."""
+        if not self.collision_enabled:
+            return None
+        return self._collision_geometry_world()
+
     def get_name(self) -> str:
         return self.name
         
@@ -319,7 +640,7 @@ class ObjectBase:
         so the file stays small, reloadable, and comparable against the saved
         snapshot regardless of transient UI state.
         """
-        exclude_fields = ['_is_initialized', '_is_for_api', '_game_manager', 'surface', 'icon', 'script_instance', 'selected', 'expanded']
+        exclude_fields = ['_is_initialized', '_is_for_api', '_game_manager', 'surface', 'icon', 'script_instance', 'selected', 'expanded', '_collision_configured']
         return {
             key: value for key, value in self.__dict__.items() 
             if key not in exclude_fields

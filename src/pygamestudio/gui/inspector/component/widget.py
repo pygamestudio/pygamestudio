@@ -157,3 +157,33 @@ class PolygonPointsWidget(QWidget):
         """Read every X/Y spin box back into a list of (x, y) tuples."""
         return [(int(x_spinbox.value()), int(y_spinbox.value()))
                 for x_spinbox, y_spinbox in self._pairs]
+
+
+class CollisionPointsWidget(PolygonPointsWidget):
+    """Reuses PolygonPointsWidget to edit an object's collision polygon
+    vertices; every edit is pushed as a collision parameter change."""
+
+    def _on_count_changed(self, value):
+        # SuffixSpinBox is a QDoubleSpinBox, so the signal carries a float.
+        value = int(value)
+        current = len(self._points)
+        if value == current:
+            return
+
+        if value > current:
+            self._points.extend([(0, 0)] * (value - current))
+        else:
+            self._points = self._points[:value]
+
+        self._rebuild_pairs()
+        self._notify_collision_changed()
+
+    def _on_pair_changed(self, *args):
+        points = self._collect_points()
+        if points != self._points:
+            self._points = points
+            self._notify_collision_changed()
+
+    def _notify_collision_changed(self):
+        self._inspector_container.set_object_collision_parameter(
+            'collision_points', list(self._points))

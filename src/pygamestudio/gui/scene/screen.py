@@ -3,6 +3,7 @@ from PySide6.QtGui import *
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
 from pygamestudio.game.object.type import *
+from pygamestudio.game.core.collision import shape_to_polygon
 from pygamestudio.gui.scene.gizmo import MoveGizmo
 from pygamestudio.common.utils.config import get_project_config
 
@@ -61,6 +62,7 @@ class PygameScreen(QWidget):
         self._game_manager.object_points_changed.connect(self._update_scene)
         self._game_manager.object_particle_parameter_changed.connect(self._update_scene)
         self._game_manager.object_frame_sequence_parameter_changed.connect(self._update_scene)
+        self._game_manager.object_collision_parameter_changed.connect(self._update_scene)
         
     def _set_pygame_screen(self):
         self._screen_surface = pygame.Surface((self._screen_width, self._screen_height))
@@ -135,8 +137,29 @@ class PygameScreen(QWidget):
                 obj._draw(parent_surface)
 
         _update(self._game_manager.all_object_tree_struct, self._screen_surface)
+        self._draw_collision_overlay()
         self.update()
         self._move_gizmo.update_pos()
+
+    def _draw_collision_overlay(self):
+        """Outline the selected object's collision body in green. Only drawn
+        while collision is enabled on that object."""
+        obj = self._final_selected_object
+        if obj is None or getattr(obj, 'type', '') == OBJECT_CANVAS:
+            return
+        if not hasattr(obj, '_collision_geometry_world'):
+            return
+        if not getattr(obj, 'collision_enabled', False):
+            return
+
+        shape = obj._collision_geometry_world()
+        if shape is None:
+            return
+        points = [(int(round(x)), int(round(y))) for (x, y) in shape_to_polygon(shape)]
+        if len(points) < 3:
+            return
+
+        pygame.draw.polygon(self._screen_surface, (0, 255, 0), points, width=2)
 
     def _convert_screen_surface_to_qimage(self, surface):
         # surarray.shape returns (width, height, depth). However, QImage expects (height, width, depth).

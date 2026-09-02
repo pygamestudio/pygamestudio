@@ -217,3 +217,33 @@ class FrameSequenceSpinBox(SuffixSpinBox):
     def _on_value_changed(self):
         new_value = float(self.value()) if self.decimals() > 0 else int(self.value())
         self._inspector_container.set_object_frame_sequence_parameter(self._attr, new_value)
+
+
+class CollisionSpinBox(SuffixSpinBox):
+    """Spinbox for one collision parameter: offset x/y or box size w/h. All
+    values are integers (content pixels)."""
+
+    _SUFFIXES = {
+        'collision_offset_x': 'X',
+        'collision_offset_y': 'Y',
+        'collision_width': 'W',
+        'collision_height': 'H',
+    }
+
+    def __init__(self, inspector_container, value, attr=''):
+        super().__init__()
+        self._inspector_container = inspector_container
+        self._attr = attr
+        if 'offset' in attr:
+            self.setRange(-999999, 999999)
+        else:
+            self.setRange(0, 999999)
+        self.setSingleStep(1)
+        self.setDecimals(0)
+        self.setValue(value)
+        self.set_suffix(self._SUFFIXES.get(attr, ''))
+
+        self.valueChanged.connect(self._on_value_changed)
+
+    def _on_value_changed(self):
+        self._inspector_container.set_object_collision_parameter(self._attr, int(self.value()))

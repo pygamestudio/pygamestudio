@@ -124,3 +124,8 @@ class UpdateAttrValueCommand(QUndoCommand):
         elif attr in ('frame_folder', 'frame_rate', 'auto_play', 'loop',
                       'frame_index'):
             self._game_manager.object_frame_sequence_parameter_changed.emit(self._obj.uuid)
+        elif attr in ('collision_enabled', 'collision_type',
+                      'collision_offset_x', 'collision_offset_y',
+                      'collision_width', 'collision_height',
+                      'collision_points'):
+            self._game_manager.object_collision_parameter_changed.emit(self._obj.uuid)
