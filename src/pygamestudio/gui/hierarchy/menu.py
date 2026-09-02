@@ -30,6 +30,7 @@ class ContextMenu(QMenu):
         add_image_action = QAction(T.tr('item.image', 'Image'), self)
         add_button_action = QAction(T.tr('item.button', 'Button'), self)
         add_particle_action = QAction(T.tr('item.particle', 'Particle Emitter'), self)
+        add_frame_sequence_action = QAction(T.tr('item.frame_sequence', 'Frame Sequence'), self)
         cut_action = QAction(T.tr('menu.cut', 'Cut'), self)
         copy_action = QAction(T.tr('menu.copy', 'Copy'), self)
         paste_action = QAction(T.tr('menu.paste', 'Paste'), self)
@@ -48,6 +49,7 @@ class ContextMenu(QMenu):
         add_image_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_IMAGE))
         add_button_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_BUTTON))
         add_particle_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_PARTICLE))
+        add_frame_sequence_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_FRAME_SEQUENCE))
         cut_action.triggered.connect(self.cut_signal.emit)
         copy_action.triggered.connect(self.copy_signal.emit)
         paste_action.triggered.connect(self.paste_signal.emit)
@@ -63,11 +65,13 @@ class ContextMenu(QMenu):
         add_shape_sub_menu = QMenu(title=T.tr('item.shape', 'Shape'), parent=self)
         add_ui_sub_menu = QMenu(title='UI', parent=self)
         add_effects_sub_menu = QMenu(title=T.tr('item.effects', 'Effects'), parent=self)
+        add_animation_sub_menu = QMenu(title=T.tr('item.animation', 'Animation'), parent=self)
 
         self.addMenu(add_menu)
         add_menu.addMenu(add_shape_sub_menu)
         add_menu.addMenu(add_ui_sub_menu)
         add_menu.addMenu(add_effects_sub_menu)
+        add_menu.addMenu(add_animation_sub_menu)
 
         add_shape_sub_menu.addAction(add_line_action)
         add_shape_sub_menu.addAction(add_rect_action)
@@ -77,6 +81,7 @@ class ContextMenu(QMenu):
         add_ui_sub_menu.addAction(add_image_action)
         add_ui_sub_menu.addAction(add_button_action)
         add_effects_sub_menu.addAction(add_particle_action)
+        add_animation_sub_menu.addAction(add_frame_sequence_action)
 
         # Right click on the blank area.
         if item_type is None:

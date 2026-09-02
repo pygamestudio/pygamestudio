@@ -193,3 +193,27 @@ class ParticleParameterSpinBox(SuffixSpinBox):
 
     def _on_value_changed(self):
         self._inspector_container.set_object_particle_parameter(self._attr, int(self.value()))
+
+
+class FrameSequenceSpinBox(SuffixSpinBox):
+    """Spinbox for one frame-sequence parameter (frame rate, ...)."""
+
+    _SUFFIXES = {
+        'frame_rate': 'fps',
+    }
+
+    def __init__(self, inspector_container, value, attr=''):
+        super().__init__()
+        self._inspector_container = inspector_container
+        self._attr = attr
+        self.setRange(0, 999999)
+        self.setSingleStep(1 if attr == 'frame_rate' else 0.1)
+        self.setDecimals(2 if attr == 'frame_rate' else 0)
+        self.setValue(value)
+        self.set_suffix(self._SUFFIXES.get(attr, ''))
+
+        self.valueChanged.connect(self._on_value_changed)
+
+    def _on_value_changed(self):
+        new_value = float(self.value()) if self.decimals() > 0 else int(self.value())
+        self._inspector_container.set_object_frame_sequence_parameter(self._attr, new_value)

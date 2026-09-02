@@ -1,6 +1,7 @@
 from .button import ObjectButton
 from .canvas import ObjectCanvas
 from .ellipse import ObjectEllipse
+from .frame_sequence import ObjectFrameSequence
 from .image import ObjectImage
 from .line import ObjectLine
 from .particle import ObjectParticle

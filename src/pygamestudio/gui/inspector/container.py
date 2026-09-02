@@ -16,6 +16,7 @@ from pygamestudio.gui.inspector.layout.text import INSPECTOR_LAYOUT_TEXT
 from pygamestudio.gui.inspector.layout.image import INSPECTOR_LAYOUT_IMAGE
 from pygamestudio.gui.inspector.layout.button import INSPECTOR_LAYOUT_BUTTON
 from pygamestudio.gui.inspector.layout.particle import INSPECTOR_LAYOUT_PARTICLE
+from pygamestudio.gui.inspector.layout.frame_sequence import INSPECTOR_LAYOUT_FRAME_SEQUENCE
 
 
 class Container(QFrame):
@@ -71,6 +72,7 @@ class Container(QFrame):
         self._game_manager.object_script_path_changed.connect(self._on_object_script_path_changed)
         self._game_manager.object_points_changed.connect(self._on_object_points_changed)
         self._game_manager.object_particle_parameter_changed.connect(self._on_object_particle_parameter_changed)
+        self._game_manager.object_frame_sequence_parameter_changed.connect(self._on_object_frame_sequence_parameter_changed)
 
     def _set_layout(self):
         self._container_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
@@ -186,13 +188,17 @@ class Container(QFrame):
         self._game_manager.set_image_path(self._object_uuid_in_inspection, lineedit.toolTip())
 
     def set_object_path(self, attr='', tooltip=''):
-        """Set an image-path style attribute (image_path or particle_image)
-        from the line edit that triggered this slot."""
+        """Set an image-path style attribute (image_path, particle_image or
+        frame_folder) from the line edit that triggered this slot."""
         if not attr:
             sender = self.sender()
             attr = sender.property('component_attribute') if sender else ''
         if attr == 'image_path':
             self._game_manager.set_image_path(self._object_uuid_in_inspection, tooltip)
+        elif attr == 'particle_image':
+            self._game_manager.set_particle_parameter(self._object_uuid_in_inspection, attr, tooltip)
+        elif attr == 'frame_folder':
+            self._game_manager.set_frame_sequence_parameter(self._object_uuid_in_inspection, attr, tooltip)
         elif attr:
             self._game_manager.set_particle_parameter(self._object_uuid_in_inspection, attr, tooltip)
 
@@ -209,6 +215,9 @@ class Container(QFrame):
 
     def set_object_particle_parameter(self, attr, new_value):
         self._game_manager.set_particle_parameter(self._object_uuid_in_inspection, attr, new_value)
+
+    def set_object_frame_sequence_parameter(self, attr, new_value):
+        self._game_manager.set_frame_sequence_parameter(self._object_uuid_in_inspection, attr, new_value)
 
     def _on_object_particle_parameter_changed(self, object_uuid):
         """Keep the particle parameter editors in sync with an undone/redone
@@ -232,6 +241,35 @@ class Container(QFrame):
             image_edit.setText(Path(image_path).name if image_path else '')
             image_edit.setToolTip(Path(image_path).as_posix() if image_path else '')
             image_edit.blockSignals(False)
+
+    def _on_object_frame_sequence_parameter_changed(self, object_uuid):
+        """Keep the frame-sequence editors in sync with an undone/redone
+        parameter change."""
+        if object_uuid != self._object_uuid_in_inspection:
+            return
+        obj = self._game_manager.get_object(object_uuid)
+
+        for attr in ('frame_rate',):
+            widget = self._find_widget(self._container_layout, attr)
+            if widget:
+                widget.blockSignals(True)
+                widget.setValue(getattr(obj, attr))
+                widget.blockSignals(False)
+
+        for attr in ('auto_play', 'loop'):
+            widget = self._find_widget(self._container_layout, attr)
+            if widget:
+                widget.blockSignals(True)
+                widget.setChecked(bool(getattr(obj, attr)))
+                widget.blockSignals(False)
+
+        folder_edit = self._find_widget(self._container_layout, 'frame_folder')
+        if folder_edit:
+            folder_edit.blockSignals(True)
+            frame_folder = getattr(obj, 'frame_folder', '')
+            folder_edit.setText(Path(frame_folder).name if frame_folder else '')
+            folder_edit.setToolTip(Path(frame_folder).as_posix() if frame_folder else '')
+            folder_edit.blockSignals(False)
     
     def show_color_picker(self, color_rgba):
         screen = QApplication.primaryScreen()
@@ -526,6 +564,8 @@ class Container(QFrame):
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_BUTTON)
         elif obj.type == OBJECT_PARTICLE:
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_PARTICLE)
+        elif obj.type == OBJECT_FRAME_SEQUENCE:
+            self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_FRAME_SEQUENCE)
 
     def _clear_layout(self, layout):
         if layout is None:

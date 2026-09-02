@@ -93,7 +93,9 @@
         "image": "Image",
         "button": "Button",
         "effects": "Effects",
-        "particle": "Particle Emitter"
+        "particle": "Particle Emitter",
+        "animation": "Animation",
+        "frame_sequence": "Frame Sequence"
     },
 
     "gm": {
@@ -184,7 +186,12 @@
         "particle_size": "Particle Size",
         "particle_image": "Particle Image",
         "gravity": "Gravity",
-        "spread_angle": "Spread Angle"
+        "spread_angle": "Spread Angle",
+        "auto_play": "Auto Play",
+        "loop": "Loop",
+        "frame_rate": "Frame Rate",
+        "frame_folder": "Frame Folder",
+        "select_folder": "Select Frame Folder"
     },
 
     "dashboard": {

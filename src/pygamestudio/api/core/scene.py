@@ -16,6 +16,7 @@ from pygamestudio.game.object.polygon import *
 from pygamestudio.game.object.image import *
 from pygamestudio.game.object.button import *
 from pygamestudio.game.object.particle import *
+from pygamestudio.game.object.frame_sequence import *
 from pygamestudio.api.config.project import get_project_config
 from pygamestudio.common.i18n.translator import Translator as T
 
@@ -108,6 +109,8 @@ class SceneLoader:
             obj = ObjectButton(self, object_data, is_for_api=True)
         elif object_type == OBJECT_PARTICLE:
             obj = ObjectParticle(self, object_data, is_for_api=True)
+        elif object_type == OBJECT_FRAME_SEQUENCE:
+            obj = ObjectFrameSequence(self, object_data, is_for_api=True)
         else:
             raise RuntimeError(T.tr('api.unknown_object_type', 'Unknown object type: {}').format(object_type))
 

@@ -60,6 +60,7 @@ class PygameScreen(QWidget):
         self._game_manager.object_font_path_changed.connect(self._update_scene)
         self._game_manager.object_points_changed.connect(self._update_scene)
         self._game_manager.object_particle_parameter_changed.connect(self._update_scene)
+        self._game_manager.object_frame_sequence_parameter_changed.connect(self._update_scene)
         
     def _set_pygame_screen(self):
         self._screen_surface = pygame.Surface((self._screen_width, self._screen_height))

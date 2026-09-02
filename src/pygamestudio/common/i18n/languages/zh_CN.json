@@ -93,7 +93,9 @@
         "image": "图片",
         "button": "按钮",
         "effects": "特效",
-        "particle": "粒子发射器"
+        "particle": "粒子发射器",
+        "animation": "动画",
+        "frame_sequence": "帧序列"
     },
 
     "gm": {
@@ -184,7 +186,12 @@
         "particle_size": "粒子大小",
         "particle_image": "粒子图片",
         "gravity": "重力",
-        "spread_angle": "发射角度"
+        "spread_angle": "发射角度",
+        "auto_play": "自动播放",
+        "loop": "循环播放",
+        "frame_rate": "帧率",
+        "frame_folder": "帧文件夹",
+        "select_folder": "选择帧文件夹"
     },
 
     "dashboard": {

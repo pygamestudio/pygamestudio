@@ -52,3 +52,19 @@ class StrikethroughCheckBox(QCheckBox):
         self.setChecked(is_checked)
 
         self.checkStateChanged.connect(self._inspector_container.set_object_strikethrough_state)
+
+
+class FrameSequenceCheckBox(QCheckBox):
+    """Checkbox for one frame-sequence boolean parameter (auto_play/loop)."""
+
+    def __init__(self, inspector_container, is_checked=True, attr=''):
+        super().__init__()
+        self._inspector_container = inspector_container
+        self._attr = attr
+        self.setChecked(is_checked)
+
+        self.checkStateChanged.connect(self._on_check_state_changed)
+
+    def _on_check_state_changed(self, check_state):
+        self._inspector_container.set_object_frame_sequence_parameter(
+            self._attr, check_state == Qt.CheckState.Checked)

@@ -121,3 +121,6 @@ class UpdateAttrValueCommand(QUndoCommand):
                       'particle_speed', 'particle_size', 'particle_image',
                       'gravity', 'spread_angle'):
             self._game_manager.object_particle_parameter_changed.emit(self._obj.uuid)
+        elif attr in ('frame_folder', 'frame_rate', 'auto_play', 'loop',
+                      'frame_index'):
+            self._game_manager.object_frame_sequence_parameter_changed.emit(self._obj.uuid)

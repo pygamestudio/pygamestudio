@@ -358,3 +358,142 @@ class ScriptPathLineEdit(_PathLineEditDropMixin, QLineEdit):
     def leaveEvent(self, event):
         self._delete_button.hide()
         return super().leaveEvent(event)
+
+
+class FrameFolderLineEdit(_PathLineEditDropMixin, QLineEdit):
+    """Folder picker for the frame-sequence object: points at a project
+    folder whose images are the animation frames. Dragging a folder (or a
+    single image file, whose parent folder is used) is accepted."""
+
+    # Image files are accepted too; a dropped file picks its parent folder.
+    _drop_extensions = {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.lbm',
+                        '.pcx', '.qoi', '.svg', '.tga', '.tiff', '.webp',
+                        '.xpm', '.xcf'}
+
+    def __init__(self, inspector_container, frame_folder='', attr=''):
+        super().__init__()
+        self._inspector_container = inspector_container
+        self._browse_button = QPushButton(self)
+        self._delete_button = QPushButton(self)
+        self._frame_folder = Path(frame_folder) if frame_folder else Path('')
+        self._set_up()
+
+    def _set_up(self):
+        self._set_widget()
+        self._set_signal()
+        self._set_layout()
+
+    def _set_widget(self):
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
+        self.setTextMargins(0, 0, 24, 0)
+        self.setReadOnly(True)
+        self.setAcceptDrops(True)
+
+        if str(self._frame_folder) not in ('', '.'):
+            project_path = Path(get_project_path())
+            folder_absolute_path = project_path / self._frame_folder
+            self.setToolTip(self._frame_folder.as_posix())
+            self.setText(self._frame_folder.name)
+
+            if not folder_absolute_path.is_dir():
+                self.setStyleSheet('color: rgb(255, 0, 0);')
+
+        self._browse_button.setFixedSize(18, 18)
+        self._browse_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        pixmap = QPixmap(':/images/browse.png')
+        scaled_pixmap = pixmap.scaled(self._browse_button.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        self._browse_button.setIcon(QIcon(scaled_pixmap))
+
+        self._delete_button.setFixedSize(18, 18)
+        self._delete_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        pixmap = QPixmap(':/images/close.png')
+        scaled_pixmap = pixmap.scaled(self._delete_button.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        self._delete_button.setIcon(QIcon(scaled_pixmap))
+        self._delete_button.hide()
+
+    def _set_signal(self):
+        self._browse_button.clicked.connect(self._choose_folder)
+        self._delete_button.clicked.connect(self._delete_folder)
+        self.textChanged.connect(self._notify_container)
+
+    def _set_layout(self):
+        h_layout = QHBoxLayout(self)
+        h_layout.addStretch(1)
+        h_layout.addWidget(self._delete_button)
+        h_layout.addWidget(self._browse_button)
+        h_layout.setContentsMargins(0, 2, 5, 0)
+
+    def _notify_container(self):
+        """Tell the inspector the frame folder changed (the value is carried
+        by the tooltip, mirroring the image path widgets)."""
+        attr = self.property('component_attribute') or 'frame_folder'
+        self._inspector_container.set_object_path(attr, self.toolTip())
+
+    def _is_valid_drop(self, mime_data):
+        """Accept a dropped folder, or a single dropped image file (whose
+        parent folder is used as the frame folder)."""
+        if not mime_data.hasUrls():
+            return False
+        urls = mime_data.urls()
+        if not urls:
+            return False
+        path = Path(urls[0].toLocalFile())
+        if path.is_dir():
+            return True
+        return path.suffix.lower() in self._drop_extensions
+
+    def dragEnterEvent(self, event):
+        if not event.mimeData().hasUrls():
+            event.ignore()
+            return
+        if self._is_valid_drop(event.mimeData()):
+            self._set_drop_feedback(True)
+            event.acceptProposedAction()
+        else:
+            self._set_drop_feedback(False)
+            event.accept()
+
+    def dropEvent(self, event):
+        if not event.mimeData().hasUrls():
+            event.ignore()
+            return
+        if self._is_valid_drop(event.mimeData()):
+            self._set_path_from_file(event.mimeData().urls()[0].toLocalFile())
+        self._set_drop_feedback(None)
+        event.acceptProposedAction()
+
+    def _set_path_from_file(self, folder_path):
+        """Apply a chosen/dropped folder (or image file -> its parent): update
+        the display and notify the inspector so the frame_folder is set."""
+        path = Path(folder_path)
+        if path.is_file():
+            path = path.parent
+        self._frame_folder = path
+        self.setToolTip(self._frame_folder.as_posix())
+        self._notify_container()
+        self.setStyleSheet('')
+
+    def _choose_folder(self):
+        folder = QFileDialog.getExistingDirectory(
+            self, T.tr('inspector.select_folder', 'Select Frame Folder'),
+            os.environ.get('__PYGAMESTUDIO_PROJECT_PATH', ''))
+        if not folder:
+            return
+
+        self._set_path_from_file(folder)
+
+    def _delete_folder(self):
+        self._frame_folder = Path('')
+        self.setToolTip('')
+        self._notify_container()
+
+        self.setStyleSheet('')
+
+    def enterEvent(self, event):
+        if str(self._frame_folder) not in ('', '.'):
+            self._delete_button.show()
+        return super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._delete_button.hide()
+        return super().leaveEvent(event)

@@ -14,6 +14,7 @@ from pygamestudio.game.object.polygon import *
 from pygamestudio.game.object.image import *
 from pygamestudio.game.object.button import *
 from pygamestudio.game.object.particle import *
+from pygamestudio.game.object.frame_sequence import *
 from pygamestudio.common.utils.config import *
 from pygamestudio.gui.console.logger import Logger
 from pygamestudio.common.i18n.translator import Translator as T
@@ -68,6 +69,7 @@ class GameManager(QObject):
     object_script_path_changed = Signal(str)
     object_points_changed = Signal(str)
     object_particle_parameter_changed = Signal(str)
+    object_frame_sequence_parameter_changed = Signal(str)
 
     # Emitted whenever the "current scene has unsaved changes" flag flips
     # (True = saved, False = unsaved), so the UI can show unsaved indicators.
@@ -262,6 +264,8 @@ class GameManager(QObject):
             obj = ObjectButton(self, object_data)
         elif object_type == OBJECT_PARTICLE:
             obj = ObjectParticle(self, object_data)
+        elif object_type == OBJECT_FRAME_SEQUENCE:
+            obj = ObjectFrameSequence(self, object_data)
 
         object_tree_struct = {
             obj.uuid: {
@@ -578,6 +582,16 @@ class GameManager(QObject):
 
     def set_particle_parameter(self, object_uuid, attr, new_value):
         """Change one particle-emitter parameter (undoable)."""
+        obj = self._get_object(object_uuid)
+        old_value = getattr(obj, attr)
+
+        if old_value == new_value:
+            return
+
+        self._undo_stack.push(UpdateAttrValueCommand(self, obj, attr, old_value, new_value))
+
+    def set_frame_sequence_parameter(self, object_uuid, attr, new_value):
+        """Change one frame-sequence parameter (undoable)."""
         obj = self._get_object(object_uuid)
         old_value = getattr(obj, attr)
 
