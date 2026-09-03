@@ -156,6 +156,7 @@
         "line": "Line",
         "rectangle": "Rectangle",
         "ellipse": "Ellipse",
+        "fill": "Fill",
         "color_picker": "Color Picker",
         "color": "Color",
         "brush_size": "Brush Size",
