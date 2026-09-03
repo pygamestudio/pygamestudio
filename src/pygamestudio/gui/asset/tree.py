@@ -22,9 +22,16 @@ TEXT_FILE_EXTENSIONS = {
     '.toml', '.yaml', '.yml', '.log', '.html', '.css', '.js', '.ts', '.csv', '.xml', '.scene'
 }
 
+# Raster image suffixes the built-in image editor can open.
+IMAGE_FILE_EXTENSIONS = {
+    '.png', '.jpg', '.jpeg', '.bmp', '.gif', '.webp', '.tga', '.tif',
+    '.tiff', '.xpm', '.ico', '.ppm', '.pgm', '.pbm', '.svg'
+}
+
 
 class AssetTreeView(QTreeView):
     edit_file_signal = Signal(str)
+    image_edit_signal = Signal(str)
 
     def __init__(self, parent=None, game_manager=None):
         super().__init__(parent)
@@ -432,27 +439,37 @@ class AssetTreeView(QTreeView):
     def _is_text_file(path):
         return path.is_file() and path.suffix.lower() in TEXT_FILE_EXTENSIONS
 
+    @staticmethod
+    def _is_image_file(path):
+        return path.is_file() and path.suffix.lower() in IMAGE_FILE_EXTENSIONS
+
     def _open_file(self):
         """Open the selected file: text files in the built-in code editor,
-        everything else with the system's default application."""
+        images in the built-in image editor, everything else with the
+        system's default application."""
         target_path = self._get_selected_file_path()
         if not target_path:
             return
         if self._is_text_file(target_path):
             self.edit_file_signal.emit(str(target_path))
+        elif self._is_image_file(target_path):
+            self.image_edit_signal.emit(str(target_path))
         else:
             self._open_externally()
 
     def _on_double_clicked(self, index):
         """Double-clicking a folder toggles expand/collapse, a text file
-        opens in the code editor, and any other file opens with the system's
-        default application."""
+        opens in the code editor, an image opens in the built-in image
+        editor, and any other file opens with the system's default
+        application."""
         target_path = Path(self._file_model.filePath(self._proxy_model.mapToSource(index)))
         if target_path.is_dir():
             # Let the tree's default behavior expand/collapse the folder.
             return
         if self._is_text_file(target_path):
             self.edit_file_signal.emit(str(target_path))
+        elif self._is_image_file(target_path):
+            self.image_edit_signal.emit(str(target_path))
         else:
             # Make sure the double-clicked item is the one that gets opened
             # (the default app opener reads the current selection).

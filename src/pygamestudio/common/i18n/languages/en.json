@@ -123,7 +123,9 @@
         "scene_saved": "Scene saved",
         "run_project": "Run Project {}",
         "failed_to_run_project": "Failed to Run Project {}: {}",
-        "run_project_finished": "Project {} exited with code {}"
+        "run_project_finished": "Project {} exited with code {}",
+        "run": "Run",
+        "refresh": "Refresh"
     },
 
     "code": {
@@ -136,6 +138,37 @@
         "save_failed": "Save failed",
         "zoom_in": "Zoom In",
         "zoom_out": "Zoom Out"
+    },
+
+    "image": {
+        "editor": "Image Editor",
+        "untitled": "Untitled",
+        "save": "Save (Ctrl+S)",
+        "save_as": "Save As",
+        "saved": "Image saved: {}",
+        "save_failed": "Failed to save image: {}",
+        "size_format": "{} × {} px",
+        "undo": "Undo (Ctrl+Z)",
+        "redo": "Redo (Ctrl+Y)",
+        "clear": "Clear",
+        "pencil": "Pencil",
+        "eraser": "Eraser",
+        "line": "Line",
+        "rectangle": "Rectangle",
+        "ellipse": "Ellipse",
+        "color_picker": "Color Picker",
+        "color": "Color",
+        "brush_size": "Brush Size",
+        "flip_h": "Flip Horizontal",
+        "flip_v": "Flip Vertical",
+        "rotate_cw": "Rotate 90° CW",
+        "rotate_ccw": "Rotate 90° CCW",
+        "zoom_in": "Zoom In",
+        "zoom_out": "Zoom Out",
+        "fit": "Fit to Window",
+        "actual_size": "Actual Size",
+        "detach": "Detach",
+        "attach": "Attach to Tabs"
     },
 
     "hierarchy": {

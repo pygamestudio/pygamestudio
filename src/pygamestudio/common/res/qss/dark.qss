@@ -505,15 +505,15 @@ QLineEdit#consoleSearchLineEdit {
 }
 
 /* ----- Scene ----- */
-QPushButton#sceneRunProjectBtn {
+QPushButton#sceneRunProjectBtn, QPushButton#sceneRefreshBtn {
     background-color: #1e1e1e;
 }
 
-QPushButton:hover#sceneRunProjectBtn {
+QPushButton:hover#sceneRunProjectBtn, QPushButton:hover#sceneRefreshBtn {
     background-color: #404142;
 }
 
-QPushButton:pressed#sceneRunProjectBtn {
+QPushButton:pressed#sceneRunProjectBtn, QPushButton:pressed#sceneRefreshBtn {
     background-color: #28292a;
 }
 
@@ -613,6 +613,64 @@ QPushButton#codeEditorZoomInBtn:hover, QPushButton#codeEditorZoomOutBtn:hover {
 
 QPushButton#codeEditorZoomInBtn:pressed, QPushButton#codeEditorZoomOutBtn:pressed {
     background-color: #28292a;
+}
+
+QWidget#imageEditorWindow {
+    background-color: #252526;
+}
+
+QWidget#imageEditorWindow QLabel {
+    color: #9d9d9d;
+    background-color: transparent;
+}
+
+QScrollArea#imageEditorScrollArea {
+    background-color: #1e1e1e;
+    border: none;
+}
+
+QScrollArea#imageEditorScrollArea > QWidget > QWidget {
+    background-color: #1e1e1e;
+}
+
+QPushButton#imageEditorToolBtn, QPushButton#imageEditorViewBtn {
+    background-color: transparent;
+    border: none;
+    border-radius: 4px;
+    color: #d4d4d4;
+}
+
+QPushButton#imageEditorToolBtn:hover, QPushButton#imageEditorViewBtn:hover {
+    background-color: #404142;
+}
+
+QPushButton#imageEditorToolBtn:pressed, QPushButton#imageEditorViewBtn:pressed {
+    background-color: #28292a;
+}
+
+QWidget#imageEditorWindow QToolButton {
+    background-color: transparent;
+    border: none;
+    border-radius: 4px;
+    color: #d4d4d4;
+}
+
+QWidget#imageEditorWindow QToolButton:hover {
+    background-color: #404142;
+}
+
+QWidget#imageEditorWindow QToolButton:pressed {
+    background-color: #28292a;
+}
+
+QWidget#imageEditorWindow QToolButton:checked {
+    background-color: #0e639c;
+    color: #ffffff;
+}
+
+QWidget#imageEditorWindow QToolButton[active="true"] {
+    background-color: #0e639c;
+    color: #ffffff;
 }
 
 QListView#codeEditorCompletionPopup {

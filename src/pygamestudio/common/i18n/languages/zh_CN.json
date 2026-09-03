@@ -123,7 +123,9 @@
         "scene_saved": "场景已保存",
         "run_project": "运行项目{}",
         "failed_to_run_project": "项目{}运行失败：{}",
-        "run_project_finished": "项目{}已退出，退出码：{}"
+        "run_project_finished": "项目{}已退出，退出码：{}",
+        "run": "运行",
+        "refresh": "刷新"
     },
 
     "code": {
@@ -136,6 +138,38 @@
         "save_failed": "保存失败",
         "zoom_in": "放大字体",
         "zoom_out": "缩小字体"
+    },
+
+    "image": {
+        "editor": "图片编辑器",
+        "untitled": "未命名",
+        "save": "保存 (Ctrl+S)",
+        "save_as": "另存为",
+        "saved": "图片已保存：{}",
+        "save_failed": "图片保存失败：{}",
+        "size_format": "{} × {} 像素",
+        "undo": "撤销 (Ctrl+Z)",
+        "redo": "重做 (Ctrl+Y)",
+        "clear": "清除",
+        "pencil": "画笔",
+        "eraser": "橡皮擦",
+        "line": "直线",
+        "rectangle": "矩形",
+        "ellipse": "椭圆",
+        "fill": "填充",
+        "color_picker": "取色器",
+        "color": "颜色",
+        "brush_size": "画笔大小",
+        "flip_h": "水平翻转",
+        "flip_v": "垂直翻转",
+        "rotate_cw": "顺时针旋转90°",
+        "rotate_ccw": "逆时针旋转90°",
+        "zoom_in": "放大",
+        "zoom_out": "缩小",
+        "fit": "适应窗口",
+        "actual_size": "实际大小",
+        "detach": "独立窗口",
+        "attach": "回到标签页"
     },
 
     "hierarchy": {

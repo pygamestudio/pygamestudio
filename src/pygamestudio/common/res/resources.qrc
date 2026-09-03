@@ -6,8 +6,19 @@
         <file>images/browse.png</file>
         <file>images/canvas.png</file>
         <file>images/check.png</file>
-        <file>images/clear.png</file>
-        <file>images/close.png</file>
+        <file>images/clear.png</file>        <file>images/bucket.png</file>
+        <file>images/color_picker.png</file>
+        <file>images/eraser.png</file>
+        <file>images/fit_window_size.png</file>
+        <file>images/flip_horizontal.png</file>
+        <file>images/flip_vertical.png</file>
+        <file>images/pen.png</file>
+        <file>images/redo.png</file>
+        <file>images/rotate_ccw.png</file>
+        <file>images/rotate_cw.png</file>
+        <file>images/save.png</file>
+        <file>images/save_as.png</file>
+        <file>images/undo.png</file>        <file>images/close.png</file>
         <file>images/create_project.png</file>
         <file>images/down_arrow.png</file>
         <file>images/ellipse.png</file>
@@ -32,6 +43,7 @@
         <file>images/polygon.png</file>
         <file>images/project_icon.png</file>
         <file>images/rect.png</file>
+        <file>images/refresh.png</file>
         <file>images/refresh_asset.png</file>
         <file>images/right_arrow_gray.png</file>
         <file>images/right_arrow.png</file>

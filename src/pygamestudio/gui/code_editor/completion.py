@@ -21,14 +21,47 @@ PYTHON_BUILTINS = (
     'zip',
 )
 
-# Words frequently used with the engine's object API (nice completion hints).
+# Words frequently used with the engine's object / runtime API (nice
+# completion hints). Kept as a set so duplicates with the document words or
+# between entries collapse.
 ENGINE_NAMES = (
-    'pygamestudio', 'ObjectBase', 'ObjectRect', 'ObjectText', 'ObjectImage',
-    'ObjectButton', 'ObjectLine', 'ObjectPolygon', 'ObjectEllipse', 'self',
-    'get_x', 'get_y', 'get_pos', 'set_pos', 'get_width', 'get_height',
-    'get_size', 'set_size', 'get_angle', 'set_angle', 'get_color', 'set_color',
-    'set_visible', 'get_visible', 'on_start', 'on_update', 'on_destroy',
-    'is_point_inside', 'get_center', 'move', 'distance_to', 'show', 'hide',
+    # engine / object classes
+    'pygamestudio', 'ObjectBase', 'ObjectCanvas', 'ObjectRect', 'ObjectEllipse',
+    'ObjectPolygon', 'ObjectLine', 'ObjectText', 'ObjectImage', 'ObjectButton',
+    'ObjectParticle', 'ObjectFrameSequence', 'self',
+    # common transform / query helpers
+    'on_start', 'on_update', 'on_destroy',
+    'get_name', 'get_uuid', 'get_type', 'get_x', 'get_y', 'get_pos', 'set_pos',
+    'set_x', 'set_y', 'get_width', 'get_height', 'set_width', 'set_height',
+    'get_size', 'set_size', 'get_scale_x', 'get_scale_y', 'get_scale', 'set_scale',
+    'get_angle', 'set_angle', 'get_color', 'set_color', 'get_visible_state',
+    'set_visible_state', 'show', 'hide', 'is_visible',
+    'get_center', 'set_center', 'move', 'get_rect', 'get_world_rect',
+    'get_world_pos', 'is_pressed', 'is_point_inside', 'is_shown', 'is_hidden',
+    'distance_to', 'distance_to_object', 'get_direction_to',
+    'is_colliding_with_rect', 'is_colliding_with_object', 'get_collision_rect',
+    # collision body API
+    'is_collision_enabled', 'set_collision_enabled', 'get_collision_type',
+    'set_collision_type', 'set_collision_offset', 'get_collision_offset',
+    'set_collision_size', 'get_collision_size', 'get_collision_radius',
+    'set_collision_ellipse', 'set_collision_polygon', 'get_collision_polygon',
+    'reset_collision_shape', 'get_collision_center', 'collides_with_point',
+    'collides_with_rect', 'collides_with_object',
+    # particle emitter API
+    'get_emission_rate', 'set_emission_rate', 'get_max_particles',
+    'set_max_particles', 'get_particle_lifetime', 'set_particle_lifetime',
+    'get_particle_speed', 'set_particle_speed', 'get_particle_size',
+    'set_particle_size', 'get_particle_image', 'set_particle_image',
+    'get_gravity', 'set_gravity', 'get_spread_angle', 'set_spread_angle',
+    'get_particle_count', 'emit_particles', 'clear_particles',
+    # frame-sequence API
+    'get_frame_folder', 'set_frame_folder', 'get_frame_rate', 'set_frame_rate',
+    'get_auto_play', 'set_auto_play', 'get_loop', 'set_loop', 'get_frame_index',
+    'set_frame_index', 'get_frame_count', 'play', 'pause', 'stop', 'restart',
+    'is_playing',
+    # runtime top-level helpers
+    'get_object_by_path', 'get_object_by_uuid', 'get_parent_object',
+    'get_screen', 'get_fps', 'set_fps', 'quit',
 )
 
 
@@ -78,12 +111,26 @@ class CodeCompleter(QCompleter):
 
         prefix = match.group()
         self.setCompletionPrefix(prefix)
-        # Most relevant first: words that start with the prefix come before
-        # words that merely contain it (alphabetical within each group).
+        # Rank candidates:
+        #   1. words that START with the prefix (before words that only contain
+        #      it), and
+        #   2. within each group respect the case the user is typing - words
+        #      whose spelling matches the typed prefix exactly come first, then
+        #      words starting with the same case (uppercase input prefers
+        #      uppercase starts, lowercase input prefers lowercase starts).
+        #      Without this a lowercase input could put "Text" before "text".
         prefix_lower = prefix.lower()
+        prefix_is_upper = prefix[0].isupper()
+
+        def rank(word):
+            exact = 0 if word.startswith(prefix) else 1
+            same_case = 0 if (word[0].isupper() == prefix_is_upper) else 1
+            return (exact, same_case, word.lower(), word)
+
         starts = [w for w in self._all_words if w.lower().startswith(prefix_lower)]
-        contains = [w for w in self._all_words if prefix_lower in w.lower() and w not in starts]
-        self._model.setStringList(starts + contains)
+        contains = [w for w in self._all_words
+                    if prefix_lower in w.lower() and w not in starts]
+        self._model.setStringList(sorted(starts, key=rank) + sorted(contains, key=rank))
         self._show_popup_at_cursor()
         return True
 

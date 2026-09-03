@@ -4,7 +4,7 @@ from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 
-from pygamestudio.gui.code.editor import CodeEditor
+from pygamestudio.gui.code_editor.editor import CodeEditor
 from pygamestudio.gui.scene.widget import RunProjectButton
 from pygamestudio.gui.base.window import WindowBase
 from pygamestudio.common.i18n.translator import Translator as T

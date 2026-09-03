@@ -4,9 +4,9 @@ from PySide6.QtCore import QRect, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QTextCharFormat, QTextFormat, QTextCursor
 from PySide6.QtWidgets import QPlainTextEdit, QTextEdit, QWidget
 
-from pygamestudio.gui.code.highlighter import CodeHighlighter
-from pygamestudio.gui.code.completion import CodeCompleter
-from pygamestudio.gui.code.menu import CodeEditorMenu
+from pygamestudio.gui.code_editor.highlighter import CodeHighlighter
+from pygamestudio.gui.code_editor.completion import CodeCompleter
+from pygamestudio.gui.code_editor.menu import CodeEditorMenu
 from pygamestudio.common.utils.config import get_editor_config, update_editor_config
 from pygamestudio.common.i18n.translator import Translator as T
 
@@ -232,25 +232,31 @@ class CodeEditor(QPlainTextEdit):
         cursor.insertText(' ' * spaces)
 
     def _unindent(self):
-        """Shift+Tab: remove one indent level, or unindent every selected
-        line by one level when there is a selection."""
+        """Shift+Tab / Ctrl+Shift+Tab: remove one indent level (4 spaces) from
+        the START of the current line, or from every selected line when there
+        is a selection. The cursor keeps its position relative to the text - it
+        is never moved to the beginning of the line."""
         cursor = self.textCursor()
         if cursor.hasSelection():
             self._indent_selection(cursor, -1)
             return
         block = cursor.block()
-        leading = len(block.text()) - len(block.text().lstrip(' '))
-        position = cursor.positionInBlock()
-        if 0 < position <= leading:
-            remove = min(self.INDENT_WIDTH, leading)
-            cursor.setPosition(block.position())
-            cursor.setPosition(block.position() + remove, QTextCursor.MoveMode.KeepAnchor)
-            cursor.removeSelectedText()
-        else:
-            cursor.movePosition(QTextCursor.MoveOperation.Left,
-                                QTextCursor.MoveMode.MoveAnchor,
-                                min(self.INDENT_WIDTH, position))
-            self.setTextCursor(cursor)
+        line_text = block.text()
+        leading = len(line_text) - len(line_text.lstrip(' '))
+        if leading <= 0:
+            return
+        remove = min(self.INDENT_WIDTH, leading)
+        column = cursor.positionInBlock()
+
+        remove_cursor = QTextCursor(block)
+        remove_cursor.setPosition(block.position())
+        remove_cursor.setPosition(block.position() + remove, QTextCursor.MoveMode.KeepAnchor)
+        remove_cursor.removeSelectedText()
+
+        # Stay on the same character of the (now shorter) line: shift the
+        # cursor left by the amount that disappeared before it.
+        cursor.setPosition(block.position() + max(0, column - remove))
+        self.setTextCursor(cursor)
 
     def _insert_newline_with_indent(self):
         """Enter: start a new line that keeps the current line's leading
@@ -437,17 +443,20 @@ class CodeEditor(QPlainTextEdit):
                 self.run_requested.emit()
                 return
 
-        # Indentation: Tab indents with spaces (never a literal tab), Enter
-        # keeps the current indentation and Backspace removes a whole level
-        # while the cursor is inside the leading whitespace.
-        if event.key() in (Qt.Key.Key_Tab, Qt.Key.Key_Backtab) \
+        # Indentation: Tab indents with spaces (never a literal tab), Shift+Tab
+        # / Ctrl+Shift+Tab unindents a whole level, Enter keeps the current
+        # indentation and Backspace removes a whole level while the cursor is
+        # inside the leading whitespace.
+        if event.key() == Qt.Key.Key_Backtab \
+                and not (event.modifiers() & (Qt.KeyboardModifier.AltModifier
+                                              | Qt.KeyboardModifier.MetaModifier)):
+            self._unindent()
+            return
+        if event.key() == Qt.Key.Key_Tab \
                 and not (event.modifiers() & (Qt.KeyboardModifier.ControlModifier
                                               | Qt.KeyboardModifier.AltModifier
                                               | Qt.KeyboardModifier.MetaModifier)):
-            if event.key() == Qt.Key.Key_Backtab:
-                self._unindent()
-            else:
-                self._indent()
+            self._indent()
             return
         if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             self._insert_newline_with_indent()

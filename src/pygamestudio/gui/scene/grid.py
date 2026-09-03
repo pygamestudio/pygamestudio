@@ -21,6 +21,7 @@ class GridGraphicsView(QGraphicsView):
         self._is_dragging = False
         self._is_first_show = True
         self._run_project_btn = RunProjectButton()
+        self._refresh_btn = RefreshButton()
         self._rubber_band = QRubberBand(QRubberBand.Shape.Rectangle, self.viewport())
         self._rb_origin = QPoint()
         self._setup()
@@ -44,6 +45,7 @@ class GridGraphicsView(QGraphicsView):
 
     def _set_signal(self):
         self._run_project_btn.clicked.connect(self._game_manager.run_project)
+        self._refresh_btn.refresh_requested.connect(self._refresh_scene)
         self._run_shortcut = QShortcut(QKeySequence('Ctrl+R'), self)
         self._run_shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
         self._run_shortcut.activated.connect(self._game_manager.run_project)
@@ -52,9 +54,15 @@ class GridGraphicsView(QGraphicsView):
         v_layout = QVBoxLayout(self)
         h_layout = QHBoxLayout()
         h_layout.addWidget(self._run_project_btn)
+        h_layout.addWidget(self._refresh_btn)
         h_layout.addStretch(1)
         v_layout.addLayout(h_layout)
         v_layout.addStretch(1)
+
+    def _refresh_scene(self):
+        """Re-render the scene preview on the pygame screen."""
+        if self._pygame_screen is not None:
+            self._pygame_screen._update_scene()
 
     def _center(self):
         screen_width = self._pygame_screen.width()
