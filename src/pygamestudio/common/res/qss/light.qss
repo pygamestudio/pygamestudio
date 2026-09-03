@@ -679,6 +679,15 @@ QWidget#imageEditorWindow QToolButton[active="true"] {
     color: #005fb8;
 }
 
+QWidget#audioPlayerWindow {
+    background-color: #ffffff;
+}
+
+QWidget#audioPlayerWindow QLabel {
+    color: #666666;
+    background-color: transparent;
+}
+
 QListView#codeEditorCompletionPopup {
     background-color: #f5f5f5;
     color: #333333;

@@ -189,6 +189,7 @@ class ImageEditorWindow(QWidget):
 
         self._update_size_label()
         self._update_enabled_state()
+        self._update_tooltips()
 
     def _set_signal(self):
         self._canvas.modified_changed.connect(lambda modified: self._update_titles())
@@ -560,8 +561,37 @@ class ImageEditorWindow(QWidget):
     def apply_theme(self, is_dark):
         pass
 
+    def _update_tooltips(self):
+        """Re-apply every button tooltip so they follow the current language."""
+        self._zoom_in_btn.setToolTip(T.tr('image.zoom_in', 'Zoom In'))
+        self._zoom_out_btn.setToolTip(T.tr('image.zoom_out', 'Zoom Out'))
+        self._fit_btn.setToolTip(T.tr('image.fit', 'Fit to Window'))
+        self._actual_btn.setToolTip(T.tr('image.actual_size', 'Actual Size'))
+
+        for btn, key, default in (
+            (self._save_btn, 'image.save', 'Save (Ctrl+S)'),
+            (self._save_as_btn, 'image.save_as', 'Save As'),
+            (self._undo_btn, 'image.undo', 'Undo (Ctrl+Z)'),
+            (self._redo_btn, 'image.redo', 'Redo (Ctrl+Y)'),
+            (self._flip_h_btn, 'image.flip_h', 'Flip Horizontal'),
+            (self._flip_v_btn, 'image.flip_v', 'Flip Vertical'),
+            (self._rotate_cw_btn, 'image.rotate_cw', 'Rotate 90° CW'),
+            (self._rotate_ccw_btn, 'image.rotate_ccw', 'Rotate 90° CCW'),
+            (self._clear_btn, 'image.clear', 'Clear'),
+        ):
+            btn.setToolTip(T.tr(key, default))
+
+        for tool_id, _icon, key, default in TOOLS:
+            btn = self._tool_buttons.get(tool_id)
+            if btn is not None:
+                btn.setToolTip(T.tr(key, default))
+
+        self._brush_spinbox.setToolTip(T.tr('image.brush_size', 'Brush Size'))
+        self._update_color_button()   # keeps the colour swatch tooltip translated
+
     def retranslate(self):
         self._update_detach_button_text()
+        self._update_tooltips()
         self._update_titles()
         self._file_label.setText(self._file_title())
 

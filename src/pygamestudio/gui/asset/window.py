@@ -8,6 +8,7 @@ from pygamestudio.gui.asset.search import SearchLineEdit
 class AssetWindow(QWidget):
     edit_file_signal = Signal(str)
     image_edit_signal = Signal(str)
+    audio_play_signal = Signal(str)
 
     def __init__(self, parent=None, game_manager=None):
         super().__init__(parent)
@@ -33,6 +34,7 @@ class AssetWindow(QWidget):
         self._refresh_asset_button.clicked.connect(self._asset_tree_view.refresh)
         self._asset_tree_view.edit_file_signal.connect(self.edit_file_signal.emit)
         self._asset_tree_view.image_edit_signal.connect(self.image_edit_signal.emit)
+        self._asset_tree_view.audio_play_signal.connect(self.audio_play_signal.emit)
 
     def _set_layout(self):
         h_layout = QHBoxLayout()

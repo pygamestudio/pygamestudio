@@ -40,7 +40,11 @@
         <file>images/maximize_disabled.png</file>
         <file>images/minimize.png</file>
         <file>images/normalize.png</file>
+        <file>images/next.png</file>
+        <file>images/pause.png</file>
+        <file>images/play.png</file>
         <file>images/polygon.png</file>
+        <file>images/previous.png</file>
         <file>images/project_icon.png</file>
         <file>images/rect.png</file>
         <file>images/refresh.png</file>
@@ -50,6 +54,7 @@
         <file>images/run.png</file>
         <file>images/search.png</file>
         <file>images/sort.png</file>
+        <file>images/stop.png</file>
         <file>images/text.png</file>
         <file>images/tree_arrow_down.png</file>
         <file>images/tree_arrow_right.png</file>

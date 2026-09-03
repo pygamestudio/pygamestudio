@@ -184,6 +184,21 @@
         "search_placeholder": "Search log"
     },
 
+    "audio": {
+        "player": "Audio Player",
+        "no_audio": "No audio loaded",
+        "no_audio_path": "The audio file {} does not exist.",
+        "play": "Play",
+        "pause": "Pause",
+        "stop": "Stop",
+        "previous": "Previous",
+        "next": "Next",
+        "size": "Size: {}",
+        "load_failed": "Failed to load audio {}",
+        "detach": "Detach",
+        "attach": "Attach to Tabs"
+    },
+
     "inspector": {
         "inspector": "Inspector",
         "visibility": "Visibility",

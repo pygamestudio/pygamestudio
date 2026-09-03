@@ -18,6 +18,7 @@ from pygamestudio.gui.about.window import AboutWindow
 from pygamestudio.gui.build.window import BuildWindow
 from pygamestudio.gui.code_editor.window import CodeEditorWindow
 from pygamestudio.gui.image_editor.window import ImageEditorWindow
+from pygamestudio.gui.audio_player.window import AudioPlayerWindow
 from pygamestudio.game.core.manager import GameManager
 from pygamestudio.common.utils.config import get_editor_config
 
@@ -41,6 +42,7 @@ class EditorBody(QMainWindow):
         self._build_window = BuildWindow(game_manager)
         self._code_editor_window = CodeEditorWindow(game_manager)
         self._image_editor_window = ImageEditorWindow(game_manager)
+        self._audio_player_window = AudioPlayerWindow(game_manager)
 
         self._left_top_tab_widget = QTabWidget()
         self._left_bottom_tab_widget = QTabWidget()
@@ -81,6 +83,8 @@ class EditorBody(QMainWindow):
         self._center_top_tab_widget.addTab(self._image_editor_window, T.tr('image.editor', 'Image Editor'))
         self._image_editor_window.set_tab_widget(self._center_top_tab_widget)
         self._center_bottom_tab_widget.addTab(self._console_window, T.tr('console.console', 'Console'))
+        self._center_bottom_tab_widget.addTab(self._audio_player_window, T.tr('audio.player', 'Audio Player'))
+        self._audio_player_window.set_tab_widget(self._center_bottom_tab_widget)
         self._right_top_tab_widget.addTab(self._inspector_window, T.tr('inspector.inspector', 'Inspector'))
         self._right_bottom_tab_widget.setHidden(True)
 
@@ -107,6 +111,7 @@ class EditorBody(QMainWindow):
         self._editor_settings_window.theme_toggled.connect(lambda theme_code: self._code_editor_window.apply_theme(theme_code == 'dark'))
         self._asset_window.edit_file_signal.connect(self._code_editor_window.open_file)
         self._asset_window.image_edit_signal.connect(self._image_editor_window.open_image)
+        self._asset_window.audio_play_signal.connect(self._audio_player_window.open_audio)
         self._console_window.open_file_at_line_signal.connect(self._code_editor_window.open_file_at_line)
         self._center_top_tab_widget.currentChanged.connect(self._on_center_top_tab_changed)
         T.add_observer(self)
@@ -234,6 +239,7 @@ class EditorBody(QMainWindow):
         self._build_window.get_ready_for_project()
         self._code_editor_window.get_ready_for_project()
         self._image_editor_window.get_ready_for_project()
+        self._audio_player_window.get_ready_for_project()
         self._game_manager.set_project_ready()
 
     def clean_up(self):
@@ -244,6 +250,7 @@ class EditorBody(QMainWindow):
         self._inspector_window.clean_up()
         self._code_editor_window.clean_up()
         self._image_editor_window.clean_up()
+        self._audio_player_window.clean_up()
         self._game_manager.clean_up()
 
     def _on_edit_menu_action_triggered(self, action_name):
@@ -340,6 +347,7 @@ class EditorBody(QMainWindow):
         self._right_top_tab_widget.setTabText(0, T.tr('inspector.inspector', 'Inspector'))
         self._code_editor_window.retranslate()
         self._image_editor_window.retranslate()
+        self._audio_player_window.retranslate()
 
     def enterEvent(self, event):
         self.setCursor(Qt.CursorShape.ArrowCursor)
