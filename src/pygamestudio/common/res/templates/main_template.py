@@ -7,7 +7,7 @@ class Game(studio.Game):
 
     def on_start(self):
         """
-        游戏启动生命周期回调。
+        游戏启动生命周期回调函数。
         在游戏初始化完成、主循环开始前仅执行一次。
 
         Game startup lifecycle callback.
@@ -17,7 +17,7 @@ class Game(studio.Game):
 
     def on_update(self, dt:float):
         """
-        每帧更新回调，每一帧循环都会执行。
+        每帧更新回调函数，每一帧循环都会执行。
         :param dt: 距离上一帧的时间（单位：秒）
 
         Per-frame update callback, runs every single frame in the main loop.
@@ -33,7 +33,7 @@ class Game(studio.Game):
 
     def on_quit(self):
         """
-        游戏退出回调。
+        游戏退出回调函数。
         主循环结束后，资源被销毁前执行一次。
 
         Game exit lifecycle callback.

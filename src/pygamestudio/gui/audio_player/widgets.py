@@ -18,6 +18,7 @@ class AudioProgress(QWidget):
         super().__init__(parent)
         self._envelope = []
         self._progress = 0.0
+        self._placeholder = ''
         self.setMinimumWidth(200)
         self.setMinimumHeight(56)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -27,6 +28,12 @@ class AudioProgress(QWidget):
         self._envelope = list(envelope or [])
         self.update()
 
+    def set_placeholder(self, text):
+        """Text shown when no audio is loaded (instead of the gray bar)."""
+        text = text or ''
+        if text != self._placeholder:
+            self._placeholder = text
+            self.update()
     def set_progress(self, fraction):
         fraction = max(0.0, min(1.0, float(fraction)))
         if abs(fraction - self._progress) > 1e-4:
@@ -58,13 +65,28 @@ class AudioProgress(QWidget):
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        rect = QRectF(self.rect()).adjusted(2, 6, -2, -8)
-        if rect.width() > 0 and rect.height() > 0:
-            if self._envelope:
-                self._paint_waveform(painter, rect)
-            else:
-                self._paint_bar(painter, rect)
+        if self._placeholder and not self._envelope:
+            self._paint_placeholder(painter)
+        else:
+            rect = QRectF(self.rect()).adjusted(2, 6, -2, -8)
+            if rect.width() > 0 and rect.height() > 0:
+                if self._envelope:
+                    self._paint_waveform(painter, rect)
+                else:
+                    self._paint_bar(painter, rect)
         painter.end()
+
+    def _paint_placeholder(self, painter):
+        palette = self.palette()
+        color = palette.text().color()
+        color.setAlpha(140)
+        # Same visual weight as the image editor empty hint (16px).
+        font = self.font()
+        font.setPixelSize(16)
+        painter.setFont(font)
+        painter.setPen(color)
+        painter.drawText(self.rect(),
+                         Qt.AlignmentFlag.AlignCenter, self._placeholder)
 
     def _colors(self):
         palette = self.palette()

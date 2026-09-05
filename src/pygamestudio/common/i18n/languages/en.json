@@ -143,6 +143,14 @@
     "image": {
         "editor": "Image Editor",
         "untitled": "Untitled",
+        "open": "Open Image",
+        "new": "New",
+        "new_title": "New Image",
+        "width": "Width",
+        "height": "Height",
+        "load_failed": "Failed to load image: {}",
+        "empty_hint": "Choose an image",
+        "unsaved_content": "The current image has unsaved changes. Do you want to save it?",
         "save": "Save (Ctrl+S)",
         "save_as": "Save As",
         "saved": "Image saved: {}",
@@ -196,6 +204,8 @@
         "next": "Next",
         "size": "Size: {}",
         "load_failed": "Failed to load audio {}",
+        "open": "Open Audio File",
+        "empty_hint": "Choose an audio file",
         "detach": "Detach",
         "attach": "Attach to Tabs"
     },

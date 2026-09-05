@@ -2,8 +2,8 @@ from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt, QTimer
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import (QHBoxLayout, QLabel, QPushButton, QVBoxLayout,
-                               QWidget)
+from PySide6.QtWidgets import (QFileDialog, QHBoxLayout, QLabel, QPushButton,
+                               QVBoxLayout, QWidget)
 
 from pygamestudio.gui.audio_player.engine import (AudioEngine, STATE_PLAYING,
                                                   STATE_PAUSED)
@@ -11,6 +11,8 @@ from pygamestudio.gui.audio_player.widgets import AudioProgress
 from pygamestudio.gui.base.window import WindowBase
 from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.gui.console.logger import Logger
+
+AUDIO_OPEN_FILTER = ('Audio (*.wav *.mp3 *.ogg *.flac *.aif *.aiff *.m4a)')
 
 
 def format_time(ms):
@@ -63,6 +65,7 @@ class AudioPlayerWindow(QWidget):
         self._ticker.setInterval(100)
 
         self._detach_btn = QPushButton()
+        self._open_btn = QPushButton()
         self._prev_btn = QPushButton()
         self._play_btn = QPushButton()
         self._next_btn = QPushButton()
@@ -87,6 +90,14 @@ class AudioPlayerWindow(QWidget):
         self._detach_btn.setObjectName('codeEditorDetachBtn')
         self._detach_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._update_detach_button_text()
+
+        # Open any audio file from disk (not only project files).
+        self._open_btn.setObjectName('imageEditorToolBtn')
+        self._open_btn.setIcon(QIcon(':/images/browse.png'))
+        self._open_btn.setIconSize(QSize(18, 18))
+        self._open_btn.setFixedSize(28, 28)
+        self._open_btn.setToolTip(T.tr('audio.open', 'Open Audio File'))
+        self._open_btn.setCursor(Qt.CursorShape.PointingHandCursor)
 
         # Transport buttons, styled like the image editor's icon buttons.
         for btn, icon, key, default in (
@@ -116,6 +127,9 @@ class AudioPlayerWindow(QWidget):
         self._time_label.setMinimumWidth(88)
         self._time_label.setText('0:00 / 0:00')
 
+        # Empty state: ask the user to pick an audio file instead of a gray bar.
+        self._progress.set_placeholder(T.tr('audio.empty_hint', 'Choose an audio file'))
+
         self._update_controls()
         self._update_time_display()
 
@@ -124,15 +138,17 @@ class AudioPlayerWindow(QWidget):
         self._progress.seek_requested.connect(self._on_seek)
 
         self._detach_btn.clicked.connect(self.toggle_detached)
+        self._open_btn.clicked.connect(self.choose_audio)
         self._prev_btn.clicked.connect(self._play_previous)
         self._play_btn.clicked.connect(self._toggle_play)
         self._stop_btn.clicked.connect(self._stop_playback)
         self._next_btn.clicked.connect(self._play_next)
 
     def _set_layout(self):
-        # Top-left toolbar: transport buttons ... time right of the buttons,
-        # then size + detach pushed to the right.
+        # Top-left toolbar: open + transport buttons ... time right of the
+        # buttons, then size + detach pushed to the right.
         toolbar = QHBoxLayout()
+        toolbar.addWidget(self._open_btn)
         toolbar.addWidget(self._prev_btn)
         toolbar.addWidget(self._play_btn)
         toolbar.addWidget(self._stop_btn)
@@ -263,6 +279,14 @@ class AudioPlayerWindow(QWidget):
         self._play_neighbor(1)
 
     # ------------------------------------------------------------------ file
+    def choose_audio(self):
+        """Pick any audio file from disk and play it."""
+        start_dir = str(self._current_path.parent) if self._current_path else ''
+        path, _ = QFileDialog.getOpenFileName(
+            self, T.tr('audio.open', 'Open Audio File'), start_dir, AUDIO_OPEN_FILTER)
+        if path:
+            self.open_audio(path)
+
     def open_audio(self, file_path, raise_window=True):
         """Load an audio file and play it once (the file name is shown by the
         tab itself)."""
@@ -280,6 +304,7 @@ class AudioPlayerWindow(QWidget):
         except OSError:
             self._current_size = 0
 
+        self._progress.set_placeholder('')
         self._size_label.setText(
             T.tr('audio.size', 'Size: {}').format(format_size(self._current_size)))
 
@@ -385,6 +410,9 @@ class AudioPlayerWindow(QWidget):
         self._stop_btn.setToolTip(T.tr('audio.stop', 'Stop'))
         self._prev_btn.setToolTip(T.tr('audio.previous', 'Previous'))
         self._next_btn.setToolTip(T.tr('audio.next', 'Next'))
+        self._open_btn.setToolTip(T.tr('audio.open', 'Open Audio File'))
+        if not self._engine.is_loaded():
+            self._progress.set_placeholder(T.tr('audio.empty_hint', 'Choose an audio file'))
         if self._current_size:
             self._size_label.setText(
                 T.tr('audio.size', 'Size: {}').format(format_size(self._current_size)))
@@ -402,6 +430,7 @@ class AudioPlayerWindow(QWidget):
             self._current_path = None
             self._size_label.setText('')
             self._progress.set_envelope([])
+            self._progress.set_placeholder(T.tr('audio.empty_hint', 'Choose an audio file'))
             self._update_time_display()
             self._update_controls()
 

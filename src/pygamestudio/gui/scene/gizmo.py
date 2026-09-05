@@ -20,6 +20,7 @@ class MoveGizmo(QWidget):
 
     def __init__(self, parent, game_manager):
         super().__init__(parent)
+        self._screen = parent          # PygameScreen: snapping + guide overlay
         self._game_manager = game_manager
         self._current_object = None
         self._axis_length = 100
@@ -170,6 +171,8 @@ class MoveGizmo(QWidget):
                 self._is_macro_open = False
                 self._mouse_start_x = event.position().x()
                 self._mouse_start_y = event.position().y()
+                if self._screen is not None:
+                    self._screen.clear_alignment_guides()
                 return
 
         return super().mousePressEvent(event)
@@ -186,6 +189,26 @@ class MoveGizmo(QWidget):
         dx = int(event.position().x() - self._mouse_start_x)
         dy = int(event.position().y() - self._mouse_start_y)
 
+        # A single-axis handle only ever moves along its own axis.
+        if self._hit_type == self.HIT_AXIS_X:
+            dy = 0
+        elif self._hit_type == self.HIT_AXIS_Y:
+            dx = 0
+
+        if dx == 0 and dy == 0:
+            return
+
+        # The screen snaps the step (only along the active axis) and records
+        # any Photoshop-style alignment guides that match the target position.
+        if self._hit_type == self.HIT_AXIS_X:
+            allow_x, allow_y = True, False
+        elif self._hit_type == self.HIT_AXIS_Y:
+            allow_x, allow_y = False, True
+        else:
+            allow_x, allow_y = True, True
+        if self._screen is not None:
+            dx, dy = self._screen.resolve_move_delta(dx, dy, allow_x, allow_y)
+
         if dx == 0 and dy == 0:
             return
 
@@ -195,20 +218,16 @@ class MoveGizmo(QWidget):
             self._is_macro_open = True
             self._game_manager.undo_stack.beginMacro('Move')
 
-        # Only the handle being dragged moves; the gizmo itself follows the
-        # cursor along that axis so it never detaches from the drag point.
-        if self._hit_type == self.HIT_AXIS_X:
+        # Keep the gizmo glued to the object: move it by the same (possibly
+        # snapped) amount as the objects, along the dragged axis only.
+        if allow_x:
             self.move(self.x()+dx, self.y())
-            self._move_selected_objects(dx, 0)
-    
-        elif self._hit_type == self.HIT_AXIS_Y:
+        if allow_y:
             self.move(self.x(), self.y()+dy)
-            self._move_selected_objects(0, dy)
 
-        elif self._hit_type == self.HIT_PLANE:
-            self.move(self.x()+dx, self.y()+dy)
+        if dx != 0 or dy != 0:
             self._move_selected_objects(dx, dy)
-            
+
         self.update()
 
     def mouseReleaseEvent(self, event):
@@ -221,5 +240,7 @@ class MoveGizmo(QWidget):
         if self._is_macro_open:
             self._is_macro_open = False
             self._game_manager.undo_stack.endMacro()
+        if self._screen is not None:
+            self._screen.clear_alignment_guides()
 
 

@@ -5,6 +5,7 @@ from PySide6.QtWidgets import *
 from pygamestudio.game.object.type import *
 from pygamestudio.game.core.collision import shape_to_polygon
 from pygamestudio.gui.scene.gizmo import MoveGizmo
+from pygamestudio.gui.scene.guide import resolve_drag, union_rect
 from pygamestudio.common.utils.config import get_project_config
 
 
@@ -22,6 +23,7 @@ class PygameScreen(QWidget):
         self._mouse_y = None
         self._is_ctrl_pressed = False
         self._final_selected_object = None
+        self._alignment_guides = []   # lines to draw: (is_vertical, value, a, b)
 
         self._setup()
     
@@ -78,6 +80,7 @@ class PygameScreen(QWidget):
         self._final_selected_object = None
         self._mouse_x = None
         self._mouse_y = None
+        self._alignment_guides = []
         self._is_ctrl_pressed = False
         self._screen_width = 800
         self._screen_height = 600
@@ -138,8 +141,86 @@ class PygameScreen(QWidget):
 
         _update(self._game_manager.all_object_tree_struct, self._screen_surface)
         self._draw_collision_overlay()
+        # Stale guides must never linger: they only exist during a gizmo drag.
+        if not self._move_gizmo.is_dragging and self._alignment_guides:
+            self._alignment_guides = []
         self.update()
         self._move_gizmo.update_pos()
+
+    # ------------------------------------------------------- smart guides
+    def _alignment_group_rect(self, moving_objects):
+        """World-space bounding box of every object being dragged together."""
+        return union_rect([obj._get_world_rect() for obj in moving_objects])
+
+    def _collect_alignment_refs(self, moving_uuids):
+        """World rects of the objects the dragged group can align against.
+
+        Objects that are themselves being dragged are skipped, and so is any
+        descendant of a dragged object (it moves along implicitly). Hidden
+        objects are ignored; the canvas is included so edges/center can align
+        to the scene/stage itself."""
+        refs = []
+
+        def walk(object_tree_struct, under_mover):
+            value = list(object_tree_struct.values())[0]
+            obj = value['object']
+            is_mover = obj.uuid in moving_uuids
+            if not under_mover and not is_mover and obj.visible:
+                refs.append(obj._get_world_rect())
+            for child_tree in value['children']:
+                walk(child_tree, under_mover or is_mover)
+
+        walk(self._game_manager.all_object_tree_struct, False)
+        return refs
+
+    def resolve_move_delta(self, dx, dy, allow_x=True, allow_y=True):
+        """Snap a gizmo drag step and record the guides to draw.
+
+        Called by the move gizmo while dragging, BEFORE the objects are moved:
+        returns the (possibly corrected) movement to apply and stores the guide
+        lines that match the final position on ``self._alignment_guides`` so the
+        next paint draws them."""
+        moving_objects = self._game_manager.get_objects_to_move()
+        if not moving_objects:
+            self._alignment_guides = []
+            return dx, dy
+
+        group = self._alignment_group_rect(moving_objects)
+        moving_uuids = {obj.uuid for obj in moving_objects}
+        refs = self._collect_alignment_refs(moving_uuids)
+        if group is None or not refs:
+            self._alignment_guides = []
+            return dx, dy
+
+        new_dx, new_dy, guides = resolve_drag(
+            dx, dy, allow_x, allow_y, group, refs)
+        self._alignment_guides = guides
+        # Repaint even when the movement collapsed to zero (object snapped to
+        # an alignment and the cursor is still within snapping distance), so
+        # the guides stay visible without a scene change.
+        self.update()
+        return new_dx, new_dy
+
+    def clear_alignment_guides(self):
+        """Hide any guide lines (called when a drag ends)."""
+        if self._alignment_guides:
+            self._alignment_guides = []
+            self.update()
+
+    def _draw_alignment_guides(self, painter):
+        """Paint the smart guides as thin magenta dashed lines."""
+        if not self._alignment_guides:
+            return
+        painter.save()
+        pen = QPen(QColor(255, 0, 255, 230), 1)
+        pen.setStyle(Qt.PenStyle.DashLine)
+        painter.setPen(pen)
+        for vertical, value, start, end in self._alignment_guides:
+            if vertical:
+                painter.drawLine(int(value), int(start), int(value), int(end))
+            else:
+                painter.drawLine(int(start), int(value), int(end), int(value))
+        painter.restore()
 
     def _draw_collision_overlay(self):
         """Outline the selected object's collision body in green. Only drawn
@@ -308,6 +389,10 @@ class PygameScreen(QWidget):
             painter.setPen(pen)
             painter.drawRect(0, 0, self._screen_surface.get_width(), self._screen_surface.get_height())
             painter.restore()
+
+        # Photoshop-style alignment guides, drawn above the scene while the
+        # move gizmo is dragging near an aligned position.
+        self._draw_alignment_guides(painter)
 
     def resizeEvent(self, event):
         new_window_size = event.size()

@@ -143,6 +143,14 @@
     "image": {
         "editor": "图片编辑器",
         "untitled": "未命名",
+        "open": "打开图片",
+        "new": "新建",
+        "new_title": "新建图片",
+        "width": "宽度",
+        "height": "高度",
+        "load_failed": "图片加载失败：{}",
+        "empty_hint": "请选择一张图片",
+        "unsaved_content": "当前图片有未保存的修改，是否保存？",
         "save": "保存 (Ctrl+S)",
         "save_as": "另存为",
         "saved": "图片已保存：{}",
@@ -196,6 +204,8 @@
         "next": "下一首",
         "size": "大小：{}",
         "load_failed": "音频加载失败 {}",
+        "open": "打开音频文件",
+        "empty_hint": "请选择音频文件",
         "detach": "独立窗口",
         "attach": "回到标签页"
     },

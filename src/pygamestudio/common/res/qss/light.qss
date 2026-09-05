@@ -688,6 +688,12 @@ QWidget#audioPlayerWindow QLabel {
     background-color: transparent;
 }
 
+QLabel#imageEditorEmptyLabel {
+    color: #999999;
+    font-size: 16px;
+    background-color: transparent;
+}
+
 QListView#codeEditorCompletionPopup {
     background-color: #f5f5f5;
     color: #333333;

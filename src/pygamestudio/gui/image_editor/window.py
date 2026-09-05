@@ -1,11 +1,12 @@
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, QRectF, QSize, Qt
-from PySide6.QtGui import (QColor, QIcon, QPainter, QPainterPath, QPen,
-                           QPixmap, QCursor)
-from PySide6.QtWidgets import (QApplication, QFileDialog, QHBoxLayout, QLabel,
-                               QPushButton, QScrollArea, QToolButton,
-                               QVBoxLayout, QWidget)
+from PySide6.QtGui import (QColor, QIcon, QImage, QPainter, QPainterPath,
+                           QPen, QPixmap, QCursor)
+from PySide6.QtWidgets import (QApplication, QDialog, QDialogButtonBox,
+                               QFileDialog, QFormLayout, QHBoxLayout, QLabel,
+                               QMessageBox, QPushButton, QScrollArea,
+                               QToolButton, QVBoxLayout, QWidget)
 
 from pygamestudio.gui.image_editor.canvas import (ImageCanvas, TOOL_PENCIL,
                                                   TOOL_ERASER, TOOL_LINE,
@@ -45,6 +46,9 @@ ACTION_ICONS = {
 SAVE_FILTER = ('PNG (*.png);;JPEG (*.jpg *.jpeg);;BMP (*.bmp);;'
                'WebP (*.webp);;GIF (*.gif);;TIFF (*.tif *.tiff)')
 
+IMAGE_OPEN_FILTER = ('Images (*.png *.jpg *.jpeg *.bmp *.gif *.webp *.tga '
+                     '*.tif *.tiff *.xpm *.ico *.ppm *.pgm *.pbm *.svg)')
+
 
 class ImageEditorWindow(QWidget):
     """The image editor panel.
@@ -65,6 +69,8 @@ class ImageEditorWindow(QWidget):
         self._canvas = ImageCanvas()
         self._scroll_area = QScrollArea()
         self._detach_btn = QPushButton()
+        self._new_btn = QPushButton()
+        self._open_btn = QPushButton()
         self._save_btn = QPushButton()
         self._save_as_btn = QPushButton()
         self._undo_btn = QPushButton()
@@ -85,6 +91,7 @@ class ImageEditorWindow(QWidget):
         self._file_label = QLabel()
         self._size_label = QLabel()
         self._zoom_label = QLabel()
+        self._empty_label = QLabel()
 
         self._set_up()
 
@@ -101,6 +108,18 @@ class ImageEditorWindow(QWidget):
         self._detach_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._update_detach_button_text()
 
+        # New / Open file buttons (icons from resources).
+        for btn, icon, key, default in (
+            (self._new_btn, ':/images/new.png', 'image.new', 'New'),
+            (self._open_btn, ':/images/browse.png', 'image.open', 'Open Image'),
+        ):
+            btn.setObjectName('imageEditorToolBtn')
+            btn.setIcon(QIcon(icon))
+            btn.setIconSize(QSize(16, 16))
+            btn.setFixedSize(26, 26)
+            btn.setToolTip(T.tr(key, default))
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+
         # Canvas inside a scroll area so large / zoomed images can pan.
         self._scroll_area.setObjectName('imageEditorScrollArea')
         self._scroll_area.setWidgetResizable(False)
@@ -110,6 +129,14 @@ class ImageEditorWindow(QWidget):
         self._scroll_area.viewport().setAutoFillBackground(True)
         self._scroll_area.viewport().installEventFilter(self)
         self._scroll_area.installEventFilter(self)
+
+        # Empty-state hint shown while no image is open.
+        self._empty_label = QLabel(self._scroll_area.viewport())
+        self._empty_label.setObjectName('imageEditorEmptyLabel')
+        self._empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._empty_label.setWordWrap(True)
+        self._empty_label.setText(T.tr('image.empty_hint', 'Choose an image'))
+        self._empty_label.hide()
 
         # Zoom controls reuse the existing icons.
         self._zoom_in_btn.setObjectName('codeEditorZoomInBtn')
@@ -199,6 +226,8 @@ class ImageEditorWindow(QWidget):
         self._color_picker.color_changed.connect(self.set_color)
 
         self._detach_btn.clicked.connect(self.toggle_detached)
+        self._new_btn.clicked.connect(self.new_image)
+        self._open_btn.clicked.connect(self.choose_image)
         self._save_btn.clicked.connect(self.save)
         self._save_as_btn.clicked.connect(self.save_as)
         self._undo_btn.clicked.connect(self._canvas.undo)
@@ -221,6 +250,8 @@ class ImageEditorWindow(QWidget):
     def _set_layout(self):
         # Row 1: file / history / view / transform.
         row1 = QHBoxLayout()
+        row1.addWidget(self._new_btn)
+        row1.addWidget(self._open_btn)
         for w in (self._save_btn, self._save_as_btn, self._undo_btn, self._redo_btn,
                   self._flip_h_btn, self._flip_v_btn, self._rotate_ccw_btn,
                   self._rotate_cw_btn, self._clear_btn):
@@ -343,18 +374,122 @@ class ImageEditorWindow(QWidget):
             + f'  rgba({color.red()}, {color.green()}, {color.blue()}, {color.alpha()})')
 
     # ------------------------------------------------------------------ file
-    def open_image(self, file_path):
-        """Open an image in the editor and bring the panel into view."""
+    def _confirm_before_replacing(self):
+        """Prompt to save when the current image has unsaved changes.
+        Returns True when it is safe to replace the image, False to cancel."""
+        if not self._canvas.is_modified():
+            return True
+        choice = QMessageBox.warning(
+            self, T.tr('message_box.warning_title', 'Warning'),
+            T.tr('image.unsaved_content',
+                 'The current image has unsaved changes. Do you want to save it?'),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            | QMessageBox.StandardButton.Cancel)
+        if choice == QMessageBox.StandardButton.Cancel:
+            return False
+        if choice == QMessageBox.StandardButton.Yes:
+            # A cancelled Save-As dialog aborts the New / Open action too.
+            return self.save()
+        return True
+
+    def _load_image_file(self, file_path):
+        """Actually load an image (no unsaved-change prompt)."""
         file_path = str(file_path)
         if not self._canvas.load(file_path):
+            Logger.error(T.tr('image.load_failed', 'Failed to load image {}').format(file_path))
             return False
         self._file_path = Path(file_path)
         self._update_enabled_state()
         self._update_titles()
         # Show the image at 1:1 by default (zoom controls let the user fit it).
         self._canvas.actual_size()
+        return True
+
+    def open_image(self, file_path):
+        """Open an image (asset double-click entry) and bring the panel into
+        view. Asks to save first when there are unsaved changes."""
+        if not self._confirm_before_replacing():
+            return False
+        if not self._load_image_file(file_path):
+            return False
         self._raise_window()
         return True
+
+    def choose_image(self):
+        """Pick any image file from disk (not only project files)."""
+        if not self._confirm_before_replacing():
+            return
+        start_dir = str(self._file_path.parent) if self._file_path else ''
+        path, _ = QFileDialog.getOpenFileName(
+            self, T.tr('image.open', 'Open Image'), start_dir, IMAGE_OPEN_FILTER)
+        if not path:
+            return
+        if self._load_image_file(path):
+            self._raise_window()
+
+    def new_image(self):
+        """Create a brand-new fully transparent canvas."""
+        if not self._confirm_before_replacing():
+            return
+        size = self._ask_canvas_size()
+        if size is None:
+            return
+        image = QImage(size[0], size[1], QImage.Format.Format_ARGB32)
+        image.fill(0)                     # fully transparent
+        self._file_path = None
+        self._canvas.set_image(image)
+        self._update_enabled_state()
+        self._update_size_label()
+        self._update_titles()
+        self._canvas.actual_size()
+        self._raise_window()
+
+    def _ask_canvas_size(self):
+        """Ask the size for a new canvas. Returns (width, height) or None."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle(T.tr('image.new_title', 'New Image'))
+        form = QFormLayout(dialog)
+
+        # Same SuffixSpinBox look as the brush-size control in the editor
+        # (arrows only appear while hovering).
+        width_spin = SuffixSpinBox()
+        width_spin.setRange(1, 16384)
+        width_spin.setDecimals(0)
+        width_spin.setSingleStep(1)
+        width_spin.set_suffix('px')
+        height_spin = SuffixSpinBox()
+        height_spin.setRange(1, 16384)
+        height_spin.setDecimals(0)
+        height_spin.setSingleStep(1)
+        height_spin.set_suffix('px')
+        current_w, current_h = self._canvas.image_size()
+        width_spin.setValue(current_w if current_w > 0 else 800)
+        height_spin.setValue(current_h if current_h > 0 else 600)
+
+        form.addRow(T.tr('image.width', 'Width'), width_spin)
+        form.addRow(T.tr('image.height', 'Height'), height_spin)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
+                                   | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        form.addRow(buttons)
+
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            return width_spin.value(), height_spin.value()
+        return None
+
+    def _update_empty_state(self):
+        """Show the 'choose an image' hint when no image is open."""
+        if self._canvas.has_image():
+            self._empty_label.hide()
+        else:
+            self._position_empty_label()
+            self._empty_label.show()
+            self._empty_label.raise_()
+
+    def _position_empty_label(self):
+        viewport = self._scroll_area.viewport()
+        self._empty_label.setGeometry(viewport.rect().adjusted(20, 20, -20, -20))
 
     def save(self):
         """Save to the current file. Returns True on success (also reports
@@ -448,6 +583,9 @@ class ImageEditorWindow(QWidget):
         super().wheelEvent(event)
 
     def eventFilter(self, obj, event):
+        # Keep the empty-state hint centered when the viewport is resized.
+        if event.type() == QEvent.Type.Resize and obj is self._scroll_area.viewport():
+            self._position_empty_label()
         # Also zoom with Ctrl+wheel while the pointer is over the gray area
         # around the image inside the scroll area.
         if (event.type() == QEvent.Type.Wheel
@@ -521,6 +659,7 @@ class ImageEditorWindow(QWidget):
             btn.setEnabled(has)
         self._brush_spinbox.setEnabled(has)
         self._color_btn.setEnabled(has)
+        self._update_empty_state()
 
     def _file_title(self):
         if self._file_path:
@@ -563,6 +702,8 @@ class ImageEditorWindow(QWidget):
 
     def _update_tooltips(self):
         """Re-apply every button tooltip so they follow the current language."""
+        self._new_btn.setToolTip(T.tr('image.new', 'New'))
+        self._open_btn.setToolTip(T.tr('image.open', 'Open Image'))
         self._zoom_in_btn.setToolTip(T.tr('image.zoom_in', 'Zoom In'))
         self._zoom_out_btn.setToolTip(T.tr('image.zoom_out', 'Zoom Out'))
         self._fit_btn.setToolTip(T.tr('image.fit', 'Fit to Window'))
@@ -594,6 +735,7 @@ class ImageEditorWindow(QWidget):
         self._update_tooltips()
         self._update_titles()
         self._file_label.setText(self._file_title())
+        self._empty_label.setText(T.tr('image.empty_hint', 'Choose an image'))
 
     def get_ready_for_project(self):
         pass
