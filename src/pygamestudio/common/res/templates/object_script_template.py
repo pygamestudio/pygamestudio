@@ -1,3 +1,6 @@
+import pygamestudio as studio
+
+
 class ObjectScript:
     def __init__(self, obj):
         self.obj = obj
@@ -13,13 +16,13 @@ class ObjectScript:
         """
         pass
 
-    def on_update(self, delta_time):
+    def on_update(self, dt:float):
         """
         每帧更新回调函数，每一帧循环都会执行。
-        :param delta_time: 距离上一帧的时间（单位：秒）
+        :param dt: 距离上一帧的时间（单位：秒）
 
         Per-frame update callback, runs every single frame in the main loop.
-        :param delta_time: Time elapsed since last frame (in seconds)
+        :param dt: Time elapsed since last frame (in seconds)
         """
         pass
     
