@@ -85,7 +85,7 @@ pygs
 
 **3.** 双击已创建的项目，即可打开编辑窗口，开始你的游戏创作。
 
-<img src="https://i-blog.csdnimg.cn/direct/28198f7ded9143f58f866c9a7e8d6dd2.png" width="800"/>
+<img src="https://i-blog.csdnimg.cn/direct/f1dfa703ce8843b6bd5b62bb3c8b6cc3.png" width="800"/>
 
 <br>
 

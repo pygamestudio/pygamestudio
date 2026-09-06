@@ -85,7 +85,7 @@ Once created, the game project will be displayed in the Dashboard.
 
 **3.** Double-click the created project to open the editing window and start your creation.
 
-<img src="https://i-blog.csdnimg.cn/direct/28198f7ded9143f58f866c9a7e8d6dd2.png" width="800"/>
+<img src="https://i-blog.csdnimg.cn/direct/f1dfa703ce8843b6bd5b62bb3c8b6cc3.png" width="800"/>
 
 <br>
 
