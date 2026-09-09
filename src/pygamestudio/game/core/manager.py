@@ -16,6 +16,7 @@ from pygamestudio.game.object.button import *
 from pygamestudio.game.object.particle import *
 from pygamestudio.game.object.text_input import *
 from pygamestudio.game.object.progress_bar import *
+from pygamestudio.game.object.slider import *
 from pygamestudio.game.object.frame_sequence import *
 from pygamestudio.game.object.tile_map import *
 from pygamestudio.common.utils.config import *
@@ -76,6 +77,7 @@ class GameManager(QObject):
     object_text_input_parameter_changed = Signal(str)
     object_tile_map_parameter_changed = Signal(str)
     object_progress_bar_parameter_changed = Signal(str)
+    object_slider_parameter_changed = Signal(str)
     object_collision_parameter_changed = Signal(str)
 
     # Emitted whenever the "current scene has unsaved changes" flag flips
@@ -275,6 +277,8 @@ class GameManager(QObject):
             obj = ObjectTextInput(self, object_data)
         elif object_type == OBJECT_PROGRESS_BAR:
             obj = ObjectProgressBar(self, object_data)
+        elif object_type == OBJECT_SLIDER:
+            obj = ObjectSlider(self, object_data)
         elif object_type == OBJECT_FRAME_SEQUENCE:
             obj = ObjectFrameSequence(self, object_data)
         elif object_type == OBJECT_TILE_MAP:
@@ -736,6 +740,18 @@ class GameManager(QObject):
 
     def set_progress_bar_parameter(self, object_uuid, attr, new_value):
         """Change one progress-bar parameter (undoable): progress value,
+        strip colors or strip image paths."""
+        obj = self._get_object(object_uuid)
+        if obj is None:
+            return
+        old_value = getattr(obj, attr)
+        if old_value == new_value:
+            return
+        self._undo_stack.push(
+            UpdateAttrValueCommand(self, obj, attr, old_value, new_value))
+
+    def set_slider_parameter(self, object_uuid, attr, new_value):
+        """Change one slider parameter (undoable): value/range, handle width,
         strip colors or strip image paths."""
         obj = self._get_object(object_uuid)
         if obj is None:

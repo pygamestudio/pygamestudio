@@ -18,6 +18,7 @@ from pygamestudio.game.object.button import *
 from pygamestudio.game.object.particle import *
 from pygamestudio.game.object.text_input import *
 from pygamestudio.game.object.progress_bar import *
+from pygamestudio.game.object.slider import *
 from pygamestudio.game.object.frame_sequence import *
 from pygamestudio.game.object.tile_map import *
 from pygamestudio.api.config.project import get_project_config
@@ -41,6 +42,9 @@ class SceneLoader:
         # The text-input (TEXT_INPUT) object that currently owns keyboard
         # input at runtime (None when none is focused).
         self._focused_text_input = None
+        # The slider (SLIDER) currently being dragged by the pointer (None
+        # when none is dragged).
+        self._active_slider = None
         # Set right after Enter inserted a '\n' (enter_newline mode) so the
         # duplicate newline TEXTINPUT that some platforms also emit for the
         # Return key is swallowed (otherwise it would double the line break).
@@ -65,6 +69,7 @@ class SceneLoader:
             # The current scene is about to be replaced; let its scripts clean up.
             self._destroy_scripts()
         self._clear_text_input_focus()
+        self._active_slider = None
         self._all_object_tree_struct = {}
         self._current_scene_path = scene_path
         with open(scene_path, 'r', encoding='utf-8') as f:
@@ -124,6 +129,8 @@ class SceneLoader:
             obj = ObjectTextInput(self, object_data, is_for_api=True)
         elif object_type == OBJECT_PROGRESS_BAR:
             obj = ObjectProgressBar(self, object_data, is_for_api=True)
+        elif object_type == OBJECT_SLIDER:
+            obj = ObjectSlider(self, object_data, is_for_api=True)
         elif object_type == OBJECT_FRAME_SEQUENCE:
             obj = ObjectFrameSequence(self, object_data, is_for_api=True)
         elif object_type == OBJECT_TILE_MAP:
@@ -382,6 +389,64 @@ class SceneLoader:
                 return obj
         return None
 
+    # ---------------------------------------- runtime slider drag
+    def _sliders(self, topmost_first=False):
+        """Yield every visible SLIDER object. With ``topmost_first`` the
+        last-drawn (topmost) object comes first (what a click should hit)."""
+        found = []
+        def _gen(object_tree_struct):
+            value = list(object_tree_struct.values())[0]
+            obj = value['object']
+            if obj.type == OBJECT_SLIDER and obj.visible:
+                found.append(obj)
+            for child_object_tree_struct in value['children']:
+                _gen(child_object_tree_struct)
+        if self._all_object_tree_struct:
+            _gen(self._all_object_tree_struct)
+        if topmost_first:
+            found.reverse()
+        return found
+
+    def _hit_slider(self, pos):
+        """The topmost visible slider under ``pos`` (world coords) or None."""
+        for obj in self._sliders(topmost_first=True):
+            if obj._get_world_rect().collidepoint(pos):
+                return obj
+        return None
+
+    def _slider_update_value(self, obj, pos):
+        """Map the pointer x inside the slider's world rect back to a value."""
+        if obj is None or (int(getattr(obj, 'angle', 0) or 0) % 360) != 0:
+            return
+        rect = obj._get_world_rect()
+        if rect.width <= 0:
+            return
+        fraction = max(0.0, min(1.0, (pos[0] - rect.left) / float(rect.width)))
+        low = float(obj.min_value or 0)
+        high = float(obj.max_value or 0)
+        if high <= low:
+            return
+        obj.set_value(low + fraction * (high - low))
+
+    def handle_pointer_move(self, pos, buttons):
+        """Pointer move while dragging a slider updates its value. Returns
+        True when the event was consumed by a slider drag."""
+        if self._active_slider is not None and (buttons or (0,))[0]:
+            self._slider_update_value(self._active_slider, pos)
+            return True
+        return False
+
+    def handle_pointer_up(self, pos, button=1):
+        """Pointer up ends a slider drag (the value is already up to date;
+        clicking without dragging also jumps the handle). Returns True when
+        the event was consumed by a slider drag."""
+        if self._active_slider is not None:
+            if button == 1:
+                self._slider_update_value(self._active_slider, pos)
+            self._active_slider = None
+            return True
+        return False
+
     def _set_caret_from_click(self, obj, pos):
         """Place obj's caret at the character under the click. The geometry
         is resolved by the object itself so it matches exactly what is drawn
@@ -418,15 +483,20 @@ class SceneLoader:
         self._set_text_input_focus(None)
 
     def handle_pointer_down(self, pos, button=1):
-        """Click handling for input boxes: focus the box under the pointer,
-        blur when clicking anywhere else. Returns True when a box was hit."""
-        if button != 1:
-            return False
+        """Pointer down: start dragging the slider under the cursor, else
+        fall back to the input-box focus behaviour. Returns True when a UI
+        control (slider or input box) was hit."""
+        if button == 1:
+            slider = self._hit_slider(pos)
+            if slider is not None:
+                self._active_slider = slider
+                self._slider_update_value(slider, pos)
+                return True
         target = self._hit_text_input(pos)
-        if target is not None:
+        if button == 1 and target is not None:
             self._set_text_input_focus(target)
             self._set_caret_from_click(target, pos)
-        else:
+        elif button == 1:
             self._clear_text_input_focus()
         return target is not None
 

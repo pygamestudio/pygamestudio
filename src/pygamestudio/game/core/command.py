@@ -132,6 +132,12 @@ class UpdateAttrValueCommand(QUndoCommand):
         elif attr in ('progress', 'foreground_color',
                       'background_image_path', 'foreground_image_path'):
             self._game_manager.object_progress_bar_parameter_changed.emit(self._obj.uuid)
+        elif attr in ('value', 'min_value', 'max_value', 'handle_width',
+                      'handle_height', 'track_thickness',
+                      'track_color', 'fill_color', 'handle_color',
+                      'track_image_path', 'fill_image_path',
+                      'handle_image_path'):
+            self._game_manager.object_slider_parameter_changed.emit(self._obj.uuid)
         elif attr == 'background_color':
             # 'background_color' is shared by the text-input box and the
             # progress bar - route it by the object type.

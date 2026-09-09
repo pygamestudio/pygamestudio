@@ -96,6 +96,7 @@
         "particle": "Particle Emitter",
         "text_input": "Text Input",
         "progress_bar": "Progress Bar",
+        "slider": "Slider",
         "animation": "Animation",
         "frame_sequence": "Frame Sequence",
         "world": "World",
@@ -289,7 +290,19 @@
         "progress_bar_background_color": "Background Color",
         "progress_bar_foreground_color": "Foreground Color",
         "progress_bar_background_image": "Background Image",
-        "progress_bar_foreground_image": "Foreground Image"
+        "progress_bar_foreground_image": "Foreground Image",
+        "slider_value": "Value",
+        "slider_min_value": "Min Value",
+        "slider_max_value": "Max Value",
+        "slider_handle_width": "Handle Width",
+        "slider_handle_height": "Handle Height",
+        "slider_track_thickness": "Track Thickness",
+        "slider_track_color": "Track Color",
+        "slider_fill_color": "Fill Color",
+        "slider_handle_color": "Handle Color",
+        "slider_track_image": "Track Image",
+        "slider_fill_image": "Fill Image",
+        "slider_handle_image": "Handle Image"
     },
 
     "dashboard": {

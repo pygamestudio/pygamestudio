@@ -20,6 +20,7 @@ from pygamestudio.gui.inspector.layout.text_input import INSPECTOR_LAYOUT_TEXT_I
 from pygamestudio.gui.inspector.layout.frame_sequence import INSPECTOR_LAYOUT_FRAME_SEQUENCE
 from pygamestudio.gui.inspector.layout.tile_map import INSPECTOR_LAYOUT_TILE_MAP
 from pygamestudio.gui.inspector.layout.progress_bar import INSPECTOR_LAYOUT_PROGRESS_BAR
+from pygamestudio.gui.inspector.layout.slider import INSPECTOR_LAYOUT_SLIDER
 from pygamestudio.gui.inspector.layout.collision import build_collision_layout
 
 
@@ -86,6 +87,7 @@ class Container(QFrame):
         self._game_manager.object_frame_sequence_parameter_changed.connect(self._on_object_frame_sequence_parameter_changed)
         self._game_manager.object_tile_map_parameter_changed.connect(self._on_object_tile_map_parameter_changed)
         self._game_manager.object_progress_bar_parameter_changed.connect(self._on_object_progress_bar_parameter_changed)
+        self._game_manager.object_slider_parameter_changed.connect(self._on_object_slider_parameter_changed)
         self._game_manager.object_collision_parameter_changed.connect(self._on_object_collision_parameter_changed)
 
     def _set_layout(self):
@@ -217,6 +219,8 @@ class Container(QFrame):
             self._game_manager.set_tile_map_parameter(self._object_uuid_in_inspection, attr, tooltip)
         elif attr in ('background_image_path', 'foreground_image_path'):
             self._game_manager.set_progress_bar_parameter(self._object_uuid_in_inspection, attr, tooltip)
+        elif attr in ('track_image_path', 'fill_image_path', 'handle_image_path'):
+            self._game_manager.set_slider_parameter(self._object_uuid_in_inspection, attr, tooltip)
         elif attr:
             self._game_manager.set_particle_parameter(self._object_uuid_in_inspection, attr, tooltip)
 
@@ -287,11 +291,13 @@ class Container(QFrame):
         attr = self._color_attr_target
         if attr and attr != 'color':
             obj = self._game_manager.get_object(self._object_uuid_in_inspection)
-            is_progress_color = (obj is not None
-                                 and getattr(obj, 'type', '') == OBJECT_PROGRESS_BAR
-                                 and attr in ('background_color', 'foreground_color'))
-            if is_progress_color:
+            obj_type = getattr(obj, 'type', '') if obj is not None else ''
+            if (obj_type == OBJECT_PROGRESS_BAR
+                    and attr in ('background_color', 'foreground_color')):
                 self.set_object_progress_bar_parameter(attr, rgba)
+            elif (obj_type == OBJECT_SLIDER
+                    and attr in ('track_color', 'fill_color', 'handle_color')):
+                self.set_object_slider_parameter(attr, rgba)
             else:
                 self.set_object_text_input_parameter(attr, rgba)
         else:
@@ -310,6 +316,39 @@ class Container(QFrame):
         strip image paths) through the manager (undoable)."""
         self._game_manager.set_progress_bar_parameter(
             self._object_uuid_in_inspection, attr, new_value)
+
+    def set_object_slider_parameter(self, attr, new_value):
+        """Change one slider parameter (value/range, handle width, strip
+        colors or strip image paths) through the manager (undoable)."""
+        self._game_manager.set_slider_parameter(
+            self._object_uuid_in_inspection, attr, new_value)
+
+    def _on_object_slider_parameter_changed(self, object_uuid):
+        """Keep the slider editors in sync with an undone/redone change."""
+        if object_uuid != self._object_uuid_in_inspection:
+            return
+        obj = self._game_manager.get_object(object_uuid)
+        if obj is None:
+            return
+        for attr in ('value', 'min_value', 'max_value', 'handle_width',
+                     'handle_height', 'track_thickness'):
+            widget = self._find_widget(self._container_layout, attr)
+            if widget:
+                widget.blockSignals(True)
+                widget.setValue(float(getattr(obj, attr)))
+                widget.blockSignals(False)
+        for attr in ('track_color', 'fill_color', 'handle_color'):
+            widget = self._find_widget(self._container_layout, attr)
+            if widget:
+                widget.set_color(tuple(int(c) for c in getattr(obj, attr, (0, 0, 0, 255))))
+        for attr in ('track_image_path', 'fill_image_path', 'handle_image_path'):
+            widget = self._find_widget(self._container_layout, attr)
+            if widget:
+                widget.blockSignals(True)
+                path = getattr(obj, attr, '') or ''
+                widget.setText(Path(path).name if path else '')
+                widget.setToolTip(Path(path).as_posix() if path else '')
+                widget.blockSignals(False)
 
     def _on_object_progress_bar_parameter_changed(self, object_uuid):
         """Keep the progress-bar editors in sync with an undone/redone change."""
@@ -829,6 +868,8 @@ class Container(QFrame):
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_TEXT_INPUT)
         elif obj.type == OBJECT_PROGRESS_BAR:
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_PROGRESS_BAR)
+        elif obj.type == OBJECT_SLIDER:
+            self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_SLIDER)
         elif obj.type == OBJECT_FRAME_SEQUENCE:
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_FRAME_SEQUENCE)
         elif obj.type == OBJECT_TILE_MAP:

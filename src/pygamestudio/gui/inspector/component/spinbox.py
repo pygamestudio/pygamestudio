@@ -315,3 +315,35 @@ class ProgressBarValueSpinBox(SuffixSpinBox):
     def _on_value_changed(self):
         self._inspector_container.set_object_progress_bar_parameter(
             self._attr, float(self.value()))
+
+
+class SliderParameterSpinBox(SuffixSpinBox):
+    """Numeric spinbox for one slider parameter: value / min / max / handle
+    width/height / track thickness. value/min/max keep TWO decimals; the
+    geometry values are integers (px)."""
+
+    _INTEGER_ATTRS = ('handle_width', 'handle_height', 'track_thickness')
+    _SUFFIXES = {'handle_width': 'px', 'handle_height': 'px',
+                 'track_thickness': 'px'}
+
+    def __init__(self, inspector_container, value, attr=''):
+        super().__init__()
+        self._inspector_container = inspector_container
+        self._attr = attr
+        if attr in self._INTEGER_ATTRS:
+            # handle_height may be 0 (= no handle drawn); the others start at 1.
+            self.setRange(0 if attr == 'handle_height' else 1, 999999)
+            self.setSingleStep(1)
+            self.setDecimals(0)
+        else:
+            self.setRange(-9999999, 9999999)
+            self.setSingleStep(1)
+            self.setDecimals(2)
+        self.setValue(float(value))
+        self.set_suffix(self._SUFFIXES.get(attr, ''))
+
+        self.valueChanged.connect(self._on_value_changed)
+
+    def _on_value_changed(self):
+        new_value = int(self.value()) if self.decimals() == 0 else float(self.value())
+        self._inspector_container.set_object_slider_parameter(self._attr, new_value)

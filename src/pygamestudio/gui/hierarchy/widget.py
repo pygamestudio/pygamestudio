@@ -60,6 +60,7 @@ class AddItemButton(QPushButton):
         add_button_action = QAction(T.tr('item.button', 'Button'), self)
         add_text_input_action = QAction(T.tr('item.text_input', 'Text Input'), self)
         add_progress_bar_action = QAction(T.tr('item.progress_bar', 'Progress Bar'), self)
+        add_slider_action = QAction(T.tr('item.slider', 'Slider'), self)
         add_tile_map_action = QAction(T.tr('item.tile_map', 'Tile Map'), self)
 
         add_line_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_LINE))
@@ -70,6 +71,7 @@ class AddItemButton(QPushButton):
         add_button_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_BUTTON))
         add_text_input_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_TEXT_INPUT))
         add_progress_bar_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_PROGRESS_BAR))
+        add_slider_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_SLIDER))
         add_tile_map_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_TILE_MAP))
 
         add_shape_sub_menu = QMenu(title=T.tr('item.shape', 'Shape'), parent=self)
@@ -87,6 +89,7 @@ class AddItemButton(QPushButton):
         add_ui_sub_menu.addAction(add_button_action)
         add_ui_sub_menu.addAction(add_text_input_action)
         add_ui_sub_menu.addAction(add_progress_bar_action)
+        add_ui_sub_menu.addAction(add_slider_action)
         add_world_sub_menu.addAction(add_tile_map_action)
 
         menu.exec(self.mapToGlobal(pos))

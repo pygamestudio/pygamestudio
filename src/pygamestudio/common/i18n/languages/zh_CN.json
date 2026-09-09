@@ -96,6 +96,7 @@
         "particle": "粒子发射器",
         "text_input": "输入框",
         "progress_bar": "进度条",
+        "slider": "滑动条",
         "animation": "动画",
         "frame_sequence": "帧序列",
         "world": "世界",
@@ -289,7 +290,19 @@
         "progress_bar_background_color": "背景颜色",
         "progress_bar_foreground_color": "前景颜色",
         "progress_bar_background_image": "背景图片",
-        "progress_bar_foreground_image": "前景图片"
+        "progress_bar_foreground_image": "前景图片",
+        "slider_value": "数值",
+        "slider_min_value": "最小值",
+        "slider_max_value": "最大值",
+        "slider_handle_width": "滑块宽度",
+        "slider_handle_height": "滑块高度",
+        "slider_track_thickness": "轨道粗细",
+        "slider_track_color": "轨道颜色",
+        "slider_fill_color": "填充颜色",
+        "slider_handle_color": "滑块颜色",
+        "slider_track_image": "轨道图片",
+        "slider_fill_image": "填充图片",
+        "slider_handle_image": "滑块图片"
     },
 
     "dashboard": {
