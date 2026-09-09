@@ -70,6 +70,23 @@ class FrameSequenceCheckBox(QCheckBox):
             self._attr, check_state == Qt.CheckState.Checked)
 
 
+class TextInputParameterCheckBox(QCheckBox):
+    """Checkbox for one text-input box boolean parameter
+    (password mode, ...)."""
+
+    def __init__(self, inspector_container, is_checked=False, attr=''):
+        super().__init__()
+        self._inspector_container = inspector_container
+        self._attr = attr
+        self.setChecked(is_checked)
+
+        self.checkStateChanged.connect(self._on_check_state_changed)
+
+    def _on_check_state_changed(self, check_state):
+        self._inspector_container.set_object_text_input_parameter(
+            self._attr, check_state == Qt.CheckState.Checked)
+
+
 class CollisionCheckBox(QCheckBox):
     """Checkbox for one collision boolean parameter (collision_enabled)."""
 

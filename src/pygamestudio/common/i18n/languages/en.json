@@ -94,8 +94,11 @@
         "button": "Button",
         "effects": "Effects",
         "particle": "Particle Emitter",
+        "text_input": "Text Input",
         "animation": "Animation",
-        "frame_sequence": "Frame Sequence"
+        "frame_sequence": "Frame Sequence",
+        "world": "World",
+        "tile_map": "Tile Map"
     },
 
     "gm": {
@@ -122,6 +125,7 @@
         "scene": "Scene",
         "scene_saved": "Scene saved",
         "run_project": "Run Project {}",
+        "failed_to_save_before_run": "Failed to save scene before running: {}",
         "failed_to_run_project": "Failed to Run Project {}: {}",
         "run_project_finished": "Project {} exited with code {}",
         "run": "Run",
@@ -259,7 +263,27 @@
         "collision_type_polygon": "Polygon",
         "collision_offset": "Collision Offset",
         "collision_size": "Collision Size",
-        "collision_points": "Collision Points"
+        "collision_points": "Collision Points",
+        "placeholder": "Placeholder",
+        "password": "Password",
+        "max_length": "Max Length",
+        "text_input_text_color": "Text Color",
+        "text_input_background_color": "Background Color",
+        "text_input_border_color": "Border Color",
+        "text_align": "H Align",
+        "text_valign": "V Align",
+        "enter_newline": "Enter adds Newline",
+        "align_left": "Align Left",
+        "align_center": "Align Center",
+        "align_right": "Align Right",
+        "align_top": "Align Top",
+        "align_middle": "Align Middle",
+        "align_bottom": "Align Bottom",
+        "tileset_path": "Tileset Path",
+        "tile_width": "Tile Width",
+        "tile_height": "Tile Height",
+        "columns": "Columns",
+        "rows": "Rows"
     },
 
     "dashboard": {
@@ -318,6 +342,39 @@
     "theme": {
         "dark": "Dark",
         "light": "Light"
+    },
+
+    "tile_map": {
+        "editor": "Tile Map Editor",
+        "detach": "Detach",
+        "attach": "Attach to Tabs",
+        "empty_hint": "Select a Tile Map object to edit it",
+        "choose_tileset": "Choose Tileset",
+        "tool_pencil": "Paint",
+        "tool_erase": "Erase",
+        "tool_fill": "Fill",
+        "tool_pick": "Pick Tile",
+        "zoom_in": "Zoom In",
+        "zoom_out": "Zoom Out",
+        "fit": "Fit",
+        "status_map": "Map {w}×{h}",
+        "status_tiles": "Tileset {sw}×{sh} / tile {tw}×{th} → {n} tiles",
+        "status_no_tiles": "Tileset {sw}×{sh} fits no whole {tw}×{th} tile - set the tile size to one cell of the source image",
+        "status_no_tileset": "No tileset chosen",
+        "palette_hint": "Left: pick tile · Wheel: zoom · Shift+wheel: scroll",
+        "layer_combo": "Current Layer",
+        "layer_combo_tip": "Current Layer: {name}",
+        "layer_add": "Add Layer",
+        "layer_add_title": "Add Layer",
+        "layer_remove": "Delete Layer",
+        "layer_delete_confirm_title": "Delete Layer",
+        "layer_delete_confirm_text": "Delete layer \"{name}\"?",
+        "layer_rename": "Rename Layer",
+        "layer_rename_title": "Rename Layer",
+        "layer_name_prompt": "Layer name:",
+        "layer_default_name": "Layer %1",
+        "layer_visible": "Show / Hide Layer",
+        "layer_collision": "Collision Layer (cells holding a tile are solid)"
     },
 
     "api": {

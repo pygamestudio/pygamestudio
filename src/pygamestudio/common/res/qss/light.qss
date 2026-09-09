@@ -572,6 +572,22 @@ QWidget#inspectorContainer QSpinBox:disabled, QWidget#inspectorContainer QDouble
     color: #888888;
 }
 
+/* Alignment picker tool buttons: the selected state is a flat color only
+   (no native sunken content shift) via the dynamic 'selected' property. */
+QToolButton#alignmentToolBtn {
+    background-color: transparent;
+    border: none;
+    border-radius: 4px;
+}
+
+QToolButton#alignmentToolBtn:hover {
+    background-color: #e0e0e0;
+}
+
+QToolButton#alignmentToolBtn[selected="true"] {
+    background-color: #cce4ff;
+}
+
 /* ----- About ----- */
 QLabel#aboutCopyrightLabel {
     font-size: 10px;
@@ -677,6 +693,31 @@ QWidget#imageEditorWindow QToolButton:checked {
 QWidget#imageEditorWindow QToolButton[active="true"] {
     background-color: #cce4ff;
     color: #005fb8;
+}
+
+QWidget#tileMapEditorWindow QToolButton {
+    background-color: transparent;
+    border: none;
+    border-radius: 4px;
+    color: #333333;
+}
+
+QWidget#tileMapEditorWindow QToolButton:hover {
+    background-color: #e0e0e0;
+}
+
+QWidget#tileMapEditorWindow QToolButton:pressed {
+    background-color: #c0c0c0;
+}
+
+QWidget#tileMapEditorWindow QToolButton[active="true"] {
+    background-color: #cce4ff;
+    color: #005fb8;
+}
+
+QWidget#tileMapEditorWindow QLabel {
+    color: #666666;
+    background-color: transparent;
 }
 
 QWidget#audioPlayerWindow {

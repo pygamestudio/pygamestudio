@@ -65,9 +65,10 @@ class GridGraphicsView(QGraphicsView):
             self._pygame_screen._update_scene()
 
     def _center(self):
-        screen_width = self._pygame_screen.width()
-        screen_height = self._pygame_screen.height()
-        self.centerOn(QPointF(screen_width/2, screen_height/2))
+        # The canvas occupies scene (0, 0, W, H); centre the view on it (not
+        # on the padded workspace widget, which is offset by the margin).
+        canvas_width, canvas_height = self._pygame_screen.canvas_size()
+        self.centerOn(QPointF(canvas_width / 2, canvas_height / 2))
 
     def resizeEvent(self, event):
         # Make sure the scene is at center when the editor shows up.
@@ -92,7 +93,11 @@ class GridGraphicsView(QGraphicsView):
     def _on_mouse_left_button_pressed(self, event):
         # Deselect all objects if users click outside the Canvas.
         proxy_screen_widget = self.scene().items()[0]
-        if not proxy_screen_widget.boundingRect().contains(self.mapToScene(event.pos())):
+        # Compare in SCENE space: boundingRect() is in item-local coords
+        # (0..widget size) and would wrongly treat anything with a negative
+        # scene coordinate (i.e. the workspace left of the canvas) as "outside",
+        # deselecting the object and eating the next gizmo drag.
+        if not proxy_screen_widget.sceneBoundingRect().contains(self.mapToScene(event.pos())):
             self._game_manager.deselect_all()
 
         self._rb_origin = event.pos()

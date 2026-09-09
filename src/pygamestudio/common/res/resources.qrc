@@ -2,6 +2,12 @@
     <qresource prefix="/">
         <file>images/add_item.png</file>
         <file>images/add.png</file>
+        <file>images/align_h_center.png</file>
+        <file>images/align_h_left.png</file>
+        <file>images/align_h_right.png</file>
+        <file>images/align_v_bottom.png</file>
+        <file>images/align_v_middle.png</file>
+        <file>images/align_v_top.png</file>
         <file>images/button.png</file>
         <file>images/browse.png</file>
         <file>images/canvas.png</file>
@@ -35,6 +41,8 @@
         <file>images/left_arrow_gray.png</file>
         <file>images/left_arrow.png</file>
         <file>images/line.png</file>
+        <file>images/text_input.png</file>
+        <file>images/tile_map.png</file>
         <file>images/logo.png</file>
         <file>images/maximize.png</file>
         <file>images/maximize_disabled.png</file>
@@ -61,6 +69,8 @@
         <file>images/tree_arrow_right.png</file>
         <file>images/up_arrow.png</file>
         <file>images/warning.png</file>
+        <file>images/collide.png</file>
+        <file>images/rename.png</file>
         <file>images/particle.png</file>
         <file>images/zoom_in.png</file>
         <file>images/zoom_out.png</file>

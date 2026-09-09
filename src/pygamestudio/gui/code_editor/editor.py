@@ -91,6 +91,16 @@ class CodeEditor(QPlainTextEdit):
         except (OSError, UnicodeDecodeError):
             content = file_path.read_text(encoding='utf-8', errors='replace')
 
+        # Opening the file the editor already shows must NOT throw away the
+        # undo/redo history. Right after running a project the same script is
+        # often requested again (jumping to a console error, re-opening the
+        # asset...), and since the run just saved it, the on-disk content still
+        # matches what is being edited - so keep the current session untouched.
+        if self._file_path == file_path and self.toPlainText() == content:
+            self._highlighter.set_language(file_path.suffix)
+            self._check_syntax()
+            return
+
         self._is_loading = True
         self.setPlainText(content)
         self._is_loading = False
@@ -346,12 +356,10 @@ class CodeEditor(QPlainTextEdit):
         return False
 
     def _handle_paren(self, cursor, open_char, close_char):
-        """'(' inserts '()' with the cursor in between; if the closing paren
-        is already right of the cursor, just move past it."""
-        if self.document().characterAt(cursor.position()) == close_char:
-            cursor.movePosition(QTextCursor.MoveOperation.Right)
-            self.setTextCursor(cursor)
-            return True
+        """'(' always inserts '()' and leaves the cursor in the middle. Typing
+        '(' right before an existing ')' therefore adds a brand-new pair
+        instead of jumping over the existing closing paren - only typing ')'
+        itself steps over an adjacent ')' (handled in _handle_auto_pair)."""
         cursor.insertText(open_char + close_char)
         cursor.movePosition(QTextCursor.MoveOperation.Left)
         self.setTextCursor(cursor)

@@ -58,6 +58,8 @@ class AddItemButton(QPushButton):
         add_text_action = QAction(T.tr('item.text', 'Text'), self)
         add_image_action = QAction(T.tr('item.image', 'Image'), self)
         add_button_action = QAction(T.tr('item.button', 'Button'), self)
+        add_text_input_action = QAction(T.tr('item.text_input', 'Text Input'), self)
+        add_tile_map_action = QAction(T.tr('item.tile_map', 'Tile Map'), self)
 
         add_line_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_LINE))
         add_rect_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_RECT))
@@ -65,11 +67,15 @@ class AddItemButton(QPushButton):
         add_text_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_TEXT))
         add_image_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_IMAGE))
         add_button_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_BUTTON))
+        add_text_input_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_TEXT_INPUT))
+        add_tile_map_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_TILE_MAP))
 
         add_shape_sub_menu = QMenu(title=T.tr('item.shape', 'Shape'), parent=self)
         add_ui_sub_menu = QMenu(title='UI', parent=self)
+        add_world_sub_menu = QMenu(title=T.tr('item.world', 'World'), parent=self)
         menu.addMenu(add_shape_sub_menu)
         menu.addMenu(add_ui_sub_menu)
+        menu.addMenu(add_world_sub_menu)
 
         add_shape_sub_menu.addAction(add_line_action)
         add_shape_sub_menu.addAction(add_rect_action)
@@ -77,6 +83,8 @@ class AddItemButton(QPushButton):
         add_ui_sub_menu.addAction(add_text_action)
         add_ui_sub_menu.addAction(add_image_action)
         add_ui_sub_menu.addAction(add_button_action)
+        add_ui_sub_menu.addAction(add_text_input_action)
+        add_world_sub_menu.addAction(add_tile_map_action)
 
         menu.exec(self.mapToGlobal(pos))
 

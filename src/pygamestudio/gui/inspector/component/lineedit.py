@@ -497,3 +497,105 @@ class FrameFolderLineEdit(_PathLineEditDropMixin, QLineEdit):
     def leaveEvent(self, event):
         self._delete_button.hide()
         return super().leaveEvent(event)
+
+
+class TilesetPathLineEdit(_PathLineEditDropMixin, QLineEdit):
+    """Image picker for the tile-map object's tileset (a single image file
+    that is cut into tiles by the object's tile size)."""
+
+    # Same image formats as the image object / frame folder widgets.
+    _drop_extensions = {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.lbm',
+                        '.pcx', '.qoi', '.svg', '.tga', '.tiff', '.webp',
+                        '.xpm', '.xcf'}
+
+    def __init__(self, inspector_container, tileset_path='', attr=''):
+        super().__init__()
+        self._inspector_container = inspector_container
+        self._browse_button = QPushButton(self)
+        self._delete_button = QPushButton(self)
+        self._tileset_path = Path(tileset_path) if tileset_path else Path('')
+        self._set_up()
+
+    def _set_up(self):
+        self._set_widget()
+        self._set_signal()
+        self._set_layout()
+
+    def _set_widget(self):
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
+        self.setTextMargins(0, 0, 24, 0)
+        self.setReadOnly(True)
+        self.setAcceptDrops(True)
+
+        if str(self._tileset_path) not in ('', '.'):
+            project_path = Path(get_project_path())
+            image_absolute_path = project_path / self._tileset_path
+            self.setToolTip(self._tileset_path.as_posix())
+            self.setText(self._tileset_path.name)
+
+            if not image_absolute_path.exists():
+                self.setStyleSheet('color: rgb(255, 0, 0);')
+
+        self._browse_button.setFixedSize(18, 18)
+        self._browse_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        pixmap = QPixmap(':/images/browse.png')
+        scaled_pixmap = pixmap.scaled(self._browse_button.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        self._browse_button.setIcon(QIcon(scaled_pixmap))
+
+        self._delete_button.setFixedSize(18, 18)
+        self._delete_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        pixmap = QPixmap(':/images/close.png')
+        scaled_pixmap = pixmap.scaled(self._delete_button.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        self._delete_button.setIcon(QIcon(scaled_pixmap))
+        self._delete_button.hide()
+
+    def _set_signal(self):
+        self._browse_button.clicked.connect(self._choose_image)
+        self._delete_button.clicked.connect(self._delete_image)
+        self.textChanged.connect(self._notify_container)
+
+    def _set_layout(self):
+        h_layout = QHBoxLayout(self)
+        h_layout.addStretch(1)
+        h_layout.addWidget(self._delete_button)
+        h_layout.addWidget(self._browse_button)
+        h_layout.setContentsMargins(0, 2, 5, 0)
+
+    def _notify_container(self):
+        """Tell the inspector the tileset path changed (the value is carried
+        by the tooltip, mirroring the image path widgets)."""
+        attr = self.property('component_attribute') or 'tileset_path'
+        self._inspector_container.set_object_path(attr, self.toolTip())
+
+    def _set_path_from_file(self, file_path):
+        """Apply a chosen/dropped tileset image: update the display and notify
+        the inspector so the object's tileset_path is set."""
+        self._tileset_path = Path(file_path)
+        self.setToolTip(self._tileset_path.as_posix())
+        self._notify_container()
+        self.setStyleSheet('')
+
+    def _choose_image(self):
+        image_path, _ = QFileDialog.getOpenFileName(
+            self, T.tr('inspector.select_image', 'Select Image'),
+            os.environ.get('__PYGAMESTUDIO_PROJECT_PATH', ''),
+            T.tr('inspector.format', 'Format') + ' (*.png *.jpg *.jpeg *.gif *.bmp *.lbm *.pcx *.qoi *.svg *.tga *.tiff *.webp *.xpm *.xcf)')
+        if not image_path:
+            return
+
+        self._set_path_from_file(image_path)
+
+    def _delete_image(self):
+        self._tileset_path = Path('')
+        self.setToolTip('')
+        self._notify_container()
+        self.setStyleSheet('')
+
+    def enterEvent(self, event):
+        if str(self._tileset_path) not in ('', '.'):
+            self._delete_button.show()
+        return super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._delete_button.hide()
+        return super().leaveEvent(event)

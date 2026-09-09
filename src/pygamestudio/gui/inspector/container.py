@@ -16,7 +16,9 @@ from pygamestudio.gui.inspector.layout.text import INSPECTOR_LAYOUT_TEXT
 from pygamestudio.gui.inspector.layout.image import INSPECTOR_LAYOUT_IMAGE
 from pygamestudio.gui.inspector.layout.button import INSPECTOR_LAYOUT_BUTTON
 from pygamestudio.gui.inspector.layout.particle import INSPECTOR_LAYOUT_PARTICLE
+from pygamestudio.gui.inspector.layout.text_input import INSPECTOR_LAYOUT_TEXT_INPUT
 from pygamestudio.gui.inspector.layout.frame_sequence import INSPECTOR_LAYOUT_FRAME_SEQUENCE
+from pygamestudio.gui.inspector.layout.tile_map import INSPECTOR_LAYOUT_TILE_MAP
 from pygamestudio.gui.inspector.layout.collision import build_collision_layout
 
 
@@ -29,6 +31,10 @@ class Container(QFrame):
         self._inspector_window = parent
         self._game_manager = game_manager
         self._color_picker = ColorPicker()
+        # Attribute the shared color popup currently edits ('' / None = the
+        # base 'color' property; anything else routes through the line-edit
+        # generic parameter channel, e.g. background_color / border_color).
+        self._color_attr_target = None
         
         self._is_selected_from_inspector = False
         self._current_selected_object_uuid_index = -1
@@ -50,7 +56,7 @@ class Container(QFrame):
 
     def _set_signal(self):
         T.add_observer(self)
-        self._color_picker.color_changed.connect(self.set_object_color)
+        self._color_picker.color_changed.connect(self._on_color_picker_color_changed)
         self._game_manager.scene_loaded_signal.connect(self._on_scene_loaded)
 
         # self._game_manager.object_added.connect(self._on_object_added)
@@ -65,6 +71,7 @@ class Container(QFrame):
         self._game_manager.object_showed.connect(self._on_object_showed)
         self._game_manager.object_hidden.connect(self._on_object_hidden)
         self._game_manager.object_color_changed.connect(self._on_object_color_changed)
+        self._game_manager.object_text_changed.connect(self._on_object_text_changed)
         self._game_manager.object_rect_border_radius_changed.connect(self._on_object_rect_border_radius_changed)
         self._game_manager.object_line_start_point_changed.connect(self._on_object_line_start_point_changed)
         self._game_manager.object_line_end_point_changed.connect(self._on_object_line_end_point_changed)
@@ -74,7 +81,9 @@ class Container(QFrame):
         self._game_manager.object_script_path_changed.connect(self._on_object_script_path_changed)
         self._game_manager.object_points_changed.connect(self._on_object_points_changed)
         self._game_manager.object_particle_parameter_changed.connect(self._on_object_particle_parameter_changed)
+        self._game_manager.object_text_input_parameter_changed.connect(self._on_object_text_input_parameter_changed)
         self._game_manager.object_frame_sequence_parameter_changed.connect(self._on_object_frame_sequence_parameter_changed)
+        self._game_manager.object_tile_map_parameter_changed.connect(self._on_object_tile_map_parameter_changed)
         self._game_manager.object_collision_parameter_changed.connect(self._on_object_collision_parameter_changed)
 
     def _set_layout(self):
@@ -202,6 +211,8 @@ class Container(QFrame):
             self._game_manager.set_particle_parameter(self._object_uuid_in_inspection, attr, tooltip)
         elif attr == 'frame_folder':
             self._game_manager.set_frame_sequence_parameter(self._object_uuid_in_inspection, attr, tooltip)
+        elif attr == 'tileset_path':
+            self._game_manager.set_tile_map_parameter(self._object_uuid_in_inspection, attr, tooltip)
         elif attr:
             self._game_manager.set_particle_parameter(self._object_uuid_in_inspection, attr, tooltip)
 
@@ -219,8 +230,69 @@ class Container(QFrame):
     def set_object_particle_parameter(self, attr, new_value):
         self._game_manager.set_particle_parameter(self._object_uuid_in_inspection, attr, new_value)
 
+    def set_object_text_input_parameter(self, attr, new_value):
+        """Change one text-input box parameter through the manager."""
+        self._game_manager.set_text_input_parameter(self._object_uuid_in_inspection, attr, new_value)
+        # Lowering max_length below the current text length should trim the
+        # content too, so editor and runtime stay consistent.
+        if attr == 'max_length':
+            self._clamp_text_input_text()
+
+    def _sync_text_edit(self):
+        """Refresh the 'text' editor widget with the object's current text.
+        Skips when they already match, so live typing never resets the
+        cursor (only undo/redo/external changes actually rewrite the field)."""
+        obj = self._game_manager.get_object(self._object_uuid_in_inspection)
+        widget = self._find_widget(self._container_layout, 'text')
+        if obj is None or widget is None:
+            return
+        current = obj.text or ''
+        if widget.toPlainText() == current:
+            return
+        widget.blockSignals(True)
+        widget.setPlainText(current)
+        widget.blockSignals(False)
+
+    def _clamp_text_input_text(self):
+        """Trim the inspected text-input's content to its max_length so typing
+        in the inspector respects the same limit as the running game."""
+        if self._object_uuid_in_inspection is None:
+            return
+        obj = self._game_manager.get_object(self._object_uuid_in_inspection)
+        if obj is None or getattr(obj, 'type', '') != OBJECT_TEXT_INPUT:
+            return
+        limit = int(getattr(obj, 'max_length', 0) or 0)
+        if limit <= 0:
+            return
+        text = obj.text or ''
+        if len(text) > limit:
+            self._game_manager.set_text(self._object_uuid_in_inspection, text[:limit])
+        self._sync_text_edit()
+
+    def _on_object_text_changed(self, object_uuid):
+        """Keep the text editor widget in sync when text is changed by undo/
+        redo or by clamping."""
+        if object_uuid != self._object_uuid_in_inspection:
+            return
+        self._sync_text_edit()
+
+    def _on_color_picker_color_changed(self, color_rgba):
+        """The shared color popup changed: route to the base 'color' property,
+        or to the attribute that opened the popup (box colors, ...)."""
+        rgba = tuple(int(c) for c in color_rgba)
+        attr = self._color_attr_target
+        if attr and attr != 'color':
+            self.set_object_text_input_parameter(attr, rgba)
+        else:
+            self.set_object_color(rgba)
+
     def set_object_frame_sequence_parameter(self, attr, new_value):
         self._game_manager.set_frame_sequence_parameter(self._object_uuid_in_inspection, attr, new_value)
+
+    def set_object_tile_map_parameter(self, attr, new_value):
+        """Change one tile-map parameter (tile size, grid columns/rows, ...)
+        through the manager (undoable)."""
+        self._game_manager.set_tile_map_parameter(self._object_uuid_in_inspection, attr, new_value)
 
     def set_object_collision_parameter(self, attr, new_value):
         # The first time collision is switched on, materialize concrete
@@ -320,6 +392,37 @@ class Container(QFrame):
             image_edit.setToolTip(Path(image_path).as_posix() if image_path else '')
             image_edit.blockSignals(False)
 
+    def _on_object_text_input_parameter_changed(self, object_uuid):
+        """Keep the text-input box editors in sync with an undone/
+        redone parameter change (placeholder, password, box colors, ...)."""
+        if object_uuid != self._object_uuid_in_inspection:
+            return
+        obj = self._game_manager.get_object(object_uuid)
+        if obj is None:
+            return
+
+        for attr in ('placeholder', 'password', 'enter_newline',
+                     'max_length', 'background_color', 'border_color'):
+            widget = self._find_widget(self._container_layout, attr)
+            if widget is None:
+                continue
+            value = getattr(obj, attr)
+            widget.blockSignals(True)
+            if attr == 'placeholder':
+                widget.setText(value)
+            elif attr in ('password', 'enter_newline'):
+                widget.setChecked(bool(value))
+            elif attr == 'max_length':
+                widget.setValue(int(value))
+            else:
+                widget.set_color(tuple(int(c) for c in value))
+            widget.blockSignals(False)
+
+        for attr in ('text_align', 'text_valign'):
+            widget = self._find_widget(self._container_layout, attr)
+            if widget is not None:
+                widget.set_value(getattr(obj, attr, 'left'))
+
     def _on_object_frame_sequence_parameter_changed(self, object_uuid):
         """Keep the frame-sequence editors in sync with an undone/redone
         parameter change."""
@@ -348,8 +451,44 @@ class Container(QFrame):
             folder_edit.setText(Path(frame_folder).name if frame_folder else '')
             folder_edit.setToolTip(Path(frame_folder).as_posix() if frame_folder else '')
             folder_edit.blockSignals(False)
-    
-    def show_color_picker(self, color_rgba):
+
+    def _on_object_tile_map_parameter_changed(self, object_uuid):
+        """Keep the tile-map editors in sync with an undone/redone parameter
+        change (tile size, grid size, derived pixel size, tileset path)."""
+        if object_uuid != self._object_uuid_in_inspection:
+            return
+        obj = self._game_manager.get_object(object_uuid)
+        if obj is None:
+            return
+
+        for attr in ('tile_width', 'tile_height', 'columns', 'rows'):
+            widget = self._find_widget(self._container_layout, attr)
+            if widget:
+                widget.blockSignals(True)
+                widget.setValue(getattr(obj, attr))
+                widget.blockSignals(False)
+
+        # The pixel size is derived from the grid, so refresh the read-only
+        # size row too when the grid / tile size changes.
+        for attr in ('width', 'height'):
+            widget = self._find_widget(self._container_layout, attr)
+            if widget:
+                widget.blockSignals(True)
+                widget.setValue(getattr(obj, attr))
+                widget.blockSignals(False)
+
+        tileset_edit = self._find_widget(self._container_layout, 'tileset_path')
+        if tileset_edit:
+            tileset_edit.blockSignals(True)
+            tileset_path = getattr(obj, 'tileset_path', '')
+            tileset_edit.setText(Path(tileset_path).name if tileset_path else '')
+            tileset_edit.setToolTip(Path(tileset_path).as_posix() if tileset_path else '')
+            tileset_edit.blockSignals(False)
+
+    def show_color_picker(self, color_rgba, attr=''):
+        """Open the shared color popup editing ``attr`` ('' = base color)."""
+        self._color_attr_target = attr or None
+
         screen = QApplication.primaryScreen()
         screen_width = screen.geometry().width()
         screen_height = screen.geometry().height()
@@ -644,8 +783,12 @@ class Container(QFrame):
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_BUTTON)
         elif obj.type == OBJECT_PARTICLE:
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_PARTICLE)
+        elif obj.type == OBJECT_TEXT_INPUT:
+            self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_TEXT_INPUT)
         elif obj.type == OBJECT_FRAME_SEQUENCE:
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_FRAME_SEQUENCE)
+        elif obj.type == OBJECT_TILE_MAP:
+            self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_TILE_MAP)
 
         # Every object (except the canvas root) can carry a collision body.
         if obj.type != OBJECT_CANVAS:

@@ -165,6 +165,26 @@ class FontSizeSpinBox(QDoubleSpinBox):
         self.valueChanged.connect(self._inspector_container.set_object_font_size)
 
 
+class TextInputParameterSpinBox(SuffixSpinBox):
+    """Integer spinbox for a text-input box numeric parameter such as
+    max_length (0 = unlimited)."""
+
+    def __init__(self, inspector_container, value, attr=''):
+        super().__init__()
+        self._inspector_container = inspector_container
+        self._attr = attr
+        self.setRange(0, 999999)
+        self.setSingleStep(1)
+        self.setDecimals(0)
+        self.setValue(value)
+
+        self.valueChanged.connect(self._on_value_changed)
+
+    def _on_value_changed(self):
+        self._inspector_container.set_object_text_input_parameter(
+            self._attr, int(self.value()))
+
+
 class ParticleParameterSpinBox(SuffixSpinBox):
     """Spinbox for one particle-emitter parameter (emission rate, lifetime,
     speed, gravity, ...)."""
@@ -247,3 +267,31 @@ class CollisionSpinBox(SuffixSpinBox):
 
     def _on_value_changed(self):
         self._inspector_container.set_object_collision_parameter(self._attr, int(self.value()))
+
+
+class TileMapSpinBox(SuffixSpinBox):
+    """Spinbox for one tile-map parameter: tile_width/tile_height in px, or
+    the grid size columns/rows (in tiles). Minimum value is 1."""
+
+    _SUFFIXES = {
+        'tile_width': 'px',
+        'tile_height': 'px',
+        'columns': '',
+        'rows': '',
+    }
+
+    def __init__(self, inspector_container, value, attr=''):
+        super().__init__()
+        self._inspector_container = inspector_container
+        self._attr = attr
+        self.setRange(1, 999999)
+        self.setSingleStep(1)
+        self.setDecimals(0)
+        self.setValue(value)
+        self.set_suffix(self._SUFFIXES.get(attr, ''))
+
+        self.valueChanged.connect(self._on_value_changed)
+
+    def _on_value_changed(self):
+        self._inspector_container.set_object_tile_map_parameter(
+            self._attr, int(self.value()))

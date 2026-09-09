@@ -94,8 +94,11 @@
         "button": "按钮",
         "effects": "特效",
         "particle": "粒子发射器",
+        "text_input": "输入框",
         "animation": "动画",
-        "frame_sequence": "帧序列"
+        "frame_sequence": "帧序列",
+        "world": "世界",
+        "tile_map": "瓦片地图"
     },
 
     "gm": {
@@ -122,6 +125,7 @@
         "scene": "场景编辑器",
         "scene_saved": "场景已保存",
         "run_project": "运行项目{}",
+        "failed_to_save_before_run": "运行前保存场景失败：{}",
         "failed_to_run_project": "项目{}运行失败：{}",
         "run_project_finished": "项目{}已退出，退出码：{}",
         "run": "运行",
@@ -259,7 +263,27 @@
         "collision_type_polygon": "多边形",
         "collision_offset": "碰撞偏移",
         "collision_size": "碰撞大小",
-        "collision_points": "碰撞顶点"
+        "collision_points": "碰撞顶点",
+        "placeholder": "占位提示",
+        "password": "密码模式",
+        "max_length": "最大长度",
+        "text_input_text_color": "文字颜色",
+        "text_input_background_color": "背景颜色",
+        "text_input_border_color": "边框颜色",
+        "text_align": "水平对齐",
+        "text_valign": "垂直对齐",
+        "enter_newline": "回车换行",
+        "align_left": "左对齐",
+        "align_center": "水平居中",
+        "align_right": "右对齐",
+        "align_top": "顶部对齐",
+        "align_middle": "垂直居中",
+        "align_bottom": "底部对齐",
+        "tileset_path": "瓦片集路径",
+        "tile_width": "瓦片宽度",
+        "tile_height": "瓦片高度",
+        "columns": "列数",
+        "rows": "行数"
     },
 
     "dashboard": {
@@ -318,6 +342,39 @@
     "theme": {
         "dark": "深色",
         "light": "浅色"
+    },
+
+    "tile_map": {
+        "editor": "瓦片地图编辑器",
+        "detach": "独立窗口",
+        "attach": "回到选项卡",
+        "empty_hint": "请先选择一个瓦片地图对象进行编辑",
+        "choose_tileset": "选择瓦片集",
+        "tool_pencil": "画笔",
+        "tool_erase": "橡皮",
+        "tool_fill": "填充",
+        "tool_pick": "取色",
+        "zoom_in": "放大",
+        "zoom_out": "缩小",
+        "fit": "适应窗口",
+        "status_map": "地图 {w}×{h}",
+        "status_tiles": "图集 {sw}×{sh} / 单格 {tw}×{th} → {n} 个瓦片",
+        "status_no_tiles": "图集 {sw}×{sh} 容纳不下整块 {tw}×{th} 的瓦片 - 请把瓦片宽高调成源图里一个小格的大小",
+        "status_no_tileset": "未选择瓦片集",
+        "palette_hint": "左键：选择瓦片 · 滚轮：缩放 · Shift+滚轮：滚动",
+        "layer_combo": "当前图层",
+        "layer_combo_tip": "当前图层：{name}",
+        "layer_add": "添加图层",
+        "layer_add_title": "添加图层",
+        "layer_remove": "删除图层",
+        "layer_delete_confirm_title": "删除图层",
+        "layer_delete_confirm_text": "确定要删除图层「{name}」吗？",
+        "layer_rename": "重命名图层",
+        "layer_rename_title": "重命名图层",
+        "layer_name_prompt": "图层名称：",
+        "layer_default_name": "图层 %1",
+        "layer_visible": "显示 / 隐藏图层",
+        "layer_collision": "碰撞图层（格子放有瓦片即为碰撞）"
     },
 
     "api": {

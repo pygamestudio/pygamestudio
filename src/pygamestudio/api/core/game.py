@@ -58,14 +58,20 @@ class Game:
 
                 # ---------- Keyboard Event ----------
                 elif event.type == pygame.KEYDOWN:
-                    self.on_key_down(event.key, event.mod, event.unicode, event.scancode, getattr(event, 'window', None))
+                    # A focused input box consumes the key (typing control keys).
+                    if not scene_loader.handle_key_down(event.key, event.mod,
+                                                        getattr(event, 'unicode', '')):
+                        self.on_key_down(event.key, event.mod, getattr(event, 'unicode', ''), event.scancode, getattr(event, 'window', None))
                 elif event.type == pygame.KEYUP:
-                    self.on_key_up(event.key, event.mod, event.unicode, event.scancode, getattr(event, 'window', None))
+                    self.on_key_up(event.key, event.mod, getattr(event, 'unicode', ''), event.scancode, getattr(event, 'window', None))
 
                 # ---------- Mouse Event ----------
                 elif event.type == pygame.MOUSEMOTION:
                     self.on_mouse_motion(event.pos, event.rel, event.buttons, getattr(event, 'touch', 0), getattr(event, 'window', None))
                 elif event.type == pygame.MOUSEBUTTONDOWN:
+                    # Clicking an input box focuses it (so subsequent keys type
+                    # into it); clicking elsewhere blurs it.
+                    scene_loader.handle_pointer_down(event.pos, event.button)
                     self.on_mouse_button_down(event.pos, event.button, getattr(event, 'touch', 0), getattr(event, "clicks", 1), getattr(event, 'window', None))
                 elif event.type == pygame.MOUSEBUTTONUP:
                     self.on_mouse_button_up(event.pos, event.button, getattr(event, 'touch', 0), getattr(event, "clicks", 1), getattr(event, 'window', None))
@@ -136,7 +142,9 @@ class Game:
                 elif event.type == pygame.TEXTEDITING:
                     self.on_text_editing(event.text, event.start, event.length, getattr(event, 'window', None))
                 elif event.type == pygame.TEXTINPUT:
-                    self.on_text_input(event.text, getattr(event, 'window', None))
+                    # Focused input boxes receive the typed text first.
+                    if not scene_loader.handle_text_input(event.text):
+                        self.on_text_input(event.text, getattr(event, 'window', None))
 
                 # ---------- Drop Event ----------
                 elif event.type == pygame.DROPBEGIN:

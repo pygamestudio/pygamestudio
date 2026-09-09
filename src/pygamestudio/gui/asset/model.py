@@ -72,6 +72,8 @@ class AssetSortFilterProxyModel(QSortFilterProxyModel):
         file_info = source_model.fileInfo(index)
 
         if file_info.isDir():
+            if file_info.fileName() == '__pycache__':
+                return False
             return True
         
         file_name = file_info.fileName()

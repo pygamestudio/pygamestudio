@@ -6,6 +6,7 @@ class ColorPicker(QPushButton):
     def __init__(self, inspector_container, color_rgba=(255, 255, 255, 255), attr=''):
         super().__init__()
         self._inspector_container = inspector_container
+        self._attr = attr
         self._current_color_rgba = color_rgba
         self.set_color(color_rgba)
 
@@ -26,4 +27,4 @@ class ColorPicker(QPushButton):
         """)
     
     def _on_color_picker_clicked(self):
-        self._inspector_container.show_color_picker(self._current_color_rgba)
+        self._inspector_container.show_color_picker(self._current_color_rgba, self._attr)

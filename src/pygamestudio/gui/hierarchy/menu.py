@@ -30,7 +30,9 @@ class ContextMenu(QMenu):
         add_image_action = QAction(T.tr('item.image', 'Image'), self)
         add_button_action = QAction(T.tr('item.button', 'Button'), self)
         add_particle_action = QAction(T.tr('item.particle', 'Particle Emitter'), self)
+        add_text_input_action = QAction(T.tr('item.text_input', 'Text Input'), self)
         add_frame_sequence_action = QAction(T.tr('item.frame_sequence', 'Frame Sequence'), self)
+        add_tile_map_action = QAction(T.tr('item.tile_map', 'Tile Map'), self)
         cut_action = QAction(T.tr('menu.cut', 'Cut'), self)
         copy_action = QAction(T.tr('menu.copy', 'Copy'), self)
         paste_action = QAction(T.tr('menu.paste', 'Paste'), self)
@@ -49,7 +51,9 @@ class ContextMenu(QMenu):
         add_image_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_IMAGE))
         add_button_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_BUTTON))
         add_particle_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_PARTICLE))
+        add_text_input_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_TEXT_INPUT))
         add_frame_sequence_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_FRAME_SEQUENCE))
+        add_tile_map_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_TILE_MAP))
         cut_action.triggered.connect(self.cut_signal.emit)
         copy_action.triggered.connect(self.copy_signal.emit)
         paste_action.triggered.connect(self.paste_signal.emit)
@@ -66,12 +70,14 @@ class ContextMenu(QMenu):
         add_ui_sub_menu = QMenu(title='UI', parent=self)
         add_effects_sub_menu = QMenu(title=T.tr('item.effects', 'Effects'), parent=self)
         add_animation_sub_menu = QMenu(title=T.tr('item.animation', 'Animation'), parent=self)
+        add_world_sub_menu = QMenu(title=T.tr('item.world', 'World'), parent=self)
 
         self.addMenu(add_menu)
         add_menu.addMenu(add_shape_sub_menu)
         add_menu.addMenu(add_ui_sub_menu)
         add_menu.addMenu(add_effects_sub_menu)
         add_menu.addMenu(add_animation_sub_menu)
+        add_menu.addMenu(add_world_sub_menu)
 
         add_shape_sub_menu.addAction(add_line_action)
         add_shape_sub_menu.addAction(add_rect_action)
@@ -80,8 +86,10 @@ class ContextMenu(QMenu):
         add_ui_sub_menu.addAction(add_text_action)
         add_ui_sub_menu.addAction(add_image_action)
         add_ui_sub_menu.addAction(add_button_action)
+        add_ui_sub_menu.addAction(add_text_input_action)
         add_effects_sub_menu.addAction(add_particle_action)
         add_animation_sub_menu.addAction(add_frame_sequence_action)
+        add_world_sub_menu.addAction(add_tile_map_action)
 
         # Right click on the blank area.
         if item_type is None:

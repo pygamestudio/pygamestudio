@@ -16,7 +16,9 @@ from pygamestudio.game.object.polygon import *
 from pygamestudio.game.object.image import *
 from pygamestudio.game.object.button import *
 from pygamestudio.game.object.particle import *
+from pygamestudio.game.object.text_input import *
 from pygamestudio.game.object.frame_sequence import *
+from pygamestudio.game.object.tile_map import *
 from pygamestudio.api.config.project import get_project_config
 from pygamestudio.common.i18n.translator import Translator as T
 
@@ -35,6 +37,13 @@ class SceneLoader:
         # Seconds elapsed since the last frame, updated by Game.run() each
         # frame and passed to the scripts' on_update(delta_time) hooks.
         self._delta_time = 0
+        # The text-input (TEXT_INPUT) object that currently owns keyboard
+        # input at runtime (None when none is focused).
+        self._focused_text_input = None
+        # Set right after Enter inserted a '\n' (enter_newline mode) so the
+        # duplicate newline TEXTINPUT that some platforms also emit for the
+        # Return key is swallowed (otherwise it would double the line break).
+        self._skip_next_newline_textinput = False
 
     def load_scene(self, screen_surface:pygame.Surface, scene_path:str=''):
         if not scene_path and self._current_scene_path or scene_path and scene_path==self._current_scene_path:
@@ -54,6 +63,7 @@ class SceneLoader:
         if self._all_object_tree_struct:
             # The current scene is about to be replaced; let its scripts clean up.
             self._destroy_scripts()
+        self._clear_text_input_focus()
         self._all_object_tree_struct = {}
         self._current_scene_path = scene_path
         with open(scene_path, 'r', encoding='utf-8') as f:
@@ -109,8 +119,12 @@ class SceneLoader:
             obj = ObjectButton(self, object_data, is_for_api=True)
         elif object_type == OBJECT_PARTICLE:
             obj = ObjectParticle(self, object_data, is_for_api=True)
+        elif object_type == OBJECT_TEXT_INPUT:
+            obj = ObjectTextInput(self, object_data, is_for_api=True)
         elif object_type == OBJECT_FRAME_SEQUENCE:
             obj = ObjectFrameSequence(self, object_data, is_for_api=True)
+        elif object_type == OBJECT_TILE_MAP:
+            obj = ObjectTileMap(self, object_data, is_for_api=True)
         else:
             raise RuntimeError(T.tr('api.unknown_object_type', 'Unknown object type: {}').format(object_type))
 
@@ -334,7 +348,137 @@ class SceneLoader:
             return None
         
         return _get(object_uuid, self._all_object_tree_struct)
-    
+
+    # ---------------------------------------- runtime text-input focus
+    def get_focused_text_input(self):
+        """The TEXT_INPUT object currently receiving keyboard input (or None)."""
+        return self._focused_text_input
+
+    def _text_inputs(self, topmost_first=False):
+        """Yield every visible TEXT_INPUT object. With ``topmost_first`` the
+        last-drawn (topmost) object comes first, which is what a mouse click
+        should hit."""
+        found = []
+        def _gen(object_tree_struct):
+            value = list(object_tree_struct.values())[0]
+            obj = value['object']
+            if obj.type == OBJECT_TEXT_INPUT and obj.visible:
+                found.append(obj)
+            for child_object_tree_struct in value['children']:
+                _gen(child_object_tree_struct)
+        if self._all_object_tree_struct:
+            _gen(self._all_object_tree_struct)
+        if topmost_first:
+            found.reverse()
+        return found
+
+    def _hit_text_input(self, pos):
+        """The topmost visible input box under ``pos`` (world coords) or None."""
+        for obj in self._text_inputs(topmost_first=True):
+            if obj._get_world_rect().collidepoint(pos):
+                return obj
+        return None
+
+    def _set_caret_from_click(self, obj, pos):
+        """Place obj's caret at the character under the click. The geometry
+        is resolved by the object itself so it matches exactly what is drawn
+        (alignment, horizontal scroll, multiline rows, scale/rotation)."""
+        try:
+            obj.set_caret_from_world_point(pos)
+        except Exception:
+            obj._runtime_caret = len(obj.text)
+
+    def _set_text_input_focus(self, obj):
+        """Focus ``obj`` (an input box) or None to blur the current one."""
+        if self._focused_text_input is obj:
+            return
+        if self._focused_text_input is not None:
+            self._focused_text_input._runtime_focused = False
+            self._focused_text_input._runtime_caret = 0
+        self._focused_text_input = obj
+        if obj is not None:
+            obj._runtime_focused = True
+            obj._runtime_caret = len(obj.text)
+        # Enable OS text input only while a box is focused (drives TEXTINPUT),
+        # and key repeat so holding Backspace/Delete/arrows keeps acting.
+        try:
+            if obj is not None:
+                pygame.key.start_text_input()
+                pygame.key.set_repeat(400, 30)
+            else:
+                pygame.key.stop_text_input()
+                pygame.key.set_repeat()
+        except Exception:
+            pass
+
+    def _clear_text_input_focus(self):
+        self._set_text_input_focus(None)
+
+    def handle_pointer_down(self, pos, button=1):
+        """Click handling for input boxes: focus the box under the pointer,
+        blur when clicking anywhere else. Returns True when a box was hit."""
+        if button != 1:
+            return False
+        target = self._hit_text_input(pos)
+        if target is not None:
+            self._set_text_input_focus(target)
+            self._set_caret_from_click(target, pos)
+        else:
+            self._clear_text_input_focus()
+        return target is not None
+
+    def handle_text_input(self, text):
+        """Insert typed text into the focused input box. Returns True when a
+        box is focused (the event is consumed)."""
+        obj = self._focused_text_input
+        if obj is None or not text:
+            return False
+        # Normalize line endings: pasted/IME text often uses CRLF or a lone CR
+        # which must never land in the stored text as stray characters.
+        text = text.replace('\r\n', '\n').replace('\r', '\n')
+        if not text:
+            return False
+        # Some platforms report the Return key as a TEXTINPUT newline in
+        # addition to the KEYDOWN that handle_key_down already consumed (and
+        # turned into '\n' when enter_newline is on). Swallow that one.
+        if self._skip_next_newline_textinput:
+            self._skip_next_newline_textinput = False
+            if text == '\n':
+                return True
+        obj._runtime_insert(text)
+        return True
+
+    def handle_key_down(self, key, mod, unicode_char=''):
+        """Route non-text keys (Backspace, arrows, Enter, Escape, ...) of a
+        focused input box. Returns True when a box is focused (key consumed)."""
+        obj = self._focused_text_input
+        if obj is None:
+            return False
+
+        if key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+            if getattr(obj, 'enter_newline', False):
+                # enter_newline on: Enter inserts a new line (multi-line).
+                obj._runtime_insert('\n')
+                self._skip_next_newline_textinput = True
+            else:
+                # Default: Enter confirms and stops editing.
+                self._clear_text_input_focus()
+        elif key in (pygame.K_ESCAPE, pygame.K_TAB):
+            self._clear_text_input_focus()
+        elif key == pygame.K_BACKSPACE:
+            obj._runtime_backspace()
+        elif key == pygame.K_DELETE:
+            obj._runtime_delete()
+        elif key == pygame.K_LEFT:
+            obj._runtime_caret_move(-1)
+        elif key == pygame.K_RIGHT:
+            obj._runtime_caret_move(1)
+        elif key == pygame.K_HOME:
+            obj._runtime_caret_home()
+        elif key == pygame.K_END:
+            obj._runtime_caret_end()
+        return True
+
 
 scene_loader = SceneLoader()
 

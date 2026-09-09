@@ -22,6 +22,15 @@ class InspectorWindow(QWidget):
 
     def _set_widget(self):
         self.setMinimumWidth(270)
+        self._scroll_area = QScrollArea(self)
+        self._scroll_area.setObjectName('inspectorScrollArea')
+        self._scroll_area.setWidgetResizable(True)
+        self._scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        self._scroll_area.setMinimumWidth(270)
+        # A long property list must scroll instead of being clipped.
+        self._scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self._scroll_area.setWidget(self._container)
     
     def _set_signal(self):
         self._select_previous_object_button.clicked.connect(self._container.select_previous_object)
@@ -37,7 +46,7 @@ class InspectorWindow(QWidget):
         h_layout.addStretch(1)
         h_layout.setContentsMargins(0, 4, 0, 0)
         v_layout.addLayout(h_layout)
-        v_layout.addWidget(self._container)
+        v_layout.addWidget(self._scroll_area, 1)
         v_layout.setSpacing(5)
         v_layout.setContentsMargins(0, 0, 0, 0)
 

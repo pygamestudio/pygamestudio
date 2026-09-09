@@ -72,9 +72,12 @@ class MoveGizmo(QWidget):
         (skipped while dragging so it doesn't fight the user's cursor)."""
         if self._is_dragging or not self._current_object:
             return
-        
+
+        ox, oy = self._screen.scene_offset() if self._screen is not None else (0, 0)
         object_hightlight_line_width = 2
-        self.move(round(self._current_object._get_world_rect().x)-self._offset_x-object_hightlight_line_width, round(self._current_object._get_world_rect().y)-self._offset_y-object_hightlight_line_width)
+        world = self._current_object._get_world_rect()
+        self.move(round(world.x) + ox - self._offset_x - object_hightlight_line_width,
+                  round(world.y) + oy - self._offset_y - object_hightlight_line_width)
         self.update()
 
     def update_pos(self):

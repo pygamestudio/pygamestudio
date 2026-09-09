@@ -14,7 +14,9 @@ from pygamestudio.game.object.polygon import *
 from pygamestudio.game.object.image import *
 from pygamestudio.game.object.button import *
 from pygamestudio.game.object.particle import *
+from pygamestudio.game.object.text_input import *
 from pygamestudio.game.object.frame_sequence import *
+from pygamestudio.game.object.tile_map import *
 from pygamestudio.common.utils.config import *
 from pygamestudio.gui.console.logger import Logger
 from pygamestudio.common.i18n.translator import Translator as T
@@ -70,6 +72,8 @@ class GameManager(QObject):
     object_points_changed = Signal(str)
     object_particle_parameter_changed = Signal(str)
     object_frame_sequence_parameter_changed = Signal(str)
+    object_text_input_parameter_changed = Signal(str)
+    object_tile_map_parameter_changed = Signal(str)
     object_collision_parameter_changed = Signal(str)
 
     # Emitted whenever the "current scene has unsaved changes" flag flips
@@ -265,8 +269,12 @@ class GameManager(QObject):
             obj = ObjectButton(self, object_data)
         elif object_type == OBJECT_PARTICLE:
             obj = ObjectParticle(self, object_data)
+        elif object_type == OBJECT_TEXT_INPUT:
+            obj = ObjectTextInput(self, object_data)
         elif object_type == OBJECT_FRAME_SEQUENCE:
             obj = ObjectFrameSequence(self, object_data)
+        elif object_type == OBJECT_TILE_MAP:
+            obj = ObjectTileMap(self, object_data)
 
         object_tree_struct = {
             obj.uuid: {
@@ -593,6 +601,138 @@ class GameManager(QObject):
 
     def set_frame_sequence_parameter(self, object_uuid, attr, new_value):
         """Change one frame-sequence parameter (undoable)."""
+        obj = self._get_object(object_uuid)
+        old_value = getattr(obj, attr)
+
+        if old_value == new_value:
+            return
+
+        self._undo_stack.push(UpdateAttrValueCommand(self, obj, attr, old_value, new_value))
+
+    def set_tile_map_parameter(self, object_uuid, attr, new_value):
+        """Change one tile-map parameter (undoable): tileset_path, tile size
+        or grid size (columns/rows).
+
+        Grid size changes reshape EVERY layer's ``tiles`` list, so they are
+        recorded as a single TileMapGridCommand that restores dimensions +
+        all layer data together (a plain attribute command on 'columns' alone
+        would lose cells).
+        """
+        obj = self._get_object(object_uuid)
+        if obj is None:
+            return
+
+        if attr in ('columns', 'rows'):
+            new_value = max(1, int(new_value))
+            if getattr(obj, attr) == new_value:
+                return
+            if attr == 'columns':
+                new_layers = [ObjectTileMap._fit_tiles(L['tiles'], new_value,
+                                                       obj.rows)
+                              for L in obj.layers]
+                new_grid = (new_value, obj.rows, new_layers)
+            else:
+                new_layers = [ObjectTileMap._fit_tiles(L['tiles'], obj.columns,
+                                                       new_value)
+                              for L in obj.layers]
+                new_grid = (obj.columns, new_value, new_layers)
+            old_grid = (obj.columns, obj.rows,
+                        [list(L['tiles']) for L in obj.layers])
+            self._undo_stack.push(TileMapGridCommand(self, obj, old_grid,
+                                                     new_grid))
+
+        else:
+            old_value = getattr(obj, attr)
+            if old_value == new_value:
+                return
+            self._undo_stack.push(
+                UpdateAttrValueCommand(self, obj, attr, old_value, new_value))
+
+    def commit_tile_map_paint(self, object_uuid, old_tiles):
+        """Record one finished paint stroke on the ACTIVE layer of a tile map
+        as a single undoable change.
+
+        The tile editor paints live (mutating the object's layer tiles
+        outside the undo stack for immediate preview) and calls this when a
+        stroke ends: ``old_tiles`` is the active layer's snapshot taken when
+        the stroke began, so one Ctrl+Z undoes the whole stroke. No-op when
+        nothing changed.
+        """
+        obj = self._get_object(object_uuid)
+        if obj is None:
+            return
+        layer_index = obj.get_active_layer_index()
+        old = list(old_tiles)
+        new = list(obj.get_layer_tiles(layer_index))
+        if old == new:
+            return
+        self._undo_stack.push(TileMapLayerPaintCommand(
+            self, obj, layer_index, old, new))
+
+    def add_tile_map_layer(self, object_uuid, name=None):
+        """Append a new empty layer to a tile map (undoable) and make it the
+        active one. Returns the new layer's index, or -1 on failure."""
+        obj = self._get_object(object_uuid)
+        if obj is None:
+            return -1
+        if not name or not str(name).strip():
+            name = 'Layer %d' % (len(obj.layers) + 1)
+        layer_dict = {'name': str(name).strip(), 'visible': True,
+                      'collision': False,
+                      'tiles': [-1] * (obj.columns * obj.rows)}
+        self._undo_stack.push(TileMapLayerAddCommand(self, obj, layer_dict))
+        return len(obj.layers) - 1
+
+    def remove_tile_map_layer(self, object_uuid, layer_index):
+        """Remove one layer of a tile map (undoable). The last remaining
+        layer cannot be removed; returns False in that case."""
+        obj = self._get_object(object_uuid)
+        if obj is None:
+            return False
+        if len(obj.layers) <= 1:
+            return False
+        if not (0 <= int(layer_index) < len(obj.layers)):
+            return False
+        self._undo_stack.push(TileMapLayerRemoveCommand(
+            self, obj, int(layer_index)))
+        return True
+
+    def set_tile_map_layer_property(self, object_uuid, layer_index, attr,
+                                    new_value):
+        """Change one layer property (name/visible/collision) of a tile map
+        (undoable). Turning one layer into the collision layer clears the
+        flag on every other layer (there is exactly one collision layer).
+        """
+        obj = self._get_object(object_uuid)
+        if obj is None:
+            return
+        if not (0 <= int(layer_index) < len(obj.layers)):
+            return
+        layer_index = int(layer_index)
+        if attr == 'collision' and bool(new_value):
+            # There is only ONE collision layer: flipping it on also flips
+            # every other layer off, recorded as one undoable macro.
+            changed = [(i, bool(L.get('collision', False)))
+                       for i, L in enumerate(obj.layers)
+                       if i != layer_index and L.get('collision', False)]
+            if not obj.layers[layer_index].get('collision', False) and changed:
+                self._undo_stack.beginMacro('Set Collision Layer')
+                for i, old_value in changed:
+                    self._undo_stack.push(TileMapLayerConfigCommand(
+                        self, obj, i, 'collision', old_value, False))
+                self._undo_stack.push(TileMapLayerConfigCommand(
+                    self, obj, layer_index, 'collision', False, True))
+                self._undo_stack.endMacro()
+                return
+        old_value = obj.layers[layer_index].get(attr)
+        if old_value == new_value:
+            return
+        self._undo_stack.push(TileMapLayerConfigCommand(
+            self, obj, layer_index, attr, old_value, new_value))
+
+    def set_text_input_parameter(self, object_uuid, attr, new_value):
+        """Change one text-input box parameter (undoable): placeholder,
+        password, max_length, box colors, ..."""
         obj = self._get_object(object_uuid)
         old_value = getattr(obj, attr)
 
@@ -1103,6 +1243,16 @@ class GameManager(QObject):
     def run_project(self):
         """Launch the project's main.py in a separate process and forward its
         stdout/stderr to the editor console (info for stdout, error for stderr)."""
+        # The game reads the .scene file from disk, so persist the current
+        # (possibly unsaved) scene first - otherwise edits made since the last
+        # save (e.g. a text input's max_length) would never reach the running
+        # game. Only save when a scene file already exists (no Save-As dialog).
+        try:
+            if self._current_scene_file_path and not self._is_current_scene_saved:
+                self._save_scene()
+        except Exception as e:
+            Logger.error(T.tr('scene.failed_to_save_before_run', 'Failed to save scene before running: {}').format(e))
+
         try:
             # QProcess integrates with the Qt event loop, so the game's output
             # is read asynchronously without ever blocking the editor UI.

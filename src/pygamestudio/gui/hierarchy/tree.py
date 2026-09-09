@@ -9,6 +9,10 @@ from pygamestudio.common.i18n.translator import Translator as T
 
 
 class HierarchyTreeView(QTreeView):
+    # Emitted when a TILE_MAP object is double-clicked (the editor opens its
+    # tile map editor tab on that object).
+    edit_tile_map_requested = Signal(str)
+
     def __init__(self, parent, game_manager):
         super().__init__(parent)
         self._hierarchy_window = parent
@@ -59,6 +63,7 @@ class HierarchyTreeView(QTreeView):
     def _set_signal(self):
         self.selectionModel().selectionChanged.connect(self._on_item_selection_changed)
         self.clicked.connect(self._on_item_clicked)
+        self.doubleClicked.connect(self._on_item_double_clicked)
         self.customContextMenuRequested.connect(self._show_context_menu)
         self._standard_model.itemChanged.connect(self._on_item_changed)
         self.expanded.connect(self._on_item_expanded)
@@ -99,6 +104,16 @@ class HierarchyTreeView(QTreeView):
     def _on_item_clicked(self, index):
         index_uuid = index.data(Qt.ItemDataRole.UserRole+1)
         self._game_manager.select(index_uuid)
+
+    def _on_item_double_clicked(self, index):
+        """Double-clicking a Tile Map object opens the tile map editor on it."""
+        item = self._standard_model.itemFromIndex(self._proxy_model.mapToSource(index))
+        item_uuid = item.data(Qt.ItemDataRole.UserRole+1) if item else None
+        if not item_uuid:
+            return
+        obj = self._game_manager.get_object(item_uuid)
+        if obj is not None and getattr(obj, 'type', '') == OBJECT_TILE_MAP:
+            self.edit_tile_map_requested.emit(item_uuid)
 
     def _on_object_selected(self, object_uuid):
         self.selectionModel().blockSignals(True)

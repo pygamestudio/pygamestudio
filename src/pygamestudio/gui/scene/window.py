@@ -20,7 +20,12 @@ class SceneWindow(QWidget):
         self._set_layout()
 
     def _set_widget(self):
-        self._grid_scene.addWidget(self._pygame_screen)
+        self._pygame_proxy = self._grid_scene.addWidget(self._pygame_screen)
+        # The (transparent) editor overlay wraps the canvas in a margin ring;
+        # parking it at scene (-offset, -offset) keeps the canvas at scene
+        # (0, 0, W, H) so all world/scene coordinates stay valid.
+        ox, oy = self._pygame_screen.scene_offset()
+        self._pygame_proxy.setPos(-ox, -oy)
 
     def _set_signal(self):
         self._grid_view.rubber_band_changed.connect(self._pygame_screen.update_selection_by_rubber_band)

@@ -200,8 +200,20 @@ class ObjectParticle(ObjectBase):
             particle['y'] += particle['vy'] * dt
             particle['vy'] += self.gravity * dt
             particle['life'] -= dt
-            if particle['life'] > 0:
-                alive.append(particle)
+            if particle['life'] <= 0:
+                continue
+            # Particles are drawn inside the emitter's own surface (self.size),
+            # so once the sprite has FULLY left that box it can no longer be
+            # seen (blit clips it). Recycle it right away instead of letting it
+            # occupy a max_particles slot until its lifetime runs out -
+            # otherwise a high emission rate fills the cap with invisible
+            # particles and the emitter appears to stop emitting until the
+            # first ones die ("burst, then a gap, then it resumes").
+            margin = particle['size']   # centre + radius: sprite fully outside
+            if (particle['x'] < -margin or particle['x'] > self.width + margin
+                    or particle['y'] < -margin or particle['y'] > self.height + margin):
+                continue
+            alive.append(particle)
         self._particles = alive
 
     def _load_particle_sprite(self):
