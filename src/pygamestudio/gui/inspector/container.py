@@ -19,6 +19,7 @@ from pygamestudio.gui.inspector.layout.particle import INSPECTOR_LAYOUT_PARTICLE
 from pygamestudio.gui.inspector.layout.text_input import INSPECTOR_LAYOUT_TEXT_INPUT
 from pygamestudio.gui.inspector.layout.frame_sequence import INSPECTOR_LAYOUT_FRAME_SEQUENCE
 from pygamestudio.gui.inspector.layout.tile_map import INSPECTOR_LAYOUT_TILE_MAP
+from pygamestudio.gui.inspector.layout.progress_bar import INSPECTOR_LAYOUT_PROGRESS_BAR
 from pygamestudio.gui.inspector.layout.collision import build_collision_layout
 
 
@@ -84,6 +85,7 @@ class Container(QFrame):
         self._game_manager.object_text_input_parameter_changed.connect(self._on_object_text_input_parameter_changed)
         self._game_manager.object_frame_sequence_parameter_changed.connect(self._on_object_frame_sequence_parameter_changed)
         self._game_manager.object_tile_map_parameter_changed.connect(self._on_object_tile_map_parameter_changed)
+        self._game_manager.object_progress_bar_parameter_changed.connect(self._on_object_progress_bar_parameter_changed)
         self._game_manager.object_collision_parameter_changed.connect(self._on_object_collision_parameter_changed)
 
     def _set_layout(self):
@@ -213,6 +215,8 @@ class Container(QFrame):
             self._game_manager.set_frame_sequence_parameter(self._object_uuid_in_inspection, attr, tooltip)
         elif attr == 'tileset_path':
             self._game_manager.set_tile_map_parameter(self._object_uuid_in_inspection, attr, tooltip)
+        elif attr in ('background_image_path', 'foreground_image_path'):
+            self._game_manager.set_progress_bar_parameter(self._object_uuid_in_inspection, attr, tooltip)
         elif attr:
             self._game_manager.set_particle_parameter(self._object_uuid_in_inspection, attr, tooltip)
 
@@ -278,11 +282,18 @@ class Container(QFrame):
 
     def _on_color_picker_color_changed(self, color_rgba):
         """The shared color popup changed: route to the base 'color' property,
-        or to the attribute that opened the popup (box colors, ...)."""
+        or to the attribute that opened the popup (box colors, strip colors)."""
         rgba = tuple(int(c) for c in color_rgba)
         attr = self._color_attr_target
         if attr and attr != 'color':
-            self.set_object_text_input_parameter(attr, rgba)
+            obj = self._game_manager.get_object(self._object_uuid_in_inspection)
+            is_progress_color = (obj is not None
+                                 and getattr(obj, 'type', '') == OBJECT_PROGRESS_BAR
+                                 and attr in ('background_color', 'foreground_color'))
+            if is_progress_color:
+                self.set_object_progress_bar_parameter(attr, rgba)
+            else:
+                self.set_object_text_input_parameter(attr, rgba)
         else:
             self.set_object_color(rgba)
 
@@ -293,6 +304,37 @@ class Container(QFrame):
         """Change one tile-map parameter (tile size, grid columns/rows, ...)
         through the manager (undoable)."""
         self._game_manager.set_tile_map_parameter(self._object_uuid_in_inspection, attr, new_value)
+
+    def set_object_progress_bar_parameter(self, attr, new_value):
+        """Change one progress-bar parameter (progress value, strip colors or
+        strip image paths) through the manager (undoable)."""
+        self._game_manager.set_progress_bar_parameter(
+            self._object_uuid_in_inspection, attr, new_value)
+
+    def _on_object_progress_bar_parameter_changed(self, object_uuid):
+        """Keep the progress-bar editors in sync with an undone/redone change."""
+        if object_uuid != self._object_uuid_in_inspection:
+            return
+        obj = self._game_manager.get_object(object_uuid)
+        if obj is None:
+            return
+        progress = self._find_widget(self._container_layout, 'progress')
+        if progress:
+            progress.blockSignals(True)
+            progress.setValue(float(getattr(obj, 'progress', 0)))
+            progress.blockSignals(False)
+        for attr in ('background_color', 'foreground_color'):
+            widget = self._find_widget(self._container_layout, attr)
+            if widget:
+                widget.set_color(tuple(int(c) for c in getattr(obj, attr, (0, 0, 0, 255))))
+        for attr in ('background_image_path', 'foreground_image_path'):
+            widget = self._find_widget(self._container_layout, attr)
+            if widget:
+                widget.blockSignals(True)
+                path = getattr(obj, attr, '') or ''
+                widget.setText(Path(path).name if path else '')
+                widget.setToolTip(Path(path).as_posix() if path else '')
+                widget.blockSignals(False)
 
     def set_object_collision_parameter(self, attr, new_value):
         # The first time collision is switched on, materialize concrete
@@ -785,6 +827,8 @@ class Container(QFrame):
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_PARTICLE)
         elif obj.type == OBJECT_TEXT_INPUT:
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_TEXT_INPUT)
+        elif obj.type == OBJECT_PROGRESS_BAR:
+            self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_PROGRESS_BAR)
         elif obj.type == OBJECT_FRAME_SEQUENCE:
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_FRAME_SEQUENCE)
         elif obj.type == OBJECT_TILE_MAP:

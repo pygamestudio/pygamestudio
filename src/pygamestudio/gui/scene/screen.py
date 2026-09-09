@@ -100,6 +100,7 @@ class PygameScreen(QWidget):
         self._game_manager.object_text_input_parameter_changed.connect(self._update_scene)
         self._game_manager.object_frame_sequence_parameter_changed.connect(self._update_scene)
         self._game_manager.object_tile_map_parameter_changed.connect(self._update_scene)
+        self._game_manager.object_progress_bar_parameter_changed.connect(self._update_scene)
         self._game_manager.object_collision_parameter_changed.connect(self._update_scene)
 
     def get_ready_for_project(self):

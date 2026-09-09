@@ -72,6 +72,7 @@
         <file>images/collide.png</file>
         <file>images/rename.png</file>
         <file>images/particle.png</file>
+        <file>images/progress_bar.png</file>
         <file>images/zoom_in.png</file>
         <file>images/zoom_out.png</file>
     </qresource>

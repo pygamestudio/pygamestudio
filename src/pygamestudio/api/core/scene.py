@@ -17,6 +17,7 @@ from pygamestudio.game.object.image import *
 from pygamestudio.game.object.button import *
 from pygamestudio.game.object.particle import *
 from pygamestudio.game.object.text_input import *
+from pygamestudio.game.object.progress_bar import *
 from pygamestudio.game.object.frame_sequence import *
 from pygamestudio.game.object.tile_map import *
 from pygamestudio.api.config.project import get_project_config
@@ -121,6 +122,8 @@ class SceneLoader:
             obj = ObjectParticle(self, object_data, is_for_api=True)
         elif object_type == OBJECT_TEXT_INPUT:
             obj = ObjectTextInput(self, object_data, is_for_api=True)
+        elif object_type == OBJECT_PROGRESS_BAR:
+            obj = ObjectProgressBar(self, object_data, is_for_api=True)
         elif object_type == OBJECT_FRAME_SEQUENCE:
             obj = ObjectFrameSequence(self, object_data, is_for_api=True)
         elif object_type == OBJECT_TILE_MAP:

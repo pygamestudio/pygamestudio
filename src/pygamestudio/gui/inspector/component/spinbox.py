@@ -295,3 +295,23 @@ class TileMapSpinBox(SuffixSpinBox):
     def _on_value_changed(self):
         self._inspector_container.set_object_tile_map_parameter(
             self._attr, int(self.value()))
+
+
+class ProgressBarValueSpinBox(SuffixSpinBox):
+    """Progress value (0..100 %) for the progress-bar object."""
+
+    def __init__(self, inspector_container, value, attr=''):
+        super().__init__()
+        self._inspector_container = inspector_container
+        self._attr = attr or 'progress'
+        self.setRange(0, 100)
+        self.setSingleStep(1)
+        self.setDecimals(1)
+        self.setValue(float(value))
+        self.set_suffix('%')
+
+        self.valueChanged.connect(self._on_value_changed)
+
+    def _on_value_changed(self):
+        self._inspector_container.set_object_progress_bar_parameter(
+            self._attr, float(self.value()))

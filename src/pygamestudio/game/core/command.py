@@ -1,4 +1,5 @@
 from PySide6.QtGui import QUndoCommand
+from pygamestudio.game.object.type import OBJECT_PROGRESS_BAR
 
 
 class AddObjectCommand(QUndoCommand):
@@ -126,8 +127,18 @@ class UpdateAttrValueCommand(QUndoCommand):
             self._game_manager.object_frame_sequence_parameter_changed.emit(self._obj.uuid)
         elif attr in ('placeholder', 'max_length', 'password',
                       'enter_newline', 'text_align', 'text_valign',
-                      'background_color', 'border_color'):
+                      'border_color'):
             self._game_manager.object_text_input_parameter_changed.emit(self._obj.uuid)
+        elif attr in ('progress', 'foreground_color',
+                      'background_image_path', 'foreground_image_path'):
+            self._game_manager.object_progress_bar_parameter_changed.emit(self._obj.uuid)
+        elif attr == 'background_color':
+            # 'background_color' is shared by the text-input box and the
+            # progress bar - route it by the object type.
+            if getattr(self._obj, 'type', '') == OBJECT_PROGRESS_BAR:
+                self._game_manager.object_progress_bar_parameter_changed.emit(self._obj.uuid)
+            else:
+                self._game_manager.object_text_input_parameter_changed.emit(self._obj.uuid)
         elif attr in ('collision_enabled', 'collision_type',
                       'collision_offset_x', 'collision_offset_y',
                       'collision_width', 'collision_height',

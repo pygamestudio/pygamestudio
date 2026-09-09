@@ -95,6 +95,7 @@
         "effects": "特效",
         "particle": "粒子发射器",
         "text_input": "输入框",
+        "progress_bar": "进度条",
         "animation": "动画",
         "frame_sequence": "帧序列",
         "world": "世界",
@@ -283,7 +284,12 @@
         "tile_width": "瓦片宽度",
         "tile_height": "瓦片高度",
         "columns": "列数",
-        "rows": "行数"
+        "rows": "行数",
+        "progress_bar_progress": "进度",
+        "progress_bar_background_color": "背景颜色",
+        "progress_bar_foreground_color": "前景颜色",
+        "progress_bar_background_image": "背景图片",
+        "progress_bar_foreground_image": "前景图片"
     },
 
     "dashboard": {

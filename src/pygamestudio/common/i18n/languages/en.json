@@ -95,6 +95,7 @@
         "effects": "Effects",
         "particle": "Particle Emitter",
         "text_input": "Text Input",
+        "progress_bar": "Progress Bar",
         "animation": "Animation",
         "frame_sequence": "Frame Sequence",
         "world": "World",
@@ -283,7 +284,12 @@
         "tile_width": "Tile Width",
         "tile_height": "Tile Height",
         "columns": "Columns",
-        "rows": "Rows"
+        "rows": "Rows",
+        "progress_bar_progress": "Progress",
+        "progress_bar_background_color": "Background Color",
+        "progress_bar_foreground_color": "Foreground Color",
+        "progress_bar_background_image": "Background Image",
+        "progress_bar_foreground_image": "Foreground Image"
     },
 
     "dashboard": {
