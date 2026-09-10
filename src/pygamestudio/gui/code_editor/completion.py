@@ -71,6 +71,13 @@ ENGINE_NAMES = (
     # runtime top-level helpers
     'get_object_by_path', 'get_object_by_uuid', 'get_parent_object',
     'get_screen', 'get_fps', 'set_fps', 'quit',
+    # window API
+    'set_window_title', 'get_window_title', 'set_window_icon',
+    'get_window_size', 'set_window_size', 'get_window_position',
+    'set_window_position', 'center_window', 'get_desktop_size',
+    'set_fullscreen', 'is_fullscreen', 'toggle_fullscreen', 'minimize_window',
+    'set_mouse_cursor_visible', 'is_mouse_cursor_visible',
+    'set_allow_screensaver', 'is_allow_screensaver',
 )
 
 

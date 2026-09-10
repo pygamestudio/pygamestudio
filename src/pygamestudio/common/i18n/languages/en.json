@@ -412,6 +412,10 @@
         "fail_to_load_sound": "Failed to load sound {}: {}",
         "fail_to_play_sound": "Failed to play sound {}: {}",
         "fail_to_play_music": "Failed to play music {}: {}",
+        "no_icon_path": "The icon path {} does not exist.",
+        "fail_to_load_icon": "Failed to load the icon {}: {}",
+        "fail_to_set_icon": "Failed to set the window icon: {}",
+        "window_error": "Window operation failed: {}",
         "no_project_pygs": "Failed to find config file project.pygs in the project root directory.",
         "fail_to_load_project_pygs": "Failed to load config file project.pygs: {}"
     },

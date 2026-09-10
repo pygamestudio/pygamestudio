@@ -412,6 +412,10 @@
         "fail_to_load_sound": "音频{}加载失败：{}",
         "fail_to_play_sound": "音频{}播放失败：{}",
         "fail_to_play_music": "音乐{}播放失败：{}",
+        "no_icon_path": "图标路径{}不存在。",
+        "fail_to_load_icon": "图标{}加载失败：{}",
+        "fail_to_set_icon": "设置窗口图标失败：{}",
+        "window_error": "窗口操作失败：{}",
         "no_project_pygs": "没有在项目根目录下找到project.pygs配置文件。",
         "fail_to_load_project_pygs": "配置文件project.pygs加载失败：{}"
     },
