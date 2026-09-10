@@ -202,10 +202,25 @@ class ObjectProgressBar(ObjectBase):
             return
 
         if name == 'progress':
-            super().__setattr__('progress', max(0.0, min(100.0, float(value))))
+            old_progress = float(self.progress or 0) if hasattr(self, 'progress') else 0.0
+            new_progress = max(0.0, min(100.0, float(value)))
+            super().__setattr__('progress', new_progress)
+            if new_progress != old_progress:
+                self._emit_event('on_progress_changed', new_progress)
+                if old_progress < 100.0 <= new_progress:
+                    self._emit_event('on_progress_full')
             return
 
         super().__setattr__(name, value)
+
+    # ------------------------------------------------------------ user hooks
+    def on_progress_changed(self, progress: float):
+        """User hook: called whenever the progress value changes at runtime."""
+        ...
+
+    def on_progress_full(self):
+        """User hook: called when the progress reaches the maximum (100%)."""
+        ...
 
     def _to_dict(self):
         """Serialize the progress bar, excluding the transient image cache."""

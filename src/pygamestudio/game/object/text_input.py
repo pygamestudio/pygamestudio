@@ -651,6 +651,23 @@ class ObjectTextInput(ObjectBase):
 
         super()._update_surface()
 
+    # ------------------------------------------------------------ user hooks
+    def on_focus(self):
+        """User hook: called when the input box gains the focus at runtime."""
+        ...
+
+    def on_blur(self):
+        """User hook: called when the input box loses the focus at runtime."""
+        ...
+
+    def on_text_changed(self, text: str):
+        """User hook: called whenever the input text changes at runtime."""
+        ...
+
+    def on_submitted(self, text: str):
+        """User hook: called when Enter confirms the input at runtime."""
+        ...
+
     def _to_dict(self):
         """Serialize the config, excluding runtime-only editing state."""
         data = super()._to_dict()

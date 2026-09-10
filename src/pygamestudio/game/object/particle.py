@@ -135,6 +135,11 @@ class ObjectParticle(ObjectBase):
         """Remove all live particles."""
         self._particles = []
 
+    # ------------------------------------------------------------ user hooks
+    def on_particles_finished(self):
+        """User hook: called when the last live particle dies at runtime."""
+        ...
+
     def _to_dict(self):
         """Serialize the emitter config, excluding the transient runtime
         state (live particles, cached sprite surface, timers) so the scene
@@ -272,6 +277,10 @@ class ObjectParticle(ObjectBase):
         self.surface = self._apply_alpha(rotated)
 
     def _update_surface(self):
+        had_particles = bool(self._particles)
         self._advance_particles()
         self._render()
         super()._update_surface()
+        if had_particles and not self._particles:
+            # The last live particle died: the effect is over.
+            self._emit_event('on_particles_finished')

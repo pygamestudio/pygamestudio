@@ -24,6 +24,7 @@ class GridGraphicsView(QGraphicsView):
         self._refresh_btn = RefreshButton()
         self._rubber_band = QRubberBand(QRubberBand.Shape.Rectangle, self.viewport())
         self._rb_origin = QPoint()
+        self._rb_last_view_rect = None
         self._setup()
     
     def _setup(self):
@@ -86,6 +87,7 @@ class GridGraphicsView(QGraphicsView):
         self._previous_scale = 1.0
         self._is_dragging = False
         self._is_first_show = True
+        self._rb_last_view_rect = None
 
     def is_dragging(self):
         return self._is_dragging
@@ -101,6 +103,7 @@ class GridGraphicsView(QGraphicsView):
             self._game_manager.deselect_all()
 
         self._rb_origin = event.pos()
+        self._rb_last_view_rect = None
         self._rubber_band.setGeometry(QRect(self._rb_origin, QSize()))
         self._rubber_band.show()
 
@@ -112,14 +115,26 @@ class GridGraphicsView(QGraphicsView):
             return
         
         rb_view_rect = QRect(self._rb_origin, event.pos()).normalized()
+        if rb_view_rect == self._rb_last_view_rect:
+            return
+
+        self._rb_last_view_rect = rb_view_rect
         self._rubber_band.setGeometry(rb_view_rect)
+        self._rubber_band.update()
+        # The band is a child widget painted ON TOP of the viewport, and the
+        # scene overlay underneath is translucent - partial repaints leave
+        # ghost lines behind when the band jumps fast, so repaint the whole
+        # viewport on every band move.
+        self.viewport().update()
+
         rb_scene_rect = self.mapToScene(rb_view_rect).boundingRect()
         self.rubber_band_changed.emit(rb_scene_rect)
-        self.viewport().update()
 
     def _on_mouse_left_button_released(self, event):
         self._rubber_band.hide()
         self._rb_origin = QPoint()
+        self._rb_last_view_rect = None
+        # Repaint everything the (now hidden) band was covering.
         self.viewport().update()
 
     def _on_mouse_mid_button_pressed(self, event):

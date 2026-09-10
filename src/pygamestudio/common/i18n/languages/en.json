@@ -406,6 +406,7 @@
         "script_start_error": "Script on_start error for {}: {}",
         "script_update_error": "Script on_update error for {}: {}",
         "script_destroy_error": "Script on_destroy error for {}: {}",
+        "script_event_error": "Script {} error for {}: {}",
         "fail_to_init_mixer": "Failed to initialize audio mixer: {}",
         "no_sound_path": "The sound path {} does not exist.",
         "fail_to_load_sound": "Failed to load sound {}: {}",

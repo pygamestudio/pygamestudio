@@ -477,6 +477,15 @@ class PygameScreen(QWidget):
         self._mouse_y = pos.y()
 
     def update_selection_by_rubber_band(self, rect_pyside6):
+        """Sync the selection to the objects the rubber band covers.
+
+        This runs on EVERY mouse move of a band drag, while select()/deselect()
+        emit per-object signals that rebuild the scene preview, the inspector,
+        the hierarchy tree and the tile map editor. Only objects whose selected
+        state actually CHANGES may be touched here - calling select()/deselect()
+        on every object of every move re-renders all that UI once per object per
+        frame, which turns the drag into a slideshow.
+        """
         def _set(object_tree_struct, rect_pyside6):
             value = list(object_tree_struct.values())[0]
 
@@ -486,12 +495,16 @@ class PygameScreen(QWidget):
             rect_pygame = pygame.FRect(rect_pyside6.x(), rect_pyside6.y(),
                                        rect_pyside6.width(), rect_pyside6.height())
             obj = value['object']
-            if obj.type != OBJECT_CANVAS and obj._check_rect_collision(rect_pygame):
+            inside = (obj.type != OBJECT_CANVAS
+                      and obj._check_rect_collision(rect_pygame))
+            if inside and not obj.selected:
                 self._game_manager.select(obj.uuid)
-            else:
+            elif not inside and obj.selected:
                 self._game_manager.deselect(obj.uuid)
 
-        self._game_manager.deselect(self._game_manager.canvas_object_uuid)
+        canvas_obj = self._game_manager.get_object(self._game_manager.canvas_object_uuid)
+        if canvas_obj is not None and canvas_obj.selected:
+            self._game_manager.deselect(self._game_manager.canvas_object_uuid)
         root_value = self._root_value()
         for child_object_tree_struct in root_value['children']:
             _set(child_object_tree_struct, rect_pyside6)

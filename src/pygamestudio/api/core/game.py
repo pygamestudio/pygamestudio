@@ -76,7 +76,8 @@ class Game:
                     scene_loader.handle_pointer_down(event.pos, event.button)
                     self.on_mouse_button_down(event.pos, event.button, getattr(event, 'touch', 0), getattr(event, "clicks", 1), getattr(event, 'window', None))
                 elif event.type == pygame.MOUSEBUTTONUP:
-                    scene_loader.handle_pointer_up(event.pos, event.button)
+                    scene_loader.handle_pointer_up(event.pos, event.button,
+                                                   getattr(event, 'clicks', 1))
                     self.on_mouse_button_up(event.pos, event.button, getattr(event, 'touch', 0), getattr(event, "clicks", 1), getattr(event, 'window', None))
                 elif event.type == pygame.MOUSEWHEEL:
                     self.on_mouse_wheel(event.flipped, event.x, event.y, getattr(event, 'touch', 0), event.precise_x, event.precise_y, getattr(event, 'window', None))

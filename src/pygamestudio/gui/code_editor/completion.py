@@ -31,6 +31,15 @@ ENGINE_NAMES = (
     'ObjectParticle', 'ObjectFrameSequence', 'self',
     # common transform / query helpers
     'on_start', 'on_update', 'on_destroy',
+    # object event callbacks (mouse / click, text input, slider)
+    'on_mouse_enter', 'on_mouse_leave', 'on_pressed', 'on_released', 'on_clicked',
+    'on_focus', 'on_blur', 'on_text_changed', 'on_submitted',
+    'on_value_changed', 'on_drag_start', 'on_drag_end',
+    # more object events (drag, visibility, collision, animation, particles, progress)
+    'on_drag', 'on_right_clicked', 'on_double_clicked', 'on_visible_changed',
+    'on_collision_enter', 'on_collision_exit',
+    'on_animation_start', 'on_frame_changed', 'on_animation_finished',
+    'on_particles_finished', 'on_progress_changed', 'on_progress_full',
     'get_name', 'get_uuid', 'get_type', 'get_x', 'get_y', 'get_pos', 'set_pos',
     'set_x', 'set_y', 'get_width', 'get_height', 'set_width', 'set_height',
     'get_size', 'set_size', 'get_scale_x', 'get_scale_y', 'get_scale', 'set_scale',

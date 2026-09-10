@@ -230,6 +230,17 @@ class CodeEditor(QPlainTextEdit):
             self._update_current_line()
 
     # ------------------------------------------------------------------ indentation
+    def _commit_cursor(self, cursor):
+        """Adopt the position of an edited cursor copy and keep it visible.
+
+        The indentation / pairing helpers edit the document through a
+        QTextCursor copy. Without this, the editor's own cursor stays behind
+        the inserted text and the view does not scroll when the edit happens
+        on the last visible line of a long file.
+        """
+        self.setTextCursor(cursor)
+        self.ensureCursorVisible()
+
     def _indent(self):
         """Tab: insert spaces up to the next indent stop, or indent every
         selected line by one level when there is a selection."""
@@ -240,6 +251,7 @@ class CodeEditor(QPlainTextEdit):
         column = cursor.positionInBlock()
         spaces = self.INDENT_WIDTH - (column % self.INDENT_WIDTH)
         cursor.insertText(' ' * spaces)
+        self._commit_cursor(cursor)
 
     def _unindent(self):
         """Shift+Tab / Ctrl+Shift+Tab: remove one indent level (4 spaces) from
@@ -266,7 +278,7 @@ class CodeEditor(QPlainTextEdit):
         # Stay on the same character of the (now shorter) line: shift the
         # cursor left by the amount that disappeared before it.
         cursor.setPosition(block.position() + max(0, column - remove))
-        self.setTextCursor(cursor)
+        self._commit_cursor(cursor)
 
     def _insert_newline_with_indent(self):
         """Enter: start a new line that keeps the current line's leading
@@ -277,6 +289,7 @@ class CodeEditor(QPlainTextEdit):
         if line_text.strip().endswith(':'):
             indent += ' ' * self.INDENT_WIDTH
         cursor.insertText('\n' + indent)
+        self._commit_cursor(cursor)
 
     def _backspace_unindent(self):
         """Backspace inside the leading whitespace removes a whole indent
@@ -296,6 +309,7 @@ class CodeEditor(QPlainTextEdit):
             cursor.setPosition(block.position() + position - remove,
                                QTextCursor.MoveMode.KeepAnchor)
             cursor.removeSelectedText()
+            self._commit_cursor(cursor)
             return True
         return False
 
@@ -344,13 +358,13 @@ class CodeEditor(QPlainTextEdit):
             if self.document().characterAt(cursor.position()) == char:
                 # The closing quote is already right of the cursor: step over it.
                 cursor.movePosition(QTextCursor.MoveOperation.Right)
-                self.setTextCursor(cursor)
+                self._commit_cursor(cursor)
                 return True
             return self._handle_quote(cursor, char)
         if char == ')':
             if self.document().characterAt(cursor.position()) == ')':
                 cursor.movePosition(QTextCursor.MoveOperation.Right)
-                self.setTextCursor(cursor)
+                self._commit_cursor(cursor)
                 return True
             return False
         return False
@@ -362,7 +376,7 @@ class CodeEditor(QPlainTextEdit):
         itself steps over an adjacent ')' (handled in _handle_auto_pair)."""
         cursor.insertText(open_char + close_char)
         cursor.movePosition(QTextCursor.MoveOperation.Left)
-        self.setTextCursor(cursor)
+        self._commit_cursor(cursor)
         return True
 
     def _handle_quote(self, cursor, char):
@@ -381,23 +395,26 @@ class CodeEditor(QPlainTextEdit):
                 cursor.insertText(char * 4)
                 cursor.movePosition(QTextCursor.MoveOperation.Left,
                                     QTextCursor.MoveMode.MoveAnchor, 3)
-                self.setTextCursor(cursor)
+                self._commit_cursor(cursor)
                 return True
             # Otherwise it is the closing quote of a triple already being
             # typed - keep it plain.
             cursor.insertText(char)
+            self._commit_cursor(cursor)
             return True
         if prev == char:
             # Second quote in a row: type it manually, do not pair.
             cursor.insertText(char)
+            self._commit_cursor(cursor)
             return True
         if prev.isalnum() or prev == '_':
             # A quote right after a word is likely an apostrophe.
             cursor.insertText(char)
+            self._commit_cursor(cursor)
             return True
         cursor.insertText(char + char)
         cursor.movePosition(QTextCursor.MoveOperation.Left)
-        self.setTextCursor(cursor)
+        self._commit_cursor(cursor)
         return True
 
     def _wrap_selection(self, cursor, open_char, close_char):
@@ -406,6 +423,7 @@ class CodeEditor(QPlainTextEdit):
         end = cursor.selectionEnd()
         selected = self.toPlainText()[start:end]
         cursor.insertText(open_char + selected + close_char)
+        self._commit_cursor(cursor)
 
     # ------------------------------------------------------------------ events
     def _on_text_changed(self):

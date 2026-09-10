@@ -556,6 +556,68 @@ class ObjectBase:
         """User hook: called every frame (before drawing) at runtime."""
         ...
 
+    def on_mouse_enter(self):
+        """User hook: called when the pointer moves onto the object at runtime."""
+        ...
+
+    def on_mouse_leave(self):
+        """User hook: called when the pointer leaves the object at runtime."""
+        ...
+
+    def on_pressed(self):
+        """User hook: called when the left mouse button goes down on the object."""
+        ...
+
+    def on_released(self):
+        """User hook: called when the button that went down on this object is released."""
+        ...
+
+    def on_clicked(self):
+        """User hook: called when the object is clicked (pressed and released on it)."""
+        ...
+
+    def on_double_clicked(self):
+        """User hook: called when the object is double-clicked at runtime."""
+        ...
+
+    def on_right_clicked(self):
+        """User hook: called when the object is right-clicked at runtime."""
+        ...
+
+    def on_drag_start(self):
+        """User hook: called when a pointer drag on the object starts at runtime."""
+        ...
+
+    def on_drag(self, pos):
+        """User hook: called on every pointer move while the object is dragged.
+
+        :param pos: the pointer position in world coordinates
+        """
+        ...
+
+    def on_drag_end(self):
+        """User hook: called when a pointer drag on the object ends at runtime."""
+        ...
+
+    def on_visible_changed(self, visible):
+        """User hook: called when the object is shown or hidden at runtime."""
+        ...
+
+    def on_collision_enter(self, other):
+        """User hook: called when the object starts overlapping another object
+        with collision enabled (hidden ones included).
+
+        :param other: the other object
+        """
+        ...
+
+    def on_collision_exit(self, other):
+        """User hook: called when the object stops overlapping another object.
+
+        :param other: the other object
+        """
+        ...
+
     def _start(self):
         """Internal wrapper for on_start (driven by the script system)."""
         self.on_start()
@@ -563,6 +625,18 @@ class ObjectBase:
     def _destroy(self):
         """Internal wrapper for on_destroy (driven by the script system)."""
         self.on_destroy()
+
+    def _emit_event(self, event_name, *args):
+        """Internal: forward an object event to the runtime scene loader.
+
+        Objects are built with the editor's GameManager while editing and with
+        the runtime SceneLoader in the game; only the loader knows how to
+        reach the attached script, so the event is forwarded to it (and the
+        call is simply a no-op in the editor).
+        """
+        emit = getattr(self._game_manager, '_emit_object_event', None)
+        if callable(emit):
+            emit(self, event_name, *args)
 
     def _draw(self, parent_surface):
         """Blit this object onto its parent surface at its local position.
@@ -675,6 +749,13 @@ class ObjectBase:
             if name == 'name' or name == 'uuid' or name == 'type':
                 print(f'{name} is a read-only property and cannot be modified.')
                 return
+
+        if name == 'visible':
+            changed = bool(self.visible) != bool(value)
+            super().__setattr__('visible', value)
+            if changed:
+                self._emit_event('on_visible_changed', bool(value))
+            return
         
         if name == 'pos':
             super().__setattr__('x', value[0])

@@ -67,6 +67,8 @@ class ObjectFrameSequence(ObjectBase):
         self._frames_cache_folder = None
         self._anim_time = float(self.frame_index) / max(float(self.frame_rate), 0.001)
         self._last_update_time = pygame.time.get_ticks()
+        self._finished_emitted = False   # on_animation_finished fired for this run
+        self._run_started = False        # on_animation_start fired for this run
 
         self._is_initialized = True
 
@@ -116,8 +118,11 @@ class ObjectFrameSequence(ObjectBase):
                 index = max(0, min(index, count - 1))
         else:
             index = 0
+        changed = index != self.frame_index
         self.frame_index = index
         self._anim_time = index / max(float(self.frame_rate), 0.001)
+        if changed:
+            self._emit_event('on_frame_changed', index)
 
     def get_frame_count(self):
         """Number of frames loaded from the frame folder (0 when unset)."""
@@ -125,7 +130,11 @@ class ObjectFrameSequence(ObjectBase):
 
     def play(self):
         """Start (or resume) automatic playback."""
-        self.auto_play = True
+        if not self.auto_play:
+            self.auto_play = True
+            self._finished_emitted = False
+            self._run_started = True
+            self._emit_event('on_animation_start')
 
     def pause(self):
         """Freeze on the current frame."""
@@ -140,9 +149,25 @@ class ObjectFrameSequence(ObjectBase):
         """Rewind to the first frame and start playing."""
         self.set_frame_index(0)
         self.auto_play = True
+        self._finished_emitted = False
+        self._run_started = True
+        self._emit_event('on_animation_start')
 
     def is_auto_play(self):
         return self.auto_play
+
+    # ------------------------------------------------------------ user hooks
+    def on_animation_start(self):
+        """User hook: called when the animation (re)starts at runtime."""
+        ...
+
+    def on_frame_changed(self, frame_index: int):
+        """User hook: called whenever the displayed frame changes at runtime."""
+        ...
+
+    def on_animation_finished(self):
+        """User hook: called when a play-once animation reaches its last frame."""
+        ...
 
     def _to_dict(self):
         """Serialize the animation config, excluding the transient runtime
@@ -150,7 +175,7 @@ class ObjectFrameSequence(ObjectBase):
         file stays small and reloadable."""
         data = super()._to_dict()
         for key in ('_frames_cache', '_frames_cache_folder', '_anim_time',
-                    '_last_update_time'):
+                    '_last_update_time', '_finished_emitted', '_run_started'):
             data.pop(key, None)
         data['frame_index'] = int(data.get('frame_index', 0))
         data['frame_rate'] = float(data.get('frame_rate', 8.0))
@@ -174,6 +199,13 @@ class ObjectFrameSequence(ObjectBase):
                     super().__setattr__('frame_folder', new_path.relative_to(project_path).as_posix())
                 except ValueError:
                     super().__setattr__('frame_folder', new_path.as_posix())
+        elif name == 'auto_play':
+            # Pausing re-arms the start notification: the animation reports
+            # itself as started again when it resumes (including through a
+            # plain `auto_play = True` assignment).
+            super().__setattr__('auto_play', value)
+            if not value:
+                super().__setattr__('_run_started', False)
         else:
             super().__setattr__(name, value)
 
@@ -219,17 +251,38 @@ class ObjectFrameSequence(ObjectBase):
         if not self.auto_play:
             return
 
+        if not self._run_started:
+            # The animation is running: report the start once, so an object
+            # that enters the scene already playing fires on_animation_start
+            # as well (the first frame is advanced after the scripts' own
+            # on_start hooks have run).
+            self._run_started = True
+            self._emit_event('on_animation_start')
+
         self._anim_time += elapsed
         count = len(self._load_frames())
         if count <= 0:
-            self.frame_index = 0
+            if self.frame_index != 0:
+                self.frame_index = 0
+                self._emit_event('on_frame_changed', 0)
             return
 
         index = int(self._anim_time * max(float(self.frame_rate), 0.001))
         if self.loop:
-            self.frame_index = index % count
+            new_index = index % count
         else:
-            self.frame_index = min(index, count - 1)
+            new_index = min(index, count - 1)
+
+        if new_index != self.frame_index:
+            self.frame_index = new_index
+            self._emit_event('on_frame_changed', new_index)
+
+        if self.loop:
+            self._finished_emitted = False
+        elif new_index >= count - 1 and not self._finished_emitted:
+            # A play-once animation reached its last frame.
+            self._finished_emitted = True
+            self._emit_event('on_animation_finished')
 
     def _update_surface(self):
         self._advance()

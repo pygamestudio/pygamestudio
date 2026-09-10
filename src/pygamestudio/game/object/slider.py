@@ -281,6 +281,19 @@ class ObjectSlider(ObjectBase):
 
         super().__setattr__(name, value)
 
+    # ------------------------------------------------------------ user hooks
+    def on_value_changed(self, value: float):
+        """User hook: called whenever the slider value changes at runtime."""
+        ...
+
+    def on_drag_start(self):
+        """User hook: called when a pointer drag on the slider starts at runtime."""
+        ...
+
+    def on_drag_end(self):
+        """User hook: called when a pointer drag on the slider ends at runtime."""
+        ...
+
     def _to_dict(self):
         """Serialize the slider, excluding the transient image cache."""
         data = super()._to_dict()
