@@ -80,7 +80,138 @@
         "release_notes": "Release Notes",
         "github_repository": "Github Repository",
         "about_pygamestudio": "About Pygame Studio",
-        "support_pygamestudio": "Support Pygame Studio"
+        "support_pygamestudio": "Support Pygame Studio",
+        "block_script": "Block Script",
+        "open_in_code_editor": "Open in Code Editor",
+        "open_in_block_editor": "Open in Block Editor"
+    },
+
+    "block": {
+        "editor": "Block Editor",
+        "toolbox": "Blocks",
+        "undo": "Undo",
+        "redo": "Redo",
+        "detach": "Detach",
+        "attach": "Attach to Tabs",
+        "delete": "Delete Block",
+        "duplicate": "Duplicate Block",
+        "nothing_here": "No block here",
+        "edit_field": "Edit Field",
+        "edit_field_value": "Value:",
+        "loose_stacks_hint": "{} stack(s) have no event block on top and are never run.",
+        "zoom_in": "Zoom In",
+        "zoom_out": "Zoom Out",
+        "convert_no_class": "This script has no ObjectScript class to attach blocks to.",
+        "convert_read_failed": "The file could not be read.",
+
+        "evg": {
+            "lifecycle": "Lifecycle",
+            "mouse": "Mouse",
+            "control": "Input & Slider",
+            "collision": "Collision",
+            "animation": "Animation",
+            "effect": "Effects"
+        },
+
+        "cat": {
+            "event": "Events",
+            "action": "Actions",
+            "control": "Control"
+        },
+
+        "ev": {
+            "start": "When the game starts",
+            "update": "Every frame (dt)",
+            "pressed": "When pressed on this object",
+            "released": "When released",
+            "clicked": "When clicked",
+            "double_clicked": "When double clicked",
+            "right_clicked": "When right clicked",
+            "mouse_enter": "When the mouse enters",
+            "mouse_leave": "When the mouse leaves",
+            "drag_start": "When a drag starts",
+            "drag": "While dragging (pos)",
+            "drag_end": "When a drag ends",
+            "collision_enter": "When a collision starts (other)",
+            "collision_exit": "When a collision ends (other)",
+            "visible_changed": "When shown or hidden (visible)",
+            "focus": "When an input gains focus",
+            "blur": "When an input loses focus",
+            "text_changed": "When the text changes (text)",
+            "submitted": "When the text is submitted (text)",
+            "value_changed": "When the slider value changes (value)",
+            "animation_start": "When the animation starts",
+            "frame_changed": "When the frame changes (frame_index)",
+            "animation_finished": "When the animation finishes",
+            "particles_finished": "When the particles are done",
+            "progress_changed": "When the progress changes (progress)",
+            "progress_full": "When the progress is full"
+        },
+
+        "act": {
+            "set_property": "Set property to value",
+            "change_property": "Change property by",
+            "move_to": "Move to x y",
+            "turn": "Turn by (degrees)",
+            "show": "Show",
+            "hide": "Hide",
+            "toggle_visible": "Toggle show / hide",
+            "set_color": "Set color",
+            "set_image": "Set image path",
+            "set_text": "Set text",
+            "play_sound": "Play sound",
+            "play_music": "Play music (loop)",
+            "stop_music": "Stop music",
+            "stop_sounds": "Stop all sounds",
+            "set_window_title": "Set window title",
+            "print": "Print",
+            "play_animation": "Play animation",
+            "pause_animation": "Pause animation",
+            "set_frame": "Go to frame (index)",
+            "restart_animation": "Restart animation",
+            "emit_particles": "Emit particles (count)",
+            "set_slider_value": "Set slider value",
+            "set_progress": "Set progress"
+        },
+
+        "ctl": {
+            "if": "If",
+            "if_else": "If / else",
+            "repeat": "Repeat (times)",
+            "while": "While (repeat while true)",
+            "repeat_until": "Repeat until",
+            "continue": "Skip to the next loop step",
+            "break": "Break out of the loop",
+            "return": "Stop this event",
+            "else": "else"
+        },
+
+        "prop": {
+            "x": "x",
+            "y": "y",
+            "width": "width",
+            "height": "height",
+            "scale_x": "scale x",
+            "scale_y": "scale y",
+            "angle": "angle",
+            "visible": "visible",
+            "text": "text",
+            "value": "value",
+            "progress": "progress",
+            "dt": "dt (frame time)",
+            "param_value": "value (parameter)",
+            "param_text": "text (parameter)",
+            "other": "other object"
+        },
+
+        "op": {
+            "eq": "equals",
+            "ne": "not equals",
+            "gt": "greater than",
+            "lt": "less than",
+            "ge": "greater or equal",
+            "le": "less or equal"
+        }
     },
 
     "item": {
@@ -142,6 +273,7 @@
         "saved": "Saved",
         "unsaved": "Unsaved",
         "save_failed": "Save failed",
+        "reloaded": "Reloaded",
         "zoom_in": "Zoom In",
         "zoom_out": "Zoom Out"
     },

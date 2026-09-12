@@ -274,6 +274,7 @@ class ImageEditorWindow(QWidget):
 
         # Status strip: file name  |  size  |  zoom.
         status = QHBoxLayout()
+        status.addSpacing(6)
         status.addWidget(self._file_label)
         status.addStretch(1)
         status.addWidget(self._size_label)
@@ -669,12 +670,13 @@ class ImageEditorWindow(QWidget):
         return f'*{name}' if self._canvas.is_modified() else name
 
     def _tab_title(self):
-        if self._file_path or self._canvas.has_image():
-            return self._file_title()
+        # the tab keeps its editor name - the window shows the file itself
         return T.tr('image.editor', 'Image Editor')
 
     def _window_title(self):
-        return f' Pygame Studio - {self._tab_title()}'
+        if self._file_path or self._canvas.has_image():
+            return f' Pygame Studio - {self._file_title()}'
+        return f' Pygame Studio - {T.tr("image.editor", "Image Editor")}'
 
     def _update_titles(self):
         self._file_label.setText(self._file_title())

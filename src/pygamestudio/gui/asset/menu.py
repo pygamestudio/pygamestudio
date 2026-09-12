@@ -3,6 +3,7 @@ from PySide6.QtGui import QAction
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QMenu
 from pygamestudio.gui.asset.type import *
+from pygamestudio.gui.block_editor.storage import is_block_script
 from pygamestudio.common.i18n.translator import Translator as T
 
 
@@ -22,6 +23,8 @@ class ContextMenu(QMenu):
     show_in_explorer_signal = Signal()
     open_signal = Signal()
     run_signal = Signal()
+    open_in_code_editor_signal = Signal()
+    open_in_block_editor_signal = Signal()
 
     def __init__(self, title='', parent=None):
         super().__init__(title, parent)
@@ -47,6 +50,8 @@ class ContextMenu(QMenu):
         open_in_terminal_action = QAction(T.tr('menu.open_in_terminal', 'Open in Terminal'), self)
         open_externally_action = QAction(T.tr('menu.open_externally', 'Open Externally'), self)
         show_in_explorer_action = QAction(T.tr('menu.show_in_explorer', 'Show in Explorer'), self)
+        open_in_code_editor_action = QAction(T.tr('menu.open_in_code_editor', 'Open in Code Editor'), self)
+        open_in_block_editor_action = QAction(T.tr('menu.open_in_block_editor', 'Open in Block Editor'), self)
 
         open_action.triggered.connect(self.open_signal.emit)
         run_action.triggered.connect(self.run_signal.emit)
@@ -67,6 +72,8 @@ class ContextMenu(QMenu):
         open_in_terminal_action.triggered.connect(self.open_in_terminal_signal.emit)
         open_externally_action.triggered.connect(self.open_externally_signal.emit)
         show_in_explorer_action.triggered.connect(self.show_in_explorer_signal.emit)
+        open_in_code_editor_action.triggered.connect(self.open_in_code_editor_signal.emit)
+        open_in_block_editor_action.triggered.connect(self.open_in_block_editor_signal.emit)
         
         add_menu = QMenu(title=T.tr('menu.add', 'Add'), parent=self)
         text_file_sub_menu = QMenu(title=T.tr('menu.text_file', 'Text File'), parent=self)
@@ -114,6 +121,13 @@ class ContextMenu(QMenu):
         # Right click on the specific file index.
         if index_type == INDEX_FILE:
             self.insertAction(add_menu.menuAction(), open_action)
+            # A script can be edited with blocks or as plain code: offer the
+            # other editor than the one a double click would use.
+            if file_path and Path(file_path).suffix.lower() == '.py':
+                if is_block_script(file_path):
+                    self.insertAction(add_menu.menuAction(), open_in_code_editor_action)
+                else:
+                    self.insertAction(add_menu.menuAction(), open_in_block_editor_action)
             # The run action only applies to the project's root main.py.
             if self._is_project_main_script(file_path):
                 self.insertAction(open_action, run_action)

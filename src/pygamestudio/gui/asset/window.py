@@ -9,6 +9,7 @@ class AssetWindow(QWidget):
     edit_file_signal = Signal(str)
     image_edit_signal = Signal(str)
     audio_play_signal = Signal(str)
+    block_edit_signal = Signal(str)
 
     def __init__(self, parent=None, game_manager=None):
         super().__init__(parent)
@@ -35,6 +36,7 @@ class AssetWindow(QWidget):
         self._asset_tree_view.edit_file_signal.connect(self.edit_file_signal.emit)
         self._asset_tree_view.image_edit_signal.connect(self.image_edit_signal.emit)
         self._asset_tree_view.audio_play_signal.connect(self.audio_play_signal.emit)
+        self._asset_tree_view.block_edit_signal.connect(self.block_edit_signal.emit)
 
     def _set_layout(self):
         h_layout = QHBoxLayout()

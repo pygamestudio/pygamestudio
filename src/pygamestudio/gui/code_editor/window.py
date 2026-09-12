@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from PySide6.QtCore import QSize, Qt
+from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from pygamestudio.gui.code_editor.editor import CodeEditor
 from pygamestudio.gui.scene.widget import RunProjectButton
@@ -18,6 +18,9 @@ class CodeEditorWindow(QWidget):
     re-docked back to the tab, so editing larger scripts is comfortable.
     """
 
+    # emitted with the shown file path so the block editor opens the SAME file
+    switch_to_block_requested = Signal(str)
+
     def __init__(self, game_manager):
         super().__init__()
         self._game_manager = game_manager
@@ -28,6 +31,8 @@ class CodeEditorWindow(QWidget):
         self._editor = CodeEditor()
         self._run_project_btn = RunProjectButton()
         self._detach_btn = QPushButton()
+        self._file_label = QLabel()
+        self._block_btn = QPushButton()
         self._zoom_in_btn = QPushButton()
         self._zoom_out_btn = QPushButton()
 
@@ -40,9 +45,17 @@ class CodeEditorWindow(QWidget):
         self._set_object_name()
 
     def _set_widget(self):
+        self._file_label.setObjectName('codeEditorFileLabel')
         self._detach_btn.setObjectName('codeEditorDetachBtn')
         self._detach_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._update_detach_button_text()
+
+        self._block_btn.setObjectName('editorSwitchBtn')
+        self._block_btn.setIcon(QIcon(':/images/block.png'))
+        self._block_btn.setIconSize(QSize(16, 16))
+        self._block_btn.setFixedSize(26, 26)
+        self._block_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._block_btn.setToolTip(T.tr('menu.open_in_block_editor', 'Open in Block Editor'))
 
         self._zoom_in_btn.setObjectName('codeEditorZoomInBtn')
         self._zoom_out_btn.setObjectName('codeEditorZoomOutBtn')
@@ -61,17 +74,29 @@ class CodeEditorWindow(QWidget):
     def _set_signal(self):
         self._run_project_btn.clicked.connect(self._run_project)
         self._detach_btn.clicked.connect(self.toggle_detached)
+        self._block_btn.clicked.connect(self._request_switch_to_block)
         self._editor.run_requested.connect(self._run_project)
         self._editor.modified_changed.connect(lambda modified: self._update_titles())
         self._zoom_in_btn.clicked.connect(self._editor.zoom_in)
         self._zoom_out_btn.clicked.connect(self._editor.zoom_out)
         self._editor.font_size_changed.connect(self._update_zoom_buttons)
 
+    def _request_switch_to_block(self):
+        """Hand the file over to the block editor (saving hand-written changes
+        first, so nothing the developer typed is lost on the way)."""
+        if self._editor.is_modified():
+            self._editor.save()
+        file_path = self._editor.current_file_path()
+        self.switch_to_block_requested.emit(str(file_path) if file_path else '')
+
     def _set_layout(self):
         toolbar_layout = QHBoxLayout()
+        toolbar_layout.addSpacing(6)
+        toolbar_layout.addWidget(self._file_label)
         toolbar_layout.addWidget(self._zoom_out_btn)
         toolbar_layout.addWidget(self._zoom_in_btn)
         toolbar_layout.addStretch(1)
+        toolbar_layout.addWidget(self._block_btn)
         toolbar_layout.addWidget(self._run_project_btn)
         toolbar_layout.addWidget(self._detach_btn)
 
@@ -108,8 +133,17 @@ class CodeEditorWindow(QWidget):
         elif self._tab_widget is not None:
             self._tab_widget.setCurrentWidget(self)
 
+    def raise_editor(self):
+        """Bring this editor into view (its tab, or its detached window)."""
+        self._raise_window()
+
     def save(self):
         self._editor.save()
+
+    def reload_file(self, file_path):
+        """Reload a file that another editor just rewrote on disk."""
+        if self._editor.reload_file(file_path):
+            self._update_titles()
 
     # ------------------------------------------------------------------ run
     def _run_project(self):
@@ -188,6 +222,7 @@ class CodeEditorWindow(QWidget):
         self._zoom_in_btn.setEnabled(size < self._editor.MAX_FONT_SIZE)
 
     def _file_title(self):
+        """The file name shown inside the window (with the modified marker)."""
         if self._editor.current_file_path():
             name = Path(self._editor.current_file_path()).name
         else:
@@ -195,14 +230,16 @@ class CodeEditorWindow(QWidget):
         return f'*{name}' if self._editor.is_modified() else name
 
     def _tab_title(self):
-        if self._editor.current_file_path():
-            return self._file_title()
+        # the tab keeps its editor name - the window shows the file itself
         return T.tr('code.editor', 'Code Editor')
 
     def _window_title(self):
-        return f' Pygame Studio - {self._tab_title()}'
+        if self._editor.current_file_path():
+            return f' Pygame Studio - {self._file_title()}'
+        return f' Pygame Studio - {T.tr("code.editor", "Code Editor")}'
 
     def _update_titles(self):
+        self._file_label.setText(self._file_title())
         if self._is_detached:
             if self._standalone_window is not None:
                 self._standalone_window.window_title.set_title_name(self._window_title())
@@ -215,6 +252,7 @@ class CodeEditorWindow(QWidget):
         self._editor.apply_theme(is_dark)
 
     def retranslate(self):
+        self._block_btn.setToolTip(T.tr('menu.open_in_block_editor', 'Open in Block Editor'))
         self._update_detach_button_text()
         self._update_titles()
 
@@ -223,6 +261,7 @@ class CodeEditorWindow(QWidget):
 
     def clean_up(self):
         self._editor.close_file()
+        self._update_titles()
 
 
 class _CodeEditorStandaloneWindow(WindowBase):

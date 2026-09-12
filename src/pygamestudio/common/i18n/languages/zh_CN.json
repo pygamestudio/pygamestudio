@@ -80,7 +80,138 @@
         "release_notes": "更新日志",
         "github_repository": "GitHub仓库",
         "about_pygamestudio": "关于Pygame Studio",
-        "support_pygamestudio": "支持Pygame Studio"
+        "support_pygamestudio": "支持Pygame Studio",
+        "block_script": "积木脚本",
+        "open_in_code_editor": "在代码编辑器中打开",
+        "open_in_block_editor": "在积木编辑器中打开"
+    },
+
+    "block": {
+        "editor": "积木编辑器",
+        "toolbox": "积木",
+        "undo": "撤销",
+        "redo": "重做",
+        "detach": "独立窗口",
+        "attach": "回到标签页",
+        "delete": "删除积木",
+        "duplicate": "复制积木",
+        "nothing_here": "此处没有积木",
+        "edit_field": "编辑参数",
+        "edit_field_value": "值：",
+        "loose_stacks_hint": "有 {} 个积木堆顶部没有事件积木，不会被执行。",
+        "zoom_in": "放大",
+        "zoom_out": "缩小",
+        "convert_no_class": "该脚本中没有 ObjectScript 类，无法挂上积木。",
+        "convert_read_failed": "无法读取该文件。",
+
+        "evg": {
+            "lifecycle": "生命周期",
+            "mouse": "鼠标",
+            "control": "输入框与滑块",
+            "collision": "碰撞",
+            "animation": "动画",
+            "effect": "粒子与进度"
+        },
+
+        "cat": {
+            "event": "事件",
+            "action": "动作",
+            "control": "控制"
+        },
+
+        "ev": {
+            "start": "当游戏开始时",
+            "update": "每一帧（dt）",
+            "pressed": "当被按下时",
+            "released": "当被松开时",
+            "clicked": "当被点击时",
+            "double_clicked": "当被双击时",
+            "right_clicked": "当被右键点击时",
+            "mouse_enter": "当鼠标进入时",
+            "mouse_leave": "当鼠标离开时",
+            "drag_start": "当开始拖拽时",
+            "drag": "拖动时（pos）",
+            "drag_end": "当拖拽结束时",
+            "collision_enter": "当发生碰撞时（other）",
+            "collision_exit": "当碰撞结束时（other）",
+            "visible_changed": "当显示或隐藏时（visible）",
+            "focus": "当输入框获得焦点时",
+            "blur": "当输入框失去焦点时",
+            "text_changed": "当文本变化时（text）",
+            "submitted": "当文本提交时（text）",
+            "value_changed": "当滑块值变化时（value）",
+            "animation_start": "当动画开始时",
+            "frame_changed": "当帧变化时（frame_index）",
+            "animation_finished": "当动画结束时",
+            "particles_finished": "当粒子播放结束时",
+            "progress_changed": "当进度变化时（progress）",
+            "progress_full": "当进度满时"
+        },
+
+        "act": {
+            "set_property": "设置属性为",
+            "change_property": "属性增加",
+            "move_to": "移到坐标",
+            "turn": "旋转（角度）",
+            "show": "显示",
+            "hide": "隐藏",
+            "toggle_visible": "切换显示/隐藏",
+            "set_color": "设置颜色",
+            "set_image": "设置图片路径",
+            "set_text": "设置文本",
+            "play_sound": "播放音效",
+            "play_music": "播放音乐（循环）",
+            "stop_music": "停止音乐",
+            "stop_sounds": "停止所有声音",
+            "set_window_title": "设置窗口标题",
+            "print": "打印输出",
+            "play_animation": "播放动画",
+            "pause_animation": "暂停动画",
+            "set_frame": "跳到第几帧",
+            "restart_animation": "重启动画",
+            "emit_particles": "发射粒子（数量）",
+            "set_slider_value": "设置滑块值",
+            "set_progress": "设置进度"
+        },
+
+        "ctl": {
+            "if": "如果",
+            "if_else": "如果 / 否则",
+            "repeat": "重复",
+            "while": "当条件满足时循环",
+            "repeat_until": "重复直到满足条件",
+            "continue": "跳过本次循环",
+            "break": "跳出循环",
+            "return": "结束本次事件",
+            "else": "否则"
+        },
+
+        "prop": {
+            "x": "x 坐标",
+            "y": "y 坐标",
+            "width": "宽度",
+            "height": "高度",
+            "scale_x": "水平缩放",
+            "scale_y": "垂直缩放",
+            "angle": "角度",
+            "visible": "可见",
+            "text": "文本",
+            "value": "值",
+            "progress": "进度",
+            "dt": "dt（帧时间）",
+            "param_value": "value（参数）",
+            "param_text": "text（参数）",
+            "other": "other（对方对象）"
+        },
+
+        "op": {
+            "eq": "等于",
+            "ne": "不等于",
+            "gt": "大于",
+            "lt": "小于",
+            "ge": "大于等于",
+            "le": "小于等于"
+        }
     },
 
     "item": {
@@ -142,6 +273,7 @@
         "saved": "已保存",
         "unsaved": "未保存",
         "save_failed": "保存失败",
+        "reloaded": "已重新加载",
         "zoom_in": "放大字体",
         "zoom_out": "缩小字体"
     },

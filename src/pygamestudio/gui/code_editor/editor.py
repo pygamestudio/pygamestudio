@@ -97,16 +97,25 @@ class CodeEditor(QPlainTextEdit):
         # asset...), and since the run just saved it, the on-disk content still
         # matches what is being edited - so keep the current session untouched.
         if self._file_path == file_path and self.toPlainText() == content:
+            # Re-highlighting emits textChanged, which would mark the file as
+            # modified (and trigger an auto-save) even though nothing changed -
+            # e.g. just switching to the block editor and back.
+            self._is_loading = True
             self._highlighter.set_language(file_path.suffix)
+            self._is_loading = False
+            self._set_modified(False)
             self._check_syntax()
             return
 
         self._is_loading = True
         self.setPlainText(content)
+        self._file_path = file_path
+        # Re-highlighting emits textChanged as well: both the plain-text load
+        # and the highlighter refresh must not count as an edit (a spurious
+        # "modified" marker / auto-save for merely LOOKING at a file).
+        self._highlighter.set_language(file_path.suffix)
         self._is_loading = False
 
-        self._file_path = file_path
-        self._highlighter.set_language(file_path.suffix)
         self.document().setModified(False)
         self._set_modified(False)
         self._update_status(T.tr('code.saved', 'Saved'))
@@ -129,6 +138,31 @@ class CodeEditor(QPlainTextEdit):
         if self._file_path is not None and self._is_modified:
             self.save()
 
+    def reload_file(self, file_path):
+        """Re-read a file from disk when another editor rewrote it (the block
+        editor regenerates the code of a block script).
+
+        Only the file the editor currently shows is reloaded; the undo history
+        is dropped because the on-disk content is the new source of truth.
+        Returns True when a reload happened.
+        """
+        file_path = Path(file_path)
+        if self._file_path != file_path:
+            return False
+        try:
+            content = file_path.read_text(encoding='utf-8')
+        except (OSError, UnicodeDecodeError):
+            return False
+        if self.toPlainText() != content:
+            self._is_loading = True
+            self.setPlainText(content)
+            self._is_loading = False
+        self.document().setModified(False)
+        self._set_modified(False)
+        self._update_status(T.tr('code.reloaded', 'Reloaded'))
+        self._check_syntax()
+        return True
+
     def close_file(self):
         """Flush any pending changes and reset the editor state."""
         self.auto_save()
@@ -145,7 +179,12 @@ class CodeEditor(QPlainTextEdit):
     def apply_theme(self, is_dark):
         """Re-color the highlighter and the current-line highlight after the
         app theme changes."""
+        # rehighlight() emits textChanged: a pure color refresh must never
+        # mark the open file as modified (it happens at startup and on every
+        # theme switch).
+        self._is_loading = True
         self._highlighter.apply_theme(is_dark)
+        self._is_loading = False
         self._current_line_color = QColor('#282828' if is_dark else '#f2f2f2')
         self._update_current_line()
 

@@ -596,6 +596,11 @@ QPlainTextEdit#codeEditor {
     selection-background-color: #404142;
 }
 
+QWidget#codeEditorWindow QLabel#codeEditorFileLabel {
+    color: #9d9d9d;
+    background-color: transparent;
+}
+
 QWidget#codeEditorWindow QLabel#codeEditorStatus {
     color: #6a9955;
     background-color: transparent;
@@ -629,6 +634,59 @@ QPushButton#codeEditorZoomInBtn:hover, QPushButton#codeEditorZoomOutBtn:hover {
 
 QPushButton#codeEditorZoomInBtn:pressed, QPushButton#codeEditorZoomOutBtn:pressed {
     background-color: #28292a;
+}
+
+QPushButton#editorSwitchBtn {
+    background-color: transparent;
+    border: none;
+    border-radius: 4px;
+}
+
+QPushButton#editorSwitchBtn:hover {
+    background-color: #404142;
+}
+
+QPushButton#editorSwitchBtn:pressed {
+    background-color: #28292a;
+}
+
+QWidget#blockEditorWindow {
+    background-color: #252526;
+}
+
+QWidget#blockEditorWindow QLabel {
+    color: #9d9d9d;
+    background-color: transparent;
+}
+
+QPushButton#blockEditorToolBtn {
+    background-color: transparent;
+    border: none;
+    border-radius: 4px;
+}
+
+QPushButton#blockEditorToolBtn:hover {
+    background-color: #404142;
+}
+
+QPushButton#blockEditorToolBtn:pressed {
+    background-color: #28292a;
+}
+
+QListWidget#blockPaletteList {
+    background-color: #2d2d2d;
+    border: none;
+    outline: none;
+}
+
+QTabWidget#blockPaletteTabs::pane {
+    border: none;
+    background-color: #2d2d2d;
+}
+
+QTabWidget#blockPaletteTabs QTabBar::tab {
+    min-width: 0px;
+    padding: 5px 10px;
 }
 
 QWidget#imageEditorWindow {

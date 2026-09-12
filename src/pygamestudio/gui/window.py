@@ -17,6 +17,8 @@ from pygamestudio.gui.settings.editor import EditorSettingsWindow
 from pygamestudio.gui.about.window import AboutWindow
 from pygamestudio.gui.build.window import BuildWindow
 from pygamestudio.gui.code_editor.window import CodeEditorWindow
+from pygamestudio.gui.block_editor.window import BlockEditorWindow
+from pygamestudio.gui.block_editor.storage import can_hold_blocks, is_block_script
 from pygamestudio.gui.image_editor.window import ImageEditorWindow
 from pygamestudio.gui.audio_player.window import AudioPlayerWindow
 from pygamestudio.gui.tile_map_editor.window import TileMapEditorWindow
@@ -42,6 +44,7 @@ class EditorBody(QMainWindow):
         self._editor_settings_window = EditorSettingsWindow(game_manager)
         self._build_window = BuildWindow(game_manager)
         self._code_editor_window = CodeEditorWindow(game_manager)
+        self._block_editor_window = BlockEditorWindow(game_manager)
         self._image_editor_window = ImageEditorWindow(game_manager)
         self._audio_player_window = AudioPlayerWindow(game_manager)
         self._tile_map_editor_window = TileMapEditorWindow(game_manager)
@@ -82,6 +85,8 @@ class EditorBody(QMainWindow):
         self._center_top_tab_widget.addTab(self._scene_widnow, T.tr('scene.scene', 'Scene'))
         self._center_top_tab_widget.addTab(self._code_editor_window, T.tr('code.editor', 'Code Editor'))
         self._code_editor_window.set_tab_widget(self._center_top_tab_widget)
+        self._center_top_tab_widget.addTab(self._block_editor_window, T.tr('block.editor', 'Block Editor'))
+        self._block_editor_window.set_tab_widget(self._center_top_tab_widget)
         self._center_top_tab_widget.addTab(self._image_editor_window, T.tr('image.editor', 'Image Editor'))
         self._image_editor_window.set_tab_widget(self._center_top_tab_widget)
         self._center_top_tab_widget.addTab(self._tile_map_editor_window, T.tr('tile_map.editor', 'Tile Map Editor'))
@@ -113,7 +118,16 @@ class EditorBody(QMainWindow):
         self._editor_settings_window.theme_toggled.connect(self._scene_widnow.update_grid_style)
         self._editor_settings_window.theme_toggled.connect(self._console_window.reload_logs_on_theme_changed)
         self._editor_settings_window.theme_toggled.connect(lambda theme_code: self._code_editor_window.apply_theme(theme_code == 'dark'))
+        self._editor_settings_window.theme_toggled.connect(lambda theme_code: self._block_editor_window.apply_theme(theme_code == 'dark'))
         self._asset_window.edit_file_signal.connect(self._code_editor_window.open_file)
+        self._asset_window.block_edit_signal.connect(self._block_editor_window.open_file)
+        # When a block script is regenerated, refresh the code editor if it is
+        # showing that same file.
+        self._block_editor_window.script_saved.connect(self._code_editor_window.reload_file)
+        # The two script editors can jump to each other from their toolbars
+        # and hand their file over, so both always work on the same script.
+        self._code_editor_window.switch_to_block_requested.connect(self._on_switch_to_block_editor)
+        self._block_editor_window.switch_to_code_requested.connect(self._on_switch_to_code_editor)
         self._asset_window.image_edit_signal.connect(self._image_editor_window.open_image)
         self._asset_window.audio_play_signal.connect(self._audio_player_window.open_audio)
         self._hierarchy_window.hierarchy_tree_view.edit_tile_map_requested.connect(self._on_edit_tile_map_requested)
@@ -124,6 +138,7 @@ class EditorBody(QMainWindow):
         # Match the code editor's highlight colors with the startup theme.
         theme_code = get_editor_config().get('theme', 'dark')
         self._code_editor_window.apply_theme(theme_code == 'dark')
+        self._block_editor_window.apply_theme(theme_code == 'dark')
 
     def _set_layout(self):
         main_layout = QHBoxLayout(self._central_widget)
@@ -243,6 +258,7 @@ class EditorBody(QMainWindow):
         self._project_settings_window.get_ready_for_project()
         self._build_window.get_ready_for_project()
         self._code_editor_window.get_ready_for_project()
+        self._block_editor_window.get_ready_for_project()
         self._image_editor_window.get_ready_for_project()
         self._audio_player_window.get_ready_for_project()
         self._tile_map_editor_window.get_ready_for_project()
@@ -255,6 +271,7 @@ class EditorBody(QMainWindow):
         self._hierarchy_window.clean_up()
         self._inspector_window.clean_up()
         self._code_editor_window.clean_up()
+        self._block_editor_window.clean_up()
         self._image_editor_window.clean_up()
         self._audio_player_window.clean_up()
         self._tile_map_editor_window.clean_up()
@@ -333,6 +350,13 @@ class EditorBody(QMainWindow):
             return False
         return self._center_top_tab_widget.currentWidget() is self._image_editor_window
 
+    def block_editor_active(self):
+        """Return True when the block editor is the panel the user is
+        currently working in (docked state only, same as the image editor)."""
+        if self._block_editor_window.is_detached():
+            return False
+        return self._center_top_tab_widget.currentWidget() is self._block_editor_window
+
     def _on_center_top_tab_changed(self, index):
         """Give keyboard focus to the image editor's canvas when its tab is
         opened, so Ctrl+Z/Y/Ctrl+S act on the image editor immediately."""
@@ -341,12 +365,41 @@ class EditorBody(QMainWindow):
             self._image_editor_window.focus_canvas()
         elif widget is self._tile_map_editor_window:
             self._tile_map_editor_window.focus_canvas()
+        elif widget is self._block_editor_window:
+            self._block_editor_window.canvas().setFocus()
 
     def _on_edit_tile_map_requested(self, object_uuid):
         """A Tile Map object was double-clicked in the hierarchy: open the
         tile map editor on it (docked tab or detached window)."""
         self._tile_map_editor_window.set_object(object_uuid)
         self._tile_map_editor_window.raise_editor()
+
+    def _on_switch_to_block_editor(self, file_path):
+        """The code editor asked for the block editor: show the SAME file.
+
+        The file itself is NOT converted here - a plain object script only
+        gets its blocks section once blocks are actually saved in the canvas,
+        so switching editors never modifies the developer's code. A script
+        without an ObjectScript class cannot hold blocks, so the user is told
+        and nothing is switched.
+        """
+        if file_path and Path(file_path).suffix.lower() == '.py':
+            if is_block_script(file_path) or can_hold_blocks(file_path)[0]:
+                self._block_editor_window.open_file(file_path)
+                return
+            QMessageBox.warning(
+                self, T.tr('message_box.warning_title', 'Warning'),
+                T.tr('block.convert_no_class',
+                     'This script has no ObjectScript class to attach blocks to.'))
+            return
+        self._block_editor_window.raise_editor()
+
+    def _on_switch_to_code_editor(self, file_path):
+        """The block editor asked for the code editor: show the SAME file."""
+        if file_path:
+            self._code_editor_window.open_file(file_path)
+        else:
+            self._code_editor_window.raise_editor()
 
     def retranslate(self):
         self.menuBar().clear()
@@ -362,6 +415,7 @@ class EditorBody(QMainWindow):
         self._center_bottom_tab_widget.setTabText(0, T.tr('console.console', 'Console'))
         self._right_top_tab_widget.setTabText(0, T.tr('inspector.inspector', 'Inspector'))
         self._code_editor_window.retranslate()
+        self._block_editor_window.retranslate()
         self._image_editor_window.retranslate()
         self._audio_player_window.retranslate()
         self._tile_map_editor_window.retranslate()
@@ -450,6 +504,8 @@ class Editor(WindowBase):
             if event.key() == Qt.Key.Key_S:
                 if self._editor_body.image_editor_active():
                     self._editor_body._image_editor_window.save()
+                elif self._editor_body.block_editor_active():
+                    self._editor_body._block_editor_window.save()
                 else:
                     self._game_manager.save_scene()
             elif event.key() == Qt.Key.Key_Z:

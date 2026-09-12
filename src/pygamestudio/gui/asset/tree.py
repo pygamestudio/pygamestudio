@@ -15,6 +15,7 @@ from pygamestudio.common.utils.config import get_project_config, update_project_
 from pygamestudio.common.utils.system import send_to_trash
 from pygamestudio.common.utils.path import RES_PATH
 from pygamestudio.gui.audio_player.engine import AUDIO_FILE_EXTENSIONS
+from pygamestudio.gui.block_editor.storage import can_hold_blocks, is_block_script
 
 
 # File suffixes the built-in code editor can open as plain text.
@@ -34,6 +35,7 @@ class AssetTreeView(QTreeView):
     edit_file_signal = Signal(str)
     image_edit_signal = Signal(str)
     audio_play_signal = Signal(str)
+    block_edit_signal = Signal(str)
 
     def __init__(self, parent=None, game_manager=None):
         super().__init__(parent)
@@ -104,6 +106,8 @@ class AssetTreeView(QTreeView):
         self._context_menu.show_in_explorer_signal.connect(self._show_in_explorer)
         self._context_menu.open_signal.connect(self._open_file)
         self._context_menu.run_signal.connect(self._run_project)
+        self._context_menu.open_in_code_editor_signal.connect(self._open_in_code_editor)
+        self._context_menu.open_in_block_editor_signal.connect(self._open_in_block_editor)
         self.doubleClicked.connect(self._on_double_clicked)
 
     def _set_object_name(self):
@@ -450,14 +454,18 @@ class AssetTreeView(QTreeView):
         return path.is_file() and path.suffix.lower() in AUDIO_FILE_EXTENSIONS
 
     def _open_file(self):
-        """Open the selected file: text files in the built-in code editor,
-        images in the built-in image editor, audio in the built-in audio
-        player, everything else with the system's default application."""
+        """Open the selected file: block scripts in the block editor, other
+        text files in the built-in code editor, images in the built-in image
+        editor, audio in the built-in audio player, everything else with the
+        system's default application."""
         target_path = self._get_selected_file_path()
         if not target_path:
             return
         if self._is_text_file(target_path):
-            self.edit_file_signal.emit(str(target_path))
+            if target_path.suffix.lower() == '.py' and is_block_script(target_path):
+                self.block_edit_signal.emit(str(target_path))
+            else:
+                self.edit_file_signal.emit(str(target_path))
         elif self._is_image_file(target_path):
             self.image_edit_signal.emit(str(target_path))
         elif self._is_audio_file(target_path):
@@ -465,17 +473,51 @@ class AssetTreeView(QTreeView):
         else:
             self._open_externally()
 
+    def _open_in_code_editor(self):
+        """Open the selected file in the code editor (even when it is a
+        block script, so its generated code can be read or extended)."""
+        target_path = self._get_selected_file_path()
+        if target_path:
+            self.edit_file_signal.emit(str(target_path))
+
+    def _open_in_block_editor(self):
+        """Open the selected script in the block editor.
+
+        There is no separate "block script" file type: a plain object script
+        gets the blocks section inserted below its ObjectScript class the
+        first time blocks are SAVED, and everything else in the file is kept
+        (merely opening it never modifies the file).
+        """
+        target_path = self._get_selected_file_path()
+        if target_path is None:
+            return
+        if target_path.suffix.lower() != '.py':
+            self._open_file()
+            return
+        if is_block_script(target_path) or can_hold_blocks(target_path)[0]:
+            self.block_edit_signal.emit(str(target_path))
+            return
+        QMessageBox.warning(QApplication.activeWindow(),
+                            T.tr('message_box.warning_title', 'Warning'),
+                            T.tr('block.convert_no_class',
+                                 'This script has no ObjectScript class to attach blocks to.'))
+        self.edit_file_signal.emit(str(target_path))
+
     def _on_double_clicked(self, index):
-        """Double-clicking a folder toggles expand/collapse, a text file
-        opens in the code editor, an image opens in the built-in image
-        editor, audio plays in the built-in audio player, and any other file
-        opens with the system's default application."""
+        """Double-clicking a folder toggles expand/collapse, a block script
+        opens in the block editor, other text files in the code editor, an
+        image opens in the built-in image editor, audio plays in the built-in
+        audio player, and any other file opens with the system's default
+        application."""
         target_path = Path(self._file_model.filePath(self._proxy_model.mapToSource(index)))
         if target_path.is_dir():
             # Let the tree's default behavior expand/collapse the folder.
             return
         if self._is_text_file(target_path):
-            self.edit_file_signal.emit(str(target_path))
+            if target_path.suffix.lower() == '.py' and is_block_script(target_path):
+                self.block_edit_signal.emit(str(target_path))
+            else:
+                self.edit_file_signal.emit(str(target_path))
         elif self._is_image_file(target_path):
             self.image_edit_signal.emit(str(target_path))
         elif self._is_audio_file(target_path):
