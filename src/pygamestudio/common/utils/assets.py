@@ -1,11 +1,11 @@
-"""Access to project assets, transparently handling protected (encrypted) builds.
+"""Access to project files, transparently handling protected (encrypted) builds.
 
 A protected build encrypts the project's data files - images, audio, fonts,
-scene files and ``project.pygs`` - inside the staging copy that PyInstaller
-packages, and writes the per-build key next to them (``assets.key``). Game code
-keeps using ordinary paths: every helper here returns the decrypted bytes for a
-protected file and the plain bytes for anything else, so the editor and
-unprotected (source) runs behave exactly as before.
+scene files, ``project.pygs`` - **and its python modules** inside the staging
+copy that PyInstaller packages. Game code keeps using ordinary paths: every
+helper here returns the decrypted bytes for a protected file and the plain
+bytes for anything else, so the editor and unprotected (source) runs behave
+exactly as before.
 
 Container format (written by ``pygamestudio.gui.build.assets``)::
 
@@ -15,6 +15,12 @@ The payload is XORed with a SHAKE-256 keystream derived from ``key + salt``,
 and the digest lets the reader detect a damaged file or a wrong key. The
 keystream is generated in C by hashlib and the XOR is done on big integers, so
 even a multi-megabyte soundtrack is decrypted in a few milliseconds.
+
+The build key itself is not shipped as a separate "key" file: it is hidden
+inside ``resources.cache``, a small binary blob that looks like a resource
+index (see ``encode_key_blob``). That is obfuscation, not security - the key
+ships with the game and can be recovered - so it is only ever a speed bump on
+top of the obfuscated code.
 """
 import hashlib
 import io
@@ -35,13 +41,25 @@ ASSET_EXTENSIONS = frozenset((
     '.scene', '.pygs',
 ))
 
-#: Name of the key file the build writes into the packaged project root.
-KEY_FILE_NAME = 'assets.key'
+#: Python modules the build encrypts as well (except the entry ``main.py``,
+#: which the packaging tools have to read).
+CODE_EXTENSIONS = frozenset(('.py',))
+
+#: Name of the file the build writes into the packaged project root. It looks
+#: like (and is) a small binary cache; the build key is hidden inside it.
+KEY_FILE_NAME = 'resources.cache'
 
 _MAGIC = b'PGSXA1'
 _SALT_SIZE = 16
 _DIGEST_SIZE = 16
 _HEADER_SIZE = len(_MAGIC) + _SALT_SIZE + _DIGEST_SIZE
+
+_KEY_MAGIC = b'PGCACHE1'
+_KEY_SALT_SIZE = 16
+_KEY_CHECK_SIZE = 8
+_KEY_BLOCK_SIZE = 256
+_KEY_SIZE = 32
+_KEY_MASK_LABEL = b'pygs-cache'
 
 
 class AssetError(RuntimeError):
@@ -63,8 +81,9 @@ def reset_cache():
 def get_key():
     """The key of the current build, or None for an unprotected project.
 
-    The key lives next to the game in the packaged build; a project run from
-    source (editor, ``python main.py``) has no key file and needs none.
+    The key travels inside ``resources.cache`` in the packaged build; a project
+    run from source (editor, ``python main.py``) has no such file and needs no
+    key at all.
     """
     global _key_loaded, _key
     if not _key_loaded:
@@ -74,11 +93,45 @@ def get_key():
             key_file = Path(project_path) / KEY_FILE_NAME
             try:
                 if key_file.is_file():
-                    _key = bytes.fromhex(key_file.read_text(encoding='ascii').strip())
-            except (OSError, ValueError):
+                    _key = decode_key_blob(key_file.read_bytes())
+            except OSError:
                 _key = None
         _key_loaded = True
     return _key
+
+
+def _key_positions(salt: bytes):
+    """Slots of the key bytes inside the cache block (stride is odd, so unique)."""
+    stride = 3 + 2 * (salt[0] % 3)
+    start = salt[1]
+    return [(start + index * stride) % _KEY_BLOCK_SIZE for index in range(_KEY_SIZE)]
+
+
+def encode_key_blob(key: bytes) -> bytes:
+    """Hide a build key inside a small, cache looking binary blob."""
+    salt = os.urandom(_KEY_SALT_SIZE)
+    mask = hashlib.sha256(salt + _KEY_MASK_LABEL).digest()
+    block = bytearray(os.urandom(_KEY_BLOCK_SIZE))
+    for index, position in enumerate(_key_positions(salt)):
+        block[position] = key[index] ^ mask[index % len(mask)]
+    check = hashlib.sha256(key).digest()[:_KEY_CHECK_SIZE]
+    return _KEY_MAGIC + salt + check + bytes(block)
+
+
+def decode_key_blob(data: bytes):
+    """Recover the build key from the blob, or None when it is not one."""
+    header = len(_KEY_MAGIC) + _KEY_SALT_SIZE + _KEY_CHECK_SIZE
+    if len(data) < header + _KEY_BLOCK_SIZE or data[:len(_KEY_MAGIC)] != _KEY_MAGIC:
+        return None
+    salt = data[len(_KEY_MAGIC):len(_KEY_MAGIC) + _KEY_SALT_SIZE]
+    check = data[len(_KEY_MAGIC) + _KEY_SALT_SIZE:header]
+    block = data[header:header + _KEY_BLOCK_SIZE]
+    mask = hashlib.sha256(salt + _KEY_MASK_LABEL).digest()
+    key = bytes(block[position] ^ mask[index % len(mask)]
+                for index, position in enumerate(_key_positions(salt)))
+    if hashlib.sha256(key).digest()[:_KEY_CHECK_SIZE] != check:
+        return None
+    return key
 
 
 def resolve(path) -> Path:

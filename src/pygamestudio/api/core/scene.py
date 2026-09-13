@@ -3,7 +3,6 @@ import sys
 import re
 import json
 import inspect
-import importlib.util
 import pygame
 from pathlib import Path
 from pygamestudio.game.object.type import *
@@ -25,6 +24,7 @@ from pygamestudio.game.object.tile_map import *
 from pygamestudio.api.config.project import get_project_config
 from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.common.utils import assets
+from pygamestudio.common.utils import project_modules
 
 
 class SceneLoader:
@@ -182,12 +182,12 @@ class SceneLoader:
 
         try:
             # A unique module name per object keeps every scene (re)load fresh,
-            # so the latest script content is always picked up.
-            module_name = f'pygamestudio_runtime_script_{obj.uuid}'
-            spec = importlib.util.spec_from_file_location(module_name, script_absolute_path)
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-        except Exception:
+            # so the latest script content is always picked up. A protected
+            # build ships the script encrypted, so it is decrypted and compiled
+            # in memory instead of being read by Python itself.
+            module = project_modules.load_module(f'pygamestudio_runtime_script_{obj.uuid}',
+                                                 script_absolute_path)
+        except Exception as e:
             print(T.tr('api.fail_to_load_script', 'Failed to load script {}: {}').format(script_absolute_path, e), file=sys.stderr)
             return None
 
@@ -530,6 +530,7 @@ class SceneLoader:
         self._hovered_object = hovered
         self._emit_object_event(previous, 'on_mouse_leave')
         self._emit_object_event(hovered, 'on_mouse_enter')
+        
     def _update_collision_events(self):
         """Fire on_collision_enter / on_collision_exit once per frame.
 

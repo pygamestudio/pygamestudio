@@ -505,7 +505,7 @@
         "obfuscation_unavailable": "未找到 pyobfus：代码已去除注释与文档字符串，但未做名称混淆",
         "obfuscation_failed": "代码混淆失败，构建已中止：{}",
         "staging_failed": "项目无法准备为构建副本，构建已中止：{}",
-        "assets_encrypted": "已加密 {} 个资源文件（{} KB）",
+        "assets_encrypted": "已加密 {} 个文件（{} KB），包含项目脚本",
         "assets_failed": "资源加密失败，构建已中止：{}"
     },
 

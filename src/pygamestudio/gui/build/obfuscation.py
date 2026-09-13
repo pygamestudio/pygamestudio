@@ -179,6 +179,90 @@ def _has_docstrings(source_code) -> bool:
     return False
 
 
+def _project_module_names(project_dir) -> dict:
+    """Map every module of the project to its file (``script.helper`` -> ...)."""
+    modules = {}
+    for script in sorted(Path(project_dir).rglob('*.py')):
+        relative = script.relative_to(Path(project_dir)).with_suffix('')
+        parts = list(relative.parts)
+        if parts and parts[-1] == '__init__':
+            parts = parts[:-1]
+        if parts:
+            modules['.'.join(parts)] = script
+    return modules
+
+
+def _dotted_name(node):
+    """``a.b.c`` for an attribute chain, or None for anything else."""
+    parts = []
+    while isinstance(node, ast.Attribute):
+        parts.append(node.attr)
+        node = node.value
+    if isinstance(node, ast.Name):
+        parts.append(node.id)
+        return '.'.join(reversed(parts))
+    return None
+
+
+def _module_level_names(root) -> set:
+    """Every name defined at the top level of any module below ``root``."""
+    names = set()
+    for script in sorted(Path(root).rglob('*.py')):
+        try:
+            tree = ast.parse(script.read_text(encoding='utf-8', errors='replace'))
+        except SyntaxError:
+            continue
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                names.add(node.name)
+            elif isinstance(node, ast.Assign):
+                names.update(target.id for target in node.targets if isinstance(target, ast.Name))
+    return names
+
+
+def _collect_module_attribute_names(project_dir) -> set:
+    """Names other files of the project read as ``<module>.<name>``.
+
+    pyobfus rewrites ``from m import x`` but leaves ``m.x`` attribute accesses
+    alone, so renaming ``x`` would break the game at runtime. Those names are
+    therefore reserved (everything else is still obfuscated).
+    """
+    modules = _project_module_names(project_dir)
+    if len(modules) < 2:
+        return set()
+    reserved = set()
+    for script in sorted(Path(project_dir).rglob('*.py')):
+        try:
+            tree = ast.parse(script.read_text(encoding='utf-8', errors='replace'))
+        except SyntaxError:
+            continue
+        aliases = {}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name in modules:
+                        aliases[alias.asname or alias.name] = alias.name
+            elif isinstance(node, ast.ImportFrom):
+                base = node.module or ''
+                for alias in node.names:
+                    candidate = f'{base}.{alias.name}' if base else alias.name
+                    if candidate in modules:
+                        aliases[alias.asname or alias.name] = candidate
+        for node in ast.walk(tree):
+            dotted = _dotted_name(node)
+            if not dotted:
+                continue
+            parts = dotted.split('.')
+            if parts[0] in aliases:
+                parts = aliases[parts[0]].split('.') + parts[1:]
+            for index in range(len(parts) - 1, 0, -1):
+                if '.'.join(parts[:index]) in modules:
+                    if len(parts) - index == 1:
+                        reserved.add(parts[index])
+                    break
+    return reserved
+
+
 def stage_project(project_path, target_dir, output_dir) -> dict:
     """Copy the project (resources and code) into the staging folder."""
     project_path = Path(project_path)
@@ -223,6 +307,10 @@ def obfuscate(project_dir, work_dir) -> dict:
     if not python_files:
         raise ObfuscationError('the project has no python files')
     callbacks = _collect_callback_names(project_dir)
+    # ``module.name`` accesses are not rewritten by the obfuscator, so those
+    # names have to keep their name (see _collect_module_attribute_names).
+    attribute_names = _collect_module_attribute_names(project_dir)
+    defined_before = _module_level_names(project_dir)
 
     code_dir = work_dir / 'code'
     obfuscated_dir = work_dir / 'obfuscated'
@@ -236,7 +324,8 @@ def obfuscate(project_dir, work_dir) -> dict:
         shutil.copy2(script, target)
 
     config_path = work_dir / 'pyobfus.yaml'
-    exclude_lines = '\n'.join(f'    - "{name}"' for name in RESERVED_NAMES)
+    excluded = list(RESERVED_NAMES) + sorted(attribute_names)
+    exclude_lines = '\n'.join(f'    - "{name}"' for name in excluded)
     config_path.write_text(_CONFIG_TEMPLATE.format(exclude_names=exclude_lines), encoding='utf-8')
 
     completed = subprocess.run(
@@ -282,8 +371,13 @@ def obfuscate(project_dir, work_dir) -> dict:
     missing = sorted(callbacks - staged_callbacks)
     if missing:
         raise ObfuscationError(f'callbacks were renamed by the obfuscator: {", ".join(missing)}')
+    # names read as module attributes elsewhere must survive as well
+    defined_after = _module_level_names(project_dir)
+    lost = sorted(attribute_names & defined_before - defined_after)
+    if lost:
+        raise ObfuscationError(f'names used as module attributes were renamed: {", ".join(lost)}')
 
-    return {'files': len(python_files), 'callbacks': len(callbacks)}
+    return {'files': len(python_files), 'callbacks': len(callbacks), 'reserved': len(attribute_names)}
 
 
 def prepare(project_path, output_dir) -> dict:

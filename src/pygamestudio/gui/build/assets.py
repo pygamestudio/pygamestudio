@@ -1,15 +1,17 @@
-"""Asset encryption for game builds.
+"""File protection for game builds.
 
 The build packages a staging copy of the project (see ``obfuscation.py``). This
-module protects the data files of that copy - images, audio, fonts, scene files
-and ``project.pygs`` - so the packaged game ships no plain resource, while the
-python code is handled by the obfuscator. The project itself is never touched:
-only the staging copy is rewritten.
+module protects the files of that copy - images, audio, fonts, scene files,
+``project.pygs`` and the project's python modules (already stripped and
+obfuscated by the time they get here) - so the packaged game ships neither a
+plain resource nor readable code in the clear. The project itself is never
+touched: only the staging copy is rewritten.
 
-The per-build key is written into the staging root as ``assets.key`` and read at
-runtime by ``pygamestudio.common.utils.assets``, which decrypts every protected
-file on the fly - game code keeps using ordinary paths. A wrong or missing key
-fails loudly instead of feeding garbage to pygame.
+The per-build key is hidden inside ``resources.cache``, a small binary blob in
+the staging root that looks like a resource index; the runtime
+(``pygamestudio.common.utils.assets``) reads it from there and decrypts every
+protected file on the fly, so game code keeps using ordinary paths. A wrong or
+missing key fails loudly instead of feeding garbage to pygame.
 """
 import os
 from pathlib import Path
@@ -30,9 +32,9 @@ def generate_key() -> bytes:
 
 
 def write_key_file(project_dir, key: bytes) -> Path:
-    """Write the build key next to the packaged game (hex text)."""
+    """Hide the build key inside the cache blob that ships with the game."""
     key_file = Path(project_dir) / asset_format.KEY_FILE_NAME
-    key_file.write_text(key.hex(), encoding='ascii')
+    key_file.write_bytes(asset_format.encode_key_blob(key))
     return key_file
 
 
@@ -44,16 +46,19 @@ def _is_ignored(relative: Path) -> bool:
 
 
 def encrypt_assets(project_dir, key: bytes) -> dict:
-    """Encrypt every protected asset of the staging copy in place.
+    """Encrypt every protected file of the staging copy in place.
 
-    Files whose suffix is not in ``assets.ASSET_EXTENSIONS`` (scripts, user
-    data such as ``.txt``/``.json``, ...) are left alone on purpose, so game
-    code that opens them directly keeps working.
+    That is the project's resources (images, audio, fonts, scene files,
+    ``project.pygs``) and its python modules. ``main.py`` stays readable because
+    PyInstaller has to analyse the entry script; user data with other suffixes
+    (``.txt``, ``.json``, ...) is left alone on purpose, so game code that opens
+    it directly keeps working.
 
-    :return: a summary with the number of files and plain bytes processed.
+    :return: a summary with the number of files, modules and plain bytes.
     """
     project_dir = Path(project_dir)
     files = 0
+    modules = 0
     byte_count = 0
     for path in sorted(project_dir.rglob('*')):
         if not path.is_file():
@@ -63,7 +68,13 @@ def encrypt_assets(project_dir, key: bytes) -> dict:
             continue
         if path.name == asset_format.KEY_FILE_NAME:
             continue
-        if path.suffix.lower() not in asset_format.ASSET_EXTENSIONS:
+
+        suffix = path.suffix.lower()
+        is_module = suffix in asset_format.CODE_EXTENSIONS
+        if is_module:
+            if path.name == 'main.py':
+                continue
+        elif suffix not in asset_format.ASSET_EXTENSIONS:
             continue
 
         data = path.read_bytes()
@@ -76,9 +87,10 @@ def encrypt_assets(project_dir, key: bytes) -> dict:
             raise AssetBuildError(f'{relative} could not be encrypted reliably')
         path.write_bytes(encrypted)
         files += 1
+        modules += 1 if is_module else 0
         byte_count += len(data)
 
-    return {'files': files, 'bytes': byte_count}
+    return {'files': files, 'modules': modules, 'bytes': byte_count}
 
 
 def prepare(project_dir) -> dict:
