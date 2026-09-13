@@ -2,6 +2,7 @@ import os
 import json
 from pathlib import Path
 from pygamestudio.common.i18n.translator import Translator as T
+from pygamestudio.common.utils import assets
 
 
 def get_project_config():
@@ -12,8 +13,7 @@ def get_project_config():
         raise RuntimeError(T.tr('api.no_project_pygs', 'Failed to find config file project.pygs in the project root directory.'))
 
     try:
-        with open(project_config_file_path, 'r', encoding='utf-8') as f:
-            project_config = json.load(f)
-            return project_config
+        # Plain when the game runs from source, decrypted in a protected build.
+        return json.loads(assets.read_text(project_config_file_path))
     except Exception as e:
         raise RuntimeError(T.tr('api.fail_to_load_project_pygs', 'Failed to load config file project.pygs: {}').format(str(e)))

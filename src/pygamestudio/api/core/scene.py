@@ -24,6 +24,7 @@ from pygamestudio.game.object.frame_sequence import *
 from pygamestudio.game.object.tile_map import *
 from pygamestudio.api.config.project import get_project_config
 from pygamestudio.common.i18n.translator import Translator as T
+from pygamestudio.common.utils import assets
 
 
 class SceneLoader:
@@ -90,8 +91,8 @@ class SceneLoader:
         self._reset_runtime_input_state()
         self._all_object_tree_struct = {}
         self._current_scene_path = scene_path
-        with open(scene_path, 'r', encoding='utf-8') as f:
-            scene_data = json.load(f)
+        # Scene files are encrypted in a protected build and plain otherwise.
+        scene_data = json.loads(assets.read_text(scene_path))
 
         def _l(parent_uuid, object_tree_struct):
             if not object_tree_struct:

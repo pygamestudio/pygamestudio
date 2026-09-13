@@ -5,6 +5,7 @@ from pathlib import Path
 from pygamestudio.game.object.type import *
 from pygamestudio.game.object.base import ObjectBase
 from pygamestudio.common.utils.path import get_project_path
+from pygamestudio.common.utils import assets
 
 # Image formats pygame can load; these are picked out of the frame folder.
 _FRAME_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.bmp', '.gif', '.webp',
@@ -227,7 +228,7 @@ class ObjectFrameSequence(ObjectBase):
                     key=lambda p: _natural_key(p.stem))
                 for image_path in image_files:
                     try:
-                        frame = pygame.image.load(str(image_path))
+                        frame = pygame.image.load(assets.open_stream(image_path))
                         try:
                             frame = frame.convert_alpha()
                         except pygame.error:

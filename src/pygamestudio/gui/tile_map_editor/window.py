@@ -32,7 +32,7 @@ from pygamestudio.gui.inspector.component.spinbox import SuffixSpinBox
 from pygamestudio.gui.tile_map_editor.canvas import (TileMapCanvas, TOOL_PENCIL,
                                                      TOOL_ERASE, TOOL_FILL, TOOL_PICK)
 from pygamestudio.gui.tile_map_editor.palette import TilesetPalette
-from pygamestudio.gui.base.window import WindowBase
+from pygamestudio.gui.base.window import DetachButton, WindowBase
 
 IMAGE_FILTER = 'Image (*.png *.jpg *.jpeg *.gif *.bmp *.webp *.tga *.pcx)'
 
@@ -73,7 +73,7 @@ class TileMapEditorWindow(QWidget):
         self._zoom_in_btn = QPushButton()
         self._zoom_out_btn = QPushButton()
         self._fit_btn = QPushButton()
-        self._detach_btn = QPushButton()
+        self._detach_btn = DetachButton()
         # Layer bar widgets (multi-layer tile maps).
         self._layer_combo = QComboBox()
         self._layer_add_btn = QToolButton()
@@ -208,9 +208,7 @@ class TileMapEditorWindow(QWidget):
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
 
         # --- detach button (reuses the code editor's detach look) ------------
-        self._detach_btn.setObjectName('codeEditorDetachBtn')
-        self._detach_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._update_detach_button_text()
+        self._update_detach_button()
 
         # --- status strip --------------------------------------------------
         self._status_label.setObjectName('tileMapStatusLabel')
@@ -349,7 +347,7 @@ class TileMapEditorWindow(QWidget):
         self.show()
         self._standalone_window.show()
         self._is_detached = True
-        self._update_detach_button_text()
+        self._update_detach_button()
 
     def attach(self):
         """Re-dock the editor back into its tab."""
@@ -366,7 +364,7 @@ class TileMapEditorWindow(QWidget):
         self._tab_widget.setCurrentWidget(self)
         self.show()
         self._is_detached = False
-        self._update_detach_button_text()
+        self._update_detach_button()
 
     def closeEvent(self, event):
         if self._is_detached:
@@ -395,11 +393,9 @@ class TileMapEditorWindow(QWidget):
     def _window_title(self):
         return ' Pygame Studio - {}'.format(self._tab_title())
 
-    def _update_detach_button_text(self):
-        if self._is_detached:
-            self._detach_btn.setText(T.tr('tile_map.attach', 'Attach to Tabs'))
-        else:
-            self._detach_btn.setText(T.tr('tile_map.detach', 'Detach'))
+    def _update_detach_button(self):
+        """Show the attach icon while the editor floats in its own window."""
+        self._detach_btn.set_detached(self._is_detached)
 
     def _update_tab_text(self):
         if (not self._is_detached and self._tab_widget is not None
@@ -430,7 +426,7 @@ class TileMapEditorWindow(QWidget):
         self._layer_visible_btn.setToolTip(T.tr('tile_map.layer_visible', 'Show / Hide Layer'))
         self._layer_collision_btn.setToolTip(T.tr('tile_map.layer_collision', 'Collision Layer'))
         self._palette.setToolTip(T.tr('tile_map.palette_hint', 'Left: pick tile · Wheel: zoom · Shift+wheel: scroll'))
-        self._update_detach_button_text()
+        self._update_detach_button()
         self._update_tab_text()
         self._refresh_from_object()
 

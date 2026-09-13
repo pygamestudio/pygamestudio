@@ -59,6 +59,11 @@ class GridGraphicsView(QGraphicsView):
         h_layout.addStretch(1)
         v_layout.addLayout(h_layout)
         v_layout.addStretch(1)
+        self._toolbar_layout = h_layout
+
+    def add_toolbar_widget(self, widget):
+        """Add a widget to the top bar, right after the refresh button."""
+        self._toolbar_layout.insertWidget(self._toolbar_layout.count() - 1, widget)
 
     def _refresh_scene(self):
         """Re-render the scene preview on the pygame screen."""

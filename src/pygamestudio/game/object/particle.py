@@ -7,6 +7,7 @@ from pygamestudio.game.object.type import *
 from pygamestudio.game.object.base import ObjectBase
 from pygamestudio.common.utils.path import RES_PATH
 from pygamestudio.common.utils.path import get_project_path
+from pygamestudio.common.utils import assets
 
 
 class ObjectParticle(ObjectBase):
@@ -232,7 +233,7 @@ class ObjectParticle(ObjectBase):
             image_path = Path(get_project_path()) / self.particle_image
             if image_path.exists():
                 try:
-                    sprite = pygame.image.load(str(image_path))
+                    sprite = pygame.image.load(assets.open_stream(image_path))
                 except pygame.error:
                     sprite = None
         if sprite is None:

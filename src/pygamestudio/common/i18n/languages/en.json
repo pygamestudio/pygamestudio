@@ -33,6 +33,7 @@
         "critical_no_output_dir": "Please choose the output dir",
         "critical_output_dir_not_exist": "Output dir does not exist",
         "critical_fail_to_build": "Failed to build the project. Please check the log.",
+        "critical_no_pyinstaller": "PyInstaller is not installed. Please install it with \"pip install pyinstaller\" and build again.",
         "to_be_released": "To be released!"
     },
 
@@ -121,7 +122,7 @@
 
         "ev": {
             "start": "When the game starts",
-            "update": "Every frame (dt)",
+            "update": "When each frame updates (dt)",
             "pressed": "When pressed on this object",
             "released": "When released",
             "clicked": "When clicked",
@@ -130,7 +131,7 @@
             "mouse_enter": "When the mouse enters",
             "mouse_leave": "When the mouse leaves",
             "drag_start": "When a drag starts",
-            "drag": "While dragging (pos)",
+            "drag": "When dragged (pos)",
             "drag_end": "When a drag ends",
             "collision_enter": "When a collision starts (other)",
             "collision_exit": "When a collision ends (other)",
@@ -434,7 +435,9 @@
         "slider_handle_color": "Handle Color",
         "slider_track_image": "Track Image",
         "slider_fill_image": "Fill Image",
-        "slider_handle_image": "Handle Image"
+        "slider_handle_image": "Handle Image",
+        "select_previous_object": "Select Previous Object",
+        "select_next_object": "Select Next Object"
     },
 
     "dashboard": {
@@ -482,12 +485,28 @@
         "output_dir": "Output Dir",
         "output_dir_placeholder": "Please choose the output dir",
         "clean_cache": "Clean Cache",
+        "clean_cache_tooltip": "Clear the PyInstaller cache and temporary files before building",
         "build": "Build",
         "open_output_dir": "Open Output Dir",
         "desktop_app": "Desktop App",
         "stop": "Stop",
         "select_app_icon": "Select App Icon",
-        "select_output_dir": "Select Output Dir"
+        "select_output_dir": "Select Output Dir",
+        "build_output": "Build output: {}",
+        "build_stopped": "Build stopped",
+        "build_fail_return_code": "PyInstaller exited with code {}",
+        "build_exe_not_found": "The build completed but the executable was not found: {}",
+        "build_entries_skipped": "Excluded from the package: {}",
+        "build_hidden_imports": "Imports found in the project: {}",
+        "build_import_missing": "Modules that could not be found, skipped: {}",
+        "build_icon_convert_failed": "Failed to convert the icon {}, the original file is used",
+        "protection_running": "Preparing the project code and assets ...",
+        "obfuscation_enabled": "Obfuscated {} python file(s), no comment or docstring left",
+        "obfuscation_unavailable": "pyobfus was not found: the code is stripped but not name-obfuscated",
+        "obfuscation_failed": "Code obfuscation failed, the build is stopped: {}",
+        "staging_failed": "The project could not be prepared for the build, the build is stopped: {}",
+        "assets_encrypted": "Encrypted {} asset file(s) ({} KB)",
+        "assets_failed": "Encrypting the project assets failed, the build is stopped: {}"
     },
 
     "theme": {
@@ -550,6 +569,11 @@
         "window_error": "Window operation failed: {}",
         "no_project_pygs": "Failed to find config file project.pygs in the project root directory.",
         "fail_to_load_project_pygs": "Failed to load config file project.pygs: {}"
+    },
+
+    "panel": {
+        "detach": "Detach into Its Own Window",
+        "attach_to_tabs": "Attach to Tabs"
     },
 
     "translator": {

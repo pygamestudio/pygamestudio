@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (QFileDialog, QHBoxLayout, QLabel, QPushButton,
 from pygamestudio.gui.audio_player.engine import (AudioEngine, STATE_PLAYING,
                                                   STATE_PAUSED)
 from pygamestudio.gui.audio_player.widgets import AudioProgress
-from pygamestudio.gui.base.window import WindowBase
+from pygamestudio.gui.base.window import DetachButton, WindowBase
 from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.gui.console.logger import Logger
 
@@ -64,7 +64,7 @@ class AudioPlayerWindow(QWidget):
         self._ticker = QTimer(self)
         self._ticker.setInterval(100)
 
-        self._detach_btn = QPushButton()
+        self._detach_btn = DetachButton()
         self._open_btn = QPushButton()
         self._prev_btn = QPushButton()
         self._play_btn = QPushButton()
@@ -87,9 +87,7 @@ class AudioPlayerWindow(QWidget):
         self.setObjectName('audioPlayerWindow')
 
     def _set_widget(self):
-        self._detach_btn.setObjectName('codeEditorDetachBtn')
-        self._detach_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._update_detach_button_text()
+        self._update_detach_button()
 
         # Open any audio file from disk (not only project files).
         self._open_btn.setObjectName('imageEditorToolBtn')
@@ -341,7 +339,7 @@ class AudioPlayerWindow(QWidget):
         self.show()
         self._standalone_window.show()
         self._is_detached = True
-        self._update_detach_button_text()
+        self._update_detach_button()
 
     def attach(self):
         if not self._is_detached or self._tab_widget is None:
@@ -357,7 +355,7 @@ class AudioPlayerWindow(QWidget):
         self._tab_widget.setCurrentIndex(1)
         self.show()
         self._is_detached = False
-        self._update_detach_button_text()
+        self._update_detach_button()
 
     def closeEvent(self, event):
         if self._is_detached:
@@ -396,11 +394,9 @@ class AudioPlayerWindow(QWidget):
             if index >= 0:
                 self._tab_widget.setTabText(index, self._tab_title())
 
-    def _update_detach_button_text(self):
-        if self._is_detached:
-            self._detach_btn.setText(T.tr('audio.attach', 'Attach to Tabs'))
-        else:
-            self._detach_btn.setText(T.tr('audio.detach', 'Detach'))
+    def _update_detach_button(self):
+        """Show the attach icon while the player floats in its own window."""
+        self._detach_btn.set_detached(self._is_detached)
 
     # ------------------------------------------------------------------ hooks
     def retranslate(self):
@@ -416,7 +412,7 @@ class AudioPlayerWindow(QWidget):
         if self._current_size:
             self._size_label.setText(
                 T.tr('audio.size', 'Size: {}').format(format_size(self._current_size)))
-        self._update_detach_button_text()
+        self._update_detach_button()
         self._update_titles()
 
     def get_ready_for_project(self):

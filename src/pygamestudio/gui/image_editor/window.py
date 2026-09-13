@@ -12,7 +12,7 @@ from pygamestudio.gui.image_editor.canvas import (ImageCanvas, TOOL_PENCIL,
                                                   TOOL_ERASER, TOOL_LINE,
                                                   TOOL_RECT, TOOL_ELLIPSE,
                                                   TOOL_FILL, TOOL_PICKER)
-from pygamestudio.gui.base.window import WindowBase
+from pygamestudio.gui.base.window import DetachButton, WindowBase
 from pygamestudio.gui.inspector.color import ColorPicker
 from pygamestudio.gui.inspector.component.spinbox import SuffixSpinBox
 from pygamestudio.common.i18n.translator import Translator as T
@@ -68,7 +68,7 @@ class ImageEditorWindow(QWidget):
 
         self._canvas = ImageCanvas()
         self._scroll_area = QScrollArea()
-        self._detach_btn = QPushButton()
+        self._detach_btn = DetachButton()
         self._new_btn = QPushButton()
         self._open_btn = QPushButton()
         self._save_btn = QPushButton()
@@ -104,9 +104,7 @@ class ImageEditorWindow(QWidget):
         self._update_zoom_label()
 
     def _set_widget(self):
-        self._detach_btn.setObjectName('codeEditorDetachBtn')   # reuse the QSS look
-        self._detach_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._update_detach_button_text()
+        self._update_detach_button()
 
         # New / Open file buttons (icons from resources).
         for btn, icon, key, default in (
@@ -617,7 +615,7 @@ class ImageEditorWindow(QWidget):
         self.show()
         self._standalone_window.show()
         self._is_detached = True
-        self._update_detach_button_text()
+        self._update_detach_button()
 
     def attach(self):
         if not self._is_detached or self._tab_widget is None:
@@ -628,14 +626,15 @@ class ImageEditorWindow(QWidget):
             standalone._editor_window = None
             standalone.hide()
             standalone.deleteLater()
-        # Re-dock right after the code editor tab when present, else after the
-        # scene tab (index 1).
-        insert_index = min(2, self._tab_widget.count())
+        # Re-dock at the canonical position (right after the block editor tab,
+        # i.e. index 3) so detaching/attaching never shuffles the tab order;
+        # insertTab appends when that index is past the end.
+        insert_index = min(3, self._tab_widget.count())
         self._tab_widget.insertTab(insert_index, self, self._tab_title())
         self._tab_widget.setCurrentIndex(insert_index)
         self.show()
         self._is_detached = False
-        self._update_detach_button_text()
+        self._update_detach_button()
 
     def closeEvent(self, event):
         if self._is_detached:
@@ -692,11 +691,9 @@ class ImageEditorWindow(QWidget):
     def _update_zoom_label(self):
         self._zoom_label.setText(f'{self._canvas.zoom() * 100:.0f}%')
 
-    def _update_detach_button_text(self):
-        if self._is_detached:
-            self._detach_btn.setText(T.tr('image.attach', 'Attach to Tabs'))
-        else:
-            self._detach_btn.setText(T.tr('image.detach', 'Detach'))
+    def _update_detach_button(self):
+        """Show the attach icon while the editor floats in its own window."""
+        self._detach_btn.set_detached(self._is_detached)
 
     # ------------------------------------------------------------------ theme / hooks
     def apply_theme(self, is_dark):
@@ -733,7 +730,7 @@ class ImageEditorWindow(QWidget):
         self._update_color_button()   # keeps the colour swatch tooltip translated
 
     def retranslate(self):
-        self._update_detach_button_text()
+        self._update_detach_button()
         self._update_tooltips()
         self._update_titles()
         self._file_label.setText(self._file_title())

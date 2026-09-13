@@ -33,6 +33,7 @@
         "critical_output_dir_not_exist": "输出目录不存在",
         "critical_main_not_found": "没有找到main.py，请确保main.py位于项目根目录下。",
         "critical_fail_to_build": "项目打包失败，请检查日志。",
+        "critical_no_pyinstaller": "未安装 PyInstaller，请先执行 \"pip install pyinstaller\" 后再打包。",
         "to_be_released": "即将发布，敬请期待！"
     },
 
@@ -121,7 +122,7 @@
 
         "ev": {
             "start": "当游戏开始时",
-            "update": "每一帧（dt）",
+            "update": "当每帧更新时（dt）",
             "pressed": "当被按下时",
             "released": "当被松开时",
             "clicked": "当被点击时",
@@ -130,7 +131,7 @@
             "mouse_enter": "当鼠标进入时",
             "mouse_leave": "当鼠标离开时",
             "drag_start": "当开始拖拽时",
-            "drag": "拖动时（pos）",
+            "drag": "当被拖动时（pos）",
             "drag_end": "当拖拽结束时",
             "collision_enter": "当发生碰撞时（other）",
             "collision_exit": "当碰撞结束时（other）",
@@ -434,7 +435,9 @@
         "slider_handle_color": "滑块颜色",
         "slider_track_image": "轨道图片",
         "slider_fill_image": "填充图片",
-        "slider_handle_image": "滑块图片"
+        "slider_handle_image": "滑块图片",
+        "select_previous_object": "选择上一个对象",
+        "select_next_object": "选择下一个对象"
     },
 
     "dashboard": {
@@ -482,12 +485,28 @@
         "output_dir": "输出目录",
         "output_dir_placeholder": "请选择输出目录",
         "clean_cache": "清除缓存",
+        "clean_cache_tooltip": "打包前清除 PyInstaller 缓存与临时文件",
         "build": "打包",
         "open_output_dir": "打开输出目录",
         "desktop_app": "桌面应用",
         "stop": "停止",
         "select_app_icon": "选择应用图标",
-        "select_output_dir": "选择输出目录"
+        "select_output_dir": "选择输出目录",
+        "build_output": "构建输出：{}",
+        "build_stopped": "已停止构建",
+        "build_fail_return_code": "PyInstaller 退出，返回码 {}",
+        "build_exe_not_found": "构建结束但没有找到可执行文件：{}",
+        "build_entries_skipped": "已从打包中排除：{}",
+        "build_hidden_imports": "项目中发现的导入：{}",
+        "build_import_missing": "找不到以下模块，已跳过：{}",
+        "build_icon_convert_failed": "图标 {} 转换失败，将使用原文件",
+        "protection_running": "正在处理项目代码与资源 ...",
+        "obfuscation_enabled": "已混淆 {} 个 Python 文件，注释与文档字符串已全部移除",
+        "obfuscation_unavailable": "未找到 pyobfus：代码已去除注释与文档字符串，但未做名称混淆",
+        "obfuscation_failed": "代码混淆失败，构建已中止：{}",
+        "staging_failed": "项目无法准备为构建副本，构建已中止：{}",
+        "assets_encrypted": "已加密 {} 个资源文件（{} KB）",
+        "assets_failed": "资源加密失败，构建已中止：{}"
     },
 
     "theme": {
@@ -550,6 +569,11 @@
         "window_error": "窗口操作失败：{}",
         "no_project_pygs": "没有在项目根目录下找到project.pygs配置文件。",
         "fail_to_load_project_pygs": "配置文件project.pygs加载失败：{}"
+    },
+
+    "panel": {
+        "detach": "独立窗口",
+        "attach_to_tabs": "回到标签页"
     },
 
     "translator": {

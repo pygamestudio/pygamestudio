@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (QHBoxLayout, QLabel, QPushButton, QSplitter, QVBo
                                QWidget)
 
 from pygamestudio.common.i18n.translator import Translator as T
-from pygamestudio.gui.base.window import WindowBase
+from pygamestudio.gui.base.window import DetachButton, WindowBase
 from pygamestudio.gui.block_editor.canvas import BlockCanvas
 from pygamestudio.gui.block_editor.palette import BlockPalette
 from pygamestudio.gui.scene.widget import RunProjectButton
@@ -39,7 +39,7 @@ class BlockEditorWindow(QWidget):
         self._zoom_in_btn = QPushButton()
         self._zoom_out_btn = QPushButton()
         self._code_btn = QPushButton()
-        self._detach_btn = QPushButton()
+        self._detach_btn = DetachButton()
         self._run_btn = RunProjectButton()
         self._palette = BlockPalette()
         self._canvas = BlockCanvas()
@@ -53,9 +53,7 @@ class BlockEditorWindow(QWidget):
 
     def _set_widget(self):
         self._file_label.setObjectName('blockEditorFileLabel')
-
-        self._detach_btn.setObjectName('codeEditorDetachBtn')
-        self._detach_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._update_detach_button()
         for button, icon_name in ((self._undo_btn, 'undo'), (self._redo_btn, 'redo'),
                                   (self._zoom_in_btn, 'zoom_in'), (self._zoom_out_btn, 'zoom_out')):
             button.setObjectName('blockEditorToolBtn')
@@ -155,6 +153,10 @@ class BlockEditorWindow(QWidget):
         """Bring this editor into view (its tab, or its detached window)."""
         self._raise_window()
 
+    def focus_editor(self):
+        """Give the keyboard focus to the block canvas."""
+        self._canvas.setFocus()
+
     def _on_script_saved(self, path):
         self._update_titles()
         self.script_saved.emit(path)
@@ -180,7 +182,7 @@ class BlockEditorWindow(QWidget):
         self.show()
         self._standalone_window.show()
         self._is_detached = True
-        self._update_detach_button_text()
+        self._update_detach_button()
 
     def attach(self):
         """Re-dock the standalone window back into the tab widget."""
@@ -196,7 +198,7 @@ class BlockEditorWindow(QWidget):
         self._tab_widget.setCurrentIndex(TAB_INDEX)
         self.show()
         self._is_detached = False
-        self._update_detach_button_text()
+        self._update_detach_button()
 
     def closeEvent(self, event):
         # Closing the detached window returns it to the tab widget.
@@ -235,11 +237,9 @@ class BlockEditorWindow(QWidget):
             if index >= 0:
                 self._tab_widget.setTabText(index, self._tab_title())
 
-    def _update_detach_button_text(self):
-        if self._is_detached:
-            self._detach_btn.setText(T.tr('block.attach', 'Attach to Tabs'))
-        else:
-            self._detach_btn.setText(T.tr('block.detach', 'Detach'))
+    def _update_detach_button(self):
+        """Show the attach icon while the editor floats in its own window."""
+        self._detach_btn.set_detached(self._is_detached)
 
     def apply_theme(self, is_dark):
         self._canvas.apply_theme(is_dark)
@@ -251,7 +251,7 @@ class BlockEditorWindow(QWidget):
         self._zoom_in_btn.setToolTip(T.tr('block.zoom_in', 'Zoom In'))
         self._zoom_out_btn.setToolTip(T.tr('block.zoom_out', 'Zoom Out'))
         self._code_btn.setToolTip(T.tr('menu.open_in_code_editor', 'Open in Code Editor'))
-        self._update_detach_button_text()
+        self._update_detach_button()
         self._palette.retranslate()
         # Blocks are labelled when their item is built, so a language switch
         # has to rebuild the scene - otherwise the canvas keeps the old text.

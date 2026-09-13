@@ -4,6 +4,7 @@ from pathlib import Path
 from pygamestudio.game.object.type import *
 from pygamestudio.game.object.base import ObjectBase
 from pygamestudio.common.utils.path import get_project_path
+from pygamestudio.common.utils import assets
 
 
 class ObjectButton(ObjectBase):
@@ -97,7 +98,7 @@ class ObjectButton(ObjectBase):
         if self.image_path == '' or not image_absolute_path.exists():
             self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
         else:
-            self.surface = pygame.image.load(image_absolute_path).convert(self.surface)
+            self.surface = pygame.image.load(assets.open_stream(image_absolute_path)).convert(self.surface)
 
         self.surface = pygame.transform.scale(self.surface, self.size)
 

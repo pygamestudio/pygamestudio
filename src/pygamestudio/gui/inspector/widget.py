@@ -15,7 +15,7 @@ class SelectPreviousObjectButton(QPushButton):
         self._set_signal()
 
     def _set_widget(self):
-        self.setToolTip(T.tr('inspector.select_previous', 'Select Previous Object'))
+        self.setToolTip(T.tr('inspector.select_previous_object', 'Select Previous Object'))
         self.set_disabled()
 
     def _set_signal(self):
@@ -43,7 +43,7 @@ class SelectNextObjectButton(QPushButton):
         self._set_signal()
 
     def _set_widget(self):
-        self.setToolTip(T.tr('inspector.select_next', 'Select Next Object'))
+        self.setToolTip(T.tr('inspector.select_next_object', 'Select Next Object'))
         self.set_disabled()
 
     def _set_signal(self):

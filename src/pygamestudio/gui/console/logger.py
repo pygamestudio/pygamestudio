@@ -1,7 +1,9 @@
-from PySide6.QtCore import QObject
+class Logger:
+    """Singleton logger.
 
-
-class Logger(QObject):
+    Plain Python on purpose: the game runtime reaches this module through the
+    translator, so it must not pull PySide6 (and therefore Qt) into the build.
+    """
     instance = None
     
     def __new__(cls):

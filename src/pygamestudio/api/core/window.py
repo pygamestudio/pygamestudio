@@ -24,6 +24,7 @@ import pygame
 from pathlib import Path
 from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.common.utils.path import RES_PATH
+from pygamestudio.common.utils import assets
 
 __all__ = [
     'WindowManager', 'window_manager',
@@ -73,7 +74,7 @@ class WindowManager:
         key = absolute_path.as_posix()
         if key not in self._icon_cache:
             try:
-                self._icon_cache[key] = pygame.image.load(str(absolute_path))
+                self._icon_cache[key] = pygame.image.load(assets.open_stream(absolute_path))
             except Exception as e:
                 self._warn('api.fail_to_load_icon', 'Failed to load the icon {}: {}', absolute_path, e)
                 return None

@@ -615,8 +615,7 @@ QWidget#codeEditorWindow QLabel#codeEditorStatus {
 QPushButton#codeEditorDetachBtn {
     background-color: transparent;
     border: none;
-    color: #333333;
-    padding: 4px 10px;
+    padding: 5px;
     border-radius: 4px;
 }
 

@@ -19,6 +19,7 @@ import os
 import pygame
 from pathlib import Path
 from pygamestudio.common.i18n.translator import Translator as T
+from pygamestudio.common.utils import assets
 
 
 class AudioManager:
@@ -61,7 +62,7 @@ class AudioManager:
         key = absolute_path.as_posix()
         if key not in self._sounds:
             try:
-                self._sounds[key] = pygame.mixer.Sound(str(absolute_path))
+                self._sounds[key] = pygame.mixer.Sound(file=assets.open_stream(absolute_path))
             except Exception as e:
                 print(T.tr('api.fail_to_load_sound', 'Failed to load sound {}: {}').format(absolute_path, e))
                 return None
@@ -129,7 +130,7 @@ class AudioManager:
             return False
 
         try:
-            pygame.mixer.music.load(str(absolute_path))
+            pygame.mixer.music.load(assets.open_stream(absolute_path))
             pygame.mixer.music.set_volume(self._music_volume)
             pygame.mixer.music.play(loops=loops, fade_ms=fade_ms)
             return True

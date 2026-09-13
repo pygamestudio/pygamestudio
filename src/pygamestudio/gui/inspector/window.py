@@ -1,11 +1,13 @@
 from PySide6.QtGui import *
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
+from pygamestudio.common.i18n.translator import Translator as T
+from pygamestudio.gui.base.window import DetachablePanel
 from pygamestudio.gui.inspector.widget import *
 from pygamestudio.gui.inspector.container import Container
 
 
-class InspectorWindow(QWidget):
+class InspectorWindow(DetachablePanel, QWidget):
     def __init__(self, parent=None, game_manager=None):
         super().__init__(parent)
         self._game_manager = game_manager
@@ -44,6 +46,7 @@ class InspectorWindow(QWidget):
         h_layout.addWidget(self._select_previous_object_button)
         h_layout.addWidget(self._select_next_object_button)
         h_layout.addStretch(1)
+        h_layout.addWidget(self._detach_btn)
         h_layout.setContentsMargins(0, 4, 0, 0)
         v_layout.addLayout(h_layout)
         v_layout.addWidget(self._scroll_area, 1)
@@ -52,6 +55,13 @@ class InspectorWindow(QWidget):
 
     def _set_object_name(self):
         self.setObjectName('inspector')
+
+    # ------------------------------------------------------------------ detach
+    def _tab_title(self):
+        return T.tr('inspector.inspector', 'Inspector')
+
+    def standalone_window_size(self):
+        return (360, 720)
 
     def _update_select_buttons(self, selection_history_length, current_index):
         if not selection_history_length:
@@ -73,4 +83,5 @@ class InspectorWindow(QWidget):
         self._container.get_ready_for_project()
         
     def clean_up(self):
+        self.redock()
         self._container.clean_up()

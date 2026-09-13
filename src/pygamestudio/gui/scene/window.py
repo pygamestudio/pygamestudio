@@ -1,10 +1,12 @@
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
+from pygamestudio.common.i18n.translator import Translator as T
+from pygamestudio.gui.base.window import DetachablePanel
 from pygamestudio.gui.scene.screen import PygameScreen
 from pygamestudio.gui.scene.grid import GridGraphicsView, GridGraphicsScene
 
 
-class SceneWindow(QWidget):
+class SceneWindow(DetachablePanel, QWidget):
     def __init__(self, parent=None, game_manager=None):
         super().__init__(parent)
         self._game_manager = game_manager
@@ -20,6 +22,7 @@ class SceneWindow(QWidget):
         self._set_layout()
 
     def _set_widget(self):
+        self._grid_view.add_toolbar_widget(self._detach_btn)
         self._pygame_proxy = self._grid_scene.addWidget(self._pygame_screen)
         # The (transparent) editor overlay wraps the canvas in a margin ring;
         # parking it at scene (-offset, -offset) keeps the canvas at scene
@@ -34,12 +37,25 @@ class SceneWindow(QWidget):
         window_layout = QVBoxLayout(self)
         window_layout.addWidget(self._grid_view)
         window_layout.setContentsMargins(0, 0, 0, 0)
+
+    # ------------------------------------------------------------------ detach
+    def _tab_title(self):
+        """The tab / window name, with the unsaved marker while the scene has
+        unsaved changes (same text the tab used to get from the editor body)."""
+        name = T.tr('scene.scene', 'Scene')
+        if self._game_manager is not None and not self._game_manager.is_current_scene_saved:
+            return '*{}'.format(name)
+        return name
+
+    def standalone_window_size(self):
+        return (1100, 720)
     
     def get_ready_for_project(self):
         self._pygame_screen.get_ready_for_project()
         self._grid_view.get_ready_for_project()
 
     def clean_up(self):
+        self.redock()
         self._grid_view.clean_up()
         self._pygame_screen.clean_up()
 

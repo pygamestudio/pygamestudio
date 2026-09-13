@@ -1,12 +1,14 @@
 from PySide6.QtGui import *
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
+from pygamestudio.common.i18n.translator import Translator as T
+from pygamestudio.gui.base.window import DetachablePanel
 from pygamestudio.gui.hierarchy.tree import HierarchyTreeView
 from pygamestudio.gui.hierarchy.search import SearchLineEdit
 from pygamestudio.gui.hierarchy.widget import ExpandCollapseAllButton, AddItemButton
 
 
-class HierarchyWindow(QWidget):
+class HierarchyWindow(DetachablePanel, QWidget):
     def __init__(self, parent=None, game_manager=None):
         super().__init__(parent)
         self._hierarchy_tree_view = HierarchyTreeView(self, game_manager)
@@ -31,6 +33,7 @@ class HierarchyWindow(QWidget):
         v_layout = QVBoxLayout(self)
         h_layout.addWidget(self._add_item_button)
         h_layout.addWidget(self._expand_collapse_all_button)
+        h_layout.addWidget(self._detach_btn)
         h_layout.addWidget(self._search_line_edit)
         h_layout.setContentsMargins(0, 4, 0, 0)
 
@@ -42,6 +45,13 @@ class HierarchyWindow(QWidget):
     def _set_object_name(self):
         self.setObjectName('hierarchy')
 
+    # ------------------------------------------------------------------ detach
+    def _tab_title(self):
+        return T.tr('hierarchy.hierarchy', 'Hierarchy')
+
+    def standalone_window_size(self):
+        return (320, 700)
+
     @property
     def hierarchy_tree_view(self):
         return self._hierarchy_tree_view
@@ -50,4 +60,5 @@ class HierarchyWindow(QWidget):
         self._hierarchy_tree_view.get_ready_for_project()
 
     def clean_up(self):
+        self.redock()
         self._hierarchy_tree_view.clean_up()

@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWi
 
 from pygamestudio.gui.code_editor.editor import CodeEditor
 from pygamestudio.gui.scene.widget import RunProjectButton
-from pygamestudio.gui.base.window import WindowBase
+from pygamestudio.gui.base.window import DetachButton, WindowBase
 from pygamestudio.common.i18n.translator import Translator as T
 
 
@@ -30,7 +30,7 @@ class CodeEditorWindow(QWidget):
 
         self._editor = CodeEditor()
         self._run_project_btn = RunProjectButton()
-        self._detach_btn = QPushButton()
+        self._detach_btn = DetachButton()
         self._file_label = QLabel()
         self._block_btn = QPushButton()
         self._zoom_in_btn = QPushButton()
@@ -46,9 +46,7 @@ class CodeEditorWindow(QWidget):
 
     def _set_widget(self):
         self._file_label.setObjectName('codeEditorFileLabel')
-        self._detach_btn.setObjectName('codeEditorDetachBtn')
-        self._detach_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._update_detach_button_text()
+        self._update_detach_button()
 
         self._block_btn.setObjectName('editorSwitchBtn')
         self._block_btn.setIcon(QIcon(':/images/block.png'))
@@ -137,6 +135,10 @@ class CodeEditorWindow(QWidget):
         """Bring this editor into view (its tab, or its detached window)."""
         self._raise_window()
 
+    def focus_editor(self):
+        """Give the keyboard focus to the code area."""
+        self._editor.setFocus()
+
     def save(self):
         self._editor.save()
 
@@ -180,7 +182,7 @@ class CodeEditorWindow(QWidget):
         self.show()
         self._standalone_window.show()
         self._is_detached = True
-        self._update_detach_button_text()
+        self._update_detach_button()
 
     def attach(self):
         """Re-dock the standalone window back into the tab widget."""
@@ -196,7 +198,7 @@ class CodeEditorWindow(QWidget):
         self._tab_widget.setCurrentIndex(1)
         self.show()
         self._is_detached = False
-        self._update_detach_button_text()
+        self._update_detach_button()
 
     def closeEvent(self, event):
         # Closing the detached window returns it to the tab widget.
@@ -210,11 +212,9 @@ class CodeEditorWindow(QWidget):
         return self._is_detached
 
     # ------------------------------------------------------------------ titles / i18n
-    def _update_detach_button_text(self):
-        if self._is_detached:
-            self._detach_btn.setText(T.tr('code.attach', 'Attach to Tabs'))
-        else:
-            self._detach_btn.setText(T.tr('code.detach', 'Detach'))
+    def _update_detach_button(self):
+        """Show the attach icon while the editor floats in its own window."""
+        self._detach_btn.set_detached(self._is_detached)
 
     def _update_zoom_buttons(self, size):
         """Disable a zoom button when the font size reached its limit."""
@@ -253,7 +253,7 @@ class CodeEditorWindow(QWidget):
 
     def retranslate(self):
         self._block_btn.setToolTip(T.tr('menu.open_in_block_editor', 'Open in Block Editor'))
-        self._update_detach_button_text()
+        self._update_detach_button()
         self._update_titles()
 
     def get_ready_for_project(self):

@@ -25,14 +25,19 @@ class Game:
         self._running = False
 
     def _init_game(self):
-        """Set up pygame and resolve the project root from the calling file.
+        """Set up pygame and resolve the project root.
 
-        The project path is derived from the stack frame of whoever created
-        the Game (the project's main.py), so no path config is required.
+        In a frozen build (PyInstaller) the project files are bundled next to
+        the executable, so the bundle folder is the project root. Otherwise the
+        project path is derived from the stack frame of whoever created the
+        Game (the project's main.py), so no path config is required.
         """
-        caller_frame = inspect.stack()[-1]
-        caller_file_path = caller_frame.filename
-        self._project_path = Path(caller_file_path).parent.resolve().as_posix()
+        if getattr(sys, 'frozen', False):
+            self._project_path = Path(getattr(sys, '_MEIPASS', Path(sys.executable).parent)).resolve().as_posix()
+        else:
+            caller_frame = inspect.stack()[-1]
+            caller_file_path = caller_frame.filename
+            self._project_path = Path(caller_file_path).parent.resolve().as_posix()
         os.environ['PROJECT_PATH'] = self._project_path
         project_config = get_project_config()
 

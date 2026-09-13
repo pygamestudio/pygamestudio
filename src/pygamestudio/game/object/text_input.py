@@ -14,6 +14,7 @@ from pathlib import Path
 from pygamestudio.game.object.type import *
 from pygamestudio.game.object.base import ObjectBase
 from pygamestudio.common.utils.path import get_project_path
+from pygamestudio.common.utils import assets
 
 
 class ObjectTextInput(ObjectBase):
@@ -271,7 +272,7 @@ class ObjectTextInput(ObjectBase):
         if self.font_path == '' or not font_absolute_path.exists():
             font = pygame.font.Font(None, size=self.font_size)
         else:
-            font = pygame.font.Font(str(font_absolute_path), size=self.font_size)
+            font = pygame.font.Font(assets.open_stream(font_absolute_path), size=self.font_size)
         font.set_bold(self.bold)
         font.set_italic(self.italic)
         font.set_underline(self.underline)

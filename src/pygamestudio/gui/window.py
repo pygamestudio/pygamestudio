@@ -81,8 +81,11 @@ class EditorBody(QMainWindow):
         self.menuBar().setNativeMenuBar(False)
 
         self._left_top_tab_widget.addTab(self._hierarchy_window, T.tr('hierarchy.hierarchy', 'Hierarchy'))
+        self._hierarchy_window.set_tab_widget(self._left_top_tab_widget)
         self._left_bottom_tab_widget.addTab(self._asset_window, T.tr('asset.asset', 'Asset'))
+        self._asset_window.set_tab_widget(self._left_bottom_tab_widget)
         self._center_top_tab_widget.addTab(self._scene_widnow, T.tr('scene.scene', 'Scene'))
+        self._scene_widnow.set_tab_widget(self._center_top_tab_widget)
         self._center_top_tab_widget.addTab(self._code_editor_window, T.tr('code.editor', 'Code Editor'))
         self._code_editor_window.set_tab_widget(self._center_top_tab_widget)
         self._center_top_tab_widget.addTab(self._block_editor_window, T.tr('block.editor', 'Block Editor'))
@@ -92,9 +95,11 @@ class EditorBody(QMainWindow):
         self._center_top_tab_widget.addTab(self._tile_map_editor_window, T.tr('tile_map.editor', 'Tile Map Editor'))
         self._tile_map_editor_window.set_tab_widget(self._center_top_tab_widget)
         self._center_bottom_tab_widget.addTab(self._console_window, T.tr('console.console', 'Console'))
+        self._console_window.set_tab_widget(self._center_bottom_tab_widget)
         self._center_bottom_tab_widget.addTab(self._audio_player_window, T.tr('audio.player', 'Audio Player'))
         self._audio_player_window.set_tab_widget(self._center_bottom_tab_widget)
         self._right_top_tab_widget.addTab(self._inspector_window, T.tr('inspector.inspector', 'Inspector'))
+        self._inspector_window.set_tab_widget(self._right_top_tab_widget)
         self._right_bottom_tab_widget.setHidden(True)
 
         self._left_vertical_splitter.setOrientation(Qt.Orientation.Vertical)
@@ -332,12 +337,9 @@ class EditorBody(QMainWindow):
 
     def _update_scene_tab_unsaved_marker(self):
         """Prefix the scene tab label with '*' while the scene has unsaved
-        changes, so the unsaved state is visible at a glance."""
-        scene_tab_name = T.tr('scene.scene', 'Scene')
-        if self._game_manager.is_current_scene_saved:
-            self._center_top_tab_widget.setTabText(0, scene_tab_name)
-        else:
-            self._center_top_tab_widget.setTabText(0, f'*{scene_tab_name}')
+        changes, so the unsaved state is visible at a glance (the detached
+        scene window keeps the same name in its title bar)."""
+        self._scene_widnow.update_window_titles()
 
     def image_editor_active(self):
         """Return True when the image editor is the panel the user is
@@ -386,6 +388,7 @@ class EditorBody(QMainWindow):
         if file_path and Path(file_path).suffix.lower() == '.py':
             if is_block_script(file_path) or can_hold_blocks(file_path)[0]:
                 self._block_editor_window.open_file(file_path)
+                self._focus_switched_editor(self._block_editor_window)
                 return
             QMessageBox.warning(
                 self, T.tr('message_box.warning_title', 'Warning'),
@@ -393,6 +396,7 @@ class EditorBody(QMainWindow):
                      'This script has no ObjectScript class to attach blocks to.'))
             return
         self._block_editor_window.raise_editor()
+        self._focus_switched_editor(self._block_editor_window)
 
     def _on_switch_to_code_editor(self, file_path):
         """The block editor asked for the code editor: show the SAME file."""
@@ -400,6 +404,26 @@ class EditorBody(QMainWindow):
             self._code_editor_window.open_file(file_path)
         else:
             self._code_editor_window.raise_editor()
+        self._focus_switched_editor(self._code_editor_window)
+
+    def _focus_switched_editor(self, editor_window):
+        """Give the editor the keyboard focus after a switch.
+
+        The editor we switched FROM may be floating in its own top-level
+        window: a docked tab would then stay behind that window (and the old
+        window would keep the focus), so the editor's main window is raised
+        explicitly. A detached target is its own window - raising it already
+        brings it to the front.
+        """
+        editor_window.raise_editor()
+        if editor_window.is_detached():
+            editor_window.focus_editor()
+            return
+        main_window = self.window()
+        if main_window is not None:
+            main_window.raise_()
+            main_window.activateWindow()
+        editor_window.focus_editor()
 
     def retranslate(self):
         self.menuBar().clear()
@@ -409,11 +433,11 @@ class EditorBody(QMainWindow):
         self._help_menu = self.menuBar().addMenu(T.tr('menu.help', 'Help'))
         self._set_menu()
 
-        self._left_top_tab_widget.setTabText(0, T.tr('hierarchy.hierarchy', 'Hierarchy'))
-        self._left_bottom_tab_widget.setTabText(0, T.tr('asset.asset', 'Asset'))
+        self._hierarchy_window.update_window_titles()
+        self._asset_window.update_window_titles()
         self._update_scene_tab_unsaved_marker()
-        self._center_bottom_tab_widget.setTabText(0, T.tr('console.console', 'Console'))
-        self._right_top_tab_widget.setTabText(0, T.tr('inspector.inspector', 'Inspector'))
+        self._console_window.update_window_titles()
+        self._inspector_window.update_window_titles()
         self._code_editor_window.retranslate()
         self._block_editor_window.retranslate()
         self._image_editor_window.retranslate()

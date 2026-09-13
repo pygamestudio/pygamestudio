@@ -1,6 +1,4 @@
 import json
-from PySide6.QtCore import *
-from PySide6.QtWidgets import *
 from pygamestudio.gui.console.logger import Logger
 from pygamestudio.common.utils.path import LANG_PATH
 

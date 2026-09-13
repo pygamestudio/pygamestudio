@@ -1,12 +1,14 @@
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import *
+from pygamestudio.common.i18n.translator import Translator as T
+from pygamestudio.gui.base.window import DetachablePanel
 from pygamestudio.gui.console.type import *
 from pygamestudio.gui.console.widget import *
 from pygamestudio.gui.console.search import SearchLineEdit
 from pygamestudio.gui.console.browser import ConsoleLogBrowser
 
 
-class ConsoleWindow(QWidget):
+class ConsoleWindow(DetachablePanel, QWidget):
     open_file_at_line_signal = Signal(str, int)
 
     def __init__(self, parent=None, game_manager=None):
@@ -48,6 +50,7 @@ class ConsoleWindow(QWidget):
         v_layout = QVBoxLayout(self)
         h_layout.addWidget(self._clear_btn)
         h_layout.addWidget(self._search_line_edit)
+        h_layout.addWidget(self._detach_btn)
         h_layout.addStretch(1)
         h_layout.addWidget(self._info_check_box)
         h_layout.addSpacerItem(QSpacerItem(10, 0))
@@ -61,10 +64,18 @@ class ConsoleWindow(QWidget):
         v_layout.setSpacing(5)
         v_layout.setContentsMargins(0, 6, 0, 0)
 
+    # ------------------------------------------------------------------ detach
+    def _tab_title(self):
+        return T.tr('console.console', 'Console')
+
+    def standalone_window_size(self):
+        return (900, 340)
+
     def get_ready_for_project(self):
         self._console_log_browser.get_ready_for_project()
 
     def clean_up(self):
+        self.redock()
         self._console_log_browser.clean_up()
 
     def reload_logs_on_theme_changed(self, theme_code):

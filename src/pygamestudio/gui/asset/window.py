@@ -1,11 +1,13 @@
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import *
+from pygamestudio.common.i18n.translator import Translator as T
+from pygamestudio.gui.base.window import DetachablePanel
 from pygamestudio.gui.asset.widget import *
 from pygamestudio.gui.asset.tree import AssetTreeView
 from pygamestudio.gui.asset.search import SearchLineEdit
 
 
-class AssetWindow(QWidget):
+class AssetWindow(DetachablePanel, QWidget):
     edit_file_signal = Signal(str)
     image_edit_signal = Signal(str)
     audio_play_signal = Signal(str)
@@ -44,6 +46,7 @@ class AssetWindow(QWidget):
         h_layout.addWidget(self._add_asset_button)
         h_layout.addWidget(self._sort_asset_button)
         h_layout.addWidget(self._refresh_asset_button)
+        h_layout.addWidget(self._detach_btn)
         h_layout.addWidget(self._search_line_edit)
         h_layout.setContentsMargins(0, 4, 0, 0)
 
@@ -55,9 +58,17 @@ class AssetWindow(QWidget):
     def _set_object_name(self):
         self.setObjectName('asset')
 
+    # ------------------------------------------------------------------ detach
+    def _tab_title(self):
+        return T.tr('asset.asset', 'Asset')
+
+    def standalone_window_size(self):
+        return (380, 700)
+
     def get_ready_for_project(self):
         self._asset_tree_view.get_ready_for_project()
 
     def clean_up(self):
+        self.redock()
         self._search_line_edit.clear()
         self._asset_tree_view.clean_up()

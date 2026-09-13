@@ -4,6 +4,7 @@ from pathlib import Path
 from pygamestudio.game.object.type import *
 from pygamestudio.game.object.base import ObjectBase
 from pygamestudio.common.utils.path import get_project_path
+from pygamestudio.common.utils import assets
 
 _IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp',
                      '.tga', '.pcx', '.qoi', '.xpm', '.lbm'}
@@ -144,7 +145,7 @@ class ObjectSlider(ObjectBase):
             path = project_root / path
         if path.is_file() and path.suffix.lower() in _IMAGE_EXTENSIONS:
             try:
-                img = pygame.image.load(str(path))
+                img = pygame.image.load(assets.open_stream(path))
                 try:
                     img = img.convert_alpha()
                 except pygame.error:
