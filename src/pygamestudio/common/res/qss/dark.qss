@@ -841,6 +841,22 @@ QPushButton#agentSendBtn {
     font-size: 12px;
 }
 
+/* The one primary action of the panel: continue a turn paused at the step limit. */
+QPushButton#agentContinueBtn {
+    background-color: #0e639c;
+    color: #ffffff;
+    padding: 2px 12px;
+    font-size: 12px;
+}
+
+QPushButton#agentContinueBtn:hover {
+    background-color: #1177bb;
+}
+
+QPushButton#agentContinueBtn:pressed {
+    background-color: #0a4d78;
+}
+
 QPushButton#agentIconBtn {
     background-color: transparent;
     border: none;

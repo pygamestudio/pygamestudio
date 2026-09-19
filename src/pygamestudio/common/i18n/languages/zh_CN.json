@@ -514,6 +514,7 @@
         "cancel": "取消",
         "allow": "允许",
         "deny": "拒绝",
+        "continue": "继续",
         "confirm_tool": "执行 {}？",
         "thinking": "思考中…第 {} 步",
         "calling": "正在调用 {}…",
@@ -522,7 +523,8 @@
         "busy": "还在处理中，请先点停止。",
         "stopped": "已停止。",
         "denied": "已跳过 {}（被拒绝）。",
-        "step_limit": "已达到步数上限（{} 步），再问一次可继续。"
+        "step_limit": "已达到 {} 步上限，确认无误后点击继续。",
+        "continue_dismissed": "已在步数上限处停止。"
     },
     "build": {
         "app_name": "应用名称",

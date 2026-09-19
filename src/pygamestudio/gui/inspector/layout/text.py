@@ -5,6 +5,7 @@ from pygamestudio.gui.inspector.component.picker import *
 from pygamestudio.gui.inspector.component.checkbox import *
 from pygamestudio.gui.inspector.component.combobox import *
 from pygamestudio.gui.inspector.component.textedit import *
+from pygamestudio.gui.inspector.component.alignment import *
 
 
 INSPECTOR_LAYOUT_TEXT = {
@@ -94,6 +95,28 @@ INSPECTOR_LAYOUT_TEXT = {
             'enabled': [True],
             'attribute': ['text'],
             'widget': [TextEdit]
+        }
+    },
+    'text_align': {
+        'i18n': {
+            'key': 'inspector.text_align',
+            'default': 'H Align'
+        },
+        'component': {
+            'enabled': [True],
+            'attribute': ['text_align'],
+            'widget': [AlignmentButtonGroup]
+        }
+    },
+    'text_valign': {
+        'i18n': {
+            'key': 'inspector.text_valign',
+            'default': 'V Align'
+        },
+        'component': {
+            'enabled': [True],
+            'attribute': ['text_valign'],
+            'widget': [AlignmentButtonGroup]
         }
     },
     'font_size': {

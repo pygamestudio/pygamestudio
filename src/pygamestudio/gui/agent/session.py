@@ -277,6 +277,7 @@ class AgentSession(QObject):
     ``tool_finished``      (name, ok, summary)   - a tool finished
     ``status_changed``     (text, busy)          - status line + busy flag
     ``confirmation_needed``(name, arguments)     - wait for approve()/deny()
+    ``continue_needed``    (steps)               - the turn hit the step limit
     ``finished``           (error_text)          - the turn ended ('' = ok)
     """
 
@@ -285,6 +286,7 @@ class AgentSession(QObject):
     tool_finished = Signal(str, bool, str)
     status_changed = Signal(str, bool)
     confirmation_needed = Signal(str, dict)
+    continue_needed = Signal(int)
     finished = Signal(str)
 
     # Internal bridge from the request thread (queued delivery keeps every
@@ -302,6 +304,7 @@ class AgentSession(QObject):
         self._pending_calls = []
         self._pending_index = 0
         self._awaiting_confirmation = None
+        self._awaiting_continue = False
         self._request_thread = None
         # The worker thread hands its result over through queued signals, so no
         # Qt object is ever touched from another thread.
@@ -312,6 +315,10 @@ class AgentSession(QObject):
     def is_busy(self) -> bool:
         """True while a turn is running (the panel shows Stop instead of Send)."""
         return self._busy
+
+    def is_awaiting_continue(self) -> bool:
+        """True while the turn is paused at the step limit (Continue button)."""
+        return self._awaiting_continue
 
     def settings(self) -> dict:
         return dict(self._settings)
@@ -326,6 +333,7 @@ class AgentSession(QObject):
         self.cancel()
         self._messages = []
         self._step = 0
+        self._awaiting_continue = False
 
     def send(self, text):
         """Start a turn with a new user message."""
@@ -335,11 +343,32 @@ class AgentSession(QObject):
         if self._busy:
             self.status_changed.emit(T.tr('agent.busy', 'Still working - press Stop first.'), True)
             return
+        # A new prompt replaces a turn that is waiting at the step limit.
+        self._awaiting_continue = False
         if not self._messages:
             self._messages.append({'role': 'system', 'content': system_prompt()})
         self._messages.append({'role': 'user', 'content': text})
         self.message_added.emit('user', text)
         self._begin()
+
+    def continue_run(self):
+        """Resume a turn that was stopped at the step limit (Continue button).
+
+        Nothing is added to the conversation: the model simply keeps working
+        from the last tool result, with a fresh step budget.
+        """
+        if self._busy or not self._awaiting_continue:
+            return
+        self._awaiting_continue = False
+        self._begin()
+
+    def dismiss_continue(self):
+        """Drop a turn that is paused at the step limit (Cancel button).
+
+        The conversation is kept - only the pending resumption is given up,
+        so the user can carry on with a message of their own.
+        """
+        self._awaiting_continue = False
 
     def stop(self):
         """Ask the running turn to stop after the current step."""
@@ -348,6 +377,7 @@ class AgentSession(QObject):
     def cancel(self):
         self._cancel = True
         self._awaiting_confirmation = None
+        self._awaiting_continue = False
         if self._busy:
             self._finish(T.tr('agent.stopped', 'Stopped.'))
 
@@ -384,11 +414,24 @@ class AgentSession(QObject):
         if self._cancel:
             return self._finish('')
         if self._step >= STEP_LIMIT:
-            return self._finish(T.tr(
-                'agent.step_limit', 'Step limit reached ({} steps) - ask again to continue.').format(STEP_LIMIT))
+            return self._pause_for_continue()
         self._step += 1
         self.status_changed.emit(T.tr('agent.thinking', 'Thinking... step {}').format(self._step), True)
         self._start_request()
+
+    def _pause_for_continue(self):
+        """Stop at the step limit and let the user decide whether to go on.
+
+        Not an error: the turn keeps its place, the panel shows a Continue
+        button and locks the input, so nobody has to guess what to type.
+        """
+        self._busy = False
+        self._awaiting_confirmation = None
+        self._awaiting_continue = True
+        self._step = 0
+        self.status_changed.emit('', False)
+        self.continue_needed.emit(STEP_LIMIT)
+        self.finished.emit('')
 
     def _start_request(self):
         """Run the model request in a worker thread (the loop stays on the main thread)."""

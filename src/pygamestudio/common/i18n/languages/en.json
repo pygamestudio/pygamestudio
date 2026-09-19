@@ -515,6 +515,7 @@
         "cancel": "Cancel",
         "allow": "Allow",
         "deny": "Deny",
+        "continue": "Continue",
         "confirm_tool": "Run {}?",
         "thinking": "Thinking... step {}",
         "calling": "Calling {}...",
@@ -523,7 +524,8 @@
         "busy": "Still working - press Stop first.",
         "stopped": "Stopped.",
         "denied": "Skipped {} (declined).",
-        "step_limit": "Step limit reached ({} steps) - ask again to continue."
+        "step_limit": "Step limit reached ({} steps). Continue when you are ready.",
+        "continue_dismissed": "Stopped at the step limit."
     },
 
     "build": {

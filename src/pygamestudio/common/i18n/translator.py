@@ -49,8 +49,11 @@ class Translator:
         """Switch language and retranslate every registered observer widget."""
         instance = Translator.get_instance()
         instance.load_language(lang_code)
-        for observer in instance.observers:
-            observer.retranslate()
+        for observer in list(instance.observers):
+            try:
+                observer.retranslate()
+            except Exception as e:  # noqa: BLE001 - one broken panel must not stop the switch
+                Logger.error('Failed to retranslate {}: {}'.format(type(observer).__name__, e))
 
     @staticmethod
     def get_instance():

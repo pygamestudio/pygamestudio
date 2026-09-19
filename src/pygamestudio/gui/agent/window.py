@@ -28,7 +28,7 @@ from pygamestudio.common.utils.config import get_editor_config
 from pygamestudio.gui.agent.session import AgentSession
 from pygamestudio.gui.agent.settings import AgentSettingsDialog
 from pygamestudio.gui.agent.view import (AgentComposer, AgentComposerFrame, AgentConfirmBar,
-                                         AgentTranscript)
+                                         AgentContinueBar, AgentTranscript)
 from pygamestudio.gui.base.window import DetachablePanel
 
 
@@ -44,6 +44,7 @@ class AgentWindow(DetachablePanel, QWidget):
         self._clear_button = QPushButton()
         self._transcript = AgentTranscript()
         self._confirm_bar = AgentConfirmBar()
+        self._continue_bar = AgentContinueBar()
         self._composer = AgentComposer()
         self._composer_frame = AgentComposerFrame(self._composer)
         self._send_button = QPushButton()
@@ -110,6 +111,7 @@ class AgentWindow(DetachablePanel, QWidget):
         layout.addLayout(top_row)
         layout.addWidget(self._transcript, 1)
         layout.addWidget(self._confirm_bar)
+        layout.addWidget(self._continue_bar)
         layout.addWidget(self._status_label)
         layout.addLayout(composer_grid)
 
@@ -119,12 +121,15 @@ class AgentWindow(DetachablePanel, QWidget):
         self._send_button.clicked.connect(self._on_send_clicked)
         self._composer.submitted.connect(self._on_submitted)
         self._confirm_bar.decided.connect(self._on_confirmed)
+        self._continue_bar.continued.connect(self._on_continue_clicked)
+        self._continue_bar.cancelled.connect(self._on_continue_cancelled)
 
         self._session.message_added.connect(self._on_message_added)
         self._session.tool_started.connect(self._transcript.add_tool_call)
         self._session.tool_finished.connect(self._on_tool_finished)
         self._session.status_changed.connect(self._on_status_changed)
         self._session.confirmation_needed.connect(self._on_confirmation_needed)
+        self._session.continue_needed.connect(self._on_continue_needed)
         self._session.finished.connect(self._on_finished)
 
     def _apply_theme(self):
@@ -150,6 +155,7 @@ class AgentWindow(DetachablePanel, QWidget):
         self._session.reset()
         self._transcript.clear()
         self._confirm_bar.clear()
+        self._continue_bar.clear()
         self._on_status_changed('', False)
 
     def _on_clear_clicked(self):
@@ -169,6 +175,8 @@ class AgentWindow(DetachablePanel, QWidget):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self._session.set_settings(dialog.result_settings())
             self._session.reset()
+            self._continue_bar.clear()
+            self._update_input_state()
             self._transcript.add_note(T.tr('agent.settings_saved',
                                            'Settings saved. The conversation was reset.'))
 
@@ -181,6 +189,7 @@ class AgentWindow(DetachablePanel, QWidget):
         self._settings_button.setToolTip(T.tr('agent.settings', 'Settings'))
         self._clear_button.setToolTip(T.tr('agent.clear', 'Clear'))
         self._confirm_bar.retranslate()
+        self._continue_bar.retranslate()
         self._composer.retranslate()
         self._update_send_button(T.tr('agent.stop', 'Stop')
                                  if self._session.is_busy() else T.tr('agent.send', 'Send'))
@@ -223,7 +232,40 @@ class AgentWindow(DetachablePanel, QWidget):
             text = T.tr('agent.working', 'Working...')
         self._status_label.setText(text or '')
         self._update_send_button(T.tr('agent.stop', 'Stop') if busy else T.tr('agent.send', 'Send'))
-        self._composer.setReadOnly(busy)
+        self._update_input_state()
+
+    def _update_input_state(self):
+        """Lock the input while a turn runs or waits for the Continue button.
+
+        Typing is pointless while the agent works, and after the step limit
+        the Continue button (not a new message) is what moves things on.
+        """
+        busy = self._session.is_busy()
+        waiting = self._session.is_awaiting_continue()
+        self._composer.setReadOnly(busy or waiting)
+        self._composer.setEnabled(not waiting)
+        self._send_button.setEnabled(not waiting)
+
+    def _on_continue_needed(self, steps):
+        self._continue_bar.offer(steps)
+        self._update_input_state()
+
+    def _on_continue_clicked(self):
+        self._continue_bar.clear()
+        self._session.continue_run()
+        self._update_input_state()
+
+    def _on_continue_cancelled(self):
+        """Give up on a turn paused at the step limit.
+
+        The conversation is kept, only the pending resumption is dropped: the
+        input box is handed back and the user decides what happens next.
+        """
+        self._continue_bar.clear()
+        self._session.dismiss_continue()
+        self._transcript.add_note(T.tr('agent.continue_dismissed',
+                                       'Stopped at the step limit.'))
+        self._update_input_state()
 
     def _on_confirmation_needed(self, name, arguments):
         self._confirm_bar.ask(name, arguments)
@@ -236,7 +278,6 @@ class AgentWindow(DetachablePanel, QWidget):
         if error_text:
             self._transcript.add_error(error_text)
         self._confirm_bar.clear()
-
     def _update_send_button(self, text):
         self._send_button.setText(text)
 

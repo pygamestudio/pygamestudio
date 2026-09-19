@@ -37,6 +37,7 @@ class Container(QFrame):
         # base 'color' property; anything else routes through the line-edit
         # generic parameter channel, e.g. background_color / border_color).
         self._color_attr_target = None
+        self._color_object_uuid = None
         
         self._is_selected_from_inspector = False
         self._current_selected_object_uuid_index = -1
@@ -286,22 +287,36 @@ class Container(QFrame):
 
     def _on_color_picker_color_changed(self, color_rgba):
         """The shared color popup changed: route to the base 'color' property,
-        or to the attribute that opened the popup (box colors, strip colors)."""
+        or to the attribute that opened the popup (box colors, strip colors).
+
+        The colour goes to the object the popup was opened from, not to
+        whatever is inspected now - the selection can change while the popup
+        is open. If that object lost the attribute (or is gone), nothing is
+        applied instead of raising.
+        """
         rgba = tuple(int(c) for c in color_rgba)
         attr = self._color_attr_target
-        if attr and attr != 'color':
-            obj = self._game_manager.get_object(self._object_uuid_in_inspection)
-            obj_type = getattr(obj, 'type', '') if obj is not None else ''
-            if (obj_type == OBJECT_PROGRESS_BAR
-                    and attr in ('background_color', 'foreground_color')):
-                self.set_object_progress_bar_parameter(attr, rgba)
-            elif (obj_type == OBJECT_SLIDER
-                    and attr in ('track_color', 'fill_color', 'handle_color')):
-                self.set_object_slider_parameter(attr, rgba)
-            else:
-                self.set_object_text_input_parameter(attr, rgba)
+        target_uuid = self._color_object_uuid or self._object_uuid_in_inspection
+        obj = self._game_manager.get_object(target_uuid) if target_uuid else None
+        if obj is None:
+            return
+
+        if not attr or attr == 'color':
+            self._game_manager.set_color(target_uuid, rgba)
+            return
+
+        if not hasattr(obj, attr):
+            return
+
+        obj_type = getattr(obj, 'type', '')
+        if (obj_type == OBJECT_PROGRESS_BAR
+                and attr in ('background_color', 'foreground_color')):
+            self._game_manager.set_progress_bar_parameter(target_uuid, attr, rgba)
+        elif (obj_type == OBJECT_SLIDER
+                and attr in ('track_color', 'fill_color', 'handle_color')):
+            self._game_manager.set_slider_parameter(target_uuid, attr, rgba)
         else:
-            self.set_object_color(rgba)
+            self._game_manager.set_text_input_parameter(target_uuid, attr, rgba)
 
     def set_object_frame_sequence_parameter(self, attr, new_value):
         self._game_manager.set_frame_sequence_parameter(self._object_uuid_in_inspection, attr, new_value)
@@ -569,6 +584,9 @@ class Container(QFrame):
     def show_color_picker(self, color_rgba, attr=''):
         """Open the shared color popup editing ``attr`` ('' = base color)."""
         self._color_attr_target = attr or None
+        # Remember whose colour this is: the selection can change while the
+        # popup is open, and the picked colour must still land on that object.
+        self._color_object_uuid = self._object_uuid_in_inspection
 
         screen = QApplication.primaryScreen()
         screen_width = screen.geometry().width()

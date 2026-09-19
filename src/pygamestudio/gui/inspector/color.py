@@ -3,6 +3,27 @@ from PySide6.QtCore import *
 from PySide6.QtWidgets import *
 
 
+def normalise_rgba(rgba):
+    """(r, g, b) or (r, g, b, a) in any number type -> int RGBA, 0..255.
+
+    Scene objects may hold a colour without an alpha channel (a game script,
+    an AI tool or a hand-edited .scene can set one), and the inspector has to
+    show it instead of failing: a missing alpha means fully opaque. Anything
+    that is not a colour at all falls back to opaque white.
+    """
+    try:
+        values = [int(round(float(channel))) for channel in rgba]
+    except (TypeError, ValueError):
+        return (255, 255, 255, 255)
+
+    if len(values) == 3:
+        values.append(255)
+    if len(values) < 4:
+        return (255, 255, 255, 255)
+
+    return tuple(max(0, min(255, channel)) for channel in values[:4])
+
+
 class AlphaBackground(QWidget):
     def __init__(self):
         super().__init__()
@@ -587,7 +608,7 @@ class ColorPicker(QWidget):
         self._update_all_visuals(*rgba)
 
     def _set_rgba(self, rgba):
-        r, g, b, a = rgba
+        r, g, b, a = normalise_rgba(rgba)
         
         for slider in [self._r_slider, self._g_slider, self._b_slider, self._a_slider]:
             slider.blockSignals(True)
@@ -609,8 +630,16 @@ class ColorPicker(QWidget):
             lineedit.blockSignals(False)
 
     def set_rgba(self, rgba):
-        self._set_rgba(rgba)
-        self._update_all_visuals(*rgba)
+        rgba = normalise_rgba(rgba)
+        # Filling the popup in is not a colour change: keep color_changed
+        # quiet, otherwise opening it would write the (normalised) colour back
+        # to the object - and onto the undo stack - for nothing.
+        was_blocked = self.blockSignals(True)
+        try:
+            self._set_rgba(rgba)
+            self._update_all_visuals(*rgba)
+        finally:
+            self.blockSignals(was_blocked)
 
     def _set_hex(self, hex_color):
         self._hex_lineedit.blockSignals(True)

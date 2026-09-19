@@ -185,7 +185,23 @@ class PygameScreen(QWidget):
     # ------------------------------------------------------------- render
     @staticmethod
     def _surface_to_qimage(surface):
-        """pygame SRCALPHA surface -> QImage (RGBA, top-down like pygame)."""
+        """pygame SRCALPHA surface -> QImage (RGBA, top-down like pygame).
+
+        A surface-level alpha (set_alpha, used by every object for the alpha
+        channel of its colour) is only applied when the surface is blitted.
+        A top-level object is painted straight from this image, so that alpha
+        is multiplied into the pixels here - changing the alpha of a colour in
+        the inspector has to show up in the scene view for every object, not
+        only for the ones that draw their colour as pixels (the canvas).
+        """
+        alpha = surface.get_alpha()
+        if alpha is not None and alpha < 255:
+            # A copy: the alpha is multiplied into the alpha channel only
+            # (BLEND_RGBA_MULT with a white colour), which is exactly what a
+            # blit would do - and the caller's surface stays untouched.
+            surface = surface.copy()
+            surface.fill((255, 255, 255, alpha), special_flags=pygame.BLEND_RGBA_MULT)
+
         data = pygame.image.tostring(surface, 'RGBA', False)
         img = QImage(data, surface.get_width(), surface.get_height(),
                      surface.get_width() * 4, QImage.Format.Format_RGBA8888)

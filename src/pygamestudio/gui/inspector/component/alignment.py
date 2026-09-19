@@ -61,6 +61,12 @@ class AlignmentButtonGroup(QWidget):
                 lambda checked=False, value=value_key: self._on_clicked(value))
         layout.addStretch(1)
 
+        # The row must keep the height of its buttons: the inspector grid
+        # otherwise hands it every leftover pixel of the panel, which showed
+        # up as a large empty gap above and below the row.
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        self.setFixedHeight(self.sizeHint().height())
+
         self.set_value(value)
 
     def _on_clicked(self, value):

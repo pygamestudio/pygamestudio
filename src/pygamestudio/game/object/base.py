@@ -1,5 +1,7 @@
 
 import math
+import os
+import time
 import pygame
 from pathlib import Path
 from pygamestudio.game.object.type import *
@@ -20,6 +22,11 @@ class ObjectBase:
       rendered into the game window and a behavior script (script_path) can be
       attached.
     """
+
+    # How often the disk state of a cached asset (font, image) is re-read while
+    # the game runs: replacing the file is picked up within this many seconds.
+    # Set to 0 to look on every frame (used by the tests).
+    ASSET_CHECK_INTERVAL = 0.25
 
     def __init__(self, game_manager, object_data={}, is_for_api=False):
         self._is_for_api = is_for_api
@@ -710,16 +717,57 @@ class ObjectBase:
         """Serialize the object for the .scene JSON file.
 
         Runtime-only / non-persistent fields (surface, script instance, the
-        manager reference, editor selection/expansion state, ...) are excluded
-        so the file stays small, reloadable, and comparable against the saved
-        snapshot regardless of transient UI state.
+        manager reference, editor selection/expansion state, render caches,
+        ...) are excluded so the file stays small, reloadable, and comparable
+        against the saved snapshot regardless of transient UI state.
         """
-        exclude_fields = ['_is_initialized', '_is_for_api', '_game_manager', 'surface', 'icon', 'script_instance', 'selected', 'expanded', '_collision_configured']
+        exclude_fields = [
+            '_is_initialized', '_is_for_api', '_game_manager', 'surface', 'icon',
+            'script_instance', 'selected', 'expanded', '_collision_configured',
+            '_font_cache', '_font_cache_key', '_image_cache', '_image_cache_key',
+            '_render_cache', '_render_state', '_file_state_cache',
+        ]
         return {
             key: value for key, value in self.__dict__.items() 
             if key not in exclude_fields
         }
-    
+
+    @staticmethod
+    def _file_state(file_path):
+        """(modification time, size) of an asset file, or None when it is
+        missing.
+
+        Objects that cache what they loaded (fonts, images) include this in
+        their cache key so replacing a file on disk - a common thing to do
+        while a game runs, e.g. after exporting an image - is picked up
+        without restarting.
+        """
+        try:
+            stat = os.stat(file_path)
+        except OSError:
+            return None
+        return (stat.st_mtime_ns, stat.st_size)
+
+    def _asset_file_state(self, asset_path):
+        """Like _file_state for a path relative to the project, memoized so
+        asking for it on every frame does not mean a disk access every frame.
+
+        The file is re-read at most every ``ASSET_CHECK_INTERVAL`` seconds:
+        that is the delay before a replaced font/image file shows up.
+        """
+        memo = getattr(self, '_file_state_cache', None)
+        if memo is None:
+            memo = self._file_state_cache = {}
+
+        now = time.monotonic()
+        entry = memo.get(asset_path)
+        if entry is not None and now - entry[0] < self.ASSET_CHECK_INTERVAL:
+            return entry[1]
+
+        state = self._file_state(Path(get_project_path()) / asset_path)
+        memo[asset_path] = (now, state)
+        return state
+
     def _apply_alpha(self, surface):
         if len(self.color) < 4:
             alpha = 255

@@ -62,17 +62,22 @@ class AgentTranscript(QTextBrowser):
         scrollbar = self.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
 
-    def _append_html(self, block: str):
+    def _append_html(self, block: str, blank_lines: int = 0):
         """Append one rich-text block, always starting on a fresh line.
 
         A markdown answer ends inside its own block, so inserting the next
         ``<p>`` right away would glue it to the answer - a block break first
         keeps every message on its own line (and lets the margins apply).
+        ``blank_lines`` adds empty lines above the block, which is how a new
+        user prompt is kept apart from the answer before it.
         """
         cursor = self.textCursor()
         cursor.movePosition(QTextCursor.MoveOperation.End)
         if cursor.block().text():
             cursor.insertBlock()
+        if blank_lines and not self.document().isEmpty():
+            for _ in range(blank_lines):
+                cursor.insertBlock()
         cursor.insertHtml(block)
         self.setTextCursor(cursor)
         self._scroll_to_end()
@@ -80,7 +85,10 @@ class AgentTranscript(QTextBrowser):
     def add_user(self, text):
         c = self._colors()
         body = html.escape(text).replace('\n', '<br>')
-        self._append_html(f'<p style="margin:6px 0 2px 0;color:{c["user"]};"><b>&gt; {body}</b></p>')
+        # Two empty lines separate a new prompt from the answer above it.
+        self._append_html(
+            f'<p style="margin:0 0 4px 0;color:{c["user"]};"><b>&gt; {body}</b></p>',
+            blank_lines=2)
 
     def add_assistant(self, text):
         """The answer of the assistant, rendered as markdown.
@@ -285,6 +293,78 @@ class AgentConfirmBar(QWidget):
     def retranslate(self):
         self._allow_button.setText(T.tr('agent.allow', 'Allow'))
         self._deny_button.setText(T.tr('agent.deny', 'Deny'))
+
+
+class AgentContinueBar(QWidget):
+    """Shown when a turn stopped at the step limit: continue it or drop it.
+
+    While the bar is visible the input box is locked, so the user does not
+    have to guess what to type to continue - pressing Continue picks the work
+    up exactly where it stopped (like the Continue button of Copilot), while
+    Cancel ends the turn and hands the input box back.
+    """
+
+    continued = Signal()
+    cancelled = Signal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._label = QLabel()
+        self._continue_button = QPushButton()
+        self._cancel_button = QPushButton()
+        self._steps = None
+
+        self._label.setWordWrap(True)
+        self._continue_button.setObjectName('agentContinueBtn')
+        self._continue_button.setText(T.tr('agent.continue', 'Continue'))
+        self._continue_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._continue_button.clicked.connect(lambda: self.continued.emit())
+        self._cancel_button.setText(T.tr('agent.cancel', 'Cancel'))
+        self._cancel_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._cancel_button.clicked.connect(lambda: self.cancelled.emit())
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(4, 2, 4, 2)
+        layout.setSpacing(4)
+        layout.addWidget(self._label, 1)
+        layout.addWidget(self._cancel_button)
+        layout.addWidget(self._continue_button)
+        self._equalize_buttons()
+        self.hide()
+
+    def offer(self, steps):
+        self._steps = steps
+        self._label.setText(self._message())
+        self._equalize_buttons()
+        self.show()
+
+    def clear(self):
+        self.hide()
+
+    def retranslate(self):
+        self._continue_button.setText(T.tr('agent.continue', 'Continue'))
+        self._cancel_button.setText(T.tr('agent.cancel', 'Cancel'))
+        self._equalize_buttons()
+        if self._steps is not None:
+            self._label.setText(self._message())
+
+    def _equalize_buttons(self):
+        """Both buttons form one pair, so they get the same size.
+
+        The primary Continue button is styled (padding, colours) while Cancel
+        keeps the plain button look, which alone would make them different
+        widths and heights - the wider/taller of the two wins.
+        """
+        width = max(self._continue_button.sizeHint().width(),
+                    self._cancel_button.sizeHint().width())
+        height = max(self._continue_button.sizeHint().height(),
+                     self._cancel_button.sizeHint().height())
+        for button in (self._continue_button, self._cancel_button):
+            button.setFixedSize(width, height)
+
+    def _message(self) -> str:
+        return T.tr('agent.step_limit',
+                    'Step limit reached ({} steps). Continue when you are ready.').format(self._steps)
 
 
 def _short_json(value, limit):

@@ -118,8 +118,13 @@ class EditorSettingsBody(QWidget):
 
     def _toggle_language(self):
         lang_code = self._get_lang_code_by_value(self._language_combobox.currentText())
-        T.toggle_language(lang_code)
+        if lang_code is None:
+            return
+        # Store the choice BEFORE the retranslation: every observer that reads
+        # the config while it retranslates (this dialog included) must already
+        # see the new language, otherwise the combo snaps back to the old one.
         update_editor_config('lang', lang_code)
+        T.toggle_language(lang_code)
 
     # ------------------------------------------------------------------- MCP
     def _set_mcp_stacked_widget(self):
@@ -204,6 +209,8 @@ class EditorSettingsBody(QWidget):
 
     def _toggle_theme(self):
         theme_code = self._get_theme_code_by_value(self._theme_combobox.currentText())
+        if theme_code is None:
+            return
         set_editor_theme(theme_code)
         update_editor_config('theme', theme_code)
         self.theme_toggled.emit(theme_code)
@@ -244,6 +251,16 @@ class EditorSettingsBody(QWidget):
         self._theme_combobox.addItems(list(self._theme_dict.values()))
         theme_code = editor_config.get('theme') if editor_config.get('theme') else 'dark'
         self._theme_combobox.setCurrentText(self._theme_dict.get(theme_code))
+
+        # The language may have been switched elsewhere (the MCP tool or the
+        # agent): show the one that is in effect without turning it into a
+        # choice of this dialog. The translator is the source of truth here -
+        # a switch made right here writes the config after the retranslation
+        # has already run.
+        current = getattr(T.get_instance(), 'current_language', '') or get_editor_language()
+        self._language_combobox.blockSignals(True)
+        self._language_combobox.setCurrentText(self._lang_dict.get(current))
+        self._language_combobox.blockSignals(False)
 
     def enterEvent(self, event):
         self._update_mcp_status()

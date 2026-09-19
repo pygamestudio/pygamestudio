@@ -173,7 +173,9 @@ def update_editor_settings(args):
     applied = {}
     if args.get('language'):
         update_editor_config('lang', args['language'])
-        T.load_language(args['language'])
+        # toggle_language also retranslates the open windows; load_language only
+        # swapped the dictionary, so the UI kept its old labels.
+        T.toggle_language(args['language'])
         applied['language'] = args['language']
     if args.get('theme'):
         update_editor_config('theme', args['theme'])

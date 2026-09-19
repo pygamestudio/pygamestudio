@@ -267,7 +267,15 @@ class EditorBody(QMainWindow):
                 self._window_menu.addSeparator()
             added_any = True
             for index, window in enumerate(windows):
-                action = QAction(renames.get(window) or tabs.tabText(index), self)
+                # The title comes from the window itself: the tab text may
+                # still be the old language (this menu is rebuilt while the
+                # language changes, before the tabs are refreshed) and a
+                # detached window has no tab to read a text from.
+                title = renames.get(window)
+                if title is None:
+                    tab_title = getattr(window, '_tab_title', None)
+                    title = tab_title() if callable(tab_title) else tabs.tabText(index)
+                action = QAction(title, self)
                 action.setCheckable(True)
                 action.setChecked(tabs.isTabVisible(index))
                 action.toggled.connect(
