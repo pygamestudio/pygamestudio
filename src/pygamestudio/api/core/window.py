@@ -34,7 +34,8 @@ __all__ = [
     'get_window_position', 'set_window_position', 'center_window',
     'get_desktop_size',
     'set_fullscreen', 'is_fullscreen', 'toggle_fullscreen', 'minimize_window',
-    'set_mouse_cursor_visible', 'is_mouse_cursor_visible',
+    'set_window_resizable', 'is_window_resizable',
+    'set_mouse_cursor_visible', 'is_mouse_cursor_visible', 'set_mouse_position',
     'set_allow_screensaver', 'is_allow_screensaver',
 ]
 
@@ -94,8 +95,15 @@ class WindowManager:
 
     @staticmethod
     def _window_flags() -> int:
-        """Display flags the current window uses (so resizing keeps fullscreen)."""
+        """Display flags the current window uses.
+
+        Re-creating the display (size, resizable) with these keeps fullscreen
+        and the resize grip the game already had.
+        """
         try:
+            surface = pygame.display.get_surface()
+            if surface is not None:
+                return surface.get_flags() & (pygame.FULLSCREEN | pygame.RESIZABLE)
             return pygame.FULLSCREEN if pygame.display.is_fullscreen() else 0
         except pygame.error:
             return 0
@@ -237,6 +245,31 @@ class WindowManager:
         except pygame.error:
             return False
 
+    def set_window_resizable(self, enabled:bool=True):
+        """Allow (or forbid) resizing the window by hand.
+
+        The display surface is re-created (exactly like set_window_size), so
+        ``studio.get_screen()`` keeps returning the surface in use and the game
+        can react to the new size.
+        """
+        try:
+            flags = self._window_flags()
+            flags = flags | pygame.RESIZABLE if enabled else flags & ~pygame.RESIZABLE
+            surface = pygame.display.set_mode(self.get_window_size(), flags)
+            self._publish_screen(surface)
+            return surface
+        except pygame.error as e:
+            self._warn('api.window_error', 'Window operation failed: {}', e)
+            return None
+
+    def is_window_resizable(self) -> bool:
+        """True while the window can be resized by the user."""
+        try:
+            surface = pygame.display.get_surface()
+            return bool(surface.get_flags() & pygame.RESIZABLE) if surface is not None else False
+        except pygame.error:
+            return False
+
     def toggle_fullscreen(self):
         """Flip between fullscreen and windowed mode."""
         try:
@@ -266,6 +299,16 @@ class WindowManager:
             return bool(pygame.mouse.get_visible())
         except pygame.error:
             return False
+
+    def set_mouse_position(self, position):
+        """Move the mouse pointer to (x, y) inside the window.\n
+        (0, 0) is the top left corner of the window - handy to re-centre the
+        pointer when switching to the mouse-look style controls.
+        """
+        try:
+            pygame.mouse.set_pos((int(position[0]), int(position[1])))
+        except (pygame.error, TypeError, IndexError, ValueError) as e:
+            self._warn('api.window_error', 'Window operation failed: {}', e)
 
     # ---------- system ----------
 
@@ -340,12 +383,24 @@ def minimize_window():
     return window_manager.minimize_window()
 
 
+def set_window_resizable(enabled=True):
+    return window_manager.set_window_resizable(enabled)
+
+
+def is_window_resizable() -> bool:
+    return window_manager.is_window_resizable()
+
+
 def set_mouse_cursor_visible(visible):
     return window_manager.set_mouse_cursor_visible(visible)
 
 
 def is_mouse_cursor_visible() -> bool:
     return window_manager.is_mouse_cursor_visible()
+
+
+def set_mouse_position(position):
+    return window_manager.set_mouse_position(position)
 
 
 def set_allow_screensaver(enabled):

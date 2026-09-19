@@ -184,6 +184,13 @@ QMenu::icon {
     left: 15px;
 }
 
+/* The Window menu has no icons, so its check marks are pulled right, close to
+   the item text (the reserved icon column would leave a big gap otherwise). */
+QMenu#windowMenu::indicator {
+    position: relative;
+    left: 20px;
+}
+
 QMenu::separator {
     height: 1px;
     background-color: #c0c0c0;
@@ -811,4 +818,39 @@ QListView#codeEditorCompletionPopup::item:hover {
 QListView#codeEditorCompletionPopup::item:selected {
     background-color: #007acc;
     color: #ffffff;
+}
+
+/* ----- Agent ----- */
+QTextBrowser#agentTranscript {
+    background-color: #ffffff;
+    border: none;
+    padding: 4px;
+}
+
+QPlainTextEdit#agentComposer {
+    background-color: transparent;
+    border: none;
+}
+
+QWidget#agentSendHolder {
+    background-color: transparent;
+}
+
+QPushButton#agentSendBtn {
+    padding: 1px 10px;
+    font-size: 12px;
+}
+
+QPushButton#agentIconBtn {
+    background-color: transparent;
+    border: none;
+    border-radius: 4px;
+}
+
+QPushButton#agentIconBtn:hover {
+    background-color: #c0c0c0;
+}
+
+QPushButton#agentIconBtn:pressed {
+    background-color: #a8a8a8;
 }

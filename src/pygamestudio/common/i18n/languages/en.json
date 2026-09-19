@@ -12,6 +12,7 @@
         "question_delete_asset_item_content": "Sure to delete {} item(s)?\n{}",
         "question_delete_hierarchy_item_content": "Sure to delete the selected item(s)?",
         "question_delete_project_content": "Sure to delete the project?",
+        "question_clear_agent_content": "Clear the current conversation?",
         "question_overwrite_content": "Sure to overwrite the following duplicate resources?\n{}",
         "question_stop_build": "Sure to stop the building?",
         "question_stop_build_close_window": "Sure to stop the building and close the window?",
@@ -64,6 +65,7 @@
         "file": "File",
         "project": "Project",
         "panel": "Panel",
+        "window": "Window",
         "help": "Help",
         "new_project": "New Project",
         "open_project": "Open Project",
@@ -84,7 +86,8 @@
         "support_pygamestudio": "Support Pygame Studio",
         "block_script": "Block Script",
         "open_in_code_editor": "Open in Code Editor",
-        "open_in_block_editor": "Open in Block Editor"
+        "open_in_block_editor": "Open in Block Editor",
+        "agent_window": "AI Agent Window"
     },
 
     "block": {
@@ -470,11 +473,57 @@
         "screen_height": "Screen Height",
         "general": "General",
         "language": "Language",
-        "theme": "Theme"
+        "theme": "Theme",
+        "mcp_server": "MCP Server",
+        "mcp_enabled": "Enable MCP server",
+        "mcp_enabled_tooltip": "Let an AI client (VS Code Copilot, Claude Desktop, ...) read and edit this project through the Model Context Protocol. Every change stays undoable with Ctrl+Z.",
+        "mcp_port": "Port",
+        "mcp_token": "Token",
+        "mcp_token_tooltip": "Send this token with every request (Authorization: Bearer <token>).",
+        "mcp_copy": "Copy",
+        "mcp_copied": "Copied",
+        "mcp_status_running": "Running: {} - add this URL to your MCP client.",
+        "mcp_status_stopped": "Stopped. Enable it, then connect your MCP client."
     },
 
     "about": {
         "version": "Version {}"
+    },
+
+    "agent": {
+        "title": "AI Agent",
+        "placeholder": "Ask the agent to build, change or explain something...",
+        "send": "Send",
+        "stop": "Stop",
+        "clear": "Clear",
+        "settings": "Settings",
+        "settings_title": "Agent settings",
+        "settings_saved": "Settings saved. The conversation was reset.",
+        "settings_confirm": "Ask before every change",
+        "settings_confirm_tooltip": "Read-only tools always run; scene/file changes wait for your Allow.",
+        "model": "Model",
+        "local_model": "Local model",
+        "choice_local": "Local model (Ollama)",
+        "choice_custom": "Custom (OpenAI compatible)",
+        "base_url": "Base URL",
+        "api_key": "API key",
+        "api_key_tooltip": "Stored in the editor settings file on this computer and only sent to the chosen model endpoint.",
+        "hint_online": "The request URL follows the model name, so the API key is all that is needed. Tool calls run inside the editor and stay undoable (Ctrl+Z).",
+        "hint_local": "Start Ollama on this computer first ({}), then enter the name of a downloaded model - no API key is needed.",
+        "hint_custom": "OpenAI compatible endpoint: fill in the request URL, model name and key. Tool calls run inside the editor and stay undoable (Ctrl+Z).",
+        "ok": "OK",
+        "cancel": "Cancel",
+        "allow": "Allow",
+        "deny": "Deny",
+        "confirm_tool": "Run {}?",
+        "thinking": "Thinking... step {}",
+        "calling": "Calling {}...",
+        "waiting_confirm": "Waiting for your confirmation...",
+        "working": "Working...",
+        "busy": "Still working - press Stop first.",
+        "stopped": "Stopped.",
+        "denied": "Skipped {} (declined).",
+        "step_limit": "Step limit reached ({} steps) - ask again to continue."
     },
 
     "build": {
@@ -554,6 +603,8 @@
         "no_script_class": "No script class found in {}.",
         "fail_to_init_script": "Failed to initialize script {}: {}",
         "unknown_object_type": "Unknown object type: {}",
+        "no_parent_object": "Parent object not found: {}",
+        "no_scene_loaded": "No scene is loaded yet - load a scene before creating objects.",
         "script_start_error": "Script on_start error for {}: {}",
         "script_update_error": "Script on_update error for {}: {}",
         "script_destroy_error": "Script on_destroy error for {}: {}",
@@ -562,6 +613,7 @@
         "no_sound_path": "The sound path {} does not exist.",
         "fail_to_load_sound": "Failed to load sound {}: {}",
         "fail_to_play_sound": "Failed to play sound {}: {}",
+        "fail_to_set_volume": "Audio operation failed: {}",
         "fail_to_play_music": "Failed to play music {}: {}",
         "no_icon_path": "The icon path {} does not exist.",
         "fail_to_load_icon": "Failed to load the icon {}: {}",

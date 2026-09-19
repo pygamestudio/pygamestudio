@@ -23,6 +23,11 @@ class Game:
         self._screen = None
         self._project_path = ""
         self._running = False
+        # Frame statistics, kept up to date by run() (see get_delta_time(),
+        # get_elapsed_time() and get_frame_count()).
+        self._delta_time = 0.0
+        self._elapsed_time = 0.0
+        self._frame_count = 0
 
     def _init_game(self):
         """Set up pygame and resolve the project root.
@@ -216,6 +221,11 @@ class Game:
             # Make the current frame's delta time available to the scene's
             # scripts (their on_update(delta_time) hooks).
             scene_loader._set_delta_time(delta_time)
+            # ... and to the scripts that ask for it instead of using the hook
+            # parameter (studio.get_delta_time(), studio.get_elapsed_time()).
+            self._delta_time = delta_time
+            self._elapsed_time += delta_time
+            self._frame_count += 1
             # --- 2. Fixed/step logic: user update + draw, then present. ---
             self.on_update(delta_time)
             pygame.display.flip()
@@ -440,4 +450,45 @@ def get_pressed_keys():
 
 def get_pressed_buttons():
     return pygame.mouse.get_pressed()
+
+def is_running() -> bool:
+    """游戏主循环是否正在运行。True while the game loop is running."""
+    instance = Game._instance
+    return bool(instance._running) if instance is not None else False
+
+def get_delta_time() -> float:
+    """上一帧经过的秒数（与脚本 on_update(dt) 收到的 dt 相同）。The last frame's duration in seconds."""
+    instance = Game._instance
+    return instance._delta_time if instance is not None else 0.0
+
+def get_elapsed_time() -> float:
+    """游戏开始运行至今的秒数。Seconds since the game loop started."""
+    instance = Game._instance
+    return instance._elapsed_time if instance is not None else 0.0
+
+def get_frame_count() -> int:
+    """已经渲染的帧数。Number of frames drawn since the game loop started."""
+    instance = Game._instance
+    return instance._frame_count if instance is not None else 0
+
+def is_key_pressed(key) -> bool:
+    """某个键当前是否被按住，例如 studio.is_key_pressed(studio.K_SPACE)。True while that key is held."""
+    try:
+        return bool(pygame.key.get_pressed()[key])
+    except (pygame.error, IndexError, KeyError, TypeError):
+        return False
+
+def get_mouse_position() -> tuple:
+    """鼠标指针在窗口内的位置 (x, y)，无窗口时返回 (0, 0)。The pointer position inside the window."""
+    try:
+        return tuple(pygame.mouse.get_pos())
+    except pygame.error:
+        return (0, 0)
+
+def is_mouse_button_pressed(button:int=1) -> bool:
+    """某个鼠标键当前是否被按住：1 = 左键，2 = 中键，3 = 右键。True while that mouse button is held."""
+    try:
+        return bool(pygame.mouse.get_pressed()[int(button) - 1])
+    except (pygame.error, IndexError, ValueError, TypeError):
+        return False
     

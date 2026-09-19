@@ -28,6 +28,7 @@ class AudioManager:
         self._sounds = {}               # absolute path -> pygame.mixer.Sound
         self._looping_channels = {}     # absolute path -> Channel (looping sfx)
         self._music_volume = 1.0
+        self._sound_volume = 1.0        # master volume of the sound effects
 
     # ---------- internals ----------
 
@@ -90,7 +91,9 @@ class AudioManager:
         try:
             channel = sound.play(loops=loops, fade_ms=fade_ms)
             if channel:
-                channel.set_volume(max(0.0, min(1.0, float(volume))))
+                # The per-call volume is multiplied with the master volume, so
+                # set_sound_volume() works like a volume slider of the game.
+                channel.set_volume(max(0.0, min(1.0, float(volume))) * self._sound_volume)
                 if loops != 0:
                     self._looping_channels[self._resolve_path(sound_path).as_posix()] = channel
             return channel
@@ -99,11 +102,46 @@ class AudioManager:
             return None
 
     def stop_sound(self, sound_path):
-        """Stop a looping sound effect started with play_sound(loops=...)."""
+        """Stop a sound effect (one-shot or looping) that is playing."""
         key = self._resolve_path(sound_path).as_posix()
-        channel = self._looping_channels.pop(key, None)
-        if channel:
-            channel.stop()
+        self._looping_channels.pop(key, None)
+        sound = self._sounds.get(key)
+        if sound is None or not self._is_available:
+            return
+        try:
+            sound.stop()            # every channel this sound plays on
+        except pygame.error as e:
+            print(T.tr('api.fail_to_set_volume', 'Audio operation failed: {}').format(e))
+
+    def is_sound_playing(self, sound_path) -> bool:
+        """True while a loaded sound effect is playing on any channel."""
+        if not self._is_available:
+            return False
+        sound = self._sounds.get(self._resolve_path(sound_path).as_posix())
+        if sound is None:
+            return False
+        try:
+            return bool(sound.get_num_channels())
+        except pygame.error:
+            return False
+
+    def set_sound_volume(self, volume):
+        """Master volume of the sound effects, in [0.0, 1.0].
+
+        Affects the sounds that are playing right now and is multiplied with
+        the per-call ``volume`` of every later play_sound().
+        """
+        self._sound_volume = max(0.0, min(1.0, float(volume)))
+        if not self._is_available:
+            return
+        try:
+            for index in range(pygame.mixer.get_num_channels()):
+                pygame.mixer.Channel(index).set_volume(self._sound_volume)
+        except pygame.error as e:
+            print(T.tr('api.fail_to_set_volume', 'Audio operation failed: {}').format(e))
+
+    def get_sound_volume(self) -> float:
+        return self._sound_volume
 
     def stop_all_sounds(self):
         """Stop every currently playing sound effect."""
@@ -184,6 +222,18 @@ def play_sound(sound_path, volume=1.0, loops=0, fade_ms=0):
 
 def stop_sound(sound_path):
     return audio_manager.stop_sound(sound_path)
+
+
+def is_sound_playing(sound_path) -> bool:
+    return audio_manager.is_sound_playing(sound_path)
+
+
+def set_sound_volume(volume):
+    return audio_manager.set_sound_volume(volume)
+
+
+def get_sound_volume() -> float:
+    return audio_manager.get_sound_volume()
 
 
 def stop_all_sounds():

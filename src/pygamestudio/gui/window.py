@@ -1,3 +1,4 @@
+import secrets
 import webbrowser
 from pathlib import Path
 
@@ -22,8 +23,10 @@ from pygamestudio.gui.block_editor.storage import can_hold_blocks, is_block_scri
 from pygamestudio.gui.image_editor.window import ImageEditorWindow
 from pygamestudio.gui.audio_player.window import AudioPlayerWindow
 from pygamestudio.gui.tile_map_editor.window import TileMapEditorWindow
+from pygamestudio.gui.agent.window import AgentWindow
 from pygamestudio.game.core.manager import GameManager
-from pygamestudio.common.utils.config import get_editor_config
+from pygamestudio.common.utils.config import get_editor_config, update_editor_config
+from pygamestudio.gui.console.logger import Logger
 
 
 class EditorBody(QMainWindow):
@@ -48,6 +51,9 @@ class EditorBody(QMainWindow):
         self._image_editor_window = ImageEditorWindow(game_manager)
         self._audio_player_window = AudioPlayerWindow(game_manager)
         self._tile_map_editor_window = TileMapEditorWindow(game_manager)
+        # The AI agent panel gets its own column on the right of the inspector,
+        # so the conversation stays visible next to the properties.
+        self._agent_window = AgentWindow(self, game_manager)
 
         self._left_top_tab_widget = QTabWidget()
         self._left_bottom_tab_widget = QTabWidget()
@@ -66,8 +72,10 @@ class EditorBody(QMainWindow):
         self._file_menu = self.menuBar().addMenu(T.tr('menu.file', 'File'))
         self._edit_menu = self.menuBar().addMenu(T.tr('menu.edit', 'Edit'))
         self._project_menu = self.menuBar().addMenu(T.tr('menu.project', 'Project'))
-        # self._panel_menu = self.menuBar().addMenu('T.tr('menu.panel', 'Panel'))
+        self._window_menu = self.menuBar().addMenu(T.tr('menu.window', 'Window'))
         self._help_menu = self.menuBar().addMenu(T.tr('menu.help', 'Help'))
+        #: widget -> QAction of the Window menu (one entry per tab window).
+        self._window_actions = {}
         self._setup()
 
     def _setup(self):
@@ -100,6 +108,10 @@ class EditorBody(QMainWindow):
         self._audio_player_window.set_tab_widget(self._center_bottom_tab_widget)
         self._right_top_tab_widget.addTab(self._inspector_window, T.tr('inspector.inspector', 'Inspector'))
         self._inspector_window.set_tab_widget(self._right_top_tab_widget)
+        # The AI agent is the second tab of the inspector column, right next to
+        # the properties (and can be detached into its own window like any panel).
+        self._right_top_tab_widget.addTab(self._agent_window, T.tr('agent.title', 'AI Agent'))
+        self._agent_window.set_tab_widget(self._right_top_tab_widget)
         self._right_bottom_tab_widget.setHidden(True)
 
         self._left_vertical_splitter.setOrientation(Qt.Orientation.Vertical)
@@ -122,6 +134,7 @@ class EditorBody(QMainWindow):
     def _set_signal(self):
         self._editor_settings_window.theme_toggled.connect(self._scene_widnow.update_grid_style)
         self._editor_settings_window.theme_toggled.connect(self._console_window.reload_logs_on_theme_changed)
+        self._editor_settings_window.theme_toggled.connect(lambda theme_code: self._agent_window.apply_theme(theme_code == 'dark'))
         self._editor_settings_window.theme_toggled.connect(lambda theme_code: self._code_editor_window.apply_theme(theme_code == 'dark'))
         self._editor_settings_window.theme_toggled.connect(lambda theme_code: self._block_editor_window.apply_theme(theme_code == 'dark'))
         self._asset_window.edit_file_signal.connect(self._code_editor_window.open_file)
@@ -154,6 +167,7 @@ class EditorBody(QMainWindow):
         self._set_file_menu()
         self._set_edit_menu()
         self._set_project_menu()
+        self._set_window_menu()
         self._set_help_menu()
 
     def _set_file_menu(self):
@@ -227,6 +241,64 @@ class EditorBody(QMainWindow):
         self._project_menu.addAction(run_action)
         self._project_menu.addAction(build_action)
 
+    def _set_window_menu(self):
+        """Window menu: one checkable entry per tab window of the editor.
+
+        Everything starts checked; unchecking an entry hides that window (its
+        tab disappears from the tab bar, the panel itself keeps running) and
+        checking it again brings it back with focus. The tab groups get a
+        separator so the layout areas stay recognisable.
+        """
+        self._window_menu.clear()
+        self._window_menu.setObjectName('windowMenu')
+        self._window_actions = {}
+        # The agent tab is a window like the others - just named explicitly,
+        # because "panel" was confusing next to the tab it lives in.
+        renames = {self._agent_window: T.tr('menu.agent_window', 'AI Agent Window')}
+        groups = (self._center_top_tab_widget, self._center_bottom_tab_widget,
+                  self._left_top_tab_widget, self._left_bottom_tab_widget,
+                  self._right_top_tab_widget)
+        added_any = False
+        for tabs in groups:
+            windows = [tabs.widget(index) for index in range(tabs.count())]
+            if not windows:
+                continue
+            if added_any:
+                self._window_menu.addSeparator()
+            added_any = True
+            for index, window in enumerate(windows):
+                action = QAction(renames.get(window) or tabs.tabText(index), self)
+                action.setCheckable(True)
+                action.setChecked(tabs.isTabVisible(index))
+                action.toggled.connect(
+                    lambda is_visible, tabs=tabs, window=window:
+                    self._toggle_tab_window(tabs, window, is_visible))
+                self._window_menu.addAction(action)
+                self._window_actions[window] = action
+
+    def _toggle_tab_window(self, tabs, window, is_visible):
+        """Show or hide one tab of the editor (Window menu).
+
+        The tab keeps its place (``setTabVisible``), so the order the user is
+        used to never changes; the panel itself is only hidden, it keeps its
+        state. A detached panel is docked back first - otherwise there would be
+        no tab to hide.
+        """
+        if not is_visible and hasattr(window, 'is_detached') and window.is_detached():
+            window.attach()
+        index = tabs.indexOf(window)
+        if index < 0:
+            return
+        tabs.setTabVisible(index, is_visible)
+        if is_visible:
+            tabs.setCurrentWidget(window)
+        elif tabs.currentWidget() is window:
+            # Hidden the active one: fall back to the next visible tab.
+            for other in range(tabs.count()):
+                if other != index and tabs.isTabVisible(other):
+                    tabs.setCurrentIndex(other)
+                    break
+
     def _set_help_menu(self):
         self._help_menu.clear()
 
@@ -260,6 +332,7 @@ class EditorBody(QMainWindow):
         self._console_window.get_ready_for_project()
         self._hierarchy_window.get_ready_for_project()
         self._inspector_window.get_ready_for_project()
+        self._agent_window.get_ready_for_project()
         self._project_settings_window.get_ready_for_project()
         self._build_window.get_ready_for_project()
         self._code_editor_window.get_ready_for_project()
@@ -280,6 +353,7 @@ class EditorBody(QMainWindow):
         self._image_editor_window.clean_up()
         self._audio_player_window.clean_up()
         self._tile_map_editor_window.clean_up()
+        self._agent_window.clean_up()
         self._game_manager.clean_up()
 
     def _on_edit_menu_action_triggered(self, action_name):
@@ -430,6 +504,7 @@ class EditorBody(QMainWindow):
         self._file_menu = self.menuBar().addMenu(T.tr('menu.file', 'File'))
         self._edit_menu = self.menuBar().addMenu(T.tr('menu.edit', 'Edit'))
         self._project_menu = self.menuBar().addMenu(T.tr('menu.project', 'Project'))
+        self._window_menu = self.menuBar().addMenu(T.tr('menu.window', 'Window'))
         self._help_menu = self.menuBar().addMenu(T.tr('menu.help', 'Help'))
         self._set_menu()
 
@@ -443,6 +518,7 @@ class EditorBody(QMainWindow):
         self._image_editor_window.retranslate()
         self._audio_player_window.retranslate()
         self._tile_map_editor_window.retranslate()
+        self._agent_window.retranslate()
 
     def enterEvent(self, event):
         self.setCursor(Qt.CursorShape.ArrowCursor)
@@ -459,6 +535,34 @@ class Editor(WindowBase):
         self._editor_body = EditorBody(self._game_manager)
 
         self._setup()
+        self._set_up_mcp()
+
+    def _set_up_mcp(self):
+        """Register the editor with the MCP server and start it when enabled.
+
+        The server itself is optional (editor settings > MCP server); attaching
+        the editor here only makes the tools able to find it. Starting the
+        server twice is harmless - the settings page uses the same module API.
+        """
+        try:
+            import pygamestudio.mcp as mcp
+
+            mcp.attach(editor=self, editor_body=self._editor_body,
+                       game_manager=self._game_manager, project_ready=False)
+
+            editor_config = get_editor_config()
+            if editor_config.get('mcp_enabled'):
+                # A token is required: generate one when the settings page has
+                # never been opened (it is shown there and can be copied).
+                token = str(editor_config.get('mcp_token') or '')
+                if not token:
+                    token = secrets.token_urlsafe(24)
+                    update_editor_config('mcp_token', token)
+                info = mcp.start_server(port=int(editor_config.get('mcp_port') or mcp.DEFAULT_PORT),
+                                        token=token)
+                Logger.info('MCP server: {} ({} tools)'.format(info['url'], info['tools']))
+        except Exception as e:  # noqa: BLE001 - MCP is optional, never block the editor
+            Logger.error('Failed to start the MCP server: {}'.format(e))
 
     def _setup(self):
         self._set_widget()
@@ -514,9 +618,22 @@ class Editor(WindowBase):
     def get_ready_for_project(self, project_path):
         self._editor_body.get_ready_for_project(project_path)
         self._update_window_title()
+        # From now on tools may touch the open project.
+        try:
+            from pygamestudio.mcp.bridge import bridge
+            bridge.set_project_ready(True)
+        except Exception as e:  # noqa: BLE001
+            Logger.error('Failed to mark the MCP project as ready: {}'.format(e))
 
     def clean_up(self):
         self._editor_body.clean_up()
+        try:
+            # The server keeps running (the dashboard is still there), but the
+            # tools must not touch the project that was just closed.
+            from pygamestudio.mcp.bridge import bridge
+            bridge.set_project_ready(False)
+        except Exception as e:  # noqa: BLE001
+            Logger.error('Failed to mark the MCP project as closed: {}'.format(e))
 
     def keyPressEvent(self, event):
         """Global editor shortcuts (work regardless of which panel has focus):

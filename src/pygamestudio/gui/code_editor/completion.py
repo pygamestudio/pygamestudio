@@ -21,35 +21,81 @@ PYTHON_BUILTINS = (
     'zip',
 )
 
-# Words frequently used with the engine's object / runtime API (nice
-# completion hints). Kept as a set so duplicates with the document words or
-# between entries collapse.
-ENGINE_NAMES = (
-    # engine / object classes
-    'pygamestudio', 'ObjectBase', 'ObjectCanvas', 'ObjectRect', 'ObjectEllipse',
-    'ObjectPolygon', 'ObjectLine', 'ObjectText', 'ObjectImage', 'ObjectButton',
-    'ObjectParticle', 'ObjectFrameSequence', 'self',
-    # common transform / query helpers
+# ---------------------------------------------------------------------------
+# Engine hints
+#
+# ``ENGINE_NAMES`` is the curated, hand-written list of what a game script
+# usually needs (it doubles as the fallback when the engine cannot be
+# inspected). ``api_names()`` adds every name the engine really exposes -
+# the ``studio.*`` functions, the object API and the event constants are read
+# from the modules themselves, so the popup cannot fall behind the API.
+# ---------------------------------------------------------------------------
+
+# engine classes / managers a script can touch
+ENGINE_CLASSES = (
+    'pygamestudio', 'pygame', 'self',
+    'Game', 'SceneLoader', 'AudioManager', 'WindowManager',
+    'ObjectBase', 'ObjectCanvas', 'ObjectRect', 'ObjectEllipse', 'ObjectPolygon',
+    'ObjectLine', 'ObjectText', 'ObjectImage', 'ObjectButton', 'ObjectParticle',
+    'ObjectFrameSequence', 'ObjectTextInput', 'ObjectProgressBar', 'ObjectSlider',
+    'ObjectTileMap',
+)
+
+# object lifecycle and event callbacks (define only the ones you use)
+ENGINE_EVENTS = (
     'on_start', 'on_update', 'on_destroy',
-    # object event callbacks (mouse / click, text input, slider)
     'on_mouse_enter', 'on_mouse_leave', 'on_pressed', 'on_released', 'on_clicked',
     'on_focus', 'on_blur', 'on_text_changed', 'on_submitted',
-    'on_value_changed', 'on_drag_start', 'on_drag_end',
-    # more object events (drag, visibility, collision, animation, particles, progress)
-    'on_drag', 'on_right_clicked', 'on_double_clicked', 'on_visible_changed',
+    'on_value_changed', 'on_drag_start', 'on_drag', 'on_drag_end',
+    'on_right_clicked', 'on_double_clicked', 'on_visible_changed',
     'on_collision_enter', 'on_collision_exit',
     'on_animation_start', 'on_frame_changed', 'on_animation_finished',
     'on_particles_finished', 'on_progress_changed', 'on_progress_full',
+)
+
+# object API: transform, visibility, colours, text, images, input
+ENGINE_OBJECT_API = (
+    # name / type / position / size / scale / angle / hierarchy
     'get_name', 'get_uuid', 'get_type', 'get_x', 'get_y', 'get_pos', 'set_pos',
     'set_x', 'set_y', 'get_width', 'get_height', 'set_width', 'set_height',
-    'get_size', 'set_size', 'get_scale_x', 'get_scale_y', 'get_scale', 'set_scale',
-    'get_angle', 'set_angle', 'get_color', 'set_color', 'get_visible_state',
-    'set_visible_state', 'show', 'hide', 'is_visible',
-    'get_center', 'set_center', 'move', 'get_rect', 'get_world_rect',
-    'get_world_pos', 'is_pressed', 'is_point_inside', 'is_shown', 'is_hidden',
+    'get_size', 'set_size', 'get_scale_x', 'set_scale_x', 'get_scale_y', 'set_scale_y',
+    'get_scale', 'set_scale', 'get_angle', 'set_angle', 'move',
+    'get_center', 'set_center', 'get_rect', 'get_world_rect', 'get_world_pos',
+    'set_world_pos',
+    # visibility / background / border
+    'get_color', 'set_color', 'get_visible_state', 'set_visible_state',
+    'show', 'hide', 'is_visible', 'is_shown', 'is_hidden',
+    'get_background_color', 'set_background_color',
+    'get_border_color', 'set_border_color',
+    'get_border_radius', 'set_border_radius',
+    'get_border_top_left_radius', 'set_border_top_left_radius',
+    'get_border_top_right_radius', 'set_border_top_right_radius',
+    'get_border_bottom_left_radius', 'set_border_bottom_left_radius',
+    'get_border_bottom_right_radius', 'set_border_bottom_right_radius',
+    # text / font
+    'get_text', 'set_text', 'get_text_color', 'set_text_color',
+    'get_text_align', 'set_text_align', 'get_text_valign', 'set_text_valign',
+    'get_text_size', 'get_font_path', 'set_font_path', 'set_font',
+    'get_font_size', 'set_font_size', 'get_bold_state', 'set_bold_state',
+    'get_italic_state', 'set_italic_state',
+    'get_underline_state', 'set_underline_state',
+    'get_strikethrough_state', 'set_strikethrough_state',
+    # input box
+    'get_max_length', 'set_max_length', 'get_placeholder', 'set_placeholder',
+    'is_password_mode', 'set_password_mode',
+    'is_enter_newline', 'set_enter_newline',
+    'set_caret_from_world_point',
+    # image / line / polygon
+    'get_image_path', 'set_image_path',
+    'get_start_point', 'set_start_point', 'get_start_x', 'set_start_x',
+    'get_start_y', 'set_start_y', 'get_end_point', 'set_end_point',
+    'get_end_x', 'set_end_x', 'get_end_y', 'set_end_y',
+    'get_thickness', 'set_thickness', 'get_length', 'get_points', 'set_points',
+    # pointer helpers
+    'is_pressed', 'is_point_inside',
     'distance_to', 'distance_to_object', 'get_direction_to',
+    # collision queries / collision body API
     'is_colliding_with_rect', 'is_colliding_with_object', 'get_collision_rect',
-    # collision body API
     'is_collision_enabled', 'set_collision_enabled', 'get_collision_type',
     'set_collision_type', 'set_collision_offset', 'get_collision_offset',
     'set_collision_size', 'get_collision_size', 'get_collision_radius',
@@ -65,20 +111,81 @@ ENGINE_NAMES = (
     'get_particle_count', 'emit_particles', 'clear_particles',
     # frame-sequence API
     'get_frame_folder', 'set_frame_folder', 'get_frame_rate', 'set_frame_rate',
-    'get_auto_play', 'set_auto_play', 'get_loop', 'set_loop', 'get_frame_index',
-    'set_frame_index', 'get_frame_count', 'play', 'pause', 'stop', 'restart',
-    'is_playing',
-    # runtime top-level helpers
-    'get_object_by_path', 'get_object_by_uuid', 'get_parent_object',
-    'get_screen', 'get_fps', 'set_fps', 'quit',
-    # window API
+    'get_auto_play', 'set_auto_play', 'is_auto_play',
+    'get_auto_play_state', 'set_auto_play_state',
+    'get_loop', 'set_loop', 'get_loop_state', 'set_loop_state',
+    'get_frame_index', 'set_frame_index', 'get_frame_count',
+    'play', 'pause', 'stop', 'restart', 'is_playing',
+)
+
+# studio.* runtime helpers
+ENGINE_RUNTIME_API = (
+    # scene / objects
+    'load_scene', 'create_object', 'destroy_object', 'get_object_by_path',
+    'get_object_by_uuid', 'get_parent_object', 'get_root_object', 'get_children',
+    'get_all_objects', 'find_objects', 'get_scene_path',
+    # game loop / state / input
+    'get_screen', 'get_fps', 'set_fps', 'quit', 'is_running',
+    'get_delta_time', 'get_elapsed_time', 'get_frame_count',
+    'get_pressed_keys', 'get_pressed_buttons', 'is_key_pressed',
+    'get_mouse_position', 'is_mouse_button_pressed',
+    # audio
+    'load_sound', 'play_sound', 'stop_sound', 'stop_all_sounds', 'is_sound_playing',
+    'set_sound_volume', 'get_sound_volume',
+    'play_music', 'stop_music', 'pause_music', 'resume_music',
+    'is_music_playing', 'set_music_volume', 'get_music_volume',
+    # window
     'set_window_title', 'get_window_title', 'set_window_icon',
     'get_window_size', 'set_window_size', 'get_window_position',
     'set_window_position', 'center_window', 'get_desktop_size',
     'set_fullscreen', 'is_fullscreen', 'toggle_fullscreen', 'minimize_window',
-    'set_mouse_cursor_visible', 'is_mouse_cursor_visible',
+    'set_window_resizable', 'is_window_resizable',
+    'set_mouse_cursor_visible', 'is_mouse_cursor_visible', 'set_mouse_position',
     'set_allow_screensaver', 'is_allow_screensaver',
+    # project
+    'get_project_config', 'get_project_path',
 )
+
+ENGINE_NAMES = ENGINE_CLASSES + ENGINE_EVENTS + ENGINE_OBJECT_API + ENGINE_RUNTIME_API
+
+#: Cache of the names read from the engine (see api_names()).
+_API_NAMES = None
+
+
+def api_names() -> tuple:
+    """Every public name the engine offers to a script.
+
+    Reads ``studio.*``, the event constants (``K_*``, ``KMOD_*``) and the object
+    API from the modules themselves, so the completion popup always matches the
+    engine that is actually installed. The result is cached; if the engine
+    cannot be inspected (built editor, import error) the curated
+    :data:`ENGINE_NAMES` is all that is used - completion never breaks the
+    editor.
+    """
+    global _API_NAMES
+    if _API_NAMES is not None:
+        return _API_NAMES
+
+    names = set()
+    try:
+        import pygamestudio as studio
+        from pygamestudio.api.event import constant as event_constants
+        from pygamestudio.game.object.base import ObjectBase
+        from pygamestudio.game import object as object_models
+
+        names.update(name for name in dir(studio) if not name.startswith('_'))
+        names.update(name for name in dir(event_constants) if not name.startswith('_'))
+        # Object API: every public member of every scene-object class.
+        object_classes = [ObjectBase]
+        object_classes += [member for member in vars(object_models).values()
+                           if isinstance(member, type) and issubclass(member, ObjectBase)]
+        for object_class in object_classes:
+            names.update(name for name in dir(object_class) if not name.startswith('_'))
+    except Exception:  # noqa: BLE001 - hints must never break the editor
+        names = set()
+
+    _API_NAMES = tuple(sorted(names))
+    return _API_NAMES
 
 
 class CodeCompleter(QCompleter):
@@ -103,10 +210,11 @@ class CodeCompleter(QCompleter):
         self._all_words = []
 
     def update_words(self):
-        """Rebuild the candidate list: keywords + identifiers in the doc."""
+        """Rebuild the candidate list: keywords + engine API + document words."""
         words = set(PYTHON_KEYWORDS)
         words.update(PYTHON_BUILTINS)
         words.update(ENGINE_NAMES)
+        words.update(api_names())
         text = self._editor.toPlainText()
         for match in re.finditer(r'\b[A-Za-z_]\w*\b', text):
             words.add(match.group())

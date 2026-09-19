@@ -1209,24 +1209,32 @@ class GameManager(QObject):
         self._current_scene_file_path = path
         self._save()
 
-    def load_scene(self, current_scene_file_path):
-        return self._load_scene(current_scene_file_path)
+    def load_scene(self, current_scene_file_path, silent=False):
+        return self._load_scene(current_scene_file_path, silent=silent)
     
-    def _load_scene(self, current_scene_file_path):
+    def _load_scene(self, current_scene_file_path, silent=False):
         """Load a .scene file and rebuild the whole object tree.
 
-        Unsaved changes trigger a save prompt first. The canvas is replaced
-        first, then every node is re-created recursively via _add() so the
-        same signal flow as interactive editing runs. The undo stack is cleared
-        because the new tree has no history.
+        Unsaved changes trigger a save prompt first (unless ``silent`` is set -
+        the MCP tools pass silent=True so an agent never opens a dialog; the
+        current scene is then saved without asking when it has a file).
+        The canvas is replaced first, then every node is re-created recursively
+        via _add() so the same signal flow as interactive editing runs. The undo
+        stack is cleared because the new tree has no history.
         """
-        if not self._is_current_scene_saved:
+        if not silent and not self._is_current_scene_saved:
             choice = QMessageBox.warning(QApplication.activeWindow(), T.tr('message_box.warning_title', 'Warning'), T.tr('message_box.warning_scene_save_content', 'The current scene data has been modified. Do you want to save it?'), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel)
             if choice == QMessageBox.StandardButton.Cancel:
                 return
             
             elif choice == QMessageBox.StandardButton.Yes:
                 self._save_scene()
+        elif silent and not self._is_current_scene_saved and self._current_scene_file_path:
+            # A non-interactive caller (MCP tool) still must not lose work.
+            try:
+                self._save()
+            except Exception as e:
+                Logger.error('Failed to save the scene before loading another one: {}'.format(e))
         
         self._is_loading_scene = True
         if self._current_canvas_object_uuid:
@@ -1358,3 +1366,37 @@ class GameManager(QObject):
         if process in self._game_processes:
             self._game_processes.remove(process)
         process.deleteLater()
+
+    def get_running_processes(self) -> list:
+        """The game processes started from the editor that are still alive."""
+        running = []
+        for process in list(self._game_processes):
+            try:
+                if process.state() == QProcess.ProcessState.NotRunning:
+                    continue
+                running.append({
+                    'pid': int(process.processId() or 0),
+                    'program': process.program(),
+                    'state': 'running',
+                })
+            except RuntimeError:
+                # The underlying C++ object is gone (already deleted).
+                continue
+        return running
+
+    def stop_project(self) -> int:
+        """Stop every game process started from the editor; returns how many
+        were still running (the editor's Run/Stop button uses the same list)."""
+        stopped = 0
+        for process in list(self._game_processes):
+            try:
+                if process.state() == QProcess.ProcessState.NotRunning:
+                    continue
+                process.kill()
+                process.waitForFinished(2000)
+                stopped += 1
+            except RuntimeError:
+                continue
+        if stopped:
+            Logger.info('Stopped {} running game process(es).'.format(stopped))
+        return stopped

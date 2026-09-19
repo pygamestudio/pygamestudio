@@ -46,6 +46,10 @@ class SceneLoader:
     def __init__(self):
         self._current_scene_path = ''
         self._all_object_tree_struct = {}
+        # Objects marked by destroy_object(): they leave the scene at the end
+        # of the frame, so a script can destroy anything while the tree is
+        # being walked without pulling the ground away from the running frame.
+        self._pending_destroy = []
         # Seconds elapsed since the last frame, updated by Game.run() each
         # frame and passed to the scripts' on_update(delta_time) hooks.
         self._delta_time = 0
@@ -90,7 +94,9 @@ class SceneLoader:
             self._destroy_scripts()
         self._reset_runtime_input_state()
         self._all_object_tree_struct = {}
-        self._current_scene_path = scene_path
+        # Nothing is left to destroy: the whole tree is gone already.
+        self._pending_destroy = []
+        self._current_scene_path = str(scene_path)
         # Scene files are encrypted in a protected build and plain otherwise.
         scene_data = json.loads(assets.read_text(scene_path))
 
@@ -124,6 +130,7 @@ class SceneLoader:
         }
 
         self._add_object_tree_struct(parent_uuid, object_tree_struct)
+        return obj
 
     def _new_object(self, object_type, object_data={}):
         if object_type == OBJECT_CANVAS:
@@ -247,8 +254,11 @@ class SceneLoader:
 
                 obj._draw(parent_surface)
 
-        _update(self._all_object_tree_struct, screen_surface)
+        if self._all_object_tree_struct:
+            _update(self._all_object_tree_struct, screen_surface)
         self._update_collision_events()
+        if self._pending_destroy:
+            self._flush_destroyed()
 
     def _set_delta_time(self, delta_time):
         """Set the per-frame delta time (seconds) passed to scripts' on_update."""
@@ -262,13 +272,17 @@ class SceneLoader:
         being reported as broken.
         """
         for obj in self._iter_objects():
-            hook = getattr(obj.script_instance, 'on_start', None)
-            if not callable(hook):
-                continue
-            try:
-                hook()
-            except Exception as e:
-                print(T.tr('api.script_start_error', 'Script on_start error for {}: {}').format(obj.name, e), file=sys.stderr)
+            self._start_script(obj)
+
+    def _start_script(self, obj):
+        """Fire on_start() on one object's script (when it defines the hook)."""
+        hook = getattr(obj.script_instance, 'on_start', None)
+        if not callable(hook):
+            return
+        try:
+            hook()
+        except Exception as e:
+            print(T.tr('api.script_start_error', 'Script on_start error for {}: {}').format(obj.name, e), file=sys.stderr)
 
     def _update_script(self, obj):
         """Fire on_update(delta_time) on an object's attached script (per frame).
@@ -287,13 +301,17 @@ class SceneLoader:
     def _destroy_scripts(self):
         """Fire on_destroy() on every attached script (before the scene is replaced)."""
         for obj in self._iter_objects():
-            hook = getattr(obj.script_instance, 'on_destroy', None)
-            if not callable(hook):
-                continue
-            try:
-                hook()
-            except Exception as e:
-                print(T.tr('api.script_destroy_error', 'Script on_destroy error for {}: {}').format(obj.name, e), file=sys.stderr)
+            self._destroy_script(obj)
+
+    def _destroy_script(self, obj):
+        """Fire on_destroy() on one object's script (when it defines the hook)."""
+        hook = getattr(obj.script_instance, 'on_destroy', None)
+        if not callable(hook):
+            return
+        try:
+            hook()
+        except Exception as e:
+            print(T.tr('api.script_destroy_error', 'Script on_destroy error for {}: {}').format(obj.name, e), file=sys.stderr)
 
     def _iter_objects(self):
         """Yield every object in the current scene tree (depth-first)."""
@@ -390,6 +408,188 @@ class SceneLoader:
             return None
         
         return _get(object_uuid, self._all_object_tree_struct)
+
+    # ------------------------------------------------- dynamic object creation
+    def create_object(self, object_type:str, parent:str='', name:str='', properties:dict=None) -> object:
+        """Create an object while the game is running and return it.
+
+        ``parent`` is the uuid, the hierarchy path ("Canvas/Hud", built with
+        the editor's list of names) or the name of the object the new one is
+        added under; empty means the root of the scene. ``properties`` use the
+        same names as the inspector and the .scene file (x, y, width, height,
+        color, text, image_path, script_path, ...); everything not given falls
+        back to that type's default, exactly like an object created in the
+        editor.
+
+        The new object behaves like one that was in the scene from the start:
+        its script (``script_path``) is attached, on_start fires right away
+        and it is updated and drawn from the next frame on.
+        """
+        object_type = (object_type or '').strip().upper()
+
+        parent_object = None
+        if parent:
+            if not self._all_object_tree_struct:
+                raise RuntimeError(T.tr('api.no_scene_loaded',
+                                        'No scene is loaded yet - load a scene before creating objects.'))
+            parent_object = self._resolve_object(parent)
+            if parent_object is None:
+                raise RuntimeError(T.tr('api.no_parent_object',
+                                        'Parent object not found: {}').format(parent))
+        elif self._all_object_tree_struct:
+            # No parent given: add to the scene root (the canvas).
+            parent_object = list(self._all_object_tree_struct.values())[0]['object']
+
+        object_data = dict(properties or {})
+        if name:
+            object_data['name'] = name
+
+        created = self._add(parent_object.uuid if parent_object else '', object_type, object_data)
+        if created is not None:
+            self._start_script(created)
+        return created
+
+    # ------------------------------------------------- object tree management
+    def _resolve_object(self, ref):
+        """An object from an object, a uuid, a hierarchy path or a name.
+
+        Only objects that are part of the running scene are returned - a stale
+        reference to something that was already removed resolves to None.
+        """
+        if not self._all_object_tree_struct:
+            return None
+        if isinstance(ref, ObjectBase):
+            return ref if self._get_object_tree_struct_by_uuid(ref.uuid) is not None else None
+        if not isinstance(ref, str) or not ref.strip():
+            return None
+        ref = ref.strip()
+        return (self.get_object_by_uuid(ref)
+                or self.get_object_by_path(ref)
+                or next((obj for obj in self._iter_objects() if obj.name == ref), None))
+
+    def _iter_tree_struct_objects(self, object_tree_struct):
+        """Yield one tree struct's object and every object below it (depth-first)."""
+        value = list(object_tree_struct.values())[0]
+        yield value['object']
+        for child_object_tree_struct in value['children']:
+            yield from self._iter_tree_struct_objects(child_object_tree_struct)
+
+    def get_root_object(self):
+        """The root object of the running scene (the canvas), or None."""
+        if not self._all_object_tree_struct:
+            return None
+        return list(self._all_object_tree_struct.values())[0]['object']
+
+    def get_scene_path(self) -> str:
+        """The scene file that is loaded right now ('' when there is none)."""
+        return str(self._current_scene_path or '')
+
+    def get_children(self, obj) -> list:
+        """The direct children of an object (object, uuid, path or name)."""
+        target = self._resolve_object(obj)
+        if target is None:
+            return []
+        object_tree_struct = self._get_object_tree_struct_by_uuid(target.uuid)
+        if not object_tree_struct:
+            return []
+        return [list(child_object_tree_struct.values())[0]['object']
+                for child_object_tree_struct in list(object_tree_struct.values())[0]['children']]
+
+    def get_all_objects(self) -> list:
+        """Every object of the running scene, in tree order (the root first)."""
+        return list(self._iter_objects())
+
+    def find_objects(self, name:str='', object_type:str='', script:str='', visible_only:bool=False) -> list:
+        """Every object matching the filters.
+
+        ``name`` and ``script`` are substrings (case-insensitive), ``type`` is
+        an exact object type (RECT, TEXT, ...); everything empty means "any".
+        """
+        name = (name or '').lower()
+        object_type = (object_type or '').upper()
+        script = (script or '').lower()
+        matches = []
+        for obj in self._iter_objects():
+            if name and name not in obj.name.lower():
+                continue
+            if object_type and obj.type != object_type:
+                continue
+            script_path = (getattr(obj, 'script_path', '') or '').lower()
+            if script and script not in script_path:
+                continue
+            if visible_only and not getattr(obj, 'visible', True):
+                continue
+            matches.append(obj)
+        return matches
+
+    def destroy_object(self, obj) -> bool:
+        """Remove an object (and its children) from the running scene.
+
+        ``obj`` is the object itself, its uuid, its hierarchy path or its
+        name. The object leaves the scene at the **end of the current frame**,
+        so a script can destroy anything - even the object it is attached to -
+        while the frame is still running; on_destroy() of its script fires when
+        it actually leaves. Returns False when there is nothing to destroy.
+        """
+        target = self._resolve_object(obj)
+        if target is None or target in self._pending_destroy:
+            return False
+        self._pending_destroy.append(target)
+        return True
+
+    def _flush_destroyed(self):
+        """Apply the deferred destroy_object() calls (end of the frame)."""
+        pending, self._pending_destroy = self._pending_destroy, []
+        for target in pending:
+            self._remove_object(target)
+
+    def _remove_object(self, target) -> bool:
+        object_tree_struct = self._get_object_tree_struct_by_uuid(target.uuid)
+        if not object_tree_struct:
+            return False
+
+        parent = self.get_parent_object(target.uuid)
+        if parent is None:
+            # The root object itself: the scene becomes empty (loading a scene
+            # again reloads it from its file).
+            for obj in self._iter_tree_struct_objects(object_tree_struct):
+                self._destroy_script(obj)
+            self._all_object_tree_struct = {}
+            self._current_scene_path = ''
+            self._reset_runtime_input_state()
+            return True
+
+        parent_tree_struct = self._get_object_tree_struct_by_uuid(parent.uuid)
+        if not parent_tree_struct:
+            return False
+        children = list(parent_tree_struct.values())[0]['children']
+        for index, child_object_tree_struct in enumerate(children):
+            if list(child_object_tree_struct.keys())[0] != target.uuid:
+                continue
+            for obj in self._iter_tree_struct_objects(child_object_tree_struct):
+                self._destroy_script(obj)
+                self._forget_runtime_state(obj)
+            del children[index]
+            return True
+        return False
+
+    def _forget_runtime_state(self, obj):
+        """Drop every runtime reference to an object that left the scene."""
+        if self._focused_text_input is obj:
+            self._clear_text_input_focus(notify=False)
+        if self._active_slider is obj:
+            self._active_slider = None
+        if self._hovered_object is obj:
+            self._hovered_object = None
+        if self._pressed_object is obj:
+            self._pressed_object = None
+        if self._drag_object is obj:
+            self._drag_object = None
+        if self._right_pressed_object is obj:
+            self._right_pressed_object = None
+        if self._collision_pairs:
+            self._collision_pairs = {pair: value for pair, value in self._collision_pairs.items()
+                                     if obj.uuid not in pair}
 
     # ---------------------------------------- runtime text-input focus
     def get_focused_text_input(self):
@@ -820,3 +1020,60 @@ def get_object_by_uuid(object_uuid:str) -> object:
 
 def get_parent_object(object_uuid:str) -> object:
     return scene_loader.get_parent_object(object_uuid)
+
+def create_object(object_type:str, parent:str='', name:str='', properties:dict=None) -> object:
+    """
+    在游戏运行时动态创建一个对象并返回它。
+    :param object_type: 对象类型，如 RECT、TEXT、IMAGE、BUTTON、FRAME_SEQUENCE 等
+    :param parent: 父对象的 uuid、层级路径（如 Canvas/Hud）或名称，留空则添加到场景根节点
+    :param name: 对象名称
+    :param properties: 初始属性字典（与属性检查器/.scene 文件同名），如 {'x': 0, 'y': 0, 'width': 50, 'height': 50, 'color': (255, 0, 0, 255)}
+
+    Create an object at runtime (while the game is running) and return it. The
+    new object is attached under ``parent`` (the scene root when it is empty)
+    with the given properties, its script is loaded, on_start fires right away
+    and it is updated/drawn from the next frame on.
+    """
+    return scene_loader.create_object(object_type, parent, name, properties)
+
+def destroy_object(obj) -> bool:
+    """
+    从场景中移除一个对象（连同它的子对象）。
+    :param obj: 对象本身、uuid、层级路径或名称
+    :return: 是否成功登记移除（重复移除返回 False）
+
+    Remove an object (and its children) while the game is running. It leaves
+    the scene at the end of the current frame, so this is always safe to call
+    from a script (even with the object it is attached to); its script's
+    on_destroy() fires when it leaves.
+    """
+    return scene_loader.destroy_object(obj)
+
+def get_root_object() -> object:
+    """场景的根对象（画布），没有加载场景时返回 None。The root object of the scene, or None."""
+    return scene_loader.get_root_object()
+
+def get_scene_path() -> str:
+    """当前加载的场景文件路径（未加载时为空字符串）。The loaded scene file path ('' when none)."""
+    return scene_loader.get_scene_path()
+
+def get_children(obj) -> list:
+    """某个对象的直接子对象列表（参数可为对象、uuid、路径或名称）。Direct children of an object."""
+    return scene_loader.get_children(obj)
+
+def get_all_objects() -> list:
+    """场景中的全部对象（按树的顺序，根对象在最前）。Every object of the scene, in tree order."""
+    return scene_loader.get_all_objects()
+
+def find_objects(name:str='', object_type:str='', script:str='', visible_only:bool=False) -> list:
+    """
+    按条件查找对象。
+    :param name: 名称包含的文本（不区分大小写，留空表示不限）
+    :param object_type: 对象类型（如 RECT、TEXT，需完全匹配）
+    :param script: 脚本路径包含的文本（如 'player.py'）
+    :param visible_only: 只返回可见对象
+
+    Every object matching the filters: ``name``/``script`` are case-insensitive
+    substrings, ``object_type`` is an exact type; empty means "any".
+    """
+    return scene_loader.find_objects(name, object_type, script, visible_only)

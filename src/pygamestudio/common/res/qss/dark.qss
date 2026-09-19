@@ -180,6 +180,13 @@ QMenu::icon {
     left: 15px;
 }
 
+/* The Window menu has no icons, so its check marks are pulled right, close to
+   the item text (the reserved icon column would leave a big gap otherwise). */
+QMenu#windowMenu::indicator {
+    position: relative;
+    left: 20px;
+}
+
 QMenu::separator {
     height: 1px;
     background-color: #3c3c3c;
@@ -805,5 +812,46 @@ QListView#codeEditorCompletionPopup::item:hover {
 QListView#codeEditorCompletionPopup::item:selected {
     background-color: #007acc;
     color: #ffffff;
+}
+
+/* ----- Agent ----- */
+/* Chat surface (flat dark); the input box below is the raised, lighter one. */
+QTextBrowser#agentTranscript {
+    background-color: #1e1e1e;
+    border: none;
+    padding: 4px;
+}
+
+/* Input box: the rounded surface and its blue focus ring are painted by
+   AgentComposerFrame - a stylesheet border is NOT drawn on a QPlainTextEdit
+   by the native Windows style, so only the transparent viewport is set here. */
+QPlainTextEdit#agentComposer {
+    background-color: transparent;
+    border: none;
+    selection-background-color: #404142;
+}
+
+/* Only there to place the Send button inside the input box. */
+QWidget#agentSendHolder {
+    background-color: transparent;
+}
+
+QPushButton#agentSendBtn {
+    padding: 1px 10px;
+    font-size: 12px;
+}
+
+QPushButton#agentIconBtn {
+    background-color: transparent;
+    border: none;
+    border-radius: 4px;
+}
+
+QPushButton#agentIconBtn:hover {
+    background-color: #404142;
+}
+
+QPushButton#agentIconBtn:pressed {
+    background-color: #28292a;
 }
 
