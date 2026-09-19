@@ -269,6 +269,68 @@ class CollisionSpinBox(SuffixSpinBox):
         self._inspector_container.set_object_collision_parameter(self._attr, int(self.value()))
 
 
+class PhysicsShapeSpinBox(SuffixSpinBox):
+    """Spinbox for one field of the RIGID-BODY shape: offset x/y or box size
+    w/h. Integers (content pixels), pushed as physics parameter changes."""
+
+    _SUFFIXES = {
+        'physics_shape_offset_x': 'X',
+        'physics_shape_offset_y': 'Y',
+        'physics_shape_width': 'W',
+        'physics_shape_height': 'H',
+    }
+
+    def __init__(self, inspector_container, value, attr=''):
+        super().__init__()
+        self._inspector_container = inspector_container
+        self._attr = attr
+        if 'offset' in attr:
+            self.setRange(-999999, 999999)
+        else:
+            self.setRange(0, 999999)
+        self.setSingleStep(1)
+        self.setDecimals(0)
+        self.setValue(value)
+        self.set_suffix(self._SUFFIXES.get(attr, ''))
+
+        self.valueChanged.connect(self._on_value_changed)
+
+    def _on_value_changed(self):
+        self._inspector_container.set_object_physics_parameter(self._attr, int(self.value()))
+
+
+class PhysicsSpinBox(SuffixSpinBox):
+    """Spinbox for one physics numeric parameter: mass, friction, elasticity,
+    gravity scale or damping. All values are floats."""
+
+    # attr: (minimum, maximum, single step, decimals)
+    _FIELDS = {
+        'physics_mass': (0.01, 99999.0, 0.1, 2),
+        'physics_friction': (0.0, 10.0, 0.05, 2),
+        'physics_elasticity': (0.0, 10.0, 0.05, 2),
+        'physics_gravity_scale': (-10.0, 10.0, 0.1, 2),
+        'physics_linear_damping': (0.0, 100.0, 0.05, 2),
+        'physics_angular_damping': (0.0, 100.0, 0.05, 2),
+    }
+
+    def __init__(self, inspector_container, value, attr=''):
+        super().__init__()
+        self._inspector_container = inspector_container
+        self._attr = attr
+        minimum, maximum, step, decimals = self._FIELDS.get(
+            attr, (0.0, 99999.0, 0.1, 2))
+        self.setRange(minimum, maximum)
+        self.setSingleStep(step)
+        self.setDecimals(decimals)
+        self.setValue(float(value))
+
+        self.valueChanged.connect(self._on_value_changed)
+
+    def _on_value_changed(self):
+        self._inspector_container.set_object_physics_parameter(
+            self._attr, float(self.value()))
+
+
 class TileMapSpinBox(SuffixSpinBox):
     """Spinbox for one tile-map parameter: tile_width/tile_height in px, or
     the grid size columns/rows (in tiles). Minimum value is 1."""

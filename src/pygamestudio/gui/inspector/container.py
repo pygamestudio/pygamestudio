@@ -22,6 +22,7 @@ from pygamestudio.gui.inspector.layout.tile_map import INSPECTOR_LAYOUT_TILE_MAP
 from pygamestudio.gui.inspector.layout.progress_bar import INSPECTOR_LAYOUT_PROGRESS_BAR
 from pygamestudio.gui.inspector.layout.slider import INSPECTOR_LAYOUT_SLIDER
 from pygamestudio.gui.inspector.layout.collision import build_collision_layout
+from pygamestudio.gui.inspector.layout.physics import build_physics_layout
 
 
 class Container(QFrame):
@@ -90,6 +91,7 @@ class Container(QFrame):
         self._game_manager.object_progress_bar_parameter_changed.connect(self._on_object_progress_bar_parameter_changed)
         self._game_manager.object_slider_parameter_changed.connect(self._on_object_slider_parameter_changed)
         self._game_manager.object_collision_parameter_changed.connect(self._on_object_collision_parameter_changed)
+        self._game_manager.object_physics_parameter_changed.connect(self._on_object_physics_parameter_changed)
 
     def _set_layout(self):
         self._container_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
@@ -461,6 +463,112 @@ class Container(QFrame):
             (shown('collision_type') != want_combo) or
             (shown('collision_width') != want_box_fields) or
             (shown('collision_points') != want_polygon)
+        )
+        if mismatch:
+            self._inspect_object(self._object_uuid_in_inspection)
+
+    def set_object_physics_parameter(self, attr, new_value):
+        # The first time physics is switched on, materialize concrete
+        # object-sized defaults for the RIGID-BODY shape: the body needs a
+        # real shape and the shape rows below show concrete numbers.
+        if attr == 'physics_enabled' and new_value:
+            obj = self._game_manager.get_object(self._object_uuid_in_inspection)
+            if obj is not None:
+                obj._ensure_physics_shape_defaults(force=True, for_type=getattr(obj, 'physics_shape_type', 'rect'))
+        self._game_manager.set_physics_parameter(self._object_uuid_in_inspection, attr, new_value)
+
+    def set_object_physics_type(self, type_code):
+        """Change the body type. The parameter-change handler rebuilds the
+        inspector so only the fields relevant to the new type are shown
+        (mass and fixed rotation are dynamic-only)."""
+        self._game_manager.set_physics_parameter(
+            self._object_uuid_in_inspection, 'physics_type', type_code)
+
+    def set_object_physics_shape_type(self, type_code):
+        """Change the rigid-body shape type. The parameter-change handler
+        rebuilds the inspector so only the fields relevant to the new shape
+        are shown; defaults for the new type are materialized first."""
+        obj = self._game_manager.get_object(self._object_uuid_in_inspection)
+        if obj is not None:
+            obj._ensure_physics_shape_defaults(force=True, for_type=type_code)
+        self._game_manager.set_physics_parameter(
+            self._object_uuid_in_inspection, 'physics_shape_type', type_code)
+
+    def _on_object_physics_parameter_changed(self, object_uuid):
+        """Keep the physics editors in sync with an undone/redone change."""
+        if object_uuid != self._object_uuid_in_inspection:
+            return
+        obj = self._game_manager.get_object(object_uuid)
+        if obj is None:
+            return
+
+        enabled = self._find_widget(self._container_layout, 'physics_enabled')
+        if enabled:
+            enabled.blockSignals(True)
+            enabled.setChecked(bool(getattr(obj, 'physics_enabled', False)))
+            enabled.blockSignals(False)
+
+        combo = self._find_widget(self._container_layout, 'physics_type')
+        if combo:
+            combo.set_physics_type(getattr(obj, 'physics_type', 'dynamic'))
+
+        fixed = self._find_widget(self._container_layout, 'physics_fixed_rotation')
+        if fixed:
+            fixed.blockSignals(True)
+            fixed.setChecked(bool(getattr(obj, 'physics_fixed_rotation', False)))
+            fixed.blockSignals(False)
+
+        # Sync every numeric field that is currently shown. Stored values are
+        # concrete floats.
+        for attr in ('physics_mass', 'physics_friction', 'physics_elasticity',
+                     'physics_gravity_scale', 'physics_linear_damping',
+                     'physics_angular_damping'):
+            widget = self._find_widget(self._container_layout, attr)
+            if widget:
+                widget.blockSignals(True)
+                widget.setValue(float(getattr(obj, attr, 0.0)))
+                widget.blockSignals(False)
+
+        # Rigid-body shape editors (own values, see the collision handler for
+        # the identical model).
+        shape_combo = self._find_widget(self._container_layout, 'physics_shape_type')
+        if shape_combo:
+            shape_combo.set_physics_shape_type(getattr(obj, 'physics_shape_type', 'rect'))
+
+        for attr in ('physics_shape_offset_x', 'physics_shape_offset_y',
+                     'physics_shape_width', 'physics_shape_height'):
+            widget = self._find_widget(self._container_layout, attr)
+            if widget:
+                widget.blockSignals(True)
+                widget.setValue(getattr(obj, attr, 0))
+                widget.blockSignals(False)
+
+        points = self._find_widget(self._container_layout, 'physics_shape_points')
+        if points:
+            points.blockSignals(True)
+            points.set_points(getattr(obj, 'physics_shape_points', []))
+            points.blockSignals(False)
+
+        # Rebuild the inspector when the visible section no longer matches the
+        # object's state - e.g. the enable checkbox was toggled or the body
+        # type / shape changed through undo/redo (bypasses the combo boxes).
+        enabled = bool(getattr(obj, 'physics_enabled', False))
+        ptype = getattr(obj, 'physics_type', 'dynamic')
+        pshape = getattr(obj, 'physics_shape_type', 'rect')
+
+        def shown(attr):
+            return self._find_widget(self._container_layout, attr) is not None
+
+        want_combo = enabled
+        want_dynamic_fields = enabled and ptype == 'dynamic'
+        want_box_fields = enabled and pshape in ('rect', 'ellipse')
+        want_polygon = enabled and pshape == 'polygon'
+        mismatch = (
+            (shown('physics_type') != want_combo) or
+            (shown('physics_mass') != want_dynamic_fields) or
+            (shown('physics_shape_offset_x') != (want_box_fields or want_polygon)) or
+            (shown('physics_shape_width') != want_box_fields) or
+            (shown('physics_shape_points') != want_polygon)
         )
         if mismatch:
             self._inspect_object(self._object_uuid_in_inspection)
@@ -893,12 +1001,20 @@ class Container(QFrame):
         elif obj.type == OBJECT_TILE_MAP:
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_TILE_MAP)
 
-        # Every object (except the canvas root) can carry a collision body.
+        # Every object (except the canvas root) can carry a collision body and
+        # a rigid body. The physics section comes first and has its own shape
+        # (physics_shape_*); the collision section below is fully independent
+        # and only shows its rows while its own switch is on.
         if obj.type != OBJECT_CANVAS:
             # Materialize defaults on first use only (never force): explicit
             # values - including a deliberate 0 - are never overwritten.
             if obj.collision_enabled:
                 obj._ensure_collision_defaults()
+            if obj.physics_enabled:
+                obj._ensure_physics_shape_defaults()
+            self._add_layout_for_specific_object(
+                obj, build_physics_layout(obj.physics_enabled, obj.physics_shape_type,
+                                          obj.physics_type))
             self._add_layout_for_specific_object(
                 obj, build_collision_layout(obj.collision_enabled, obj.collision_type))
 
@@ -928,7 +1044,7 @@ class Container(QFrame):
             label = PropertyLabel(self, text)
             self._container_layout.addWidget(label, self._container_row, 0, 1, 1)
 
-            if property_detail['i18n']['default'] in ('Points', 'Collision Points'):
+            if property_detail['i18n']['default'] in ('Points', 'Collision Points', 'Shape Points'):
                 label.setAlignment(Qt.AlignmentFlag.AlignTop)
                 label.setContentsMargins(0, 4, 0, 0)
 

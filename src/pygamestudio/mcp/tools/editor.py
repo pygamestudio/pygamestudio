@@ -143,7 +143,14 @@ def object_types(args):
     common = ['name', 'x', 'y', 'width', 'height', 'angle', 'visible', 'color',
               'script_path', 'scale_x', 'scale_y', 'collision_enabled',
               'collision_type', 'collision_offset_x', 'collision_offset_y',
-              'collision_width', 'collision_height', 'collision_points']
+              'collision_width', 'collision_height', 'collision_points',
+              'physics_enabled', 'physics_type', 'physics_mass',
+              'physics_friction', 'physics_elasticity', 'physics_gravity_scale',
+              'physics_fixed_rotation', 'physics_linear_damping',
+              'physics_angular_damping', 'physics_shape_type',
+              'physics_shape_offset_x', 'physics_shape_offset_y',
+              'physics_shape_width', 'physics_shape_height',
+              'physics_shape_points']
     result = {
         'creatable_types': object_type_names(),
         'common_properties': sorted(set(common)),
@@ -153,6 +160,10 @@ def object_types(args):
             'script_path is project relative, e.g. "./script/player.py".',
             'color is [r, g, b] or [r, g, b, a] with 0-255 per channel.',
             'collision_* properties only matter when collision_enabled is true.',
+            'physics_* properties only matter when physics_enabled is true; the rigid '
+            'body uses its own shape (physics_shape_type/size/offset/points, '
+            'independent from the collision shape), and physics_type is static, '
+            'dynamic or kinematic.',
         ],
     }
     if wanted:

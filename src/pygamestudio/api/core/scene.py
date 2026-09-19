@@ -69,6 +69,10 @@ class SceneLoader:
         self._right_pressed_object = None
         # Collision pairs found during the previous frame: {(uuid, uuid): (obj, obj)}.
         self._collision_pairs = {}
+        # The physics world of the running scene (None while no scene is
+        # loaded, and always None in the editor - physics only runs in the
+        # game process).
+        self._physics = None
         # Set right after Enter inserted a '\n' (enter_newline mode) so the
         # duplicate newline TEXTINPUT that some platforms also emit for the
         # Return key is swallowed (otherwise it would double the line break).
@@ -97,6 +101,10 @@ class SceneLoader:
         # Nothing is left to destroy: the whole tree is gone already.
         self._pending_destroy = []
         self._current_scene_path = str(scene_path)
+        # A fresh world for the scene about to be built: every physics-enabled
+        # object gets its body while it is created (see _register_physics_object).
+        self._physics = None
+        self._start_physics()
         # Scene files are encrypted in a protected build and plain otherwise.
         scene_data = json.loads(assets.read_text(scene_path))
 
@@ -130,6 +138,9 @@ class SceneLoader:
         }
 
         self._add_object_tree_struct(parent_uuid, object_tree_struct)
+        # A physics body is built once the object is in the tree: placing it
+        # needs its parent offsets.
+        self._register_physics_object(obj)
         return obj
 
     def _new_object(self, object_type, object_data={}):
@@ -241,6 +252,9 @@ class SceneLoader:
 
     def _update_scene(self, screen_surface:pygame.Surface):
         screen_surface.fill((0, 0, 0))
+        # Physics runs before the scripts: on_update() sees the position the
+        # bodies ended up in, and can push them for the next frame.
+        self._update_physics()
 
         def _update(object_tree_struct, parent_surface):
             value = list(object_tree_struct.values())[0]
@@ -323,6 +337,48 @@ class SceneLoader:
 
         if self._all_object_tree_struct:
             yield from _gen(self._all_object_tree_struct)
+
+    # ------------------------------------------------------------------ physics
+    def physics_world(self):
+        """The physics world of the running scene, or None (editor, no scene)."""
+        return self._physics
+
+    def _start_physics(self):
+        """Create the physics world for the scene that is being loaded.
+
+        pymunk is imported here (not at module level) so a game without
+        physics never pays for it - and neither does the editor.
+        """
+        try:
+            from pygamestudio.game.core.physics import PhysicsWorld
+        except ImportError as e:  # noqa: BLE001 - physics is optional
+            print(T.tr('api.physics_unavailable', 'Physics is not available: {}').format(e),
+                  file=sys.stderr)
+            self._physics = None
+            return
+        self._physics = PhysicsWorld()
+
+    def _register_physics_object(self, obj):
+        """Give ``obj`` its physics body when it wants one."""
+        world = self._physics
+        if world is not None and getattr(obj, 'physics_enabled', False):
+            world.refresh_object(obj)
+
+    def _update_physics(self):
+        """Step the world and write the bodies back into the objects.
+
+        Bodies are added/removed here as well, so a script can switch
+        ``physics_enabled`` on or off at runtime (it takes effect next frame).
+        """
+        world = self._physics
+        if world is None:
+            return
+        for obj in self._iter_objects():
+            if getattr(obj, 'physics_enabled', False):
+                world.refresh_object(obj)
+            elif world.has_object(obj):
+                world.remove_object(obj)
+        world.step(self._delta_time)
 
     def _get_object_tree_struct_by_path(self, object_path):
         def _get(name, target_item_index, current_item_index, recursion_time, part_number, object_tree_struct):
@@ -590,6 +646,8 @@ class SceneLoader:
         if self._collision_pairs:
             self._collision_pairs = {pair: value for pair, value in self._collision_pairs.items()
                                      if obj.uuid not in pair}
+        if self._physics is not None and self._physics.has_object(obj):
+            self._physics.remove_object(obj)
 
     # ---------------------------------------- runtime text-input focus
     def get_focused_text_input(self):
@@ -746,6 +804,13 @@ class SceneLoader:
             for index, obj_a in enumerate(colliders):
                 rect_a = obj_a._get_world_rect()
                 for obj_b in colliders[index + 1:]:
+                    # Contacts of a physics body are reported by the physics
+                    # world (fed in below) - testing them here as well would
+                    # fire every event twice.
+                    if self._physics is not None and (
+                            self._physics.has_object(obj_a)
+                            or self._physics.has_object(obj_b)):
+                        continue
                     # Cheap world-rect reject before the precise shape test.
                     if not rect_a.colliderect(obj_b._get_world_rect()):
                         continue
@@ -753,6 +818,11 @@ class SceneLoader:
                         continue
                     key = tuple(sorted((obj_a.uuid, obj_b.uuid)))
                     current_pairs[key] = (obj_a, obj_b)
+
+        if self._physics is not None:
+            # Physics contacts take part whatever the collision switch says:
+            # enabling physics alone is enough to receive the events.
+            current_pairs.update(self._physics.pairs())
 
         for key, (obj_a, obj_b) in self._collision_pairs.items():
             if key in current_pairs:

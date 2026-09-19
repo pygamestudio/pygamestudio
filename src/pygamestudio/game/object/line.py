@@ -156,3 +156,23 @@ class ObjectLine(ObjectBase):
 
         else:
             super().__setattr__(name, value)
+
+    def _set_world_rect(self, world_x, world_y):
+        """Move the line so its world rectangle starts at (world_x, world_y).
+
+        x/y are recomputed from the endpoints on every surface update, so a
+        plain x/y write would be undone - the endpoints have to shift (that is
+        what the ``pos`` setter does). The requested rectangle is the world box
+        of the ROTATED surface, so the centre is what gets matched.
+        """
+        rad = math.radians(self.angle)
+        width = abs(self.width * self.scale_x)
+        height = abs(self.height * self.scale_y)
+        rotated_w = abs(width * math.cos(rad)) + abs(height * math.sin(rad))
+        rotated_h = abs(width * math.sin(rad)) + abs(height * math.cos(rad))
+        center_x = world_x + rotated_w / 2.0
+        center_y = world_y + rotated_h / 2.0
+        self.pos = (center_x - width / 2.0, center_y - height / 2.0)
+        # x/y/size come from the endpoints, so refresh them right away instead
+        # of waiting for the next surface update.
+        self._update_bounding_box()

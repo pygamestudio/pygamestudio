@@ -493,6 +493,13 @@ def type_properties():
         _COLLISION_ENABLED, _COLLISION_OFFSET, _COLLISION_POINTS, _COLLISION_SIZE,
         _COLLISION_TYPE,
     )
+    from pygamestudio.gui.inspector.layout.physics import (
+        _PHYSICS_ANGULAR_DAMPING, _PHYSICS_ELASTICITY, _PHYSICS_ENABLED,
+        _PHYSICS_FIXED_ROTATION, _PHYSICS_FRICTION, _PHYSICS_GRAVITY_SCALE,
+        _PHYSICS_LINEAR_DAMPING, _PHYSICS_MASS, _PHYSICS_SHAPE,
+        _PHYSICS_SHAPE_OFFSET, _PHYSICS_SHAPE_POINTS, _PHYSICS_SHAPE_SIZE,
+        _PHYSICS_TYPE,
+    )
 
     layouts = {
         OBJECT_RECT: INSPECTOR_LAYOUT_RECT,
@@ -510,11 +517,28 @@ def type_properties():
         OBJECT_TILE_MAP: INSPECTOR_LAYOUT_TILE_MAP,
         OBJECT_CANVAS: INSPECTOR_LAYOUT_CANVAS,
     }
-    shared = dict(_COLLISION_ENABLED)
-    shared.update(_COLLISION_TYPE)
-    shared.update(_COLLISION_OFFSET)
-    shared.update(_COLLISION_SIZE)
-    shared.update(_COLLISION_POINTS)
+    # The shared sections are stored as individual row details (their layout
+    # builders wrap them with a row name), so name them here the same way.
+    shared = {
+        'collision_enabled': _COLLISION_ENABLED,
+        'collision_type': _COLLISION_TYPE,
+        'collision_offset': _COLLISION_OFFSET,
+        'collision_size': _COLLISION_SIZE,
+        'collision_points': _COLLISION_POINTS,
+        'physics_enabled': _PHYSICS_ENABLED,
+        'physics_type': _PHYSICS_TYPE,
+        'physics_mass': _PHYSICS_MASS,
+        'physics_fixed_rotation': _PHYSICS_FIXED_ROTATION,
+        'physics_friction': _PHYSICS_FRICTION,
+        'physics_elasticity': _PHYSICS_ELASTICITY,
+        'physics_gravity_scale': _PHYSICS_GRAVITY_SCALE,
+        'physics_linear_damping': _PHYSICS_LINEAR_DAMPING,
+        'physics_angular_damping': _PHYSICS_ANGULAR_DAMPING,
+        'physics_shape': _PHYSICS_SHAPE,
+        'physics_shape_offset': _PHYSICS_SHAPE_OFFSET,
+        'physics_shape_size': _PHYSICS_SHAPE_SIZE,
+        'physics_shape_points': _PHYSICS_SHAPE_POINTS,
+    }
 
     def attributes_of(layout):
         attrs = []

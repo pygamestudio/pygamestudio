@@ -26,7 +26,8 @@ from pygamestudio.gui.block_editor.model import (block_children, clone_block, fi
                                                  insert_block, new_block,
                                                  new_stack, new_workspace, normalize_workspace,
                                                  remove_segment)
-from pygamestudio.gui.block_editor.registry import (FIELD_WIDTHS, field_spec, field_value,
+from pygamestudio.gui.block_editor.registry import (FIELD_WIDTHS, OPTION_FIELD_KINDS,
+                                                    field_spec, field_value,
                                                     get_category, get_definition, header_text,
                                                     option_text, options_for)
 BLOCK_MIME = 'application/x-pygs-block'
@@ -268,7 +269,7 @@ class BlockItem(QGraphicsItem):
 
     def _field_text(self, spec):
         value = field_value(self._block, self._definition, spec['name'])
-        if spec['kind'] in ('property', 'operator', 'event'):
+        if spec['kind'] in OPTION_FIELD_KINDS:
             for option in options_for(spec['kind']):
                 if option[0] == value:
                     return option_text(option)
@@ -1026,8 +1027,11 @@ class BlockCanvas(QGraphicsView):
     def _choose_field_value(self, item, spec):
         """Ask the user for a new field value (dropdown menu or text dialog)."""
         current = field_value(item.block(), item.definition(), spec['name'])
-        if spec['kind'] in ('property', 'operator'):
+        if spec['kind'] in OPTION_FIELD_KINDS and options_for(spec['kind']):
             menu = QMenu(self)
+            # Long lists (the key picker has the whole keyboard) stay usable:
+            # Qt keeps the menu inside the screen and scrolls it.
+            menu.setStyleSheet('QMenu { menu-scrollable: 1; }')
             for option in options_for(spec['kind']):
                 action = menu.addAction(option_text(option))
                 action.setCheckable(True)

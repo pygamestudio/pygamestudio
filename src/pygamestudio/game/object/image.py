@@ -116,11 +116,16 @@ class ObjectImage(ObjectBase):
                 super().__setattr__('image_path', '')
             else:
                 project_path = Path(get_project_path())
-                new_image_path = Path(value).absolute()
+                new_image_path = Path(value)
+                if not new_image_path.is_absolute():
+                    # A relative path is project-relative (the documented
+                    # convention), never relative to the process directory.
+                    new_image_path = project_path / new_image_path
                 try:
-                    super().__setattr__('image_path', new_image_path.relative_to(project_path).as_posix())
+                    super().__setattr__('image_path',
+                                        new_image_path.resolve().relative_to(project_path.resolve()).as_posix())
                 except ValueError:
-                    super().__setattr__('image_path', new_image_path.as_posix())
+                    super().__setattr__('image_path', new_image_path.resolve().as_posix())
 
         else:
             super().__setattr__(name, value)

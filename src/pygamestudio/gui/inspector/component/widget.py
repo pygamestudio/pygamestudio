@@ -176,14 +176,24 @@ class CollisionPointsWidget(PolygonPointsWidget):
             self._points = self._points[:value]
 
         self._rebuild_pairs()
-        self._notify_collision_changed()
+        self._notify_points_changed()
 
     def _on_pair_changed(self, *args):
         points = self._collect_points()
         if points != self._points:
             self._points = points
-            self._notify_collision_changed()
+            self._notify_points_changed()
 
-    def _notify_collision_changed(self):
+    def _notify_points_changed(self):
         self._inspector_container.set_object_collision_parameter(
             'collision_points', list(self._points))
+
+
+class PhysicsShapePointsWidget(CollisionPointsWidget):
+    """Reuses the collision points widget to edit the RIGID-BODY polygon
+    vertices (physics_shape_points); every edit is pushed as a physics
+    parameter change."""
+
+    def _notify_points_changed(self):
+        self._inspector_container.set_object_physics_parameter(
+            'physics_shape_points', list(self._points))

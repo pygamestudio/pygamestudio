@@ -533,9 +533,17 @@ class CodeEditor(QPlainTextEdit):
 
         # Auto-complete bracket and quote pairs while typing.
         text = event.text()
-        if text and not (event.modifiers() & (Qt.KeyboardModifier.ControlModifier
+        modifiers_down = event.modifiers() & (Qt.KeyboardModifier.ControlModifier
                                               | Qt.KeyboardModifier.AltModifier
-                                              | Qt.KeyboardModifier.MetaModifier)) \
+                                              | Qt.KeyboardModifier.MetaModifier)
+        if text and not modifiers_down \
+                and not (text.isalnum() or text == '_') \
+                and event.key() not in (Qt.Key.Key_Backspace, Qt.Key.Key_Delete):
+            # Anything that cannot continue an identifier ends the completion
+            # session (so Enter after a space or bracket is a newline, never
+            # an accidental insertion).
+            self._completer.popup().hide()
+        if text and not modifiers_down \
                 and (text in self._AUTO_PAIRS or text == ')'):
             if self._handle_auto_pair(text):
                 return

@@ -1,4 +1,5 @@
 import re
+from types import ModuleType
 
 from PySide6.QtCore import QStringListModel, Qt
 from PySide6.QtGui import QFont, QTextCursor
@@ -102,6 +103,20 @@ ENGINE_OBJECT_API = (
     'set_collision_ellipse', 'set_collision_polygon', 'get_collision_polygon',
     'reset_collision_shape', 'get_collision_center', 'collides_with_point',
     'collides_with_rect', 'collides_with_object',
+    # rigid-body (physics) API
+    'is_physics_enabled', 'set_physics_enabled', 'get_physics_type',
+    'set_physics_type', 'get_physics_mass', 'set_physics_mass',
+    'get_physics_friction', 'set_physics_friction', 'get_physics_elasticity',
+    'set_physics_elasticity', 'get_physics_gravity_scale',
+    'set_physics_gravity_scale', 'is_physics_fixed_rotation',
+    'set_physics_fixed_rotation', 'get_physics_damping', 'set_physics_damping',
+    'apply_force', 'apply_impulse', 'get_velocity', 'set_velocity',
+    'get_angular_velocity', 'set_angular_velocity', 'is_grounded',
+    'get_physics_shape_type', 'set_physics_shape_type',
+    'get_physics_shape_offset', 'set_physics_shape_offset',
+    'get_physics_shape_size', 'set_physics_shape_size',
+    'set_physics_shape_ellipse', 'get_physics_shape_polygon',
+    'set_physics_shape_polygon', 'reset_physics_shape',
     # particle emitter API
     'get_emission_rate', 'set_emission_rate', 'get_max_particles',
     'set_max_particles', 'get_particle_lifetime', 'set_particle_lifetime',
@@ -116,6 +131,28 @@ ENGINE_OBJECT_API = (
     'get_loop', 'set_loop', 'get_loop_state', 'set_loop_state',
     'get_frame_index', 'set_frame_index', 'get_frame_count',
     'play', 'pause', 'stop', 'restart', 'is_playing',
+)
+
+# object attribute names: the fields a script reads or writes directly
+# (the inspector edits the same names and the scene file saves them). Needed
+# as an explicit list because dir(ObjectBase) cannot see instance fields -
+# without it the popup would never offer e.g. physics_mass or collision_width.
+ENGINE_OBJECT_ATTRIBUTES = (
+    'name', 'uuid', 'type', 'x', 'y', 'pos', 'width', 'height', 'size',
+    'scale_x', 'scale_y', 'scale', 'angle', 'color', 'visible', 'script_path',
+    # specialised object fields
+    'text', 'font_size', 'font_path', 'image_path', 'points',
+    'start_point', 'end_point', 'thickness', 'frame_folder',
+    # collision shape
+    'collision_enabled', 'collision_type',
+    'collision_offset_x', 'collision_offset_y',
+    'collision_width', 'collision_height', 'collision_points',
+    # rigid body + its own shape
+    'physics_enabled', 'physics_type', 'physics_mass', 'physics_friction',
+    'physics_elasticity', 'physics_gravity_scale', 'physics_fixed_rotation',
+    'physics_linear_damping', 'physics_angular_damping',
+    'physics_shape_type', 'physics_shape_offset_x', 'physics_shape_offset_y',
+    'physics_shape_width', 'physics_shape_height', 'physics_shape_points',
 )
 
 # studio.* runtime helpers
@@ -134,6 +171,9 @@ ENGINE_RUNTIME_API = (
     'set_sound_volume', 'get_sound_volume',
     'play_music', 'stop_music', 'pause_music', 'resume_music',
     'is_music_playing', 'set_music_volume', 'get_music_volume',
+    # physics world
+    'get_physics_world', 'set_gravity', 'get_gravity', 'physics_raycast',
+    'set_physics_time_scale', 'get_physics_time_scale',
     # window
     'set_window_title', 'get_window_title', 'set_window_icon',
     'get_window_size', 'set_window_size', 'get_window_position',
@@ -146,7 +186,8 @@ ENGINE_RUNTIME_API = (
     'get_project_config', 'get_project_path',
 )
 
-ENGINE_NAMES = ENGINE_CLASSES + ENGINE_EVENTS + ENGINE_OBJECT_API + ENGINE_RUNTIME_API
+ENGINE_NAMES = (ENGINE_CLASSES + ENGINE_EVENTS + ENGINE_OBJECT_API
+                + ENGINE_OBJECT_ATTRIBUTES + ENGINE_RUNTIME_API)
 
 #: Cache of the names read from the engine (see api_names()).
 _API_NAMES = None
@@ -173,7 +214,9 @@ def api_names() -> tuple:
         from pygamestudio.game.object.base import ObjectBase
         from pygamestudio.game import object as object_models
 
-        names.update(name for name in dir(studio) if not name.startswith('_'))
+        names.update(name for name in dir(studio)
+                     if not name.startswith('_')
+                     and not isinstance(getattr(studio, name, None), ModuleType))
         names.update(name for name in dir(event_constants) if not name.startswith('_'))
         # Object API: every public member of every scene-object class.
         object_classes = [ObjectBase]
@@ -208,13 +251,18 @@ class CodeCompleter(QCompleter):
         self.popup().setObjectName('codeEditorCompletionPopup')
         self.activated.connect(self._insert_completion)
         self._all_words = []
+        # exact-cased engine/keyword/builtin names, so the popup can tell a
+        # hint from the user's own (document-only) text - see complete_prefix
+        self._known_words = set()
 
     def update_words(self):
         """Rebuild the candidate list: keywords + engine API + document words."""
-        words = set(PYTHON_KEYWORDS)
-        words.update(PYTHON_BUILTINS)
-        words.update(ENGINE_NAMES)
-        words.update(api_names())
+        known = set(PYTHON_KEYWORDS)
+        known.update(PYTHON_BUILTINS)
+        known.update(ENGINE_NAMES)
+        known.update(api_names())
+        self._known_words = known
+        words = set(known)
         text = self._editor.toPlainText()
         for match in re.finditer(r'\b[A-Za-z_]\w*\b', text):
             words.add(match.group())
@@ -251,12 +299,26 @@ class CodeCompleter(QCompleter):
             same_case = 0 if (word[0].isupper() == prefix_is_upper) else 1
             return (exact, same_case, word.lower(), word)
 
-        starts = [w for w in self._all_words if w.lower().startswith(prefix_lower)]
+        starts = [w for w in self._all_words
+                  if not self._is_document_echo(w, prefix)
+                  and w.lower().startswith(prefix_lower)]
         contains = [w for w in self._all_words
-                    if prefix_lower in w.lower() and w not in starts]
+                    if not self._is_document_echo(w, prefix)
+                    and prefix_lower in w.lower() and w not in starts]
         self._model.setStringList(sorted(starts, key=rank) + sorted(contains, key=rank))
         self._show_popup_at_cursor()
         return True
+
+    def _is_document_echo(self, word, prefix):
+        """True when a candidate would just repeat what is being typed.
+
+        The document contains the identifier under the cursor, so without this
+        the popup would greet the user with their own text as the first entry.
+        Only document-only words are dropped: keywords, builtins and engine
+        names stay (suggesting them is meaningful, and accepting a finished
+        name with Enter never inserts something else).
+        """
+        return word == prefix and word not in self._known_words
 
     def _show_popup_at_cursor(self):
         """Position the popup right below the text cursor and show it."""

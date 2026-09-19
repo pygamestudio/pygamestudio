@@ -195,11 +195,16 @@ class ObjectFrameSequence(ObjectBase):
                 super().__setattr__('frame_folder', '')
             else:
                 project_path = Path(get_project_path())
-                new_path = Path(value).absolute()
+                new_path = Path(value)
+                if not new_path.is_absolute():
+                    # A relative path is project-relative (the documented
+                    # convention), never relative to the process directory.
+                    new_path = project_path / new_path
                 try:
-                    super().__setattr__('frame_folder', new_path.relative_to(project_path).as_posix())
+                    super().__setattr__('frame_folder',
+                                        new_path.resolve().relative_to(project_path.resolve()).as_posix())
                 except ValueError:
-                    super().__setattr__('frame_folder', new_path.as_posix())
+                    super().__setattr__('frame_folder', new_path.resolve().as_posix())
         elif name == 'auto_play':
             # Pausing re-arms the start notification: the animation reports
             # itself as started again when it resumes (including through a

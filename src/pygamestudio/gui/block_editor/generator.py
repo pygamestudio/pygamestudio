@@ -132,10 +132,12 @@ def _field_code(definition, name, value):
         value = spec['default'] if spec else ''
     if kind == 'number':
         return _format_number(value)
-    if kind in ('property', 'operator'):
+    if kind in ('property', 'expr', 'operator', 'key', 'toggle', 'event'):
+        # dropdown kinds store the code expression itself; an unknown value
+        # (e.g. from an older file) falls back to the first option
         options = options_for(kind)
         codes = [option[0] for option in options]
-        return value if value in codes else codes[0]
+        return value if value in codes else (codes[0] if codes else repr(str(value)))
     if kind == 'value':
         # "number-or-text": bare number when possible, else a string literal.
         text = str(value).strip()

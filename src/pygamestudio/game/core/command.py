@@ -150,6 +150,14 @@ class UpdateAttrValueCommand(QUndoCommand):
                       'collision_width', 'collision_height',
                       'collision_points'):
             self._game_manager.object_collision_parameter_changed.emit(self._obj.uuid)
+        elif attr in ('physics_enabled', 'physics_type', 'physics_mass',
+                      'physics_friction', 'physics_elasticity',
+                      'physics_gravity_scale', 'physics_fixed_rotation',
+                      'physics_linear_damping', 'physics_angular_damping',
+                      'physics_shape_type', 'physics_shape_offset_x',
+                      'physics_shape_offset_y', 'physics_shape_width',
+                      'physics_shape_height', 'physics_shape_points'):
+            self._game_manager.object_physics_parameter_changed.emit(self._obj.uuid)
         elif attr in ('tileset_path', 'tile_width', 'tile_height',
                       'columns', 'rows'):
             self._game_manager.object_tile_map_parameter_changed.emit(self._obj.uuid)

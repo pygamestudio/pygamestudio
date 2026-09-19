@@ -79,6 +79,7 @@ class GameManager(QObject):
     object_progress_bar_parameter_changed = Signal(str)
     object_slider_parameter_changed = Signal(str)
     object_collision_parameter_changed = Signal(str)
+    object_physics_parameter_changed = Signal(str)
 
     # Emitted whenever the "current scene has unsaved changes" flag flips
     # (True = saved, False = unsaved), so the UI can show unsaved indicators.
@@ -775,6 +776,16 @@ class GameManager(QObject):
 
     def set_collision_parameter(self, object_uuid, attr, new_value):
         """Change one collision parameter (undoable)."""
+        obj = self._get_object(object_uuid)
+        old_value = getattr(obj, attr)
+
+        if old_value == new_value:
+            return
+
+        self._undo_stack.push(UpdateAttrValueCommand(self, obj, attr, old_value, new_value))
+
+    def set_physics_parameter(self, object_uuid, attr, new_value):
+        """Change one physics parameter (undoable)."""
         obj = self._get_object(object_uuid)
         old_value = getattr(obj, attr)
 

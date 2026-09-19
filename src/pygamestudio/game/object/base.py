@@ -101,6 +101,46 @@ class ObjectBase:
         # serialized).
         self._collision_configured = False
 
+        # ------------------------------------------------------------------
+        # Physics (default: disabled). A physics-enabled object is driven by
+        # the 2D physics world while the game runs (see core/physics.py):
+        #   physics_type: 'static' (never moves), 'dynamic' (falls, is pushed,
+        #       rotates) or 'kinematic' (moved by a script, pushes others).
+        #   The SHAPE is the rigid-body shape below (physics_shape_*) - it is
+        #       independent from the collision shape and the collision_enabled
+        #       switch is not required.
+        #   physics_fixed_rotation keeps the object upright (characters).
+        #   physics_gravity_scale 0 = floats, 1 = normal, -1 = falls upwards.
+        # ------------------------------------------------------------------
+        _physics_type = object_data.get('physics_type', 'dynamic')
+        self.physics_enabled = bool(object_data.get('physics_enabled', False))
+        self.physics_type = _physics_type if _physics_type in ('static', 'dynamic', 'kinematic') else 'dynamic'
+        self.physics_mass = float(object_data.get('physics_mass', 1.0) or 1.0)
+        self.physics_friction = float(object_data.get('physics_friction', 0.6))
+        self.physics_elasticity = float(object_data.get('physics_elasticity', 0.2))
+        self.physics_gravity_scale = float(object_data.get('physics_gravity_scale', 1.0))
+        self.physics_fixed_rotation = bool(object_data.get('physics_fixed_rotation', False))
+        self.physics_linear_damping = float(object_data.get('physics_linear_damping', 0.0))
+        self.physics_angular_damping = float(object_data.get('physics_angular_damping', 0.0))
+
+        # ------------------------------------------------------------------
+        # Rigid-body shape (only used while physics_enabled). Same model as
+        # the collision fields above - type/offset/size/points - but a
+        # separate set of values so the body can differ from the collision
+        # shape. Zero-sized fields are filled from the object's own size the
+        # first time a shape type is used (see _ensure_physics_shape_defaults).
+        # ------------------------------------------------------------------
+        _physics_shape_type = object_data.get('physics_shape_type', 'rect')
+        self.physics_shape_type = _physics_shape_type if _physics_shape_type in ('bbox', 'rect', 'ellipse', 'polygon') else 'rect'
+        self.physics_shape_offset_x = float(object_data.get('physics_shape_offset_x', 0))
+        self.physics_shape_offset_y = float(object_data.get('physics_shape_offset_y', 0))
+        self.physics_shape_width = float(object_data.get('physics_shape_width', 0))
+        self.physics_shape_height = float(object_data.get('physics_shape_height', 0))
+        self.physics_shape_points = list(object_data.get('physics_shape_points', []))
+        # Becomes True once the body shape fields carry explicit values (never
+        # serialized).
+        self._physics_shape_configured = False
+
     def is_pressed(self, x:int, y:int) -> bool:
         """Pixel-perfect hit test: True when (x, y) (world coords) hits a
         non-transparent pixel of the object. More expensive than
@@ -316,15 +356,39 @@ class ObjectBase:
         # object's own size (see _ensure_collision_defaults).
         self._ensure_collision_defaults()
 
-        cw = float(self.collision_width)
-        ch = float(self.collision_height)
+        return self._shape_geometry_world(
+            ctype, self.collision_offset_x, self.collision_offset_y,
+            self.collision_width, self.collision_height, self.collision_points)
+
+    def _physics_shape_geometry_world(self):
+        """Return the RIGID-BODY shape (physics_shape_*) as a world-space
+        descriptor, or None. Same model as the collision shape, separate
+        values; 'bbox' returns the rendered world bounding box."""
+        ctype = self.physics_shape_type if self.physics_shape_type in ('bbox', 'rect', 'ellipse', 'polygon') else 'rect'
+
+        if ctype == 'bbox':
+            return rect_shape(self._get_world_rect())
+
+        self._ensure_physics_shape_defaults()
+
+        return self._shape_geometry_world(
+            ctype, self.physics_shape_offset_x, self.physics_shape_offset_y,
+            self.physics_shape_width, self.physics_shape_height,
+            self.physics_shape_points)
+
+    def _shape_geometry_world(self, ctype, offset_x, offset_y, box_width, box_height, points):
+        """World descriptor of a type/offset/size/points shape definition.
+
+        Shared by the collision shape and the rigid-body shape."""
+        cw = float(box_width)
+        ch = float(box_height)
         if cw <= 0 or ch <= 0:
             return None
 
         # Centre of the shape in local content coordinates (offset shifts the
         # shape away from the object centre for every non-bbox type).
-        cx = self.width / 2.0 + self.collision_offset_x
-        cy = self.height / 2.0 + self.collision_offset_y
+        cx = self.width / 2.0 + offset_x
+        cy = self.height / 2.0 + offset_y
         sx = abs(self.scale_x)
         sy = abs(self.scale_y)
 
@@ -352,11 +416,11 @@ class ObjectBase:
             return {'kind': 'poly', 'points': world}
 
         # 'polygon': explicit vertices (absolute local pixels + offset shift)
-        # or the collision box.
-        if self.collision_points:
-            local = [(float(px) + self.collision_offset_x,
-                      float(py) + self.collision_offset_y)
-                     for (px, py) in self.collision_points]
+        # or the shape's own box.
+        if points:
+            local = [(float(px) + offset_x,
+                      float(py) + offset_y)
+                     for (px, py) in points]
         else:
             hw, hh = cw / 2.0, ch / 2.0
             local = [(cx - hw, cy - hh), (cx + hw, cy - hh),
@@ -394,12 +458,204 @@ class ObjectBase:
                 self.collision_height = float(self.height)
             self._collision_configured = True
 
+    def _ensure_physics_shape_defaults(self, force=False, for_type=None):
+        """Fill the rigid-body shape's still-zero size fields from the
+        object's own size (same model as _ensure_collision_defaults). Called
+        when the inspector enables physics or switches the shape, and
+        defensively from the body builder on first use."""
+        ctype = for_type
+        if ctype not in ('rect', 'ellipse', 'polygon'):
+            ctype = self.physics_shape_type if self.physics_shape_type in ('rect', 'ellipse', 'polygon') else 'rect'
+
+        if force or not self._physics_shape_configured:
+            if self.physics_shape_width <= 0:
+                self.physics_shape_width = float(self.width)
+            if self.physics_shape_height <= 0:
+                self.physics_shape_height = float(self.height)
+            self._physics_shape_configured = True
+
     def _collision_shape(self):
         """The world-space descriptor used by collision tests, or None when
         collision is not enabled (the object then never collides)."""
         if not self.collision_enabled:
             return None
         return self._collision_geometry_world()
+
+    # --------------------------------------------------------------- physics API
+    def _physics_world(self):
+        """The running scene's physics world, or None (editor, or a scene
+        without a physics world)."""
+        getter = getattr(self._game_manager, 'physics_world', None)
+        return getter() if callable(getter) else None
+
+    def is_physics_enabled(self) -> bool:
+        """Whether this object is driven by the physics world."""
+        return bool(self.physics_enabled)
+
+    def set_physics_enabled(self, enabled: bool):
+        """Turn the rigid body of this object on or off (while the game runs
+        the body appears/disappears on the next frame)."""
+        self.physics_enabled = bool(enabled)
+
+    def get_physics_type(self) -> str:
+        """'static', 'dynamic' or 'kinematic'."""
+        return self.physics_type
+
+    def set_physics_type(self, physics_type: str):
+        """static: never moves. dynamic: falls and is pushed. kinematic: moved
+        by a script, pushes the others."""
+        if physics_type in ('static', 'dynamic', 'kinematic'):
+            self.physics_type = physics_type
+
+    def get_physics_mass(self) -> float:
+        return self.physics_mass
+
+    def set_physics_mass(self, mass: float):
+        """Heavier bodies need more force/impulse for the same movement."""
+        self.physics_mass = max(0.0001, float(mass))
+
+    def get_physics_friction(self) -> float:
+        return self.physics_friction
+
+    def set_physics_friction(self, friction: float):
+        """0 = ice, 1 = sticky."""
+        self.physics_friction = max(0.0, float(friction))
+
+    def get_physics_elasticity(self) -> float:
+        return self.physics_elasticity
+
+    def set_physics_elasticity(self, elasticity: float):
+        """Bounce of the body: 0 = lands dead, 1 = bounces back fully."""
+        self.physics_elasticity = max(0.0, float(elasticity))
+
+    def get_physics_gravity_scale(self) -> float:
+        return self.physics_gravity_scale
+
+    def set_physics_gravity_scale(self, scale: float):
+        """0 = floats, 1 = normal gravity, negative = falls upwards."""
+        self.physics_gravity_scale = float(scale)
+
+    def is_physics_fixed_rotation(self) -> bool:
+        return bool(self.physics_fixed_rotation)
+
+    def set_physics_fixed_rotation(self, fixed: bool):
+        """True keeps the body upright (a character never tips over)."""
+        self.physics_fixed_rotation = bool(fixed)
+
+    def get_physics_damping(self) -> tuple:
+        """(linear, angular) damping: how quickly movement dies down."""
+        return (self.physics_linear_damping, self.physics_angular_damping)
+
+    def set_physics_damping(self, linear: float, angular: float = 0.0):
+        self.physics_linear_damping = max(0.0, float(linear))
+        self.physics_angular_damping = max(0.0, float(angular))
+
+    def get_physics_shape_type(self) -> str:
+        """One of 'bbox', 'rect', 'ellipse' or 'polygon' - the shape of the
+        rigid body (independent from the collision shape)."""
+        return self.physics_shape_type
+
+    def set_physics_shape_type(self, shape_type: str):
+        """Set the rigid-body shape type: 'bbox' (rendered bounding box),
+        'rect', 'ellipse' or 'polygon'."""
+        if shape_type in ('bbox', 'rect', 'ellipse', 'polygon'):
+            self.physics_shape_type = shape_type
+            self._physics_shape_configured = True
+
+    def get_physics_shape_offset(self) -> tuple:
+        """(offset_x, offset_y) of the body shape centre vs the object centre."""
+        return (self.physics_shape_offset_x, self.physics_shape_offset_y)
+
+    def set_physics_shape_offset(self, x: float, y: float):
+        """Offset of the body shape's centre from the object's local centre,
+        in unscaled content pixels."""
+        self.physics_shape_offset_x = float(x)
+        self.physics_shape_offset_y = float(y)
+        self._physics_shape_configured = True
+
+    def get_physics_shape_size(self) -> tuple:
+        """The stored (width, height) of the body shape: the full box size
+        for a rect, the bounding-box size for an ellipse."""
+        return (self.physics_shape_width, self.physics_shape_height)
+
+    def set_physics_shape_size(self, width: int, height: int):
+        """Body shape box size in content pixels (used by rect and ellipse)."""
+        self.physics_shape_width = float(int(width))
+        self.physics_shape_height = float(int(height))
+        self._physics_shape_configured = True
+
+    def set_physics_shape_ellipse(self, radius_x: float, radius_y: float):
+        """Convenience: set the two radii of the body ellipse (content
+        pixels) and switch to the 'ellipse' type."""
+        self.physics_shape_width = float(radius_x) * 2
+        self.physics_shape_height = float(radius_y) * 2
+        self.physics_shape_type = 'ellipse'
+        self._physics_shape_configured = True
+
+    def set_physics_shape_polygon(self, points):
+        """Set explicit body vertices (local content pixels, top-left origin)
+        and switch the shape type to 'polygon'."""
+        self.physics_shape_points = [(float(px), float(py)) for (px, py) in points]
+        self.physics_shape_type = 'polygon'
+        self._physics_shape_configured = True
+
+    def get_physics_shape_polygon(self) -> list:
+        """The explicit body polygon vertices, or [] when using auto (box)."""
+        return list(self.physics_shape_points)
+
+    def reset_physics_shape(self):
+        """Reset the body shape back to the object-sized default (all stored
+        values are made concrete, matching the object)."""
+        self.physics_shape_offset_x = 0
+        self.physics_shape_offset_y = 0
+        self.physics_shape_width = 0
+        self.physics_shape_height = 0
+        self.physics_shape_points = []
+        self._physics_shape_configured = False
+        self._ensure_physics_shape_defaults(force=True)
+
+    def apply_force(self, force):
+        """Push the body every frame while it is called (wind, thrusters).
+
+        The force is ``mass * acceleration``: with the default mass of 1, a
+        force of 1200 adds 1200 pixels/second of speed per second."""
+        world = self._physics_world()
+        if world is not None:
+            world.apply_force(self, force)
+
+    def apply_impulse(self, impulse):
+        """Add an instant push (a jump, an explosion): ``mass * pixels/s``."""
+        world = self._physics_world()
+        if world is not None:
+            world.apply_impulse(self, impulse)
+
+    def get_velocity(self):
+        """(vx, vy) in pixels per second, or None without a body."""
+        world = self._physics_world()
+        return world.get_velocity(self) if world is not None else None
+
+    def set_velocity(self, velocity):
+        """Set the movement speed directly (pixels per second)."""
+        world = self._physics_world()
+        if world is not None:
+            world.set_velocity(self, velocity)
+
+    def get_angular_velocity(self):
+        """Spin in degrees per second, or None without a body."""
+        world = self._physics_world()
+        return world.get_angular_velocity(self) if world is not None else None
+
+    def set_angular_velocity(self, angular_velocity):
+        """Set the spin in degrees per second."""
+        world = self._physics_world()
+        if world is not None:
+            world.set_angular_velocity(self, angular_velocity)
+
+    def is_grounded(self) -> bool:
+        """True while the body stands on something (a short memory covers
+        walking off a ledge, so a jump still works just after it)."""
+        world = self._physics_world()
+        return world.is_grounded(self) if world is not None else False
 
     def get_name(self) -> str:
         return self.name
@@ -724,6 +980,7 @@ class ObjectBase:
         exclude_fields = [
             '_is_initialized', '_is_for_api', '_game_manager', 'surface', 'icon',
             'script_instance', 'selected', 'expanded', '_collision_configured',
+            '_physics_shape_configured',
             '_font_cache', '_font_cache_key', '_image_cache', '_image_cache_key',
             '_render_cache', '_render_state', '_file_state_cache',
         ]

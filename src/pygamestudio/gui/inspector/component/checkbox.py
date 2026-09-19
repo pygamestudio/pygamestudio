@@ -101,3 +101,20 @@ class CollisionCheckBox(QCheckBox):
     def _on_check_state_changed(self, check_state):
         self._inspector_container.set_object_collision_parameter(
             self._attr, check_state == Qt.CheckState.Checked)
+
+
+class PhysicsCheckBox(QCheckBox):
+    """Checkbox for one physics boolean parameter (physics_enabled,
+    physics_fixed_rotation)."""
+
+    def __init__(self, inspector_container, is_checked=False, attr=''):
+        super().__init__()
+        self._inspector_container = inspector_container
+        self._attr = attr
+        self.setChecked(is_checked)
+
+        self.checkStateChanged.connect(self._on_check_state_changed)
+
+    def _on_check_state_changed(self, check_state):
+        self._inspector_container.set_object_physics_parameter(
+            self._attr, check_state == Qt.CheckState.Checked)

@@ -386,29 +386,42 @@ class PygameScreen(QWidget):
         painter.restore()
 
     def _draw_collision_overlay(self, painter):
-        """Outline the selected object's collision body in green. Only drawn
-        while collision is enabled on that object."""
+        """Outline the selected object's bodies while the switches are on.
+
+        Green (solid) = collision - the geometry/raycast system, drawn from the
+        collision shape. Purple (dashed) = physics - the rigid body, drawn from
+        its own rigid-body shape. Both can be shown at once; they are two
+        independent shapes."""
         obj = self._final_selected_object
         if obj is None or getattr(obj, 'type', '') == OBJECT_CANVAS:
             return
-        if not hasattr(obj, '_collision_geometry_world'):
-            return
-        if not getattr(obj, 'collision_enabled', False):
-            return
-
-        shape = obj._collision_geometry_world()
-        if shape is None:
+        collision_on = bool(getattr(obj, 'collision_enabled', False))
+        physics_on = bool(getattr(obj, 'physics_enabled', False))
+        if not collision_on and not physics_on:
             return
         ox, oy = self.scene_offset()
+        painter.save()
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        if collision_on and hasattr(obj, '_collision_geometry_world'):
+            self._draw_shape_overlay(painter, obj._collision_geometry_world(),
+                                     QColor(0, 255, 0), ox, oy)
+        if physics_on and hasattr(obj, '_physics_shape_geometry_world'):
+            self._draw_shape_overlay(painter, obj._physics_shape_geometry_world(),
+                                     QColor(168, 85, 247), ox, oy, dashed=True)
+        painter.restore()
+
+    def _draw_shape_overlay(self, painter, shape, color, ox, oy, dashed=False):
+        """Paint one collision/physics shape as an outline in the scene view."""
+        if shape is None:
+            return
         points = [QPointF(x + ox, y + oy) for (x, y) in shape_to_polygon(shape)]
         if len(points) < 3:
             return
-        painter.save()
-        pen = QPen(QColor(0, 255, 0), 2)
+        pen = QPen(color, 2)
+        if dashed:
+            pen.setStyle(Qt.PenStyle.DashLine)
         painter.setPen(pen)
-        painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawPolygon(QPolygonF(points))
-        painter.restore()
 
     # ------------------------------------------------------------- events
     def _on_mouse_left_button_pressed(self, event):

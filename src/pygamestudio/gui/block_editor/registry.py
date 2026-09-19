@@ -22,7 +22,8 @@ from pygamestudio.common.i18n.translator import Translator as T
 CATEGORIES = (
     {'key': 'event', 'label': 'block.cat.event', 'default_label': 'Events', 'color': '#d9a03c'},
     {'key': 'action', 'label': 'block.cat.action', 'default_label': 'Actions', 'color': '#4c97ff'},
-    {'key': 'control', 'label': 'block.cat.control', 'default_label': 'Control', 'color': '#9b59b6'},
+    {'key': 'physics', 'label': 'block.cat.physics', 'default_label': 'Physics', 'color': '#9b59b6'},
+    {'key': 'control', 'label': 'block.cat.control', 'default_label': 'Control', 'color': '#2ea8a0'},
 )
 
 # The object types the scene editor can create. The palette groups the event
@@ -51,9 +52,16 @@ FIELD_WIDTHS = {
     'value': 70,
     'number': 60,
     'property': 132,
+    'expr': 132,
     'operator': 62,
     'choice': 84,
+    'key': 110,
+    'toggle': 64,
 }
+
+# Field kinds rendered as a dropdown whose stored value IS a code expression
+# (the canvas asks options_for() for the entries).
+OPTION_FIELD_KINDS = ('property', 'expr', 'operator', 'key', 'toggle', 'event')
 
 _DEFAULT_BY_KIND = {'text': '', 'value': '0', 'number': 0, 'property': None, 'operator': None,
                     'choice': None}
@@ -85,6 +93,87 @@ OPERATOR_OPTIONS = (
     ('<', 'block.op.lt', '<'),
     ('>=', 'block.op.ge', '>='),
     ('<=', 'block.op.le', '<='),
+)
+
+# Values a condition can READ on top of the assignable property list: engine
+# expressions that make sense in an if / while comparison but cannot be
+# assigned to (the "Set property" block must never produce
+# ``self.obj.is_grounded() = 1``, so it keeps using PROPERTY_OPTIONS alone).
+CONDITION_OPTIONS = (
+    ('self.obj.is_grounded()', 'block.val.grounded', 'on ground'),
+    ('self.obj.is_collision_enabled()', 'block.val.collision_on', 'collision on'),
+    ('(self.obj.get_velocity() or (0.0, 0.0))[0]', 'block.val.velocity_x', 'speed x'),
+    ('(self.obj.get_velocity() or (0.0, 0.0))[1]', 'block.val.velocity_y', 'speed y'),
+    ('self.obj.get_angular_velocity() or 0.0', 'block.val.spin', 'spin (deg/s)'),
+    ('self.obj.physics_enabled', 'block.val.physics_enabled', 'physics on'),
+    ('self.obj.physics_mass', 'block.val.physics_mass', 'mass'),
+    ('self.obj.physics_friction', 'block.val.physics_friction', 'friction'),
+    ('self.obj.physics_elasticity', 'block.val.physics_elasticity', 'elasticity'),
+    ('self.obj.physics_gravity_scale', 'block.val.physics_gravity_scale', 'gravity scale'),
+    ('studio.get_mouse_position()[0]', 'block.val.mouse_x', 'mouse x'),
+    ('studio.get_mouse_position()[1]', 'block.val.mouse_y', 'mouse y'),
+)
+
+# Keys the "if key pressed" blocks can test (the constants come from the
+# engine's pygame re-exports). The few keys games ask for most often come
+# first, the rest of the keyboard follows - the picker scrolls.
+def _literal_key(code, label):
+    """A key whose label is the same in every language (A, 1, F5, ...)."""
+    return (code, '', label)
+
+
+KEY_OPTIONS = (
+    # arrows and the keys a game tests all the time
+    ('studio.K_LEFT', 'block.key.left', 'Left arrow'),
+    ('studio.K_RIGHT', 'block.key.right', 'Right arrow'),
+    ('studio.K_UP', 'block.key.up', 'Up arrow'),
+    ('studio.K_DOWN', 'block.key.down', 'Down arrow'),
+    ('studio.K_SPACE', 'block.key.space', 'Space'),
+    ('studio.K_RETURN', 'block.key.enter', 'Enter'),
+    ('studio.K_TAB', 'block.key.tab', 'Tab'),
+    ('studio.K_ESCAPE', 'block.key.escape', 'Escape'),
+    ('studio.K_BACKSPACE', 'block.key.backspace', 'Backspace'),
+    ('studio.K_DELETE', 'block.key.delete', 'Delete'),
+    # modifiers and navigation
+    ('studio.K_LSHIFT', 'block.key.lshift', 'Left Shift'),
+    ('studio.K_RSHIFT', 'block.key.rshift', 'Right Shift'),
+    ('studio.K_LCTRL', 'block.key.lctrl', 'Left Ctrl'),
+    ('studio.K_RCTRL', 'block.key.rctrl', 'Right Ctrl'),
+    ('studio.K_LALT', 'block.key.lalt', 'Left Alt'),
+    ('studio.K_RALT', 'block.key.ralt', 'Right Alt'),
+    ('studio.K_HOME', 'block.key.home', 'Home'),
+    ('studio.K_END', 'block.key.end', 'End'),
+    ('studio.K_PAGEUP', 'block.key.pageup', 'Page Up'),
+    ('studio.K_PAGEDOWN', 'block.key.pagedown', 'Page Down'),
+    ('studio.K_INSERT', 'block.key.insert', 'Insert'),
+) + tuple(
+    _literal_key('studio.K_' + letter, letter.upper())
+    for letter in 'abcdefghijklmnopqrstuvwxyz'
+) + tuple(
+    _literal_key('studio.K_' + digit, digit)
+    for digit in '0123456789'
+) + tuple(
+    _literal_key('studio.K_F{}'.format(number), 'F{}'.format(number))
+    for number in range(1, 13)
+) + (
+    # punctuation
+    ('studio.K_MINUS', 'block.key.minus', 'Minus -'),
+    ('studio.K_EQUALS', 'block.key.equals', 'Equals ='),
+    ('studio.K_COMMA', 'block.key.comma', 'Comma ,'),
+    ('studio.K_PERIOD', 'block.key.period', 'Period .'),
+    ('studio.K_SLASH', 'block.key.slash', 'Slash /'),
+    ('studio.K_SEMICOLON', 'block.key.semicolon', 'Semicolon ;'),
+    ('studio.K_QUOTE', 'block.key.quote', "Quote '"),
+    ('studio.K_LEFTBRACKET', 'block.key.lbracket', 'Left bracket ['),
+    ('studio.K_RIGHTBRACKET', 'block.key.rbracket', 'Right bracket ]'),
+    ('studio.K_BACKSLASH', 'block.key.backslash', 'Backslash \\'),
+    ('studio.K_BACKQUOTE', 'block.key.backquote', 'Backquote `'),
+)
+
+# on / off values for toggle-style blocks.
+TOGGLE_OPTIONS = (
+    ('True', 'block.toggle.on', 'On'),
+    ('False', 'block.toggle.off', 'Off'),
 )
 
 BLOCKS = {}
@@ -135,8 +224,12 @@ def _add(block_type, category, label, default_label, fields=(), code='', callbac
 
 
 def _kind_default(kind):
-    if kind == 'property':
+    if kind in ('property', 'expr'):
         return PROPERTY_OPTIONS[0][0]
+    if kind == 'key':
+        return KEY_OPTIONS[0][0]
+    if kind == 'toggle':
+        return TOGGLE_OPTIONS[0][0]
     if kind == 'operator':
         return OPERATOR_OPTIONS[0][0]
     if kind == 'choice':
@@ -152,6 +245,7 @@ def _kind_default(kind):
 EVENT_BLOCKS = (
     ('on_start', 'start', 'When the game starts', '', ALL_OBJECTS),
     ('on_update', 'update', 'Every frame (dt)', 'dt', ALL_OBJECTS),
+    ('on_destroy', 'destroy', 'When this object is destroyed', '', ALL_OBJECTS),
     ('on_visible_changed', 'visible_changed', 'When shown or hidden (visible)', 'visible', ALL_OBJECTS),
     ('on_pressed', 'pressed', 'When pressed on this object', '', ALL_OBJECTS),
     ('on_released', 'released', 'When released', '', ALL_OBJECTS),
@@ -254,24 +348,51 @@ _add('action_set_progress', 'action', 'block.act.set_progress', 'Set progress',
      fields=(('value', 'number', 50),),
      code='self.obj.set_progress({value})', objects=('progress_bar',))
 
+# ---------------------------------------------------------------- physics
+
+_add('physics_apply_force', 'physics', 'block.phy.apply_force', 'Apply force x y',
+     fields=(('fx', 'number', 0), ('fy', 'number', 0)),
+     code='self.obj.apply_force(({fx}, {fy}))')
+_add('physics_apply_impulse', 'physics', 'block.phy.apply_impulse', 'Apply impulse (a jump)',
+     fields=(('ix', 'number', 0), ('iy', 'number', -520)),
+     code='self.obj.apply_impulse(({ix}, {iy}))')
+_add('physics_set_velocity', 'physics', 'block.phy.set_velocity', 'Set speed x y',
+     fields=(('vx', 'number', 0), ('vy', 'number', 0)),
+     code='self.obj.set_velocity(({vx}, {vy}))')
+_add('physics_set_spin', 'physics', 'block.phy.set_spin', 'Set spin (degrees/s)',
+     fields=(('degrees', 'number', 90),),
+     code='self.obj.set_angular_velocity({degrees})')
+_add('physics_set_state', 'physics', 'block.phy.set_state', 'Set physics',
+     fields=(('state', 'toggle'),),
+     code='self.obj.set_physics_enabled({state})')
+_add('physics_set_gravity', 'physics', 'block.phy.set_gravity', 'World gravity x y',
+     fields=(('gx', 'number', 0), ('gy', 'number', 980)),
+     code='studio.set_gravity(({gx}, {gy}))')
+
 # ---------------------------------------------------------------- control
 
 _add('control_if', 'control', 'block.ctl.if', 'If',
-     fields=(('property', 'property'), ('operator', 'operator'), ('value', 'value')),
+     fields=(('property', 'expr'), ('operator', 'operator'), ('value', 'value')),
      code='if {property} {operator} {value}:\n{body}')
 _add('control_if_else', 'control', 'block.ctl.if_else', 'If / else',
-     fields=(('property', 'property'), ('operator', 'operator'), ('value', 'value')),
+     fields=(('property', 'expr'), ('operator', 'operator'), ('value', 'value')),
      code='if {property} {operator} {value}:\n{body}\nelse:\n{else_block}',
      header=('block.ctl.if', 'If'))
 _add('control_repeat', 'control', 'block.ctl.repeat', 'Repeat',
      fields=(('times', 'number', 10),),
      code='for _ in range({times}):\n{body}')
 _add('control_while', 'control', 'block.ctl.while', 'While (repeat while true)',
-     fields=(('property', 'property'), ('operator', 'operator'), ('value', 'value')),
+     fields=(('property', 'expr'), ('operator', 'operator'), ('value', 'value')),
      code='while {property} {operator} {value}:\n{body}')
 _add('control_repeat_until', 'control', 'block.ctl.repeat_until', 'Repeat until',
-     fields=(('property', 'property'), ('operator', 'operator'), ('value', 'value')),
+     fields=(('property', 'expr'), ('operator', 'operator'), ('value', 'value')),
      code='while not ({property} {operator} {value}):\n{body}')
+_add('control_if_key', 'control', 'block.ctl.if_key', 'If key is pressed',
+     fields=(('key', 'key'),),
+     code='if studio.is_key_pressed({key}):\n{body}')
+_add('control_while_key', 'control', 'block.ctl.while_key', 'While key is held',
+     fields=(('key', 'key'),),
+     code='while studio.is_key_pressed({key}):\n{body}')
 _add('control_continue', 'control', 'block.ctl.continue', 'Skip to the next loop step',
      code='continue')
 _add('control_break', 'control', 'block.ctl.break', 'Break out of the loop',
@@ -383,6 +504,9 @@ def category_text(category):
 
 def option_text(option):
     """The translated label of a (code, i18n key, default) option."""
+    if not option[1]:
+        # literal labels (A, 1, F5, ...) read the same in every language
+        return option[2]
     return T.tr(option[1], option[2])
 
 
@@ -390,6 +514,13 @@ def options_for(kind):
     """The dropdown options of a field kind."""
     if kind == 'property':
         return PROPERTY_OPTIONS
+    if kind == 'expr':
+        # condition operands: the assignable fields plus the read-only values
+        return PROPERTY_OPTIONS + CONDITION_OPTIONS
     if kind == 'operator':
         return OPERATOR_OPTIONS
+    if kind == 'key':
+        return KEY_OPTIONS
+    if kind == 'toggle':
+        return TOGGLE_OPTIONS
     return ()

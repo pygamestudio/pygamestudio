@@ -409,6 +409,12 @@ class BuildThread(QThread):
         if missing_imports:
             Logger.warning(T.tr('build.build_import_missing', 'Modules that could not be found, skipped: {}').format(', '.join(missing_imports)))
 
+        # The rigid-body module is imported lazily (only when a scene uses
+        # physics), so it and its pymunk dependency are pinned into the build.
+        for name in ('pymunk', 'pygamestudio.game.core.physics'):
+            if name not in hidden_imports:
+                cmd.append(f'--hidden-import={name}')
+
         # Qt is only needed by the editor, a game does not use it at all, so
         # PySide6 stays out of the build (unless a project script imports it).
         if 'PySide6' not in hidden_imports:

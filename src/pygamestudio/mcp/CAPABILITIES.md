@@ -63,6 +63,7 @@ not exposed (with the reason). Tool names are the MCP tool names.
 | Expand / collapse in the tree | Hierarchy | **no** - UI state only, not scene content |
 | Attach / detach a script | Inspector > Script Path | `create_script` (`attach_to`), `update_object` (`script_path`) |
 | Collision shape editing (type, offset, size, polygon points) | Inspector > collision section | `update_object` (`collision_*`) |
+| Rigid body editing (enable, body type, mass, friction, elasticity, gravity scale, fixed rotation, damping, rigid-body shape) | Inspector > physics section | `update_object` (`physics_*`, incl. `physics_shape_*`) - separate from the collision shape |
 | Tile map painting, tile layers | Tile Map Editor | **no** - cell-level painting is an interactive editor; `update_object` can still set the tileset/tile size/grid |
 
 ## 5. Scripts

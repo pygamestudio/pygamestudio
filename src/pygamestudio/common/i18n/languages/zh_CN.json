@@ -120,12 +120,14 @@
         "cat": {
             "event": "事件",
             "action": "动作",
+            "physics": "物理",
             "control": "控制"
         },
 
         "ev": {
             "start": "当游戏开始时",
             "update": "当每帧更新时（dt）",
+            "destroy": "当对象被销毁时",
             "pressed": "当被按下时",
             "released": "当被松开时",
             "clicked": "当被点击时",
@@ -178,12 +180,23 @@
             "set_progress": "设置进度"
         },
 
+        "phy": {
+            "apply_force": "施加力 x y",
+            "apply_impulse": "施加冲量（跳跃）",
+            "set_velocity": "设置速度 x y",
+            "set_spin": "设置旋转速度（度/秒）",
+            "set_state": "设置物理",
+            "set_gravity": "世界重力 x y"
+        },
+
         "ctl": {
             "if": "如果",
             "if_else": "如果 / 否则",
             "repeat": "重复",
             "while": "当条件满足时循环",
             "repeat_until": "重复直到满足条件",
+            "if_key": "如果按下按键",
+            "while_key": "当按住按键",
             "continue": "跳过本次循环",
             "break": "跳出循环",
             "return": "结束本次事件",
@@ -206,6 +219,61 @@
             "param_value": "value（参数）",
             "param_text": "text（参数）",
             "other": "other（对方对象）"
+        },
+
+        "val": {
+            "grounded": "在地面上",
+            "collision_on": "碰撞已开启",
+            "velocity_x": "速度 x",
+            "velocity_y": "速度 y",
+            "spin": "旋转速度（度/秒）",
+            "physics_enabled": "物理已开启",
+            "physics_mass": "质量",
+            "physics_friction": "摩擦力",
+            "physics_elasticity": "弹性",
+            "physics_gravity_scale": "重力系数",
+            "mouse_x": "鼠标 x",
+            "mouse_y": "鼠标 y"
+        },
+
+        "key": {
+            "left": "左方向键",
+            "right": "右方向键",
+            "up": "上方向键",
+            "down": "下方向键",
+            "space": "空格",
+            "enter": "回车",
+            "tab": "Tab",
+            "escape": "Esc",
+            "backspace": "退格",
+            "delete": "Delete",
+            "lshift": "左 Shift",
+            "rshift": "右 Shift",
+            "lctrl": "左 Ctrl",
+            "rctrl": "右 Ctrl",
+            "lalt": "左 Alt",
+            "ralt": "右 Alt",
+            "home": "Home",
+            "end": "End",
+            "pageup": "Page Up",
+            "pagedown": "Page Down",
+            "insert": "Insert",
+            "minus": "减号 -",
+            "equals": "等号 =",
+            "comma": "逗号 ,",
+            "period": "句点 .",
+            "slash": "斜杠 /",
+            "semicolon": "分号 ;",
+            "quote": "引号 '",
+            "lbracket": "左方括号 [",
+            "rbracket": "右方括号 ]",
+            "backslash": "反斜杠 \\",
+            "backquote": "反引号 `"
+        },
+
+        "toggle": {
+            "on": "开启",
+            "off": "关闭"
         },
 
         "op": {
@@ -394,7 +462,7 @@
         "frame_folder": "帧文件夹",
         "select_folder": "选择帧文件夹",
         "collision_enabled": "启用碰撞",
-        "collision_type": "碰撞类型",
+        "collision_type": "碰撞形状",
         "collision_type_bbox": "包围盒",
         "collision_type_rect": "矩形",
         "collision_type_ellipse": "椭圆",
@@ -402,6 +470,26 @@
         "collision_offset": "碰撞偏移",
         "collision_size": "碰撞大小",
         "collision_points": "碰撞顶点",
+        "physics_enabled": "启用物理",
+        "physics_type": "刚体类型",
+        "physics_type_dynamic": "动态",
+        "physics_type_static": "静态",
+        "physics_type_kinematic": "运动学",
+        "physics_mass": "质量",
+        "physics_friction": "摩擦力",
+        "physics_elasticity": "弹性",
+        "physics_gravity_scale": "重力系数",
+        "physics_fixed_rotation": "固定旋转",
+        "physics_linear_damping": "线性阻尼",
+        "physics_angular_damping": "角阻尼",
+        "physics_shape": "刚体形状",
+        "physics_shape_bbox": "包围盒",
+        "physics_shape_rect": "矩形",
+        "physics_shape_ellipse": "椭圆",
+        "physics_shape_polygon": "多边形",
+        "physics_shape_offset": "形状偏移",
+        "physics_shape_size": "形状大小",
+        "physics_shape_points": "形状顶点",
         "placeholder": "占位提示",
         "password": "密码模式",
         "max_length": "最大长度",
@@ -618,7 +706,8 @@
         "fail_to_set_icon": "设置窗口图标失败：{}",
         "window_error": "窗口操作失败：{}",
         "no_project_pygs": "没有在项目根目录下找到project.pygs配置文件。",
-        "fail_to_load_project_pygs": "配置文件project.pygs加载失败：{}"
+        "fail_to_load_project_pygs": "配置文件project.pygs加载失败：{}",
+        "physics_unavailable": "物理系统不可用：{}"
     },
 
     "panel": {

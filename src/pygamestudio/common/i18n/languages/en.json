@@ -120,12 +120,14 @@
         "cat": {
             "event": "Events",
             "action": "Actions",
+            "physics": "Physics",
             "control": "Control"
         },
 
         "ev": {
             "start": "When the game starts",
             "update": "When each frame updates (dt)",
+            "destroy": "When this object is destroyed",
             "pressed": "When pressed on this object",
             "released": "When released",
             "clicked": "When clicked",
@@ -178,12 +180,23 @@
             "set_progress": "Set progress"
         },
 
+        "phy": {
+            "apply_force": "Apply force x y",
+            "apply_impulse": "Apply impulse (a jump)",
+            "set_velocity": "Set speed x y",
+            "set_spin": "Set spin (degrees/s)",
+            "set_state": "Set physics",
+            "set_gravity": "World gravity x y"
+        },
+
         "ctl": {
             "if": "If",
             "if_else": "If / else",
             "repeat": "Repeat (times)",
             "while": "While (repeat while true)",
             "repeat_until": "Repeat until",
+            "if_key": "If key is pressed",
+            "while_key": "While key is held",
             "continue": "Skip to the next loop step",
             "break": "Break out of the loop",
             "return": "Stop this event",
@@ -206,6 +219,61 @@
             "param_value": "value (parameter)",
             "param_text": "text (parameter)",
             "other": "other object"
+        },
+
+        "val": {
+            "grounded": "on ground",
+            "collision_on": "collision on",
+            "velocity_x": "speed x",
+            "velocity_y": "speed y",
+            "spin": "spin (deg/s)",
+            "physics_enabled": "physics on",
+            "physics_mass": "mass",
+            "physics_friction": "friction",
+            "physics_elasticity": "elasticity",
+            "physics_gravity_scale": "gravity scale",
+            "mouse_x": "mouse x",
+            "mouse_y": "mouse y"
+        },
+
+        "key": {
+            "left": "Left arrow",
+            "right": "Right arrow",
+            "up": "Up arrow",
+            "down": "Down arrow",
+            "space": "Space",
+            "enter": "Enter",
+            "tab": "Tab",
+            "escape": "Escape",
+            "backspace": "Backspace",
+            "delete": "Delete",
+            "lshift": "Left Shift",
+            "rshift": "Right Shift",
+            "lctrl": "Left Ctrl",
+            "rctrl": "Right Ctrl",
+            "lalt": "Left Alt",
+            "ralt": "Right Alt",
+            "home": "Home",
+            "end": "End",
+            "pageup": "Page Up",
+            "pagedown": "Page Down",
+            "insert": "Insert",
+            "minus": "Minus -",
+            "equals": "Equals =",
+            "comma": "Comma ,",
+            "period": "Period .",
+            "slash": "Slash /",
+            "semicolon": "Semicolon ;",
+            "quote": "Quote '",
+            "lbracket": "Left bracket [",
+            "rbracket": "Right bracket ]",
+            "backslash": "Backslash \\",
+            "backquote": "Backquote `"
+        },
+
+        "toggle": {
+            "on": "On",
+            "off": "Off"
         },
 
         "op": {
@@ -394,7 +462,7 @@
         "frame_folder": "Frame Folder",
         "select_folder": "Select Frame Folder",
         "collision_enabled": "Enable Collision",
-        "collision_type": "Collision Type",
+        "collision_type": "Collision Shape",
         "collision_type_bbox": "Bounding Box",
         "collision_type_rect": "Rect",
         "collision_type_ellipse": "Ellipse",
@@ -402,6 +470,26 @@
         "collision_offset": "Collision Offset",
         "collision_size": "Collision Size",
         "collision_points": "Collision Points",
+        "physics_enabled": "Enable Physics",
+        "physics_type": "Body Type",
+        "physics_type_dynamic": "Dynamic",
+        "physics_type_static": "Static",
+        "physics_type_kinematic": "Kinematic",
+        "physics_mass": "Mass",
+        "physics_friction": "Friction",
+        "physics_elasticity": "Elasticity",
+        "physics_gravity_scale": "Gravity Scale",
+        "physics_fixed_rotation": "Fixed Rotation",
+        "physics_linear_damping": "Linear Damping",
+        "physics_angular_damping": "Angular Damping",
+        "physics_shape": "Rigid Body Shape",
+        "physics_shape_bbox": "Bounding Box",
+        "physics_shape_rect": "Rect",
+        "physics_shape_ellipse": "Ellipse",
+        "physics_shape_polygon": "Polygon",
+        "physics_shape_offset": "Shape Offset",
+        "physics_shape_size": "Shape Size",
+        "physics_shape_points": "Shape Points",
         "placeholder": "Placeholder",
         "password": "Password",
         "max_length": "Max Length",
@@ -622,7 +710,8 @@
         "fail_to_set_icon": "Failed to set the window icon: {}",
         "window_error": "Window operation failed: {}",
         "no_project_pygs": "Failed to find config file project.pygs in the project root directory.",
-        "fail_to_load_project_pygs": "Failed to load config file project.pygs: {}"
+        "fail_to_load_project_pygs": "Failed to load config file project.pygs: {}",
+        "physics_unavailable": "Physics is not available: {}"
     },
 
     "panel": {
