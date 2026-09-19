@@ -105,10 +105,16 @@ class EditorSettingsBody(QWidget):
         self._theme_combobox.addItems(list(self._theme_dict.values()))
 
         editor_config = get_editor_config()
-        lang_code = editor_config.get('lang') if editor_config.get('lang') else 'en'
+        lang_code = get_editor_language()
         theme_code = editor_config.get('theme') if editor_config.get('theme') else 'dark'
+        # Filling the combos must not look like a choice: writing the language
+        # back here would replace the automatic system language for good.
+        self._language_combobox.blockSignals(True)
+        self._theme_combobox.blockSignals(True)
         self._language_combobox.setCurrentText(self._lang_dict.get(lang_code))
         self._theme_combobox.setCurrentText(self._theme_dict.get(theme_code))
+        self._language_combobox.blockSignals(False)
+        self._theme_combobox.blockSignals(False)
 
     def _toggle_language(self):
         lang_code = self._get_lang_code_by_value(self._language_combobox.currentText())

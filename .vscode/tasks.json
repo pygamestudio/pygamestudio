@@ -1,0 +1,11 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "debug-locale",
+			"type": "shell",
+			"command": "d:\\python\\python.exe -c \"import os; os.environ['QT_QPA_PLATFORM']='offscreen'; import locale; from PySide6.QtCore import QLocale; print('before app:', QLocale.system().name(), locale.getdefaultlocale()); from PySide6.QtWidgets import QApplication; app=QApplication([]); print('after app:', QLocale.system().name(), locale.getdefaultlocale())\"",
+			"problemMatcher": []
+		}
+	]
+}

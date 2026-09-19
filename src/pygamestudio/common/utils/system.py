@@ -1,16 +1,67 @@
 import locale
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 
+def _is_chinese(name: str) -> bool:
+    key = str(name).strip().lower().replace('-', '_')
+    return key.startswith('zh') or 'chinese' in key
+
+
+def _language_candidates():
+    """The names the OS reports for its own language, most reliable first.
+
+    Several sources are asked on purpose: the stdlib locale knows the Windows
+    system language even when a terminal forces ``LANG=en_US``, while Qt's UI
+    languages are the only source that works for an app started from the macOS
+    Finder, where no locale environment variables exist.
+    """
+    names = []
+
+    getter = getattr(locale, 'getdefaultlocale', None)
+    if getter is not None:
+        try:
+            name = getter()[0]
+        except Exception:
+            name = None
+        if name:
+            names.append(name)
+
+    try:
+        from PySide6.QtCore import QLocale
+        system_locale = QLocale.system()
+        names.extend(system_locale.uiLanguages() or [])
+        names.append(system_locale.name())
+    except Exception:
+        pass
+
+    # Windows reports 'Chinese (Simplified)_China', Linux/macOS 'zh_CN.UTF-8'.
+    name = locale.getlocale()[0] or ''
+    if 'chinese' in name.lower():
+        names.append('zh_CN')
+
+    for variable in ('LANG', 'LC_ALL', 'LANGUAGE'):
+        value = os.environ.get(variable) or ''
+        if value:
+            names.append(value.split(':')[0].split('.')[0])
+
+    return [name for name in (str(name).strip() for name in names) if name]
+
+
+def get_system_language_name() -> str:
+    """A name of the language the OS is set to, e.g. ``zh_CN`` or ``en_US``."""
+    candidates = _language_candidates()
+    return candidates[0] if candidates else ''
+
+
 def get_system_lang():
-    """Detect the OS UI language; only zh_CN is distinguished from English."""
-    lang, encoding = locale.getdefaultlocale()
-    if lang == 'zh_CN':
-        return lang
-    else:
-        return 'en'
+    """The editor language the OS asks for: Chinese -> ``zh_CN``, else ``en``."""
+    for name in _language_candidates():
+        if _is_chinese(name):
+            return 'zh_CN'
+    return 'en'
 
 
 def send_to_trash(path):

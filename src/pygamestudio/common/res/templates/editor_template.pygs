@@ -1,5 +1,6 @@
 {
-    "lang": "en",
+    "settings_version": 2,
+    "lang": "",
     "theme": "dark",
     "code_editor_font_size": 10
 }
