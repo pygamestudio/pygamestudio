@@ -4,3 +4,4 @@ pyproject.toml
 /src/pygamestudio.egg-info
 .DS_Store
 .idea/
+.vscode/
