@@ -24,12 +24,12 @@ not exposed (with the reason). Tool names are the MCP tool names.
 | --- | --- | --- |
 | Browse the project tree, filter/sort, search | Asset panel | `list_files` (filter by folder, kind, name) |
 | Create folder / script / scene / txt / json | Asset context menu > Add | `write_file`, `create_script` |
-| Open a file in the code/block editor | Asset context menu > Open | `open_in_code_editor` (block editor: no) |
+| Open a file in the code/block editor | Asset context menu > Open | `open_in_code_editor`, `block_editor_open` |
 | Rename, move, duplicate | cut + paste, rename in the tree | `move_file` |
 | Delete file/folder | context menu > Delete | `delete_file` (folders need `recursive`) |
 | Import a file from the computer | drag & drop, copy into the folder | `import_file` |
 | Open in terminal / file explorer | context menu | **no** - launches external processes, an agent should not need it |
-| Play audio, edit image, edit tile map | Audio Player / Image Editor / Tile Map Editor | **no** - pixel/tile editing tools are a later step |
+| Play audio, edit image, edit tile map | Audio Player / Image Editor / Tile Map Editor | `audio_player_open`, `audio_player_control`; `image_editor_open`, `image_editor_draw`, `image_editor_fill`, `image_editor_transform`, `image_editor_save`, `image_editor_capture`; `tile_map_editor_open`, `tile_map_editor_paint`, `tile_map_editor_fill`, `tile_map_editor_layer` |
 
 ## 3. Scenes
 
@@ -64,7 +64,7 @@ not exposed (with the reason). Tool names are the MCP tool names.
 | Attach / detach a script | Inspector > Script Path | `create_script` (`attach_to`), `update_object` (`script_path`) |
 | Collision shape editing (type, offset, size, polygon points) | Inspector > collision section | `update_object` (`collision_*`) |
 | Rigid body editing (enable, body type, mass, friction, elasticity, gravity scale, fixed rotation, damping, rigid-body shape) | Inspector > physics section | `update_object` (`physics_*`, incl. `physics_shape_*`) - separate from the collision shape |
-| Tile map painting, tile layers | Tile Map Editor | **no** - cell-level painting is an interactive editor; `update_object` can still set the tileset/tile size/grid |
+| Tile map painting, tile layers | Tile Map Editor | `tile_map_editor_paint` (cells, undoable), `tile_map_editor_fill`, `tile_map_editor_layer` (add/remove/rename/select/visible/collision); `update_object` can still set the tileset/tile size/grid |
 
 ## 5. Scripts
 
@@ -73,7 +73,7 @@ not exposed (with the reason). Tool names are the MCP tool names.
 | Create a script from the ObjectScript template | Asset > Add > Script | `create_script` |
 | Read / write script files | Code Editor | `read_file`, `write_file` |
 | Jump to a file (and line) in the editor | Asset / console click | `open_in_code_editor` |
-| Visual (block) scripting | Block Editor | **no** - block scripts are still plain `.py` files, so `read_file`/`write_file` work on them |
+| Visual (block) scripting | Block Editor | `block_editor_open`, `block_editor_list_types`, `block_editor_get_blocks`, `block_editor_add_block`, `block_editor_set_field`, `block_editor_move_block`, `block_editor_delete_block`, `block_editor_save` (block scripts stay plain `.py` files) |
 
 ## 6. Running and debugging
 
@@ -92,6 +92,7 @@ not exposed (with the reason). Tool names are the MCP tool names.
 | --- | --- | --- |
 | Look at the scene as the user sees it | Scene panel | `capture_scene_view` (PNG, whole canvas or a region, scalable) |
 | Which panels exist and are visible | tab bars | `list_editor_panels` |
+| Show a panel (select its tab, raise a detached window, re-show one hidden from the Window menu) | tab bars / Window menu | `open_panel` |
 | Pan/zoom/grid, gizmos, alignment guides | Scene panel + mouse | **no** - interactive only |
 
 ## 8. Building
@@ -129,7 +130,7 @@ Every tool that changes the scene funnels through the editor's `QUndoStack`, and
 | Modal dialogs (file chooser, save prompt, message boxes) | a tool call must never block on a UI dialog; the tools use non-interactive paths (`silent=True`, explicit paths) |
 | Shell commands, opening terminals, deleting the project folder | nothing an agent needs, and hard to undo |
 | The dashboard (create/import/delete projects) | it runs before an editor session exists; project creation stays a human action |
-| Interactive editing (painting tiles/images, dragging gizmos) | has no headless equivalent; `capture_scene_view` + property editing replace the observable part |
+| Interactive editing (painting tiles/images, dragging gizmos) | painting is exposed as data edits (`tile_map_editor_paint`, `image_editor_draw`); gizmo dragging has no headless equivalent, `capture_scene_view` replaces the observable part |
 
 ## 11. Resources (read-only documents)
 

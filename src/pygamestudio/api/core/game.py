@@ -43,6 +43,17 @@ class Game:
             caller_frame = inspect.stack()[-1]
             caller_file_path = caller_frame.filename
             self._project_path = Path(caller_file_path).parent.resolve().as_posix()
+        # A game process must never inherit the EDITOR's project variable. The
+        # editor exports __PYGAMESTUDIO_PROJECT_PATH and every process it starts
+        # (the asset panel's "open externally", a terminal it opened, ...) gets
+        # a copy. get_project_path() prefers that variable over PROJECT_PATH, so
+        # a protected build launched this way would read its assets - and look
+        # for resources.cache - in the SOURCE project and die with "this build
+        # contains protected assets but no resources.cache was found next to
+        # the game". A running game always knows its own root, so the editor
+        # variable is dropped here (it is set again by the editor itself, per
+        # process, and never crosses into a game).
+        os.environ.pop('__PYGAMESTUDIO_PROJECT_PATH', None)
         os.environ['PROJECT_PATH'] = self._project_path
         project_config = get_project_config()
 
