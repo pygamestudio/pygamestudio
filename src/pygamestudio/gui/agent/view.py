@@ -45,14 +45,43 @@ class AgentTranscript(QTextBrowser):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._theme = 'dark'
+        #: Every message ever written (kind, payload...). The color of a block
+        #: lives in its inline HTML, so a theme switch re-renders this log.
+        self._entries = []
         self.setObjectName('agentTranscript')
         self.setOpenExternalLinks(False)
         self.setReadOnly(True)
 
     # ----------------------------------------------------------------- theme
     def apply_theme(self, is_dark: bool):
-        """Follow the editor theme (messages already written keep their color)."""
-        self._theme = 'dark' if is_dark else 'light'
+        """Follow the editor theme, re-rendering everything already written.
+
+        The message colors are baked into the HTML of each block, so simply
+        remembering the new palette would leave old tool cards dark on a light
+        surface: the log is rendered again with the new colors instead.
+        """
+        theme = 'dark' if is_dark else 'light'
+        if theme == self._theme:
+            return
+        self._theme = theme
+        self._rebuild()
+
+    def clear(self):
+        """Empty the transcript, log included."""
+        self._entries.clear()
+        super().clear()
+
+    def _rebuild(self):
+        """Render the logged entries again with the current colors."""
+        scrollbar = self.verticalScrollBar()
+        scroll_value = scrollbar.value()
+        entries = list(self._entries)
+        self._entries = []
+        super().clear()
+        for entry in entries:
+            self._entries.append(entry)
+            self._render(entry)
+        scrollbar.setValue(min(scroll_value, scrollbar.maximum()))
 
     def _colors(self):
         return COLORS[self._theme]
@@ -83,12 +112,7 @@ class AgentTranscript(QTextBrowser):
         self._scroll_to_end()
 
     def add_user(self, text):
-        c = self._colors()
-        body = html.escape(text).replace('\n', '<br>')
-        # Two empty lines separate a new prompt from the answer above it.
-        self._append_html(
-            f'<p style="margin:0 0 4px 0;color:{c["user"]};"><b>&gt; {body}</b></p>',
-            blank_lines=2)
+        self._add(('user', text))
 
     def add_assistant(self, text):
         """The answer of the assistant, rendered as markdown.
@@ -98,6 +122,51 @@ class AgentTranscript(QTextBrowser):
         raw ``**``/``` markup. The colour is taken from the insertion point, so
         the answer follows the editor theme, and the text stays selectable.
         """
+        self._add(('assistant', text))
+
+    def add_note(self, text):
+        self._add(('note', text))
+
+    def add_error(self, text):
+        self._add(('error', text))
+
+    def add_tool_call(self, name, arguments):
+        self._add(('tool_call', name, arguments))
+
+    def add_tool_result(self, name, ok, text):
+        self._add(('tool_result', name, ok, text))
+
+    # ------------------------------------------------------------ rendering
+    def _add(self, entry):
+        """Log one entry and draw it with the current colors."""
+        self._entries.append(entry)
+        self._render(entry)
+
+    def _render(self, entry):
+        """Draw one logged entry (used for new messages and for re-renders)."""
+        kind = entry[0]
+        if kind == 'user':
+            self._render_user(entry[1])
+        elif kind == 'assistant':
+            self._render_assistant(entry[1])
+        elif kind == 'note':
+            self._render_note(entry[1])
+        elif kind == 'error':
+            self._render_error(entry[1])
+        elif kind == 'tool_call':
+            self._render_tool_call(entry[1], entry[2])
+        elif kind == 'tool_result':
+            self._render_tool_result(entry[1], entry[2], entry[3])
+
+    def _render_user(self, text):
+        c = self._colors()
+        body = html.escape(text).replace('\n', '<br>')
+        # Two empty lines separate a new prompt from the answer above it.
+        self._append_html(
+            f'<p style="margin:0 0 4px 0;color:{c["user"]};"><b>&gt; {body}</b></p>',
+            blank_lines=2)
+
+    def _render_assistant(self, text):
         text = (text or '').strip()
         if not text:
             return
@@ -112,17 +181,17 @@ class AgentTranscript(QTextBrowser):
         cursor.insertFragment(QTextDocumentFragment(document))
         self._scroll_to_end()
 
-    def add_note(self, text):
+    def _render_note(self, text):
         c = self._colors()
         self._append_html(
             f'<p style="margin:2px 0;color:{c["muted"]};"><i>{html.escape(text)}</i></p>')
 
-    def add_error(self, text):
+    def _render_error(self, text):
         c = self._colors()
         body = html.escape(text).replace('\n', '<br>')
         self._append_html(f'<p style="margin:6px 0;color:{c["error"]};"><b>{body}</b></p>')
 
-    def add_tool_call(self, name, arguments):
+    def _render_tool_call(self, name, arguments):
         c = self._colors()
         args = html.escape(_short_json(arguments, 300))
         self._append_html(
@@ -132,7 +201,7 @@ class AgentTranscript(QTextBrowser):
             f'<div style="color:{c["muted"]};font-family:Consolas,monospace;'
             f'font-size:11px;">{args}</div></div>')
 
-    def add_tool_result(self, name, ok, text):
+    def _render_tool_result(self, name, ok, text):
         c = self._colors()
         color = c['ok'] if ok else c['error']
         status = 'ok' if ok else 'error'

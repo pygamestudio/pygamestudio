@@ -34,6 +34,7 @@ class DesktopAppBuildWindow(QScrollArea):
         self._clean_cache_checkbox = QCheckBox()
         self._progress_bar = QProgressBar()
         self._build_button = QPushButton()
+        self._run_button = QPushButton()
         self._open_output_dir_button = QPushButton()
 
         self._build_thread = BuildThread(self._game_manager)
@@ -65,6 +66,8 @@ class DesktopAppBuildWindow(QScrollArea):
         self._progress_bar.setRange(0, 100)
         self._progress_bar.setValue(0)
         self._build_button.setText(T.tr('build.build', 'Build'))
+        self._run_button.setText(T.tr('build.run_game', 'Run Game'))
+        self._run_button.setEnabled(False)
         self._open_output_dir_button.setText(T.tr('build.open_output_dir', 'Open Output Dir'))
         self._update_button_widths()
         
@@ -72,6 +75,7 @@ class DesktopAppBuildWindow(QScrollArea):
         self._app_icon_browse_button.clicked.connect(self._browse_app_icon)
         self._output_dir_browse_button.clicked.connect(self._browse_output_dir)
         self._build_button.clicked.connect(self._build)
+        self._run_button.clicked.connect(self._run_game)
         self._open_output_dir_button.clicked.connect(self._open_output_dir)
 
         self._build_thread.stopped_signal.connect(self._on_build_stopped)
@@ -94,6 +98,8 @@ class DesktopAppBuildWindow(QScrollArea):
 
         button_layout = QHBoxLayout()
         button_layout.addWidget(self._build_button)
+        button_layout.addSpacing(5)
+        button_layout.addWidget(self._run_button)
         button_layout.addSpacing(5)
         button_layout.addWidget(self._open_output_dir_button)
         button_layout.addStretch()
@@ -119,9 +125,12 @@ class DesktopAppBuildWindow(QScrollArea):
         self._build_button.setObjectName('desktopAppBuildBtn')
 
     def _update_button_widths(self):
-        """Give both buttons one width, wide enough for the longer label."""
-        button_width = max(self._build_button.sizeHint().width(), self._open_output_dir_button.sizeHint().width())
+        """Give the buttons one width, wide enough for the longer label."""
+        button_width = max(self._build_button.sizeHint().width(),
+                           self._run_button.sizeHint().width(),
+                           self._open_output_dir_button.sizeHint().width())
         self._build_button.setMinimumWidth(button_width)
+        self._run_button.setMinimumWidth(button_width)
         self._open_output_dir_button.setMinimumWidth(button_width)
 
     def get_ready_for_project(self):
@@ -198,6 +207,7 @@ class DesktopAppBuildWindow(QScrollArea):
         
         self._progress_bar.setValue(0)
         self._progress_bar.show()
+        self._run_button.setEnabled(False)
         self._build_thread.set_build_config(self.get_build_config())
         self._build_thread.start()
         self._is_building = True
@@ -223,16 +233,48 @@ class DesktopAppBuildWindow(QScrollArea):
         else:
             QMessageBox.information(QApplication.activeWindow(), T.tr('message_box.information_title', 'Info'), T.tr('message_box.information_os_content', 'Unsupported Operating System'))
 
+    def _run_game(self):
+        """Launch the built executable (a separate process)."""
+        executable_path = self._build_thread.executable_path
+        if executable_path is None or not Path(executable_path).exists():
+            QMessageBox.critical(self, T.tr('message_box.critical_title', 'Error'), T.tr('message_box.critical_game_exe_missing', 'The built game was not found, please build again: {}').format(str(executable_path)))
+            self._set_run_enabled()
+            return
+
+        try:
+            # The editor's own project variables must not leak into the game:
+            # a protected build carries its own resources.cache, and
+            # get_project_path() prefers __PYGAMESTUDIO_PROJECT_PATH, so the
+            # game would look for its assets in the source project instead of
+            # in its own folder (a double click works because the environment
+            # is clean there).
+            environment = dict(os.environ)
+            environment.pop('PROJECT_PATH', None)
+            environment.pop('__PYGAMESTUDIO_PROJECT_PATH', None)
+            subprocess.Popen([Path(executable_path).as_posix()], cwd=Path(executable_path).parent.as_posix(), env=environment)
+        except OSError as e:
+            QMessageBox.critical(self, T.tr('message_box.critical_title', 'Error'), T.tr('message_box.critical_run_game_failed', 'Could not run the game: {}').format(str(e)))
+            return
+
+        Logger.info(T.tr('build.run_game_output', 'Running the game: {}').format(Path(executable_path).as_posix()))
+
+    def _set_run_enabled(self):
+        """Run is available once a built executable exists on disk."""
+        executable_path = self._build_thread.executable_path
+        self._run_button.setEnabled(executable_path is not None and Path(executable_path).exists())
+
     def _on_build_stopped(self):
         self._is_building = False
         self._build_button.setEnabled(True)
         self._build_button.setText(T.tr('build.build', 'Build'))
         self._progress_bar.hide()
+        self._set_run_enabled()
         
     def _on_build_finished(self, is_successful):
         self._is_building = False
         self._build_button.setEnabled(True)
         self._build_button.setText(T.tr('build.build', 'Build'))
+        self._set_run_enabled()
 
         if not is_successful:
             QMessageBox.critical(self, T.tr('message_box.critical_title', 'Error'), T.tr('message_box.critical_fail_to_build', 'Failed to build the project. Please check the log.'))
@@ -270,6 +312,7 @@ class DesktopAppBuildWindow(QScrollArea):
         self._clean_cache_label.setText(T.tr('build.clean_cache', 'Clean Cache'))
         self._clean_cache_checkbox.setToolTip(T.tr('build.clean_cache_tooltip', 'Clear the PyInstaller cache and temporary files before building'))
         self._build_button.setText(T.tr('build.build', 'Build'))
+        self._run_button.setText(T.tr('build.run_game', 'Run Game'))
         self._open_output_dir_button.setText(T.tr('build.open_output_dir', 'Open Output Dir'))
         self._update_button_widths()
 
@@ -314,6 +357,8 @@ class BuildThread(QThread):
         self._build_config = {}
         self._progress_value = 0
         self._stop_requested = False
+        #: Path of the last built executable (used by the Run Game button).
+        self.executable_path = None
 
     def set_build_config(self, build_config):
         """Take a snapshot of the build configuration.
@@ -384,6 +429,7 @@ class BuildThread(QThread):
                     Logger.error(T.tr('build.build_exe_not_found', 'The build completed but the executable was not found: {}').format((output_dir / 'dist').as_posix()))
                     is_successful = False
                 else:
+                    self.executable_path = executable_path
                     Logger.info(T.tr('build.build_output', 'Build output: {}').format(executable_path.parent.as_posix()))
                     self._emit_progress(100)
 

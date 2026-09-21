@@ -96,12 +96,21 @@ not exposed (with the reason). Tool names are the MCP tool names.
 
 ## 8. Building
 
+The Build window has two tabs: **Desktop App** (PyInstaller executable for the
+current operating system) and **Web App** (a folder with `index.html` +
+`game.zip` that plays the game in a browser through Pyodide and pygame-ce; the
+project code/assets are protected like in the desktop build, the result lands in
+`<output dir>/build/Web` and the installed engine is never modified).
+
 | Capability | Editor entry point | MCP |
 | --- | --- | --- |
-| Read build settings (app name, icon, output dir, cache, progress) | Build window | `get_build_settings` |
-| Start a build (PyInstaller desktop app) | Build window > Build | `start_build` |
-| Stop a build | Build window > Stop | `stop_build` |
-| Open the output folder | Build window | `open_output_dir` |
+| Read build settings (desktop values + `build.web`, running state, progress, last web bundle) | Build window | `get_build_settings` |
+| Start a desktop build (PyInstaller executable) | Build window > Desktop App > Build | `start_build` |
+| Start a web build (browser bundle) | Build window > Web App > Build | `start_web_build` |
+| Stop a build (whichever tab is building) | Build window > Stop | `stop_build` |
+| Open the desktop output / the web bundle folder | Build window > Open Output Dir | `open_output_dir` (`target`: `"desktop"` / `"web"`) |
+| Run the built app / preview the web build | Run Game / Run in Browser buttons | **no** - buttons only |
+
 
 ## 9. Undo / history
 

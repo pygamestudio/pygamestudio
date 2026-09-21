@@ -3,6 +3,7 @@ from PySide6.QtCore import *
 from PySide6.QtWidgets import *
 from pygamestudio.gui.base.window import WindowBase
 from pygamestudio.gui.build.desktop import DesktopAppBuildWindow
+from pygamestudio.gui.build.web import WebAppBuildWindow
 from pygamestudio.common.i18n.translator import Translator as T
 
 
@@ -10,6 +11,7 @@ class BuildWindowBody(QTabWidget):
     def __init__(self, game_manager):
         super().__init__()
         self._desktop_app_build_window = DesktopAppBuildWindow(game_manager)
+        self._web_app_build_window = WebAppBuildWindow(game_manager)
         self._set_up()
 
     def _set_up(self):
@@ -18,15 +20,18 @@ class BuildWindowBody(QTabWidget):
 
     def _set_widget(self):
         self.addTab(self._desktop_app_build_window, T.tr('build.desktop_app', 'Desktop App'))
+        self.addTab(self._web_app_build_window, T.tr('build.web_app', 'Web App'))
     
     def _set_signal(self):
         T.add_observer(self)
 
     def retranslate(self):
         self.setTabText(0, T.tr('build.desktop_app', 'Desktop App'))
+        self.setTabText(1, T.tr('build.web_app', 'Web App'))
 
     def get_ready_for_project(self):
         self._desktop_app_build_window.get_ready_for_project()
+        self._web_app_build_window.get_ready_for_project()
 
     def enterEvent(self, event):
         self.setCursor(Qt.CursorShape.ArrowCursor)

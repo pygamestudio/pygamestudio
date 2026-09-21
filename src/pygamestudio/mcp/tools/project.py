@@ -180,6 +180,13 @@ def update_editor_settings(args):
     if args.get('theme'):
         update_editor_config('theme', args['theme'])
         set_editor_theme(args['theme'])
+        # Repaint the panels that carry their own colors: the settings dialog
+        # does this over its `theme_toggled` signal, a tool call has no dialog
+        # and has to ask the editor body explicitly.
+        body = bridge.editor_body_or_none()
+        apply_theme = getattr(body, 'apply_editor_theme', None)
+        if callable(apply_theme):
+            apply_theme(args['theme'])
         applied['theme'] = args['theme']
     if not applied:
         raise ToolError('Nothing to change: pass language and/or theme.')

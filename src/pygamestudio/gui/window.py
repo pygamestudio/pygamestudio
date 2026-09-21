@@ -131,12 +131,23 @@ class EditorBody(QMainWindow):
 
         self.setCentralWidget(self._central_widget)
 
+    def apply_editor_theme(self, theme_code):
+        """Repaint every panel that carries its own colors.
+
+        The settings dialog emits ``theme_toggled`` for this, but the theme can
+        also be changed without the dialog (the MCP tool
+        ``update_editor_settings``), so both paths call this method and a theme
+        switch looks the same however it was triggered.
+        """
+        is_dark = theme_code == 'dark'
+        self._scene_widnow.update_grid_style(theme_code)
+        self._console_window.reload_logs_on_theme_changed(theme_code)
+        self._agent_window.apply_theme(is_dark)
+        self._code_editor_window.apply_theme(is_dark)
+        self._block_editor_window.apply_theme(is_dark)
+
     def _set_signal(self):
-        self._editor_settings_window.theme_toggled.connect(self._scene_widnow.update_grid_style)
-        self._editor_settings_window.theme_toggled.connect(self._console_window.reload_logs_on_theme_changed)
-        self._editor_settings_window.theme_toggled.connect(lambda theme_code: self._agent_window.apply_theme(theme_code == 'dark'))
-        self._editor_settings_window.theme_toggled.connect(lambda theme_code: self._code_editor_window.apply_theme(theme_code == 'dark'))
-        self._editor_settings_window.theme_toggled.connect(lambda theme_code: self._block_editor_window.apply_theme(theme_code == 'dark'))
+        self._editor_settings_window.theme_toggled.connect(self.apply_editor_theme)
         self._asset_window.edit_file_signal.connect(self._code_editor_window.open_file)
         self._asset_window.block_edit_signal.connect(self._block_editor_window.open_file)
         # When a block script is regenerated, refresh the code editor if it is
@@ -153,10 +164,11 @@ class EditorBody(QMainWindow):
         self._center_top_tab_widget.currentChanged.connect(self._on_center_top_tab_changed)
         T.add_observer(self)
 
-        # Match the code editor's highlight colors with the startup theme.
+        # Match the panels with the theme the editor starts with.
         theme_code = get_editor_config().get('theme', 'dark')
         self._code_editor_window.apply_theme(theme_code == 'dark')
         self._block_editor_window.apply_theme(theme_code == 'dark')
+        self._agent_window.apply_theme(theme_code == 'dark')
 
     def _set_layout(self):
         main_layout = QHBoxLayout(self._central_widget)
