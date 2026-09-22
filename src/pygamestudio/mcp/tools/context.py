@@ -36,6 +36,21 @@ _READ_ONLY_ATTRS = {
     'selected', 'expanded', '_is_initialized', '_is_for_api', '_game_manager',
 }
 
+#: Geometry mirrors: the object stores pos / size / scale as tuples and
+#: derives x/y, width/height, scale_x/scale_y from them (ObjectBase.__setattr__
+#: syncs only in that direction), so writing a component directly would change
+#: the saved data WITHOUT moving or resizing the object on screen (the surface
+#: and the rect come from the tuple). Each component writes its tuple through
+#: the same command the inspector uses: (manager method, tuple attrs, index).
+_GEOMETRY_COMPONENTS = {
+    'x': ('move', ('x', 'y'), 0),
+    'y': ('move', ('x', 'y'), 1),
+    'width': ('resize', ('width', 'height'), 0),
+    'height': ('resize', ('width', 'height'), 1),
+    'scale_x': ('scale', ('scale_x', 'scale_y'), 0),
+    'scale_y': ('scale', ('scale_x', 'scale_y'), 1),
+}
+
 
 # ------------------------------------------------------------------ context
 def manager():
@@ -311,10 +326,24 @@ def scene_tree(node=None, depth=4):
 
 
 # -------------------------------------------------------------------- edits
-def push_property(manager_, obj, attr, value):
-    """Set one attribute of an object as an undoable editor change."""
-    from pygamestudio.game.core.command import UpdateAttrValueCommand
+def push_geometry_component(manager_, obj, attr, new_value):
+    """Set one component of pos / size / scale through its editor command."""
+    command_name, components, index = _GEOMETRY_COMPONENTS[attr]
+    values = [getattr(obj, name) for name in components]
+    if values[index] == new_value:
+        return False
+    values[index] = new_value
+    getattr(manager_, command_name)(obj.uuid, tuple(values))
+    return True
 
+
+def coerce_property(obj, attr, value):
+    """Validate one property write and coerce its value.
+
+    Returns (old_value, new_value) and raises ToolError for unknown or
+    read-only attributes and for values that do not fit the property - the
+    same rules push_property applies.
+    """
     if not hasattr(obj, attr):
         raise ToolError('Object "{}" ({}) has no property "{}".'.format(
             obj.name, obj.type, attr))
@@ -332,10 +361,88 @@ def push_property(manager_, obj, attr, value):
             and len(new_value) == len(old_value) - 1 and attr.endswith('color')):
         # A colour given as [r, g, b] keeps the alpha the object already had.
         new_value = list(new_value) + [list(old_value)[-1]]
+    return old_value, new_value
+
+
+def property_changes(obj, attr, value):
+    """True when the write would change the object (no side effect).
+
+    Tools use this to decide whether a call needs an undo step at all: an
+    EMPTY QUndoStack macro stays on the stack (Qt 6 does not drop it), so a
+    no-op call must not open one - undo would move past it doing nothing.
+    """
+    old_value, new_value = coerce_property(obj, attr, value)
+    if attr in _GEOMETRY_COMPONENTS:
+        _command_name, components, index = _GEOMETRY_COMPONENTS[attr]
+        return getattr(obj, components[index]) != new_value
+    return old_value != new_value
+
+
+def push_property(manager_, obj, attr, value):
+    """Set one attribute of an object as an undoable editor change."""
+    from pygamestudio.game.core.command import UpdateAttrValueCommand
+
+    old_value, new_value = coerce_property(obj, attr, value)
+    if attr in _GEOMETRY_COMPONENTS:
+        # 'width' & co are mirrors of the size / pos / scale tuples: updating
+        # the mirror alone never reaches the rendered surface, so they go
+        # through the same commands the inspector's rows use.
+        return push_geometry_component(manager_, obj, attr, new_value)
     if old_value == new_value:
         return False
     manager_._undo_stack.push(UpdateAttrValueCommand(manager_, obj, attr, old_value, new_value))
     return True
+
+
+def fit_object_size(manager_, obj, padding=0):
+    """Resize a TEXT object's box to its rendered text (one undo step).
+
+    A text object draws the text INSIDE its width/height box and everything
+    that does not fit is clipped, while a model has no way to measure a font:
+    a label created with the default 60x40 box shows "Score" fine and cuts
+    "Score: 12345" off. The natural size comes from the object itself
+    (Font.size with the current font settings), so the box can be fitted
+    exactly.
+    """
+    getter = getattr(obj, 'get_text_size', None)
+    if not callable(getter):
+        raise ToolError(
+            'fit_object_size only supports TEXT objects ("{}" is a {}, whose '
+            'size is its design, not its content).'.format(obj.name, obj.type))
+
+    text_width, text_height = (max(1, int(value)) for value in getter())
+    margin = max(0, int(padding or 0))
+    width = text_width + margin * 2
+    height = text_height + margin * 2
+    previous = [int(obj.width), int(obj.height)]
+    if previous == [width, height]:
+        # Already fitted: report it without pushing an undo step.
+        return {
+            'uuid': obj.uuid,
+            'path': object_path(obj),
+            'size': previous,
+            'previous_size': list(previous),
+            'text_size': [text_width, text_height],
+            'padding': margin,
+            'changed': False,
+        }
+
+    begin_macro(manager_, 'Fit Text Size')
+    try:
+        push_property(manager_, obj, 'width', width)
+        push_property(manager_, obj, 'height', height)
+    finally:
+        end_macro(manager_)
+
+    return {
+        'uuid': obj.uuid,
+        'path': object_path(obj),
+        'size': [int(obj.width), int(obj.height)],
+        'previous_size': previous,
+        'text_size': [text_width, text_height],
+        'padding': margin,
+        'changed': True,
+    }
 
 
 def resolve_project_path(value):

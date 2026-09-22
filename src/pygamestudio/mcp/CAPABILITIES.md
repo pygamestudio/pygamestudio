@@ -51,6 +51,7 @@ not exposed (with the reason). Tool names are the MCP tool names.
 | Find objects | Hierarchy search | `find_objects` (name/type/script/visibility) |
 | Which properties exist per type | Inspector layout | `object_types` |
 | Edit properties (move, resize, scale, rotate, color, text, font, image, collision, particle, slider, progress bar, frame sequence, ...) | Inspector widgets | `update_object`, `apply_scene_patch` |
+| Fit a text box to its text (a TEXT label is clipped to its width/height otherwise) | Inspector > Size (by hand) | `fit_object_size`; `create_object` / `update_object` accept `"auto_size": true` |
 | Rename | Hierarchy > Rename | `update_object` (`name`) |
 | Show / hide | Inspector > Visibility | `update_object` (`visible`) |
 | Delete (with children) | Hierarchy > Delete | `delete_object` |

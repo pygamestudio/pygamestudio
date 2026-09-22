@@ -4,9 +4,10 @@ import uuid as uuid_module
 
 from pygamestudio.mcp.registry import ToolError, tool
 from pygamestudio.mcp.tools.context import (
-    begin_macro, canvas_object, end_macro, iter_objects, json_value,
-    manager, object_details, object_path, object_summary, object_type_names,
-    parent_of, push_property, resolve_object,
+    begin_macro, canvas_object, end_macro, fit_object_size, iter_objects,
+    json_value, manager, object_details, object_path, object_summary,
+    object_type_names, parent_of, property_changes, push_property,
+    resolve_object,
 )
 
 
@@ -52,7 +53,9 @@ def get_object(args):
             'name': {'type': 'string', 'description': 'Object name (must be unique to be addressable by name).'},
             'properties': {'type': 'object', 'additionalProperties': True,
                            'description': 'Initial properties: x, y, width, height, color, text, '
-                                          'script_path, image_path, font_size, ...'},
+                                          'script_path, image_path, font_size, ... A TEXT object also '
+                                          'takes "auto_size": true, which fits width/height to the '
+                                          'text so the label is not clipped.'},
             'select': {'type': 'boolean', 'default': True,
                        'description': 'Select the new object in the editor (the user sees it).'},
         },
@@ -62,6 +65,8 @@ def get_object(args):
     annotations={'title': 'Create object'},
 )
 def create_object(args):
+    from pygamestudio.game.object.type import OBJECT_TEXT
+
     manager_ = manager()
     object_type = args['type'].upper()
     if object_type not in object_type_names():
@@ -74,6 +79,10 @@ def create_object(args):
 
     new_uuid = str(uuid_module.uuid4())
     object_data = dict(args.get('properties') or {})
+    auto_size = bool(object_data.pop('auto_size', False))
+    if auto_size and object_type != OBJECT_TEXT:
+        raise ToolError('"auto_size" only applies to TEXT objects (a {} lays its '
+                        'content out itself).'.format(object_type))
     object_data['uuid'] = new_uuid
     if args.get('name'):
         object_data['name'] = args['name']
@@ -82,10 +91,20 @@ def create_object(args):
     if conflicts and args.get('name'):
         raise ToolError('An object called "{}" already exists. Use another name.'.format(args['name']))
 
-    manager_.add(parent.uuid, object_type, object_data)
-    created = manager_.get_object(new_uuid)
-    if created is None:
-        raise ToolError('The object could not be created.')
+    # Creating + fitting a text box is ONE undo step, so Ctrl+Z removes the
+    # whole label again.
+    if auto_size:
+        begin_macro(manager_, 'Create Object')
+    try:
+        manager_.add(parent.uuid, object_type, object_data)
+        created = manager_.get_object(new_uuid)
+        if created is None:
+            raise ToolError('The object could not be created.')
+        if auto_size:
+            fit_object_size(manager_, created)
+    finally:
+        if auto_size:
+            end_macro(manager_)
 
     if args.get('select', True):
         manager_.deselect_all()
@@ -99,7 +118,9 @@ def create_object(args):
 @tool(
     'update_object',
     'Change one or more properties of an object (all changes of this call are '
-    'ONE undo step). Values are converted to the type the property already has.',
+    'ONE undo step). Values are converted to the type the property already '
+    'has. A TEXT object also takes "auto_size": true, which refits its box '
+    'to the text after the other values so the label is not clipped.',
     {
         'type': 'object',
         'properties': {
@@ -117,12 +138,44 @@ def update_object(args):
     return update_object_properties(args.get('ref'), args['properties'])
 
 
+@tool(
+    'fit_object_size',
+    'Resize a TEXT object so its text fits: the text is drawn inside the '
+    'width/height box and everything longer is clipped, which a model cannot '
+    'see coming because it cannot measure a font. The box becomes the '
+    'rendered text size; "padding" adds a margin on every side. One undo '
+    'step. Call it after changing text / font_size, or pass "auto_size": '
+    'true to create_object / update_object.',
+    {
+        'type': 'object',
+        'properties': {
+            'ref': {'type': 'string', 'description':
+                    'Uuid, path or name of the TEXT object (default: the selection).'},
+            'padding': {'type': 'integer', 'minimum': 0, 'maximum': 200, 'default': 0,
+                        'description': 'Extra pixels added around the text.'},
+        },
+        'additionalProperties': False,
+    },
+    annotations={'title': 'Fit a text object to its text'},
+)
+def fit_object_size_tool(args):
+    obj = resolve_object(args.get('ref'))
+    return fit_object_size(manager(), obj, args.get('padding', 0))
+
+
 def update_object_properties(ref, properties, macro_name='Update Object'):
     """Shared implementation of update_object (also used by other tools)."""
+    from pygamestudio.game.object.type import OBJECT_TEXT
+
     manager_ = manager()
     obj = resolve_object(ref)
-    if not properties:
+    properties = dict(properties or {})
+    auto_size = bool(properties.pop('auto_size', False))
+    if not properties and not auto_size:
         raise ToolError('No properties given.')
+    if auto_size and getattr(obj, 'type', '') != OBJECT_TEXT:
+        raise ToolError('"auto_size" only applies to TEXT objects ("{}" is a {}).'.format(
+            obj.name, obj.type))
 
     unknown = [attr for attr in properties if not hasattr(obj, attr)]
     if unknown:
@@ -130,14 +183,31 @@ def update_object_properties(ref, properties, macro_name='Update Object'):
             obj.name, obj.type, 'y' if len(unknown) == 1 else 'ies',
             ', '.join(sorted(unknown)), ', '.join(sorted(_editable_names(obj)))))
 
-    begin_macro(manager_, macro_name)
+    # An EMPTY QUndoStack macro stays on the stack (Qt 6 does not drop it), so
+    # a call that changes nothing must not open one - Ctrl+Z would step past
+    # it doing nothing at all.
+    will_change = any(property_changes(obj, attr, value)
+                      for attr, value in properties.items())
+
+    changed = {}
+    if will_change:
+        begin_macro(manager_, macro_name)
     try:
-        changed = {}
-        for attr, value in properties.items():
-            if push_property(manager_, obj, attr, value):
-                changed[attr] = json_value(getattr(obj, attr))
+        if will_change:
+            for attr, value in properties.items():
+                if push_property(manager_, obj, attr, value):
+                    changed[attr] = json_value(getattr(obj, attr))
+        if auto_size:
+            # Refit AFTER the other values, so a new text / font size is what
+            # the box is measured against (explicit width/height lose). When
+            # it is the only change it owns its own undo step.
+            fitted = fit_object_size(manager_, obj)
+            if fitted['changed']:
+                changed['width'] = fitted['size'][0]
+                changed['height'] = fitted['size'][1]
     finally:
-        end_macro(manager_)
+        if will_change:
+            end_macro(manager_)
 
     return {
         'uuid': obj.uuid,
@@ -149,6 +219,32 @@ def update_object_properties(ref, properties, macro_name='Update Object'):
 
 def _editable_names(obj):
     return [name for name in vars(obj) if not name.startswith('_')]
+
+
+def _patch_would_change(operations):
+    """Conservative peek: False only when every operation is a no-op update.
+
+    Keeps apply_scene_patch from leaving an empty undo macro behind (Qt 6
+    keeps empty macros on the stack). Anything that cannot be judged here is
+    treated as a change, so the real run reports errors the same way as
+    before.
+    """
+    for operation in operations:
+        if operation.get('op') != 'update':
+            return True
+        properties = dict(operation.get('properties') or {})
+        if properties.pop('auto_size', False):
+            return True
+        if not properties:
+            continue
+        try:
+            obj = resolve_object(operation.get('ref'))
+            if any(property_changes(obj, attr, value)
+                   for attr, value in properties.items()):
+                return True
+        except Exception:  # noqa: BLE001 - let the real run report it
+            return True
+    return False
 
 
 @tool(
@@ -191,6 +287,9 @@ def apply_scene_patch(args):
         raise ToolError('No operations given.')
     if len(operations) > 200:
         raise ToolError('Too many operations in one call (max 200).')
+    if not _patch_would_change(operations):
+        return {'applied': 0, 'results': [],
+                'note': 'Nothing changed: the values are already the current ones.'}
 
     manager_ = manager()
     results = []

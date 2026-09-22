@@ -123,6 +123,15 @@ class ObjectPolygon(ObjectBase):
             dx = value[0] - self.x
             dy = value[1] - self.y
             super().__setattr__('points', [(point[0] + dx, point[1] + dy) for point in self.points])
+            # x/y/pos/size follow the vertices: publish them RIGHT AWAY. A
+            # pure move never rebuilds the surface (the scene view skips that
+            # to keep drags smooth) and the move gizmo computes every step
+            # from obj.x - a stale box made the polygon lag one step behind
+            # the cursor, so the drag stuttered and the gizmo detached.
+            self._update_bounding_box()
+        elif name == 'points':
+            super().__setattr__('points', value)
+            self._update_bounding_box()
         else:
             super().__setattr__(name, value)
 

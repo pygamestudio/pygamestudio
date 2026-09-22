@@ -164,6 +164,9 @@ def object_types(args):
             'body uses its own shape (physics_shape_type/size/offset/points, '
             'independent from the collision shape), and physics_type is static, '
             'dynamic or kinematic.',
+            'A TEXT object clips its text to width/height: after changing text or '
+            'font_size call fit_object_size, or pass "auto_size": true to '
+            'create_object / update_object, so labels are not cut off.',
         ],
     }
     if wanted:

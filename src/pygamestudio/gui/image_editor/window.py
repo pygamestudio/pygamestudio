@@ -572,11 +572,10 @@ class ImageEditorWindow(QWidget):
         super().keyPressEvent(event)
 
     def wheelEvent(self, event):
-        # Ctrl+wheel zooms anywhere over the panel, not only on the image.
-        if (event.modifiers() & Qt.KeyboardModifier.ControlModifier
-                and self._canvas.has_image()):
-            factor = 1.15 if event.angleDelta().y() > 0 else 1 / 1.15
-            self._canvas.set_zoom(self._canvas.zoom() * factor)
+        # The wheel zooms anywhere over the panel, not only on the image
+        # itself (Ctrl+wheel zooms too; Shift+wheel scrolls - see
+        # ImageCanvas.handle_wheel).
+        if self._canvas.handle_wheel(event):
             event.accept()
             return
         super().wheelEvent(event)
@@ -585,14 +584,14 @@ class ImageEditorWindow(QWidget):
         # Keep the empty-state hint centered when the viewport is resized.
         if event.type() == QEvent.Type.Resize and obj is self._scroll_area.viewport():
             self._position_empty_label()
-        # Also zoom with Ctrl+wheel while the pointer is over the gray area
-        # around the image inside the scroll area.
+        # The same wheel rule while the pointer is over the gray area around
+        # the image inside the scroll area (over the image itself the canvas'
+        # own wheelEvent handles it).
         if (event.type() == QEvent.Type.Wheel
                 and obj in (self._scroll_area, self._scroll_area.viewport())
-                and event.modifiers() & Qt.KeyboardModifier.ControlModifier
-                and self._canvas.has_image()):
-            factor = 1.15 if event.angleDelta().y() > 0 else 1 / 1.15
-            self._canvas.set_zoom(self._canvas.zoom() * factor)
+                and self._canvas.handle_wheel(event)):
+            # handle_wheel already zoomed / scrolled: swallow the event.
+            event.accept()
             return True
         return super().eventFilter(obj, event)
 

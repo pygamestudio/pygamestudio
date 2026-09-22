@@ -7,7 +7,7 @@ from collections import deque
 
 from PySide6.QtCore import QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import (QColor, QImage, QPainter, QPen, QPolygonF, QTransform)
-from PySide6.QtWidgets import QWidget
+from PySide6.QtWidgets import QAbstractScrollArea, QWidget
 
 
 # Tool identifiers.
@@ -435,13 +435,49 @@ class ImageCanvas(QWidget):
             self._shape_current = None
             self.update()
 
-    def wheelEvent(self, event):
+    def handle_wheel(self, event):
+        """Apply one wheel notch: zoom the image. True when consumed.
+
+        The WHEEL zooms (Ctrl+wheel zooms too - it used to be the other way
+        round); Shift+wheel scrolls the view instead, so a zoomed-in image
+        can still be panned. The tileset palette of the tile map editor and
+        the block canvas follow the same rule. The window forwards wheel
+        events that land on the panel AROUND the image to this method, so
+        the whole panel behaves the same wherever the cursor is.
+        """
         if self._image is None:
-            return
-        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
-            factor = 1.15 if event.angleDelta().y() > 0 else 1 / 1.15
-            self.set_zoom(self._zoom * factor)
+            return False
+        delta = event.angleDelta().y()
+        if not delta:
+            return False
+        if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+            scroll = self._parent_scroll_area()
+            if scroll is None:
+                return False
+            bar = scroll.verticalScrollBar()
+            if bar is None or bar.maximum() <= 0:
+                return False
+            step = bar.singleStep() * 3
+            bar.setValue(bar.value() - step if delta > 0 else bar.value() + step)
+            return True
+        factor = 1.15 if delta > 0 else 1 / 1.15
+        self.set_zoom(self._zoom * factor)
+        return True
+
+    def wheelEvent(self, event):
+        if self.handle_wheel(event):
             event.accept()
+            return
+        super().wheelEvent(event)
+
+    def _parent_scroll_area(self):
+        """The QScrollArea this canvas lives in (for Shift+wheel scrolling)."""
+        widget = self.parentWidget()
+        while widget is not None:
+            if isinstance(widget, QAbstractScrollArea):
+                return widget
+            widget = widget.parentWidget()
+        return None
 
     # ------------------------------------------------------------ drawing
     def _painter(self):

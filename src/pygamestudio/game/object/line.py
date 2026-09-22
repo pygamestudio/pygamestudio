@@ -144,15 +144,24 @@ class ObjectLine(ObjectBase):
             self.start_point = (new_start_x, new_start_y)
             self.end_point = (new_end_x, new_end_y)
 
+            # x/y/pos/size follow the endpoints: publish them RIGHT AWAY. A
+            # pure move never rebuilds the surface (the scene view skips that
+            # to keep drags smooth) and the move gizmo computes every step
+            # from obj.x - a stale box made the line lag one step behind the
+            # cursor, so the drag stuttered and the gizmo detached.
+            self._update_bounding_box()
+
         elif name == 'start_point':
             super().__setattr__('start_x', value[0])
             super().__setattr__('start_y', value[1])
             super().__setattr__('start_point', value)
+            self._update_bounding_box()
 
         elif name == 'end_point':
             super().__setattr__('end_x', value[0])
             super().__setattr__('end_y', value[1])
             super().__setattr__('end_point', value)
+            self._update_bounding_box()
 
         else:
             super().__setattr__(name, value)
