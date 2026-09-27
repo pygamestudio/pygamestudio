@@ -45,11 +45,10 @@ class GridGraphicsView(QGraphicsView):
         self.setRenderHint(QPainter.RenderHint.Antialiasing|QPainter.RenderHint.TextAntialiasing|QPainter.RenderHint.SmoothPixmapTransform)
 
     def _set_signal(self):
+        # Ctrl+R is a global editor shortcut (Editor.keyPressEvent) so it works
+        # from every panel - no local shortcut here.
         self._run_project_btn.clicked.connect(self._game_manager.run_project)
         self._refresh_btn.refresh_requested.connect(self._refresh_scene)
-        self._run_shortcut = QShortcut(QKeySequence('Ctrl+R'), self)
-        self._run_shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
-        self._run_shortcut.activated.connect(self._game_manager.run_project)
 
     def _set_layout(self):
         v_layout = QVBoxLayout(self)

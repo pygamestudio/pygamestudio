@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from PySide6.QtGui import *
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
@@ -5,9 +7,26 @@ from pygamestudio.gui.asset.type import *
 
 
 class AssetFileSystemModel(QFileSystemModel):
+    #: A rename through the inline editor (old absolute path, new absolute path).
+    file_renamed_signal = Signal(str, str)
+
     def __init__(self, parent):
         super().__init__()
         self._tree_view = parent
+
+    def setData(self, index, value, role=Qt.ItemDataRole.EditRole):
+        """Detect a rename through the inline editor and report the paths.
+
+        The tree re-emits this as file_moved_signal so the code / block
+        editor can follow the file to its new name instead of keeping a
+        stale path.
+        """
+        old_path = self.filePath(index) if role == Qt.ItemDataRole.EditRole else ''
+        renamed = super().setData(index, value, role)
+        new_name = str(value).strip()
+        if renamed and old_path and new_name and new_name != Path(old_path).name:
+            self.file_renamed_signal.emit(old_path, str(Path(old_path).parent / new_name))
+        return renamed
 
     def hasChildren(self, parent):
         file_info = self.fileInfo(parent)

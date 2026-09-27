@@ -10,6 +10,10 @@ browser tab). The installed engine is not touched.
 
 This module is only used by the Web build; the desktop build keeps using the
 project's own main.py.
+
+When the project uses physics, ``main()`` first loads the pymunk wheel the
+build placed next to the page (or, without that wheel, installs the package
+from PyPI), so the browser can simulate falling, colliding objects.
 """
 
 import asyncio
@@ -69,6 +73,54 @@ def _find_game_class(project_main):
         'main.py 中没有定义游戏类（studio.Game 的子类）。')
 
 
+def _notify_page(hook_name, *args):
+    """Call a hook the page installed (no-op outside the browser)."""
+    try:
+        import js
+
+        callback = getattr(js, hook_name, None)
+        if callback is not None:
+            callback(*args)
+    except Exception:
+        pass
+
+
+async def _prepare_physics(install_source):
+    """Make pymunk available when the project uses physics ('' = skip).
+
+    The build ships the Pyodide wheel of pymunk next to index.html and it is
+    loaded straight through ``loadPackage`` - no package manager involved -
+    with its only dependency (cffi) loaded from the Pyodide distribution
+    first. Without that wheel the fallback installs the package from PyPI
+    through micropip, which is part of the distribution but has to be loaded
+    before it can be used.
+    """
+    if not install_source:
+        return
+    try:
+        import pyodide_js
+
+        await pyodide_js.loadPackage('cffi')
+
+        if install_source.endswith('.whl'):
+            if '://' not in install_source:
+                from js import URL, location
+                install_source = URL.new(install_source, location.href).href
+            await pyodide_js.loadPackage(install_source)
+            return
+
+        # No shipped wheel: the plain package name is fetched from PyPI.
+        await pyodide_js.loadPackage('micropip')
+
+        import micropip
+
+        await micropip.install(install_source)
+    except Exception as error:
+        # The game still starts: the engine imports pymunk lazily and simply
+        # skips the simulation when that import fails.
+        print('[pygamestudio] physics support could not be installed: {}'.format(error), file=sys.stderr)
+
+
 async def main():
     """Import the project's main.py and run its Game loop until it quits."""
     os.environ['PROJECT_PATH'] = PROJECT_ROOT
@@ -77,8 +129,14 @@ async def main():
     if PROJECT_ROOT not in sys.path:
         sys.path.insert(0, PROJECT_ROOT)
 
+    await _prepare_physics('__PYGS_PYMUNK_SOURCE__')
+    _notify_page('__pygsProgress', 97)
+
     project_main = _load_project_main()
     game = _find_game_class(project_main)()
+    # The page keeps its loading bar up to this point: from here on the game
+    # loop itself is running.
+    _notify_page('__pygsGameStarted')
     await game.run_async()
 
 

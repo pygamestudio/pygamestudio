@@ -126,6 +126,19 @@ class WindowTitleBase(QWidget):
         return super().enterEvent(event)
     
 
+def editor_run_handler(widget):
+    """The run entry point of the editor window `widget` is docked in.
+
+    Detached panels float in top-level windows of their own, so the editor
+    window never sees their key events; their ``detach()`` reads this handler
+    and installs it on the standalone window (see ``WindowBase.keyPressEvent``)
+    so Ctrl+R keeps working there. Returns None for widgets that are not
+    docked in an editor window.
+    """
+    body = getattr(widget.window(), '_editor_body', None)
+    return getattr(body, 'run_project', None)
+
+
 class WindowBase(QWidget):
     def __init__(self):
         super().__init__()
@@ -139,6 +152,10 @@ class WindowBase(QWidget):
         self._stretch_area_offset = 10
         self._start_geometry = None
         self._start_global_pos = None
+        #: Run entry point called when Ctrl+R is pressed while this window
+        #: floats a detached panel (installed by the panel's detach()); None
+        #: for every other window, the main editor included.
+        self._editor_run_handler = None
 
         self.__setup()
 
@@ -177,6 +194,26 @@ class WindowBase(QWidget):
     def set_window_body(self, window_body):
         self.window_body = window_body
         self.__set_layout()
+
+    def set_editor_run_handler(self, handler):
+        """Install the editor's run entry point for the panel floating here."""
+        self._editor_run_handler = handler
+
+    def keyPressEvent(self, event):
+        """Forward the editor-global run shortcut of a detached panel.
+
+        A detached panel floats in a top-level window of its own, so the
+        editor window's key handler never sees its key events - Ctrl+R is
+        handed over to the editor explicitly instead (the handler its
+        detach() installed on this window).
+        """
+        if (self._editor_run_handler is not None
+                and event.modifiers() == Qt.KeyboardModifier.ControlModifier
+                and event.key() == Qt.Key.Key_R):
+            self._editor_run_handler()
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
     def _move(self, dis_x, dis_y):
         self.move(self.x() + dis_x, self.y() + dis_y)
@@ -465,12 +502,16 @@ class DetachablePanel:
         """Undock the panel into its own frameless top-level window."""
         if self._detached or self._tab_widget is None:
             return
+        # Read the run entry point while the panel is still docked: the
+        # floating window forwards Ctrl+R to it (WindowBase.keyPressEvent).
+        run_handler = editor_run_handler(self)
         index = self._tab_widget.indexOf(self)
         if index >= 0:
             self._tab_widget.removeTab(index)
         self.setParent(None)
         self._standalone_window = PanelStandaloneWindow(
             self, self._window_title(), self.standalone_window_size())
+        self._standalone_window.set_editor_run_handler(run_handler)
         self.show()
         self._standalone_window.show()
         self._detached = True

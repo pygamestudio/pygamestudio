@@ -27,13 +27,16 @@ import json
 import re
 from pathlib import Path
 
-from pygamestudio.gui.block_editor.generator import generate_workspace, generated_callbacks
+from pygamestudio.gui.block_editor.generator import generate_workspace, generated_callbacks, value_code
 from pygamestudio.gui.block_editor.model import (WORKSPACE_VERSION, new_workspace,
-                                                 normalize_workspace)
+                                                 normalize_workspace, variable_name_error,
+                                                 variable_type)
 
 BLOCKS_MARKER = '# === pygs-blocks:'
 GENERATED_START = '# === pygs-generated ==='
 GENERATED_END = '# === /pygs-generated ==='
+VARIABLES_START = '# === pygs-vars ==='
+VARIABLES_END = '# === /pygs-vars ==='
 
 DEFAULT_HEAD = '''import pygamestudio as studio
 
@@ -89,7 +92,9 @@ def create_script(path, workspace=None):
     workspace = workspace if workspace is not None else new_workspace()
     file_path = Path(path)
     file_path.parent.mkdir(parents=True, exist_ok=True)
-    file_path.write_text(compose(workspace, DEFAULT_HEAD, DEFAULT_TAIL), encoding='utf-8')
+    file_path.write_text(_sync_variables(compose(workspace, DEFAULT_HEAD, DEFAULT_TAIL),
+                                         workspace.get('variables') or []),
+                         encoding='utf-8')
     return file_path
 
 
@@ -187,7 +192,7 @@ def save_workspace(path, workspace):
         create_script(file_path, workspace)
         return file_path
     if not is_block_script(file_path):
-        if not workspace.get('stacks'):
+        if not workspace.get('stacks') and not workspace.get('variables'):
             # nothing to record: never inject markers into an untouched script
             return file_path
         if not ensure_block_script(file_path, workspace)[0]:
@@ -200,10 +205,17 @@ def save_workspace(path, workspace):
     hand_written.update(_hand_written_definitions(tail))
     empty = [name for name in callbacks if hand_written.get(name)]
     by_hand = [name for name in callbacks if name in hand_written and not hand_written[name]]
+    skip = list(by_hand)
+    if '__init__' in hand_written:
+        # the file defines its own __init__: the variables are injected into
+        # it (see _sync_variables) instead of getting a generated one
+        skip.append('__init__')
     head = _disable_duplicate_definitions(head, empty)
     tail = _disable_duplicate_definitions(tail, empty)
     file_path = Path(path)
-    file_path.write_text(compose(workspace, head, tail, skip=by_hand), encoding='utf-8')
+    text = compose(workspace, head, tail, skip=skip)
+    text = _sync_variables(text, workspace.get('variables') or [])
+    file_path.write_text(text, encoding='utf-8')
     return file_path
 
 
@@ -330,3 +342,100 @@ def compose(workspace, head, tail, skip=()):
         parts.append('\n')
     parts.append(tail)
     return ''.join(parts)
+
+
+# ---------------------------------------------------------------- variables
+
+def _sync_variables(text, variables):
+    """Write the ``self.<name> = <value>`` lines of the workspace's variables.
+
+    The lines live between ``# === pygs-vars ===`` markers at the end of the
+    ``__init__`` the script actually uses and are rewritten on every save, so
+    adding / renaming / removing a variable updates the script and nothing
+    else. A hand-written ``__init__`` keeps its own code - the variable lines
+    are only added to it (or taken out of it again). When the file has no
+    ``__init__`` at all, the generated region already provides one (see
+    ``generator._emit_variables``) and nothing is injected here.
+    """
+    lines = _remove_variables_region(text.splitlines(keepends=True))
+    if not variables:
+        return ''.join(lines)
+    location = _init_location(lines)
+    if location is None:
+        return ''.join(lines)
+    index, indent = location
+    block = []
+    for variable in variables:
+        name = str(variable.get('name') or '').strip() if isinstance(variable, dict) else ''
+        if not name or variable_name_error(name):
+            continue
+        block.append('{}{}\n'.format(indent, 'self.{} = {}'.format(
+            name, value_code(variable.get('value'), variable_type(variable)))))
+    if not block:
+        return ''.join(lines)
+    block.insert(0, '{}{}\n'.format(indent, VARIABLES_START))
+    block.append('{}{}\n'.format(indent, VARIABLES_END))
+    if index > 0 and not lines[index - 1].endswith('\n'):
+        lines[index - 1] += '\n'
+    lines[index:index] = block
+    return ''.join(lines)
+
+
+def _remove_variables_region(lines):
+    """Drop the managed variable lines (markers included) from the text."""
+    start = next((index for index, line in enumerate(lines) if VARIABLES_START in line), None)
+    if start is None:
+        return lines
+    end = next((index for index in range(start + 1, len(lines)) if VARIABLES_END in lines[index]),
+               len(lines) - 1)
+    del lines[start:end + 1]
+    return lines
+
+
+def _init_location(lines):
+    """(insert index, indent) for the variable lines, or None.
+
+    Finds the ``__init__`` the script really uses (the last class-level one -
+    Python keeps the last definition). Returns None when it already lives in
+    the generated region: there the generator owns the variables itself.
+    """
+    start_line = next((index + 1 for index, line in enumerate(lines) if GENERATED_START in line),
+                      None)
+    end_line = next((index + 1 for index, line in enumerate(lines) if GENERATED_END in line), None)
+    text = ''.join(lines)
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        tree = None
+    if tree is None:
+        # a file that does not parse (yet) still gets its variables: locate
+        # the def textually, there is nothing to analyze
+        pattern = re.compile(r'^([ \t]*)def[ \t]+__init__[ \t]*\(')
+        matches = [index for index, line in enumerate(lines) if pattern.match(line)]
+        if not matches:
+            return None
+        index = max(matches)
+        return index + 1, pattern.match(lines[index]).group(1) + '    '
+    found = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef):
+            for child in node.body:
+                if isinstance(child, ast.FunctionDef) and child.name == '__init__':
+                    found.append(child)
+    if not found:
+        return None
+    node = max(found, key=lambda item: item.lineno)
+    if start_line is not None and start_line < node.lineno \
+            and (end_line is None or node.lineno < end_line):
+        return None
+    first_body_line = node.body[0].lineno if node.body else node.lineno
+    if first_body_line > node.lineno:
+        indent = _line_indent(lines[first_body_line - 1])
+    else:
+        indent = _line_indent(lines[node.lineno - 1]) + '    '
+    return node.end_lineno, indent
+
+
+def _line_indent(line):
+    """The leading whitespace of a line."""
+    return re.match(r'[ \t]*', line).group(0)

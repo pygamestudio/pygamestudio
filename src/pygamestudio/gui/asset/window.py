@@ -12,6 +12,9 @@ class AssetWindow(DetachablePanel, QWidget):
     image_edit_signal = Signal(str)
     audio_play_signal = Signal(str)
     block_edit_signal = Signal(str)
+    scene_open_signal = Signal(str)
+    files_deleted_signal = Signal(list)
+    file_moved_signal = Signal(str, str)
 
     def __init__(self, parent=None, game_manager=None):
         super().__init__(parent)
@@ -39,6 +42,9 @@ class AssetWindow(DetachablePanel, QWidget):
         self._asset_tree_view.image_edit_signal.connect(self.image_edit_signal.emit)
         self._asset_tree_view.audio_play_signal.connect(self.audio_play_signal.emit)
         self._asset_tree_view.block_edit_signal.connect(self.block_edit_signal.emit)
+        self._asset_tree_view.scene_open_signal.connect(self.scene_open_signal.emit)
+        self._asset_tree_view.files_deleted_signal.connect(self.files_deleted_signal.emit)
+        self._asset_tree_view.file_moved_signal.connect(self.file_moved_signal.emit)
 
     def _set_layout(self):
         h_layout = QHBoxLayout()
@@ -67,6 +73,10 @@ class AssetWindow(DetachablePanel, QWidget):
 
     def get_ready_for_project(self):
         self._asset_tree_view.get_ready_for_project()
+
+    def set_last_script_editor(self, editor):
+        """Remember the script editor double clicks use (see AssetTreeView)."""
+        self._asset_tree_view.set_last_script_editor(editor)
 
     def clean_up(self):
         self.redock()

@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt, Signal
@@ -6,8 +7,9 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWi
 
 from pygamestudio.gui.code_editor.editor import CodeEditor
 from pygamestudio.gui.scene.widget import RunProjectButton
-from pygamestudio.gui.base.window import DetachButton, WindowBase
+from pygamestudio.gui.base.window import DetachButton, WindowBase, editor_run_handler
 from pygamestudio.common.i18n.translator import Translator as T
+from pygamestudio.common.utils.path import followed_path
 
 
 class CodeEditorWindow(QWidget):
@@ -147,6 +149,42 @@ class CodeEditorWindow(QWidget):
         if self._editor.reload_file(file_path):
             self._update_titles()
 
+    def handle_deleted_files(self, paths):
+        """Clear the editor when its file was deleted on disk.
+
+        ``paths`` are the files/folders deleted in the asset panel (or via
+        the MCP delete_file tool); a file below a deleted folder counts as
+        deleted too. Clearing also forgets the path, so the editor can no
+        longer auto-save the deleted file back to disk.
+        """
+        file_path = self._editor.current_file_path()
+        if file_path is None:
+            return
+        current = os.path.normcase(str(file_path))
+        for path in paths:
+            root = os.path.normcase(str(Path(path)))
+            if current == root or current.startswith(root + os.sep):
+                self._editor.clear_file()
+                self._update_titles()
+                return
+
+    def handle_moved_files(self, old_path, new_path):
+        """Follow a file that was renamed / moved on disk.
+
+        ``old_path`` -> ``new_path`` comes from the asset panel (rename,
+        cut/paste, drag & drop) or the MCP move_file tool. When the editor
+        shows the moved file - or a file below a moved folder - it keeps its
+        content (and undo history) and switches to the new path.
+        """
+        file_path = self._editor.current_file_path()
+        if file_path is None:
+            return
+        followed = followed_path(file_path, old_path, new_path)
+        if followed is None:
+            return
+        self._editor.retarget_file(followed)
+        self._update_titles()
+
     # ------------------------------------------------------------------ run
     def _run_project(self):
         if self._editor.is_modified():
@@ -174,9 +212,13 @@ class CodeEditorWindow(QWidget):
         """
         if self._is_detached or self._tab_widget is None:
             return
+        # Read the run entry point while the editor is still docked: the
+        # floating window forwards Ctrl+R to it (WindowBase.keyPressEvent).
+        run_handler = editor_run_handler(self)
         self._tab_widget.removeTab(self._tab_widget.indexOf(self))
         self.setParent(None)
         self._standalone_window = _CodeEditorStandaloneWindow(self, self._window_title())
+        self._standalone_window.set_editor_run_handler(run_handler)
         # removeTab() hides the page, so re-show it now that it lives in the
         # standalone window, otherwise the editor would stay invisible.
         self.show()
@@ -210,6 +252,21 @@ class CodeEditorWindow(QWidget):
 
     def is_detached(self):
         return self._is_detached
+
+    def is_floating_active(self):
+        """True while this editor floats in its own window and that window
+        is the active one (the user is working in the floating editor)."""
+        return (self._is_detached
+                and self._standalone_window is not None
+                and self._standalone_window.isActiveWindow())
+
+    def is_active(self):
+        """True while this editor is the one the user is working in: the
+        current tab, or its floating window being the active one."""
+        if self._is_detached:
+            return self.is_floating_active()
+        return (self._tab_widget is not None
+                and self._tab_widget.currentWidget() is self)
 
     # ------------------------------------------------------------------ titles / i18n
     def _update_detach_button(self):

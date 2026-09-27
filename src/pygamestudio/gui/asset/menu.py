@@ -3,7 +3,6 @@ from PySide6.QtGui import QAction
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QMenu
 from pygamestudio.gui.asset.type import *
-from pygamestudio.gui.block_editor.storage import is_block_script
 from pygamestudio.common.i18n.translator import Translator as T
 
 
@@ -120,18 +119,21 @@ class ContextMenu(QMenu):
 
         # Right click on the specific file index.
         if index_type == INDEX_FILE:
-            self.insertAction(add_menu.menuAction(), open_action)
-            # A script can be edited with blocks or as plain code: offer the
-            # other editor than the one a double click would use.
-            if file_path and Path(file_path).suffix.lower() == '.py':
-                if is_block_script(file_path):
-                    self.insertAction(add_menu.menuAction(), open_in_code_editor_action)
-                else:
+            is_script = bool(file_path) and Path(file_path).suffix.lower() == '.py'
+            is_main_script = self._is_project_main_script(file_path)
+            if is_script:
+                # A script is always opened in an editor, never with a plain
+                # "Open": custom scripts offer BOTH editors, the project's
+                # main.py only the code editor.
+                self.insertAction(add_menu.menuAction(), open_in_code_editor_action)
+                if not is_main_script:
                     self.insertAction(add_menu.menuAction(), open_in_block_editor_action)
-            # The run action only applies to the project's root main.py.
-            if self._is_project_main_script(file_path):
-                self.insertAction(open_action, run_action)
-                self.insertSeparator(open_action)
+                if is_main_script:
+                    # The run action only applies to the project's root main.py.
+                    self.insertAction(open_in_code_editor_action, run_action)
+                    self.insertSeparator(open_in_code_editor_action)
+            else:
+                self.insertAction(add_menu.menuAction(), open_action)
             self.insertSeparator(add_menu.menuAction())
             self.insertAction(show_in_explorer_action, open_externally_action)
         

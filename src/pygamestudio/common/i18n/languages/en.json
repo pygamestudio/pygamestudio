@@ -104,6 +104,10 @@
         "attach": "Attach to Tabs",
         "delete": "Delete Block",
         "duplicate": "Duplicate Block",
+        "copy": "Copy Block",
+        "paste": "Paste",
+        "detach": "Detach the blocks below",
+        "delete_stack": "Delete the whole stack",
         "nothing_here": "No block here",
         "edit_field": "Edit Field",
         "edit_field_value": "Value:",
@@ -126,7 +130,8 @@
             "event": "Events",
             "action": "Actions",
             "physics": "Physics",
-            "control": "Control"
+            "control": "Control",
+            "variable": "Variables"
         },
 
         "ev": {
@@ -196,7 +201,8 @@
 
         "ctl": {
             "if": "If",
-            "if_else": "If / else",
+            "elif": "else if",
+            "else": "else",
             "repeat": "Repeat (times)",
             "while": "While (repeat while true)",
             "repeat_until": "Repeat until",
@@ -204,8 +210,7 @@
             "while_key": "While key is held",
             "continue": "Skip to the next loop step",
             "break": "Break out of the loop",
-            "return": "Stop this event",
-            "else": "else"
+            "return": "Stop this event"
         },
 
         "prop": {
@@ -288,6 +293,32 @@
             "lt": "less than",
             "ge": "greater or equal",
             "le": "less or equal"
+        },
+
+        "var": {
+            "tab_hint": "Variables belong to the script: every variable is initialized in ObjectScript.__init__ (self.<name> = <value>) and appears in the property drop-downs of the blocks.",
+            "new": "New variable",
+            "edit": "Edit variable",
+            "delete": "Delete variable",
+            "title": "Variable",
+            "name_prompt": "Variable name:",
+            "value_prompt": "Initial value:",
+            "type_prompt": "Variable type:",
+            "type_number": "Number",
+            "type_text": "Text",
+            "type_bool": "Boolean (True / False)",
+            "delete_confirm": "Delete the variable \"{name}\"? Blocks that used it fall back to x.",
+            "err_identifier": "The name must be a valid Python name (letters, digits, underscores; cannot start with a digit or __).",
+            "err_reserved": "This name is reserved by the engine (obj, the event names like on_update, self).",
+            "err_duplicate": "A variable with this name already exists.",
+            "err_missing": "This variable no longer exists.",
+            "err_number": "The initial value must be a number."
+        },
+
+        "amount": {
+            "custom": "Custom number...",
+            "prompt": "Number:",
+            "invalid": "Please enter a number."
         }
     },
 
@@ -338,6 +369,7 @@
         "failed_to_save_before_run": "Failed to save scene before running: {}",
         "failed_to_run_project": "Failed to Run Project {}: {}",
         "run_project_finished": "Project {} exited with code {}",
+        "run_cancelled": "Run cancelled: the scene was not saved to a .scene file yet.",
         "run": "Run",
         "refresh": "Refresh"
     },
@@ -628,8 +660,6 @@
         "app_icon_placeholder": "Please choose the app icon (.png/.ico/.icns)",
         "output_dir": "Output Dir",
         "output_dir_placeholder": "Please choose the output dir",
-        "clean_cache": "Clean Cache",
-        "clean_cache_tooltip": "Clear the PyInstaller cache and temporary files before building",
         "build": "Build",
         "open_output_dir": "Open Output Dir",
         "run_game": "Run Game",
@@ -648,7 +678,8 @@
         "web_engine_source_missing": "Cannot find the engine file to copy: {}",
         "web_patch_failed": "The engine file {} no longer matches the web patch (#{}): the web build was stopped and the installed engine file was left unchanged",
         "web_template_missing": "The web build template is missing: {}",
-        "web_physics_unsupported": "The project uses physics, which a browser cannot run yet (pymunk is not part of Pyodide): those objects are not simulated in the web build",
+        "web_physics_bundled": "The project uses physics: pymunk ships next to the page and the browser runs the simulation",
+        "web_physics_pypi_fallback": "The project uses physics but the shipped pymunk wheel is missing from the engine resources ({}): the page will download pymunk from PyPI instead",
         "web_build_summary": "Bundled {} project file(s) and {} engine file(s)",
         "web_build_output": "Web build output: {}",
         "web_serve_hint": "Serve the folder over HTTP to play it, for example: python -m http.server 8000 --directory \"{}\"",

@@ -80,7 +80,7 @@ not exposed (with the reason). Tool names are the MCP tool names.
 
 | Capability | Editor entry point | MCP |
 | --- | --- | --- |
-| Run the project (saves the scene, starts `main.py`) | Project > Run | `run_project` |
+| Run the project (saves the scene — a scene with no file must be saved first — starts `main.py`) | Project > Run | `run_project` |
 | Stop running game processes | (editor keeps them alive until exit) | `stop_project` |
 | Runtime status (pids, console length) | Console | `get_runtime_status` |
 | Read the console (info/error/warning, search) | Console panel | `get_console_logs` |
@@ -100,9 +100,11 @@ not exposed (with the reason). Tool names are the MCP tool names.
 
 The Build window has two tabs: **Desktop App** (PyInstaller executable for the
 current operating system) and **Web App** (a folder with `index.html` +
-`game.zip` that plays the game in a browser through Pyodide and pygame-ce; the
-project code/assets are protected like in the desktop build, the result lands in
-`<output dir>/build/Web` and the installed engine is never modified).
+`game.zip` that plays the game in a browser through Pyodide and pygame-ce - a
+project that uses physics also gets pymunk's Pyodide wheel next to the page, so
+nothing is fetched from PyPI at runtime; the project code/assets are protected
+like in the desktop build, the result lands in `<output dir>/build/Web` and the
+installed engine is never modified).
 
 | Capability | Editor entry point | MCP |
 | --- | --- | --- |

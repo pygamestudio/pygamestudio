@@ -15,7 +15,7 @@ class RunProjectButton(QPushButton):
         self._set_object_name()
     
     def _set_widget(self):
-        self.setToolTip(T.tr('scene.run', 'Run'))
+        self.setToolTip(T.tr('scene.run', 'Run') + ' (Ctrl + R)')
         self.setIcon(QIcon(':/images/run.png'))
 
     def _set_signal(self):
@@ -25,7 +25,7 @@ class RunProjectButton(QPushButton):
         self.setObjectName('sceneRunProjectBtn')
     
     def retranslate(self):
-        self.setToolTip(T.tr('scene.run', 'Run'))
+        self.setToolTip(T.tr('scene.run', 'Run') + ' (Ctrl + R)')
 
 
 class RefreshButton(QPushButton):

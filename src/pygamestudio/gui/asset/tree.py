@@ -11,18 +11,25 @@ from pygamestudio.gui.asset.model import *
 from pygamestudio.gui.asset.menu import ContextMenu
 from pygamestudio.gui.asset.delegate import AssetTreeWidgetDelegate
 from pygamestudio.common.i18n.translator import Translator as T
-from pygamestudio.common.utils.config import get_project_config, update_project_config
+from pygamestudio.common.utils.config import (
+    get_editor_config, get_project_config, update_editor_config, update_project_config,
+)
 from pygamestudio.common.utils.system import send_to_trash
 from pygamestudio.common.utils.path import RES_PATH
 from pygamestudio.gui.audio_player.engine import AUDIO_FILE_EXTENSIONS
 from pygamestudio.gui.block_editor.storage import can_hold_blocks, is_block_script
 
 
-# File suffixes the built-in code editor can open as plain text.
+# File suffixes the built-in code editor can open as plain text. Scene files
+# are NOT part of this set: they open in the scene editor instead (the tree
+# emits scene_open_signal, see _open_file / _on_double_clicked).
 TEXT_FILE_EXTENSIONS = {
     '.py', '.txt', '.json', '.md', '.pygs', '.qss', '.qrc', '.cfg', '.ini',
-    '.toml', '.yaml', '.yml', '.log', '.html', '.css', '.js', '.ts', '.csv', '.xml', '.scene'
+    '.toml', '.yaml', '.yml', '.log', '.html', '.css', '.js', '.ts', '.csv', '.xml'
 }
+
+# Suffix of the scene files: opening one shows the visual scene editor.
+SCENE_FILE_EXTENSION = '.scene'
 
 # Raster image suffixes the built-in image editor can open.
 IMAGE_FILE_EXTENSIONS = {
@@ -36,6 +43,10 @@ class AssetTreeView(QTreeView):
     image_edit_signal = Signal(str)
     audio_play_signal = Signal(str)
     block_edit_signal = Signal(str)
+    scene_open_signal = Signal(str)
+    files_deleted_signal = Signal(list)
+    #: A file/folder was renamed or moved (old absolute path, new absolute path).
+    file_moved_signal = Signal(str, str)
 
     def __init__(self, parent=None, game_manager=None):
         super().__init__(parent)
@@ -91,6 +102,7 @@ class AssetTreeView(QTreeView):
     def _set_signal(self):
         self.selectionModel().selectionChanged.connect(self._clear_highlight_items)
         self.customContextMenuRequested.connect(self._show_context_menu)
+        self._file_model.file_renamed_signal.connect(self._on_file_renamed)
 
         self._context_menu.add_signal.connect(self._add)
         self._context_menu.cut_signal.connect(self._cut)
@@ -262,11 +274,19 @@ class AssetTreeView(QTreeView):
         if reply == QMessageBox.StandardButton.No:
             return
         
+        deleted_paths = []
         for index in indexes_to_delete:
             index_path = Path(self._file_model.filePath(self._proxy_model.mapToSource(index)))
             if index_path.exists():
+                deleted_paths.append(str(index_path))
                 # Move to the system recycle bin instead of deleting permanently.
                 send_to_trash(index_path)
+
+        if deleted_paths:
+            # The script editors clear themselves for any file below a deleted
+            # path - an open script must not survive in the code / block editor
+            # (a pending auto-save would write the deleted file back to disk).
+            self.files_deleted_signal.emit(deleted_paths)
 
     def _cut(self):
         selected_indexes = self.selectedIndexes()
@@ -337,6 +357,7 @@ class AssetTreeView(QTreeView):
             else:
                 shutil.move(source_path, target_path)
                 self._highlight_indexes_paths.append(target_path)
+                self.file_moved_signal.emit(str(source_path), str(target_path))
 
         if not repetitive_assets_paths:
             return
@@ -352,9 +373,15 @@ class AssetTreeView(QTreeView):
                 shutil.copytree(source_path, target_path, dirs_exist_ok=True) if source_path.is_dir() else shutil.copy2(source_path, target_path)
                 shutil.rmtree(source_path) if source_path.is_dir() else source_path.unlink()
                 self._highlight_indexes_paths.append(target_path)
+                self.file_moved_signal.emit(str(source_path), str(target_path))
 
     def _rename(self):
         self.edit(self.currentIndex())
+
+    def _on_file_renamed(self, old_path, new_path):
+        """A rename through the inline editor: the script editors follow the
+        file to its new path (they keep their content, no clearing)."""
+        self.file_moved_signal.emit(old_path, new_path)
 
     def _get_unique_path(self, name, parent_item_path):
         num = 0
@@ -453,15 +480,86 @@ class AssetTreeView(QTreeView):
     def _is_audio_file(path):
         return path.is_file() and path.suffix.lower() in AUDIO_FILE_EXTENSIONS
 
+    def _is_project_main_script(self, path):
+        """True only for the project root's main.py (always opened as code,
+        never with blocks)."""
+        project_path = self._game_manager.get_project_path() if self._game_manager else None
+        return (bool(project_path) and path.name.lower() == 'main.py'
+                and path.parent == Path(project_path))
+
+    def last_script_editor(self):
+        """'code' / 'block': the editor a double click opens scripts with.
+
+        Remembered in the editor config by every open action (double-click,
+        the context menu entries, the editors' toolbar switch buttons); ''
+        means nothing was remembered yet - the old default applies (block
+        scripts in the block editor, every other script in the code editor).
+        """
+        return get_editor_config().get('script_editor', '')
+
+    def set_last_script_editor(self, editor):
+        """Remember the editor a script was just opened with."""
+        if self.last_script_editor() == editor:
+            return
+        update_editor_config('script_editor', editor)
+
+    @staticmethod
+    def _can_hold_editor_blocks(path):
+        """True when the script may be edited with blocks (a block script
+        or an ObjectScript class the blocks section can be attached to)."""
+        return is_block_script(path) or can_hold_blocks(path)[0]
+
+    def _script_editor_for_double_click(self, path):
+        """The editor a double-click opens a custom script with.
+
+        Follows the editor the user last opened a script with; a remembered
+        block editor falls back to the code editor for scripts that cannot
+        hold blocks. Without a memory the previous default applies (block
+        scripts in the block editor, every other script in the code editor).
+        """
+        remembered = self.last_script_editor()
+        if remembered == 'block':
+            return 'block' if self._can_hold_editor_blocks(path) else 'code'
+        if remembered == 'code':
+            return 'code'
+        return 'block' if is_block_script(path) else 'code'
+
+    def _open_scene(self, scene_path):
+        """Open a scene file from the asset panel: it becomes the current
+        scene, and the editor body is asked to show the scene editor (scene
+        files are never shown in the code editor - the user wants to see the
+        scene itself, not its JSON).
+
+        Opening the scene that is already current simply selects its canvas.
+        The game manager asks to save a modified current scene first: when the
+        user cancels that prompt, the load does not happen and the signal stays
+        silent, so nothing in the editor switches.
+        """
+        if scene_path.as_posix() == self._current_scene_path():
+            self._game_manager.deselect_all()
+            self._game_manager.select(self._game_manager.canvas_object_uuid)
+        else:
+            self._game_manager.load_scene(scene_path.as_posix())
+            if scene_path.as_posix() != self._current_scene_path():
+                return
+        self.scene_open_signal.emit(str(scene_path))
+
+    def _current_scene_path(self):
+        """The current scene file path in a normalized comparison form."""
+        path = self._game_manager.current_scene_file_path
+        return Path(path).as_posix() if path else ''
+
     def _open_file(self):
-        """Open the selected file: block scripts in the block editor, other
-        text files in the built-in code editor, images in the built-in image
-        editor, audio in the built-in audio player, everything else with the
-        system's default application."""
+        """Open the selected file: a scene file in the scene editor, block
+        scripts in the block editor, other text files in the built-in code
+        editor, images in the built-in image editor, audio in the built-in
+        audio player, everything else with the system's default application."""
         target_path = self._get_selected_file_path()
         if not target_path:
             return
-        if self._is_text_file(target_path):
+        if target_path.suffix.lower() == SCENE_FILE_EXTENSION:
+            self._open_scene(target_path)
+        elif self._is_text_file(target_path):
             if target_path.suffix.lower() == '.py' and is_block_script(target_path):
                 self.block_edit_signal.emit(str(target_path))
             else:
@@ -475,10 +573,17 @@ class AssetTreeView(QTreeView):
 
     def _open_in_code_editor(self):
         """Open the selected file in the code editor (even when it is a
-        block script, so its generated code can be read or extended)."""
+        block script, so its generated code can be read or extended).
+
+        Opening a custom script this way is remembered for the double-click
+        behavior; main.py never changes the memory.
+        """
         target_path = self._get_selected_file_path()
-        if target_path:
-            self.edit_file_signal.emit(str(target_path))
+        if target_path is None:
+            return
+        if target_path.suffix.lower() == '.py' and not self._is_project_main_script(target_path):
+            self.set_last_script_editor('code')
+        self.edit_file_signal.emit(str(target_path))
 
     def _open_in_block_editor(self):
         """Open the selected script in the block editor.
@@ -494,7 +599,8 @@ class AssetTreeView(QTreeView):
         if target_path.suffix.lower() != '.py':
             self._open_file()
             return
-        if is_block_script(target_path) or can_hold_blocks(target_path)[0]:
+        if self._can_hold_editor_blocks(target_path):
+            self.set_last_script_editor('block')
             self.block_edit_signal.emit(str(target_path))
             return
         QMessageBox.warning(QApplication.activeWindow(),
@@ -504,19 +610,30 @@ class AssetTreeView(QTreeView):
         self.edit_file_signal.emit(str(target_path))
 
     def _on_double_clicked(self, index):
-        """Double-clicking a folder toggles expand/collapse, a block script
-        opens in the block editor, other text files in the code editor, an
-        image opens in the built-in image editor, audio plays in the built-in
-        audio player, and any other file opens with the system's default
-        application."""
+        """Double-clicking a folder toggles expand/collapse, a scene file
+        loads in the scene editor, a custom script opens in the script editor
+        the user last used (see _script_editor_for_double_click), other text
+        files in the code editor, an image opens in the built-in image
+        editor, audio plays in the built-in audio player, and any other
+        file opens with the system's default application."""
         target_path = Path(self._file_model.filePath(self._proxy_model.mapToSource(index)))
         if target_path.is_dir():
             # Let the tree's default behavior expand/collapse the folder.
             return
-        if self._is_text_file(target_path):
-            if target_path.suffix.lower() == '.py' and is_block_script(target_path):
-                self.block_edit_signal.emit(str(target_path))
+        if target_path.suffix.lower() == SCENE_FILE_EXTENSION:
+            self._open_scene(target_path)
+        elif self._is_text_file(target_path):
+            if target_path.suffix.lower() == '.py' and not self._is_project_main_script(target_path):
+                # Custom scripts open in the editor the user last used for
+                # scripts; that choice is remembered for the next double click.
+                editor = self._script_editor_for_double_click(target_path)
+                self.set_last_script_editor(editor)
+                if editor == 'block':
+                    self.block_edit_signal.emit(str(target_path))
+                else:
+                    self.edit_file_signal.emit(str(target_path))
             else:
+                # main.py (and every other text file) always opens as code.
                 self.edit_file_signal.emit(str(target_path))
         elif self._is_image_file(target_path):
             self.image_edit_signal.emit(str(target_path))
@@ -557,6 +674,7 @@ class AssetTreeView(QTreeView):
             else:
                 if is_internal_drag:
                     shutil.move(source_path, target_path)
+                    self.file_moved_signal.emit(str(source_path), str(target_path))
                 else:
                     shutil.copytree(source_path, target_path, dirs_exist_ok=True) if source_path.is_dir() else shutil.copy2(source_path, target_path)
 
@@ -574,6 +692,7 @@ class AssetTreeView(QTreeView):
                 shutil.copytree(source_path, target_path, dirs_exist_ok=True) if source_path.is_dir() else shutil.copy2(source_path, target_path)
                 if is_internal_drag:
                     shutil.rmtree(source_path) if source_path.is_dir() else source_path.unlink()
+                    self.file_moved_signal.emit(str(source_path), str(target_path))
 
     def _save_expand_state(self):
         def _save(parent_path):
@@ -682,23 +801,6 @@ class AssetTreeView(QTreeView):
         index = self.indexAt(event.pos())
         if not index.isValid():
             self._clear_highlight_items()
-
-    def mouseDoubleClickEvent(self, event):
-        super().mouseDoubleClickEvent(event)
-        index = self.indexAt(event.pos())
-        if not index.isValid():
-            return
-        
-        index_path = Path(self._file_model.filePath(self._proxy_model.mapToSource(index)))
-        if index_path.suffix == '.scene':
-            # Load the same scene.
-            if index_path.as_posix() == self._game_manager.current_scene_file_path:
-                self._game_manager.deselect_all()
-                self._game_manager.select(self._game_manager.canvas_object_uuid)
-                return
-            
-            # Load a different scene.
-            self._game_manager.load_scene(index_path.as_posix())
 
     def dragEnterEvent(self, event):
         if event.source() != None and event.source() != self:

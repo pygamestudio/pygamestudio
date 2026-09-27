@@ -3,16 +3,19 @@ The block editor panel: palette + canvas, docked as a center tab (between the
 code editor and the image editor) or detached into its own window.
 """
 
+import os
 from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import (QHBoxLayout, QLabel, QPushButton, QSplitter, QVBoxLayout,
-                               QWidget)
+from PySide6.QtWidgets import (QHBoxLayout, QInputDialog, QLabel, QMessageBox, QPushButton,
+                               QSplitter, QVBoxLayout, QWidget)
 
 from pygamestudio.common.i18n.translator import Translator as T
-from pygamestudio.gui.base.window import DetachButton, WindowBase
+from pygamestudio.common.utils.path import followed_path
+from pygamestudio.gui.base.window import DetachButton, WindowBase, editor_run_handler
 from pygamestudio.gui.block_editor.canvas import BlockCanvas
+from pygamestudio.gui.block_editor.model import variable_type
 from pygamestudio.gui.block_editor.palette import BlockPalette
 from pygamestudio.gui.scene.widget import RunProjectButton
 
@@ -70,6 +73,10 @@ class BlockEditorWindow(QWidget):
 
     def _set_signal(self):
         self._palette.add_requested.connect(self._canvas.add_block)
+        self._palette.variable_new_requested.connect(self._on_variable_new)
+        self._palette.variable_edit_requested.connect(self._on_variable_edit)
+        self._palette.variable_delete_requested.connect(self._on_variable_delete)
+        self._canvas.variables_changed.connect(self._sync_variables)
         self._canvas.script_saved.connect(self._on_script_saved)
         self._canvas.modified_changed.connect(lambda _modified: self._update_titles())
         self._undo_btn.clicked.connect(self._canvas.undo)
@@ -79,6 +86,7 @@ class BlockEditorWindow(QWidget):
         self._detach_btn.clicked.connect(self.toggle_detached)
         self._run_btn.clicked.connect(self._run_project)
         self._code_btn.clicked.connect(self._request_switch_to_code)
+        self._sync_variables()
         self.retranslate()
 
     def _set_layout(self):
@@ -161,6 +169,142 @@ class BlockEditorWindow(QWidget):
         self._update_titles()
         self.script_saved.emit(path)
 
+    def handle_deleted_files(self, paths):
+        """Clear the canvas when its script was deleted on disk.
+
+        ``paths`` are the files/folders deleted in the asset panel (or via
+        the MCP delete_file tool); a file below a deleted folder counts as
+        deleted too. Clearing also forgets the path, so the debounced
+        auto-save can no longer write the deleted script back to disk.
+        """
+        file_path = self._canvas.file_path()
+        if file_path is None:
+            return
+        current = os.path.normcase(str(file_path))
+        for path in paths:
+            root = os.path.normcase(str(Path(path)))
+            if current == root or current.startswith(root + os.sep):
+                self._canvas.clear_file()
+                self._update_titles()
+                return
+
+    def handle_moved_files(self, old_path, new_path):
+        """Follow a script that was renamed / moved on disk.
+
+        ``old_path`` -> ``new_path`` comes from the asset panel (rename,
+        cut/paste, drag & drop) or the MCP move_file tool. When the canvas
+        shows the moved script - or a script below a moved folder - it keeps
+        its workspace and switches to the new path (the debounced auto-save
+        then lands in the right place).
+        """
+        file_path = self._canvas.file_path()
+        if file_path is None:
+            return
+        followed = followed_path(file_path, old_path, new_path)
+        if followed is None:
+            return
+        self._canvas.retarget_file(followed)
+        self._update_titles()
+
+    # ------------------------------------------------------------------ variables
+    def _sync_variables(self):
+        """Mirror the variables of the opened script into the palette tab."""
+        self._palette.set_variables(self._canvas.variables())
+
+    def _on_variable_new(self):
+        entry = self._ask_variable()
+        if entry is not None:
+            self._show_variable_error(self._canvas.add_variable(*entry)[1])
+
+    def _on_variable_edit(self, variable_id):
+        variable = next((item for item in self._canvas.variables()
+                         if str(item.get('id')) == str(variable_id)), None)
+        if variable is None:
+            return
+        entry = self._ask_variable(variable)
+        if entry is not None:
+            self._show_variable_error(self._canvas.update_variable(variable_id, *entry)[1])
+
+    def _on_variable_delete(self, variable_id):
+        variable = next((item for item in self._canvas.variables()
+                         if str(item.get('id')) == str(variable_id)), None)
+        if variable is None:
+            return
+        answer = QMessageBox.question(
+            self, T.tr('block.var.title', 'Variable'),
+            T.tr('block.var.delete_confirm', 'Delete the variable "{name}"?')
+            .format(name=variable.get('name', '')))
+        if answer == QMessageBox.StandardButton.Yes:
+            self._canvas.remove_variable(variable_id)
+
+    def _ask_variable(self, variable=None):
+        """Ask for name (validated right away), type and initial value.
+
+        Returns (name, value, type) or None when the user cancels. The name is
+        checked as soon as the first dialog is accepted, so a bad name is
+        reported before the type / value are ever asked for.
+        """
+        title = T.tr('block.var.title', 'Variable')
+        current_name = str(variable.get('name', '')) if variable else ''
+        current_value = str(variable.get('value', '0')) if variable else '0'
+        current_type = variable_type(variable) if variable else 'number'
+        while True:
+            name, accepted = QInputDialog.getText(
+                self, title, T.tr('block.var.name_prompt', 'Variable name:'),
+                text=current_name)
+            if not accepted:
+                return None
+            name = str(name).strip()
+            error = self._canvas.check_variable_name(name, (variable or {}).get('id'))
+            if not error:
+                break
+            QMessageBox.warning(self, title, T.tr(error, error))
+            current_name = name
+        type_choices = [(T.tr('block.var.type_number', 'Number'), 'number'),
+                        (T.tr('block.var.type_text', 'Text'), 'text'),
+                        (T.tr('block.var.type_bool', 'Boolean (True / False)'), 'bool')]
+        labels = [text for text, _key in type_choices]
+        keys = {text: key for text, key in type_choices}
+        label, accepted = QInputDialog.getItem(
+            self, title, T.tr('block.var.type_prompt', 'Variable type:'), labels,
+            [key for _text, key in type_choices].index(current_type), False)
+        if not accepted or str(label) not in keys:
+            return None
+        value_type = keys[str(label)]
+        value = self._ask_variable_value(title, value_type, current_value)
+        if value is None:
+            return None
+        return name, value, value_type
+
+    def _ask_variable_value(self, title, value_type, current_value):
+        """The initial value: booleans are picked, numbers are validated."""
+        prompt = T.tr('block.var.value_prompt', 'Initial value:')
+        if value_type == 'bool':
+            options = ['True', 'False']
+            index = 1 if str(current_value) in ('False', '0', '') else 0
+            chosen, accepted = QInputDialog.getItem(self, title, prompt, options, index, False)
+            return str(chosen) if accepted else None
+        current = str(current_value)
+        while True:
+            text, accepted = QInputDialog.getText(self, title, prompt, text=current)
+            if not accepted:
+                return None
+            text = str(text).strip()
+            if value_type != 'number':
+                return text
+            try:
+                float(text)
+            except ValueError:
+                QMessageBox.warning(self, title, T.tr(
+                    'block.var.err_number', 'The initial value must be a number.'))
+                current = text
+                continue
+            return text
+
+    def _show_variable_error(self, error):
+        if error:
+            QMessageBox.warning(self, T.tr('block.var.title', 'Variable'), T.tr(error, error))
+
     # ------------------------------------------------------------------ detach / attach
     def set_tab_widget(self, tab_widget):
         """The center-top QTabWidget this panel is docked into."""
@@ -176,9 +320,13 @@ class BlockEditorWindow(QWidget):
         """Undock the editor into a standalone frameless window."""
         if self._is_detached or self._tab_widget is None:
             return
+        # Read the run entry point while the editor is still docked: the
+        # floating window forwards Ctrl+R to it (WindowBase.keyPressEvent).
+        run_handler = editor_run_handler(self)
         self._tab_widget.removeTab(self._tab_widget.indexOf(self))
         self.setParent(None)
         self._standalone_window = _BlockEditorStandaloneWindow(self, self._window_title())
+        self._standalone_window.set_editor_run_handler(run_handler)
         self.show()
         self._standalone_window.show()
         self._is_detached = True
@@ -210,6 +358,21 @@ class BlockEditorWindow(QWidget):
 
     def is_detached(self):
         return self._is_detached
+
+    def is_floating_active(self):
+        """True while this editor floats in its own window and that window
+        is the active one (the user is working in the floating editor)."""
+        return (self._is_detached
+                and self._standalone_window is not None
+                and self._standalone_window.isActiveWindow())
+
+    def is_active(self):
+        """True while this editor is the one the user is working in: the
+        current tab, or its floating window being the active one."""
+        if self._is_detached:
+            return self.is_floating_active()
+        return (self._tab_widget is not None
+                and self._tab_widget.currentWidget() is self)
 
     # ------------------------------------------------------------------ titles / i18n
     def _file_title(self):

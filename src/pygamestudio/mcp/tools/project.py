@@ -398,6 +398,13 @@ def delete_file(args):
         shutil.rmtree(path)
     else:
         path.unlink()
+    # The open script editors clear themselves for the deleted path (same as
+    # the asset panel Delete): a pending auto-save must not write the file
+    # back to disk.
+    body = bridge.editor_body_or_none()
+    handler = getattr(body, 'handle_deleted_files', None)
+    if callable(handler):
+        handler([str(path)])
     return {'deleted': project_relative(path)}
 
 
@@ -423,6 +430,12 @@ def move_file(args):
         raise ToolError('"{}" already exists.'.format(args['target']))
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(str(source), str(target))
+    # The open script editors follow the moved file (same as a rename in the
+    # asset panel): they keep their content and switch to the new path.
+    body = bridge.editor_body_or_none()
+    handler = getattr(body, 'handle_moved_files', None)
+    if callable(handler):
+        handler(str(source), str(target))
     return {'moved': [project_relative(source), project_relative(target)]}
 
 

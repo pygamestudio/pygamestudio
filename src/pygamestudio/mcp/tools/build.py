@@ -90,17 +90,16 @@ def get_build_settings(args):
 @tool(
     'start_build',
     'Package the project into a standalone desktop app with PyInstaller (same '
-    'as the Build button in the desktop-app tab of the Build window). This '
-    'takes a while: the build runs in the background, poll get_build_settings '
-    'and read get_console_logs for the log, open_output_dir points at the result.',
+    'as the Build button in the desktop-app tab of the Build window; the '
+    'PyInstaller cache is always cleared first). This takes a while: the build '
+    'runs in the background, poll get_build_settings and read get_console_logs '
+    'for the log, open_output_dir points at the result.',
     {
         'type': 'object',
         'properties': {
             'app_name': {'type': 'string', 'description': 'Name of the executable (e.g. "MyGame").'},
             'app_icon': {'type': 'string', 'description': 'Absolute path of a .png/.ico/.icns icon (optional).'},
             'output_dir': {'type': 'string', 'description': 'Absolute path of an existing output folder.'},
-            'clean_cache': {'type': 'boolean', 'default': False,
-                            'description': 'Clear the PyInstaller cache before building.'},
         },
         'required': ['output_dir'],
         'additionalProperties': False,
@@ -143,14 +142,12 @@ def start_build(args):
         build_config['app_name'] = args['app_name']
     build_config['app_icon'] = app_icon
     build_config['output_dir'] = str(output_dir)
-    build_config['clean_cache'] = bool(args.get('clean_cache', False))
     save_project_config(config)
 
     # Mirror the values into the build window widgets, then start its thread.
     body._app_name_lineedit.setText(str(build_config.get('app_name', '')))
     body._app_icon_lineedit.setText(build_config['app_icon'])
     body._output_dir_lineedit.setText(build_config['output_dir'])
-    body._clean_cache_checkbox.setChecked(build_config['clean_cache'])
 
     body._progress_bar.setValue(0)
     body._progress_bar.show()
@@ -170,8 +167,10 @@ def start_build(args):
     'start_web_build',
     'Package the project for the browser (same as the Build button in the '
     'Web App tab of the Build window): the result is a folder with index.html '
-    'and game.zip that plays the game through Pyodide and pygame-ce, and it '
-    'starts by itself once loaded. The project code/assets are protected like '
+    'and game.zip that plays the game through Pyodide and pygame-ce (a '
+    'project that uses physics also gets the pymunk wheel next to the page, '
+    'so nothing is fetched from PyPI at runtime), and it starts by itself '
+    'once loaded. The project code/assets are protected like '
     'in the desktop build (the installed engine is never modified) and the '
     'result lands in <output_dir>/build/Web. The build runs in the background: '
     'poll get_build_settings (web_is_building / web_progress), read '

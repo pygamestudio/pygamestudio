@@ -6,8 +6,9 @@ grouped by category, draggable onto the canvas.
 from PySide6.QtCore import QMimeData, QRectF, QSize, Qt, Signal
 from PySide6.QtGui import (QColor, QDrag, QFont, QFontMetrics, QIcon, QPainter, QPainterPath,
                            QPen, QPixmap)
-from PySide6.QtWidgets import (QAbstractItemView, QListWidget, QListWidgetItem,
-                               QStyle, QStyledItemDelegate, QTabWidget, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QAbstractItemView, QListWidget, QListWidgetItem, QMenu,
+                               QPushButton, QStyle, QStyledItemDelegate, QTabWidget,
+                               QVBoxLayout, QWidget)
 
 from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.gui.block_editor.canvas import BLOCK_MIME
@@ -20,6 +21,7 @@ IS_CATEGORY_ROLE = Qt.ItemDataRole.UserRole + 1
 COLOR_ROLE = Qt.ItemDataRole.UserRole + 2
 IS_OBJECT_ROLE = Qt.ItemDataRole.UserRole + 3
 GROUPED_ROLE = Qt.ItemDataRole.UserRole + 4
+VARIABLE_ID_ROLE = Qt.ItemDataRole.UserRole + 5
 
 BLOCK_HEIGHT = 26.0
 BLOCK_ROW_HEIGHT = 32
@@ -55,19 +57,25 @@ def paint_block_shape(painter, rect, color, label, font, arrow=False):
 
 
 class BlockPalette(QWidget):
-    """Left-hand toolbox: one tab per category (events / actions / control).
+    """Left-hand toolbox: one tab per category plus the variables tab.
 
     The event and action tabs list their blocks under the object type they
-    belong to (collapsed until the user opens one).
+    belong to (collapsed until the user opens one); the last tab manages the
+    script's custom variables - they show up in the property drop-downs of
+    every block that reads or writes a property.
     """
 
     add_requested = Signal(str)
+    variable_new_requested = Signal()
+    variable_edit_requested = Signal(str)
+    variable_delete_requested = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._tabs = QTabWidget()
         self._expanded = set()
         self._lists = []
+        self._variables_index = -1
         self._set_up()
 
     def _set_up(self):
@@ -82,12 +90,29 @@ class BlockPalette(QWidget):
             block_list.group_toggled.connect(self._rebuild)
             self._tabs.addTab(block_list, '')
             self._lists.append(block_list)
+        self._variables = _VariableList()
+        self._variables.add_requested.connect(self.variable_new_requested)
+        self._variables.edit_requested.connect(self.variable_edit_requested)
+        self._variables.delete_requested.connect(self.variable_delete_requested)
+        self._variables_index = self._tabs.addTab(self._variables, '')
         self.retranslate()
 
     def retranslate(self):
         for index, category in enumerate(CATEGORIES):
             self._tabs.setTabText(index, category_text(category))
+        self._tabs.setTabText(self._variables_index, T.tr('block.cat.variable', 'Variables'))
+        self._tabs.setTabToolTip(
+            self._variables_index,
+            T.tr('block.var.tab_hint',
+                 'Variables belong to the script: every variable is initialized in '
+                 'ObjectScript.__init__ (self.<name> = <value>) and appears in the '
+                 'property drop-downs of the blocks.'))
+        self._variables.retranslate()
         self._rebuild()
+
+    def set_variables(self, variables):
+        """Show the custom variables of the opened script."""
+        self._variables.set_variables(variables)
 
     def apply_theme(self, is_dark):
         for block_list in self._lists:
@@ -210,6 +235,87 @@ class _BlockList(QListWidget):
                           arrow=bool(definition.get('label_from_field')))
         painter.end()
         return pixmap
+
+
+class _VariableList(QWidget):
+    """The variables tab: the script's custom variables + a “New variable” button.
+
+    A variable is not a draggable block: it is a plain instance attribute of
+    the script (``self.speed``) that the property drop-downs of the blocks
+    offer, so the script can read and write it.  Double-click (or the context
+    menu) edits a variable; the context menu deletes one.
+    """
+
+    add_requested = Signal()
+    edit_requested = Signal(str)
+    delete_requested = Signal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._list = QListWidget()
+        self._list.setObjectName('blockPaletteList')
+        self._list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self._list.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self._list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._list.viewport().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._list.viewport().customContextMenuRequested.connect(self._show_menu)
+        self._list.itemDoubleClicked.connect(self._on_double_clicked)
+        self._list.itemSelectionChanged.connect(self._update_delete_button)
+        self._add_btn = QPushButton()
+        self._add_btn.setObjectName('blockVarAddBtn')
+        self._add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._add_btn.clicked.connect(self.add_requested)
+        self._delete_btn = QPushButton()
+        self._delete_btn.setObjectName('blockVarDeleteBtn')
+        self._delete_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._delete_btn.setEnabled(False)
+        self._delete_btn.clicked.connect(self._delete_clicked)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(6)
+        layout.addWidget(self._list, 1)
+        layout.addWidget(self._add_btn)
+        layout.addWidget(self._delete_btn)
+
+    def set_variables(self, variables):
+        """Show the variables of the opened script."""
+        self._list.clear()
+        for variable in variables or ():
+            item = QListWidgetItem('{} = {}'.format(variable.get('name', ''),
+                                                    variable.get('value', '')))
+            item.setData(VARIABLE_ID_ROLE, variable.get('id', ''))
+            self._list.addItem(item)
+        self._update_delete_button()
+
+    def retranslate(self):
+        self._add_btn.setText(T.tr('block.var.new', 'New variable'))
+        self._delete_btn.setText(T.tr('block.var.delete', 'Delete variable'))
+
+    def _on_double_clicked(self, item):
+        self.edit_requested.emit(str(item.data(VARIABLE_ID_ROLE)))
+
+    def _delete_clicked(self):
+        """Delete the selected variable (the window asks for confirmation)."""
+        item = self._list.currentItem()
+        if item is not None:
+            self.delete_requested.emit(str(item.data(VARIABLE_ID_ROLE)))
+
+    def _update_delete_button(self):
+        self._delete_btn.setEnabled(self._list.currentItem() is not None)
+
+    def _show_menu(self, position):
+        item = self._list.itemAt(position)
+        if item is None:
+            return
+        menu = QMenu(self)
+        edit_action = menu.addAction(T.tr('block.var.edit', 'Edit variable'))
+        delete_action = menu.addAction(T.tr('block.var.delete', 'Delete variable'))
+        chosen = menu.exec(self._list.viewport().mapToGlobal(position))
+        variable_id = str(item.data(VARIABLE_ID_ROLE))
+        if chosen is edit_action:
+            self.edit_requested.emit(variable_id)
+        elif chosen is delete_action:
+            self.delete_requested.emit(variable_id)
 
 
 class BlockPaletteDelegate(QStyledItemDelegate):

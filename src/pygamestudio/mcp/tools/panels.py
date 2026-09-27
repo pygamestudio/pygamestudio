@@ -175,7 +175,7 @@ def _find_block(workspace, block_id):
     return block
 
 
-def _coerce_block_value(spec, value):
+def _coerce_block_value(spec, value, variables=()):
     """Turn a JSON value into the value the workspace should store."""
     from pygamestudio.gui.block_editor import registry as block_registry
 
@@ -195,7 +195,30 @@ def _coerce_block_value(spec, value):
                     spec['name'], value))
         return int(number) if number.is_integer() else number
 
-    options = block_registry.options_for(kind)
+    if kind == 'amount':
+        # a number, or the code / label of one of the script's number variables
+        if not isinstance(value, bool):
+            if isinstance(value, (int, float)):
+                number = float(value)
+                return int(number) if number.is_integer() else number
+            try:
+                number = float(str(value).strip())
+                return int(number) if number.is_integer() else number
+            except ValueError:
+                pass
+        options = block_registry.options_for('amount', variables)
+        codes = [option[0] for option in options]
+        text = str(value).strip()
+        if text in codes:
+            return text
+        for option in options:
+            if block_registry.option_text(option).strip().lower() == text.lower():
+                return option[0]
+        raise ToolError(
+            'Field "{}" needs a number or one of the script\'s number variables, '
+            'got "{}".'.format(spec['name'], value))
+
+    options = block_registry.options_for(kind, variables)
     if options:
         if kind == 'toggle' and isinstance(value, bool):
             value = 'True' if value else 'False'
@@ -345,6 +368,7 @@ def block_editor_get_blocks(args):
         'file': project_relative(path) if path else None,
         'is_block_script': bool(path) and storage.is_block_script(path),
         'modified': canvas.is_modified(),
+        'variables': [dict(item) for item in workspace.get('variables') or []],
         'stacks': [render(stack) for stack in workspace['stacks']],
     }
 
@@ -444,7 +468,7 @@ def block_editor_set_field(args):
         names = [item['name'] for item in (definition or {}).get('fields', [])]
         raise ToolError('The block has no field "{}". Fields: {}.'.format(
             args['field'], ', '.join(names) if names else '(none)'))
-    value = _coerce_block_value(spec, args.get('value'))
+    value = _coerce_block_value(spec, args.get('value'), workspace.get('variables') or [])
     canvas.set_field(args['block'], args['field'], value)
     return {'block': args['block'], 'field': args['field'], 'value': value,
             'modified': canvas.is_modified()}

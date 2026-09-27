@@ -11,8 +11,10 @@ _LEVEL_NAMES = {'INFO': 'info', 'ERROR': 'error', 'WARNING': 'warning'}
 @tool(
     'run_project',
     'Run the game (same as the editor Run button): the current scene is saved '
-    'and main.py is started in its own process. The game output appears in the '
-    'editor console - read it with get_console_logs.',
+    'and main.py is started in its own process. The scene needs a .scene file '
+    'first (save it with save_scene, e.g. {"path": "./scene/main.scene"}) - '
+    'without one the game would start with an empty screen. The game output '
+    'appears in the editor console - read it with get_console_logs.',
     {
         'type': 'object',
         'properties': {
@@ -25,6 +27,10 @@ _LEVEL_NAMES = {'INFO': 'info', 'ERROR': 'error', 'WARNING': 'warning'}
 )
 def run_project(args):
     manager_ = manager()
+    if not manager_.current_scene_file_path:
+        raise ToolError(
+            'The scene has no .scene file yet: save it first with save_scene '
+            '(for example {"path": "./scene/main.scene"}).')
     if args.get('clear_console', True):
         browser = _console_browser(required=False)
         if browser is not None:

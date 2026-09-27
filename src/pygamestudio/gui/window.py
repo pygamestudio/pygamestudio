@@ -150,6 +150,13 @@ class EditorBody(QMainWindow):
         self._editor_settings_window.theme_toggled.connect(self.apply_editor_theme)
         self._asset_window.edit_file_signal.connect(self._code_editor_window.open_file)
         self._asset_window.block_edit_signal.connect(self._block_editor_window.open_file)
+        self._asset_window.scene_open_signal.connect(self._show_scene_editor)
+        # Files deleted on disk must not survive in the script editors: their
+        # content is cleared, so a pending auto-save cannot write them back.
+        self._asset_window.files_deleted_signal.connect(self.handle_deleted_files)
+        # Renamed / moved files: the script editors follow the new path
+        # instead of clearing (the content stays editable).
+        self._asset_window.file_moved_signal.connect(self.handle_moved_files)
         # When a block script is regenerated, refresh the code editor if it is
         # showing that same file.
         self._block_editor_window.script_saved.connect(self._code_editor_window.reload_file)
@@ -241,11 +248,11 @@ class EditorBody(QMainWindow):
         self._project_menu.clear()
 
         project_settings_action = QAction(T.tr('menu.project_settings', 'Project Settings'), self)
-        run_action = QAction(T.tr('menu.run', 'Run'), self)
+        run_action = QAction(T.tr('menu.run', 'Run') + '\tCtrl+R', self)
         build_action = QAction(T.tr('menu.build', 'Build'), self)
 
         project_settings_action.triggered.connect(self._show_project_settings_window)
-        run_action.triggered.connect(self._game_manager.run_project)
+        run_action.triggered.connect(self.run_project)
         build_action.triggered.connect(self._show_build_window)
 
         self._project_menu.addAction(project_settings_action)
@@ -447,11 +454,39 @@ class EditorBody(QMainWindow):
         return self._center_top_tab_widget.currentWidget() is self._image_editor_window
 
     def block_editor_active(self):
-        """Return True when the block editor is the panel the user is
-        currently working in (docked state only, same as the image editor)."""
-        if self._block_editor_window.is_detached():
-            return False
-        return self._center_top_tab_widget.currentWidget() is self._block_editor_window
+        """Return True when the block editor is the editor the user is
+        working in: the current tab, or its floating window being active."""
+        return self._block_editor_window.is_active()
+
+    def run_project(self):
+        """Run the project (toolbar buttons, menu and the global Ctrl+R of the
+        editor window and of every detached panel all end up here).
+
+        The editor the user is working in saves its file first - blocks for
+        the block editor, the open script for the code editor, docked or
+        floating - exactly like its toolbar Run button. Only that one editor
+        is saved, so an idle tab can never overwrite the file the other one
+        is editing. A dirty scene is saved by the game manager when the game
+        starts.
+        """
+        editor = self._editor_in_use()
+        if editor is not None:
+            editor.save()
+        self._game_manager.run_project()
+
+    def _editor_in_use(self):
+        """The code / block editor the user is working in (None: neither).
+
+        A floating window that owns the active window wins over the current
+        docked tab - that window is where the keystrokes go.
+        """
+        for window in (self._code_editor_window, self._block_editor_window):
+            if window.is_floating_active():
+                return window
+        for window in (self._code_editor_window, self._block_editor_window):
+            if window.is_active():
+                return window
+        return None
 
     def _on_center_top_tab_changed(self, index):
         """Give keyboard focus to the image editor's canvas when its tab is
@@ -470,6 +505,37 @@ class EditorBody(QMainWindow):
         self._tile_map_editor_window.set_object(object_uuid)
         self._tile_map_editor_window.raise_editor()
 
+    def _show_scene_editor(self, file_path):
+        """A scene file was opened in the asset panel: bring the scene editor
+        to the front.
+
+        The asset tree already did the opening (it owns the game manager and
+        knows which click happened); scene files are never shown in the code
+        editor - the user wants to see the scene itself.
+        """
+        self._scene_widnow.raise_editor()
+
+    def handle_deleted_files(self, paths):
+        """Clear the script editors for files that were deleted on disk.
+
+        Called by the asset panel (Delete) and by the MCP delete_file tool.
+        The code / block editor forgets the file instead of keeping its
+        content, so a pending auto-save can never write the deleted file
+        back to disk.
+        """
+        self._code_editor_window.handle_deleted_files(paths)
+        self._block_editor_window.handle_deleted_files(paths)
+
+    def handle_moved_files(self, old_path, new_path):
+        """Let the script editors follow a file that was renamed or moved.
+
+        Called by the asset panel (rename, cut/paste, drag & drop) and by the
+        MCP move_file tool. The editors keep their content and switch to the
+        new path, so the next auto-save writes the right file.
+        """
+        self._code_editor_window.handle_moved_files(old_path, new_path)
+        self._block_editor_window.handle_moved_files(old_path, new_path)
+
     def _on_switch_to_block_editor(self, file_path):
         """The code editor asked for the block editor: show the SAME file.
 
@@ -482,6 +548,8 @@ class EditorBody(QMainWindow):
         if file_path and Path(file_path).suffix.lower() == '.py':
             if is_block_script(file_path) or can_hold_blocks(file_path)[0]:
                 self._block_editor_window.open_file(file_path)
+                # Remember the switch: a double click then opens scripts here.
+                self._asset_window.set_last_script_editor('block')
                 self._focus_switched_editor(self._block_editor_window)
                 return
             QMessageBox.warning(
@@ -493,9 +561,15 @@ class EditorBody(QMainWindow):
         self._focus_switched_editor(self._block_editor_window)
 
     def _on_switch_to_code_editor(self, file_path):
-        """The block editor asked for the code editor: show the SAME file."""
+        """The block editor asked for the code editor: show the SAME file.
+
+        Handing a script over is also remembered: a double click in the asset
+        panel then opens scripts in the code editor (same for the other
+        direction in _on_switch_to_block_editor).
+        """
         if file_path:
             self._code_editor_window.open_file(file_path)
+            self._asset_window.set_last_script_editor('code')
         else:
             self._code_editor_window.raise_editor()
         self._focus_switched_editor(self._code_editor_window)
@@ -657,10 +731,11 @@ class Editor(WindowBase):
 
     def keyPressEvent(self, event):
         """Global editor shortcuts (work regardless of which panel has focus):
-        Ctrl+S save, Ctrl+Z undo, Ctrl+Y / Ctrl+Shift+Z redo.
+        Ctrl+S save, Ctrl+R run, Ctrl+Z undo, Ctrl+Y / Ctrl+Shift+Z redo.
 
-        Ctrl+S is context aware: while the image editor is the active panel
-        it saves the edited image; everywhere else it saves the scene."""
+        Ctrl+S and Ctrl+R are context aware: while the image editor is the
+        active panel Ctrl+S saves the edited image; while the code or block
+        editor is active, Ctrl+R saves that editor's file before running."""
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
             if event.key() == Qt.Key.Key_S:
                 if self._editor_body.image_editor_active():
@@ -669,6 +744,8 @@ class Editor(WindowBase):
                     self._editor_body._block_editor_window.save()
                 else:
                     self._game_manager.save_scene()
+            elif event.key() == Qt.Key.Key_R:
+                self._editor_body.run_project()
             elif event.key() == Qt.Key.Key_Z:
                 self._game_manager.undo_stack.undo()
             elif event.key() == Qt.Key.Key_Y:

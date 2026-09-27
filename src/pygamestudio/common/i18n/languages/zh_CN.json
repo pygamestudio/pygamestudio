@@ -104,6 +104,10 @@
         "attach": "回到标签页",
         "delete": "删除积木",
         "duplicate": "复制积木",
+        "copy": "复制到剪贴板",
+        "paste": "粘贴",
+        "detach": "分离下方积木",
+        "delete_stack": "删除整段（含下方积木）",
         "nothing_here": "此处没有积木",
         "edit_field": "编辑参数",
         "edit_field_value": "值：",
@@ -126,7 +130,8 @@
             "event": "事件",
             "action": "动作",
             "physics": "物理",
-            "control": "控制"
+            "control": "控制",
+            "variable": "变量"
         },
 
         "ev": {
@@ -196,7 +201,8 @@
 
         "ctl": {
             "if": "如果",
-            "if_else": "如果 / 否则",
+            "elif": "否则如果",
+            "else": "否则",
             "repeat": "重复",
             "while": "当条件满足时循环",
             "repeat_until": "重复直到满足条件",
@@ -204,8 +210,7 @@
             "while_key": "当按住按键",
             "continue": "跳过本次循环",
             "break": "跳出循环",
-            "return": "结束本次事件",
-            "else": "否则"
+            "return": "结束本次事件"
         },
 
         "prop": {
@@ -288,6 +293,32 @@
             "lt": "小于",
             "ge": "大于等于",
             "le": "小于等于"
+        },
+
+        "var": {
+            "tab_hint": "变量保存在脚本里：每个变量都会在 ObjectScript.__init__ 中初始化为 self.变量名 = 值，并出现在积木的属性下拉框中。",
+            "new": "新建变量",
+            "edit": "编辑变量",
+            "delete": "删除变量",
+            "title": "变量",
+            "name_prompt": "变量名：",
+            "value_prompt": "初始值：",
+            "type_prompt": "变量类型：",
+            "type_number": "数值",
+            "type_text": "文本",
+            "type_bool": "布尔值（True / False）",
+            "delete_confirm": "确定删除变量“{name}”吗？用到它的积木会退回为 x。",
+            "err_identifier": "名称必须是合法的 Python 变量名（字母、数字、下划线，不能以数字或 __ 开头）。",
+            "err_reserved": "该名称被引擎保留（obj、on_update 等事件名、self），请换一个。",
+            "err_duplicate": "已经存在同名变量。",
+            "err_missing": "该变量已不存在。",
+            "err_number": "初始值必须是数字。"
+        },
+
+        "amount": {
+            "custom": "自定义数值…",
+            "prompt": "数值：",
+            "invalid": "请输入一个数字。"
         }
     },
 
@@ -338,6 +369,7 @@
         "failed_to_save_before_run": "运行前保存场景失败：{}",
         "failed_to_run_project": "项目{}运行失败：{}",
         "run_project_finished": "项目{}已退出，退出码：{}",
+        "run_cancelled": "已取消运行：场景尚未保存为 .scene 文件。",
         "run": "运行",
         "refresh": "刷新"
     },
@@ -626,8 +658,6 @@
         "app_icon_placeholder": "请选择应用图标 (.png/.ico/.icns)",
         "output_dir": "输出目录",
         "output_dir_placeholder": "请选择输出目录",
-        "clean_cache": "清除缓存",
-        "clean_cache_tooltip": "打包前清除 PyInstaller 缓存与临时文件",
         "build": "打包",
         "open_output_dir": "打开输出目录",
         "run_game": "运行游戏",
@@ -646,7 +676,8 @@
         "web_engine_source_missing": "找不到需要复制的引擎文件：{}",
         "web_patch_failed": "引擎文件 {} 与网页补丁不再匹配（第 {} 项）：已停止网页版打包，安装目录中的引擎文件未被改动",
         "web_template_missing": "缺少网页版打包模板：{}",
-        "web_physics_unsupported": "项目中使用了物理（pymunk），浏览器暂不支持：这些对象在网页版中不会进行物理模拟",
+        "web_physics_bundled": "项目中使用了物理：pymunk 已随网页发布，浏览器可正常进行物理模拟",
+        "web_physics_pypi_fallback": "项目中使用了物理，但引擎资源中缺少 pymunk 安装包（{}）：页面将改为从 PyPI 下载",
         "web_build_summary": "已打包 {} 个项目文件、{} 个引擎文件",
         "web_build_output": "网页版输出：{}",
         "web_serve_hint": "请通过 HTTP 访问输出目录来运行游戏，例如：python -m http.server 8000 --directory \"{}\"",

@@ -13,24 +13,35 @@ nearest "gap" (every position in every statement list).
 """
 
 import json
+import re
 
 from PySide6.QtCore import QPoint, QPointF, QRect, QRectF, QSize, QSizeF, Qt, QTimer, Signal
 from PySide6.QtGui import (QColor, QCursor, QFont, QFontMetrics, QKeySequence, QPainter,
                            QPainterPath, QPen)
 from PySide6.QtWidgets import (QApplication, QGraphicsItem, QGraphicsItemGroup, QGraphicsScene,
-                               QGraphicsView, QInputDialog, QMenu, QRubberBand)
+                               QGraphicsView, QInputDialog, QMenu, QMessageBox, QRubberBand)
 
 from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.gui.block_editor import storage
-from pygamestudio.gui.block_editor.model import (block_children, clone_block, find_block,
-                                                 insert_block, new_block,
-                                                 new_stack, new_workspace, normalize_workspace,
-                                                 remove_segment)
+from pygamestudio.gui.block_editor.model import (VARIABLE_TYPES, block_children, clone_block,
+                                                 find_block, find_variable, insert_block,
+                                                 new_block, new_stack, new_variable,
+                                                 new_workspace, normalize_workspace,
+                                                 remove_segment, rewrite_variable_references,
+                                                 variable_name_error)
 from pygamestudio.gui.block_editor.registry import (FIELD_WIDTHS, OPTION_FIELD_KINDS,
-                                                    field_spec, field_value,
+                                                    PROPERTY_OPTIONS, field_spec, field_value,
                                                     get_category, get_definition, header_text,
                                                     option_text, options_for)
 BLOCK_MIME = 'application/x-pygs-block'
+
+_VARIABLE_CODE = re.compile(r'^self\.(\w+)$')
+
+
+def variable_field_text(value):
+    """A custom variable reads as its bare name (``self.speed`` -> ``speed``)."""
+    match = _VARIABLE_CODE.match(str(value))
+    return match.group(1) if match else str(value)
 
 HEADER_HEIGHT = 34
 FIELD_HEIGHT = 22
@@ -126,7 +137,7 @@ class BlockItem(QGraphicsItem):
         self._height = HEADER_HEIGHT
         self._field_rects = {}
         self._body_slots = []
-        self._else_bar_top = None
+        self._bars = []          # the elif / else bars (key + top position)
         self._footer_top = HEADER_HEIGHT
         self._color = category_color(self._definition['category'] if self._definition else 'action')
         self._font = QFont(QApplication.font())
@@ -217,14 +228,15 @@ class BlockItem(QGraphicsItem):
         width = header_width
         height = HEADER_HEIGHT
         self._body_slots = []
-        self._else_bar_top = None
+        self._bars = []
         self._footer_top = HEADER_HEIGHT
         if definition and definition['shape'] in ('c', 'c_else'):
             cursor = float(HEADER_HEIGHT + BODY_PAD)
             content_width = 0.0
             for key, child_blocks in block_children(self._block):
-                if key == 'else':
-                    self._else_bar_top = cursor
+                if key != 'body':
+                    # every extra slot (elif / else) starts with its own bar
+                    self._bars.append({'key': key, 'top': cursor})
                     cursor += ELSE_BAR_HEIGHT
                 items = [BlockItem(child, self) for child in child_blocks]
                 y = cursor
@@ -244,7 +256,6 @@ class BlockItem(QGraphicsItem):
         elif definition and definition['shape'] == 'hat':
             # hats carry the statements stacked below them (touching tightly)
             cursor = float(HEADER_HEIGHT)
-            content_width = 0.0
             has_body = False
             for key, child_blocks in block_children(self._block):
                 items = [BlockItem(child, self) for child in child_blocks]
@@ -252,14 +263,15 @@ class BlockItem(QGraphicsItem):
                 for item in items:
                     item.setPos(0, y)
                     y += item.height() + STACK_GAP
-                    content_width = max(content_width, item.width())
                 self._body_slots.append({'key': key, 'list': child_blocks,
                                          'items': items, 'origin': QPointF(0, cursor)})
                 if items:
                     cursor = y - STACK_GAP
                     has_body = True
             height = cursor if has_body else HEADER_HEIGHT
-            width = max(header_width, content_width)
+            # the event block keeps its own width: a wider stack below never
+            # stretches the hat (Scratch style)
+            width = header_width
 
         self.prepareGeometryChange()
         self._width = width
@@ -273,7 +285,9 @@ class BlockItem(QGraphicsItem):
             for option in options_for(spec['kind']):
                 if option[0] == value:
                     return option_text(option)
-            return str(value)
+            return variable_field_text(value)
+        if spec['kind'] == 'amount':
+            return variable_field_text(value)
         return str(value)
 
     # ------------------------------------------------------------ painting
@@ -316,20 +330,20 @@ class BlockItem(QGraphicsItem):
             painter.setPen(QColor('#2b2b2b'))
             text = self._field_text(spec)
             painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, self._clip_text(text, rect.width() - 10))
-            if spec['kind'] in ('property', 'operator'):
+            if spec['kind'] in ('property', 'operator', 'amount'):
                 self._paint_arrow(painter, rect.right() - 10, rect.center().y())
 
-        # else separator
-        if self._else_bar_top is not None:
-            # The separator only spans the else bar itself: the arm continues
+        # elif / else separators
+        for bar in self._bars:
+            # The separator only spans the bar itself: the arm continues
             # straight down on the left (Scratch style) and must stay solid.
             painter.setPen(QPen(QColor(255, 255, 255, 200), 1.0))
-            painter.drawLine(QPointF(ARM + 1, self._else_bar_top + 1),
-                             QPointF(width - 1.5, self._else_bar_top + 1))
+            painter.drawLine(QPointF(ARM + 1, bar['top'] + 1),
+                             QPointF(width - 1.5, bar['top'] + 1))
             painter.setPen(QColor('#ffffff'))
-            painter.drawText(QRectF(ARM + 8, self._else_bar_top, width - ARM - 8, ELSE_BAR_HEIGHT),
+            painter.drawText(QRectF(ARM + 8, bar['top'], width - ARM - 8, ELSE_BAR_HEIGHT),
                              Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
-                             T.tr('block.ctl.else', 'else'))
+                             self._bar_label(bar['key']))
 
         if self.isSelected():
             # the highlight follows the block outline (rounded), not a box
@@ -367,10 +381,11 @@ class BlockItem(QGraphicsItem):
             footer = QPainterPath()
             footer.addRoundedRect(QRectF(0, self._footer_top, width, FOOTER), 7, 7)
             path = path.united(footer)
-            if self._else_bar_top is not None:
-                bar = QPainterPath()
-                bar.addRect(QRectF(0, self._else_bar_top, width, ELSE_BAR_HEIGHT))
-                path = path.united(bar)
+            if self._bars:
+                for bar_info in self._bars:
+                    bar = QPainterPath()
+                    bar.addRect(QRectF(0, bar_info['top'], width, ELSE_BAR_HEIGHT))
+                    path = path.united(bar)
             path.setFillRule(Qt.FillRule.WindingFill)
         return path
 
@@ -379,6 +394,13 @@ class BlockItem(QGraphicsItem):
         """A small downward chevron (marks a dropdown)."""
         painter.drawLine(QPointF(x - 3, y - 2), QPointF(x + 1, y + 2))
         painter.drawLine(QPointF(x + 1, y + 2), QPointF(x + 5, y - 2))
+
+    @staticmethod
+    def _bar_label(key):
+        """The text drawn on an elif / else bar."""
+        if key == 'elif':
+            return T.tr('block.ctl.elif', 'elif')
+        return T.tr('block.ctl.else', 'else')
 
     @staticmethod
     def _rounded(rect):
@@ -402,6 +424,7 @@ class BlockCanvas(QGraphicsView):
 
     script_saved = Signal(str)
     modified_changed = Signal(bool)
+    variables_changed = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -420,6 +443,7 @@ class BlockCanvas(QGraphicsView):
         self._press_item = None
         self._pending_field = None
         self._selected_ids = set()
+        self._clipboard = []
         self._rubber_band = QRubberBand(QRubberBand.Shape.Rectangle, self.viewport())
         self._band_origin = None
         self._band_last_rect = None
@@ -480,6 +504,7 @@ class BlockCanvas(QGraphicsView):
         self._hoist_nested_hats()
         self._absorb_touching_stacks()
         self.rebuild()
+        self.variables_changed.emit()
         self.modified_changed.emit(False)
 
     def file_path(self):
@@ -495,7 +520,19 @@ class BlockCanvas(QGraphicsView):
         self._redo_stack = []
         self._selected_ids = set()
         self.rebuild()
+        self.variables_changed.emit()
         self.modified_changed.emit(False)
+
+    def retarget_file(self, file_path):
+        """Point the canvas at a moved/renamed script, keeping the workspace.
+
+        Used when the open script was renamed or moved on disk (asset panel
+        or MCP move_file): the blocks stay, only the path changes - the
+        debounced auto-save then writes the new location.
+        """
+        if self._path is None:
+            return
+        self._path = str(file_path)
 
     def workspace(self):
         return self._workspace
@@ -505,6 +542,7 @@ class BlockCanvas(QGraphicsView):
         self.push_undo()
         self._workspace = workspace
         self.rebuild()
+        self.variables_changed.emit()
         self.schedule_save()
 
     def save_now(self):
@@ -523,6 +561,81 @@ class BlockCanvas(QGraphicsView):
 
     def is_modified(self):
         return self._dirty
+
+    # ------------------------------------------------------------ variables
+    # The variables belong to the workspace: they are stored in the blocks
+    # marker of the script and generated as ``self.<name> = <value>`` lines
+    # in __init__ (see storage.save_workspace). Every block that reads or
+    # writes a property offers them next to the object's own properties.
+    def variables(self):
+        """The script's custom variables (id, name, value), in order."""
+        return list(self._workspace.get('variables') or [])
+
+    def check_variable_name(self, name, ignore_id=None):
+        """'' when the name may be used, else the i18n key of the problem."""
+        name = str(name or '').strip()
+        error = variable_name_error(name)
+        if error:
+            return error
+        if any(item.get('name') == name and str(item.get('id')) != str(ignore_id)
+               for item in self.variables()):
+            return 'block.var.err_duplicate'
+        return ''
+
+    def add_variable(self, name, value='0', value_type='number'):
+        """Add a variable. Returns (ok, i18n key of the problem)."""
+        name = str(name or '').strip()
+        error = self.check_variable_name(name)
+        if error:
+            return False, error
+        self.push_undo()
+        self._workspace.setdefault('variables', [])
+        self._workspace['variables'].append(new_variable(name, value, value_type))
+        self.rebuild()
+        self.variables_changed.emit()
+        self.schedule_save()
+        return True, ''
+
+    def update_variable(self, variable_id, name, value='0', value_type=None):
+        """Change the name / type / initial value of a variable.
+
+        Renaming repoints the blocks that used it, so nothing breaks. Returns
+        (ok, i18n key of the problem).
+        """
+        variable = find_variable(self._workspace, variable_id)
+        if variable is None:
+            return False, 'block.var.err_missing'
+        name = str(name or '').strip()
+        error = self.check_variable_name(name, ignore_id=variable_id)
+        if error:
+            return False, error
+        self.push_undo()
+        old_name = str(variable.get('name') or '')
+        variable['name'] = name
+        variable['value'] = str(value if value is not None else '0')
+        if value_type in VARIABLE_TYPES:
+            variable['type'] = value_type
+        if name != old_name:
+            rewrite_variable_references(self._workspace, old_name, 'self.{}'.format(name))
+        self.rebuild()
+        self.variables_changed.emit()
+        self.schedule_save()
+        return True, ''
+
+    def remove_variable(self, variable_id):
+        """Delete a variable; blocks that used it fall back to the default property."""
+        variable = find_variable(self._workspace, variable_id)
+        if variable is None:
+            return False
+        self.push_undo()
+        self._workspace['variables'] = [item for item in self.variables()
+                                        if str(item.get('id')) != str(variable_id)]
+        rewrite_variable_references(self._workspace, str(variable.get('name') or ''),
+                                    PROPERTY_OPTIONS[0][0])
+        self.rebuild()
+        self.variables_changed.emit()
+        self.schedule_save()
+        return True
 
     # ------------------------------------------------------------ scene
     def rebuild(self):
@@ -669,24 +782,123 @@ class BlockCanvas(QGraphicsView):
         return block
 
     def delete_block(self, block_id):
-        """Delete the block (and its subtree) from the workspace."""
+        """Delete the block (and its subtree) from the workspace.
+
+        Deleting an EVENT block keeps the blocks stacked below it: they land
+        on the canvas as a loose stack (``delete_stack`` is the other
+        behaviour - throwing everything away together).
+        """
+        _, _, block = find_block(self._workspace['stacks'], block_id)
+        if block is None:
+            return
         self.push_undo()
+        self._release_body(block)
         remove_segment(self._workspace['stacks'], block_id)
         self._selected_ids.discard(block_id)
         self.rebuild()
         self.schedule_save()
 
     def delete_selected(self):
-        """Delete every selected block as ONE undo step."""
+        """Delete every selected block as ONE undo step.
+
+        Event blocks keep the blocks below them (they become a loose stack);
+        blocks that were selected explicitly are removed with it.
+        """
         ids = self._topmost_ids(self._selected_ids)
         if not ids:
             return
+        extras = set(self._selected_ids) - set(ids)
         self.push_undo()
         for block_id in ids:
+            _, _, block = find_block(self._workspace['stacks'], block_id)
+            if block is None:
+                continue
+            self._release_body(block)
             remove_segment(self._workspace['stacks'], block_id)
+        for block_id in extras:
+            _, _, block = find_block(self._workspace['stacks'], block_id)
+            if block is not None:
+                remove_segment(self._workspace['stacks'], block_id)
         self._selected_ids = set()
         self.rebuild()
         self.schedule_save()
+
+    def delete_stack(self, block_id):
+        """Delete a block TOGETHER with everything stacked below / inside it."""
+        _, _, block = find_block(self._workspace['stacks'], block_id)
+        if block is None:
+            return
+        self.push_undo()
+        remove_segment(self._workspace['stacks'], block_id)
+        self._selected_ids = {item for item in self._selected_ids
+                              if find_block(self._workspace['stacks'], item)[2] is not None}
+        self.rebuild()
+        self.schedule_save()
+
+    def detach_body(self, block_id):
+        """Move an event block's body blocks out to a loose stack below it."""
+        _, _, block = find_block(self._workspace['stacks'], block_id)
+        if block is None or not self._is_hat(block) or not block.get('body'):
+            return False
+        self.push_undo()
+        self._release_body(block)
+        self.rebuild()
+        self.schedule_save()
+        return True
+
+    def copy_selected(self):
+        """Copy the selected blocks (exactly as configured) to the clipboard."""
+        blocks = []
+        for block_id in self._topmost_ids(self._selected_ids):
+            _, _, block = find_block(self._workspace['stacks'], block_id)
+            if block is not None:
+                blocks.append(json.loads(json.dumps(block, ensure_ascii=False)))
+        if not blocks:
+            return False
+        self._clipboard = blocks
+        return True
+
+    def paste_blocks(self):
+        """Paste the clipboard as new loose blocks (fresh ids, exact copy)."""
+        if not self._clipboard:
+            return []
+        self.push_undo()
+        center = self.mapToScene(self.viewport().rect().center())
+        pasted = []
+        for index, block in enumerate(self._clipboard):
+            clone = clone_block(block)
+            clone['x'] = int(center.x()) + 30 * index
+            clone['y'] = int(center.y()) + 30 * index
+            self._workspace['stacks'].append(clone)
+            pasted.append(clone)
+        self.rebuild()
+        self._selected_ids = {block['id'] for block in pasted}
+        self._apply_selection()
+        self.schedule_save()
+        return pasted
+
+    @staticmethod
+    def _is_hat(block):
+        definition = get_definition(block.get('type'))
+        return definition is not None and definition['shape'] == 'hat'
+
+    def _release_body(self, block):
+        """Re-home an event block's body as a loose stack right below it.
+
+        The body of a control block (if / repeat / ...) is its content and is
+        left alone; only event blocks give the blocks below them back.
+        """
+        children = block.get('body')
+        if not children or not self._is_hat(block):
+            return
+        block['body'] = []
+        x = int(block.get('x', DEFAULT_X))
+        y = int(block.get('y', DEFAULT_Y)) + int(BlockItem(block).height()) + HOIST_GAP
+        for child in children:
+            child['x'] = x
+            child['y'] = y
+            y += int(BlockItem(child).height())
+            self._workspace['stacks'].append(child)
 
     def duplicate_block(self, block_id):
         """Duplicate a block right behind its original."""
@@ -771,6 +983,7 @@ class BlockCanvas(QGraphicsView):
         self._redo_stack.append(json.dumps(self._workspace, ensure_ascii=False))
         self._restore(self._undo_stack.pop())
         self.rebuild()
+        self.variables_changed.emit()
         self.schedule_save()
 
     def redo(self):
@@ -779,6 +992,7 @@ class BlockCanvas(QGraphicsView):
         self._undo_stack.append(json.dumps(self._workspace, ensure_ascii=False))
         self._restore(self._redo_stack.pop())
         self.rebuild()
+        self.variables_changed.emit()
         self.schedule_save()
 
     def _restore(self, snapshot):
@@ -926,12 +1140,20 @@ class BlockCanvas(QGraphicsView):
         self._set_selection([block_id] if block_id else [])
 
     def _set_selection(self, block_ids):
-        """Select the given blocks (whole stacks win over their children)."""
-        self._selected_ids = set(self._topmost_ids(block_ids))
+        """Select exactly the given blocks.
+
+        A click picks the one block under the cursor; a rubber band picks
+        every block it covers (rows of a stack included).
+        """
+        self._selected_ids = {block_id for block_id in block_ids if block_id}
         self._apply_selection()
 
     def _apply_selection(self):
-        """Push the selection state onto every item (no rebuild)."""
+        """Push the selection state onto every item (no rebuild).
+
+        The dashed frame shows exactly what the user selected: clicking one
+        block marks that block, a rubber band marks every block it covers.
+        """
         selected = self._selected_ids
 
         def apply(item):
@@ -1027,12 +1249,15 @@ class BlockCanvas(QGraphicsView):
     def _choose_field_value(self, item, spec):
         """Ask the user for a new field value (dropdown menu or text dialog)."""
         current = field_value(item.block(), item.definition(), spec['name'])
-        if spec['kind'] in OPTION_FIELD_KINDS and options_for(spec['kind']):
+        variables = self.variables()
+        if spec['kind'] == 'amount':
+            return self._choose_amount(current)
+        if spec['kind'] in OPTION_FIELD_KINDS and options_for(spec['kind'], variables):
             menu = QMenu(self)
             # Long lists (the key picker has the whole keyboard) stay usable:
             # Qt keeps the menu inside the screen and scrolls it.
             menu.setStyleSheet('QMenu { menu-scrollable: 1; }')
-            for option in options_for(spec['kind']):
+            for option in options_for(spec['kind'], variables):
                 action = menu.addAction(option_text(option))
                 action.setCheckable(True)
                 action.setChecked(option[0] == current)
@@ -1045,6 +1270,43 @@ class BlockCanvas(QGraphicsView):
             self, T.tr('block.edit_field', 'Edit field'),
             T.tr('block.edit_field_value', 'Value:'), text=str(current))
         return text if accepted else None
+
+    def _choose_amount(self, current):
+        """A number, or one of the script's number variables (change-by blocks)."""
+        menu = QMenu(self)
+        menu.setStyleSheet('QMenu { menu-scrollable: 1; }')
+        custom_action = menu.addAction(T.tr('block.amount.custom', 'Custom number...'))
+        variable_actions = {}
+        options = options_for('amount', self.variables())
+        if options:
+            menu.addSeparator()
+            for option in options:
+                action = menu.addAction(option_text(option))
+                action.setCheckable(True)
+                action.setChecked(option[0] == str(current))
+                variable_actions[action] = option[0]
+        chosen = menu.exec(QCursor.pos())
+        if chosen is None:
+            return None
+        if chosen in variable_actions:
+            return variable_actions[chosen]
+        if chosen is not custom_action:
+            return None
+        text = str(current)
+        while True:
+            text, accepted = QInputDialog.getText(
+                self, T.tr('block.edit_field', 'Edit field'),
+                T.tr('block.amount.prompt', 'Number:'), text=text)
+            if not accepted:
+                return None
+            text = str(text).strip()
+            try:
+                float(text)
+            except ValueError:
+                QMessageBox.warning(self, T.tr('block.edit_field', 'Edit field'),
+                                    T.tr('block.amount.invalid', 'Please enter a number.'))
+                continue
+            return text
 
     # ------------------------------------------------------------ drag
     def _begin_drag(self, item, view_position):
@@ -1145,6 +1407,11 @@ class BlockCanvas(QGraphicsView):
                 drag['block']['x'] = int(drop_point.x())
                 drag['block']['y'] = int(drop_point.y())
             self._workspace['stacks'].append(drag['block'])
+            # dropping an event block on a loose stack picks up that stack;
+            # the blocks still touching its new bottom (an otherwise separate
+            # chain parked below) fold in as well, so one drag carries ALL of
+            # them instead of one more row per drag.
+            self._absorb_touching_stacks()
             self.rebuild()
             self.schedule_save()
             return
@@ -1215,12 +1482,13 @@ class BlockCanvas(QGraphicsView):
         return None
 
     def _absorb_touching_stacks(self):
-        """Upgrade legacy “parked right below a hat” stacks to real bodies.
+        """Fold “parked right below a hat” stacks into the event's body.
 
-        Old layouts parked a dropped event block as its own top-level stack
-        that only TOUCHED the stack below it, so the blocks never became the
-        event's body. Exactly touching, same-x pairs are folded together when
-        the file is opened (the drop itself does this too now).
+        A dropped event block parks its pickup as its own top-level stack when
+        the two only TOUCH, so the blocks never became the event's body.
+        Exactly touching, same-x pairs are folded together when the file is
+        opened and after every drop, so a whole detached chain comes back in
+        one go instead of one row per drag.
         """
         stacks = self._workspace.get('stacks', [])
         changed = True
@@ -1269,6 +1537,18 @@ class BlockCanvas(QGraphicsView):
         else:
             super().dragMoveEvent(event)
 
+    def dragLeaveEvent(self, event):
+        """Swallow the leave of a palette drag.
+
+        ``dragEnterEvent`` accepts the palette drag itself instead of handing
+        it to the scene (no item accepts drops - the drop is handled at view
+        level), so the base implementation would log “drag leave received
+        before drag enter”. There is nothing to clean up here: the drop
+        indicator only belongs to the canvas' own block dragging, which never
+        uses Qt drag & drop.
+        """
+        event.accept()
+
     def dropEvent(self, event):
         if not event.mimeData().hasFormat(BLOCK_MIME):
             super().dropEvent(event)
@@ -1298,6 +1578,14 @@ class BlockCanvas(QGraphicsView):
             self.duplicate_selected()
             event.accept()
             return
+        if event.matches(QKeySequence.StandardKey.Copy) and self._selected_ids:
+            self.copy_selected()
+            event.accept()
+            return
+        if event.matches(QKeySequence.StandardKey.Paste) and self._clipboard:
+            self.paste_blocks()
+            event.accept()
+            return
         super().keyPressEvent(event)
 
     def contextMenuEvent(self, event):
@@ -1311,11 +1599,32 @@ class BlockCanvas(QGraphicsView):
                 self._select(item.block()['id'])
             delete_action = menu.addAction(T.tr('block.delete', 'Delete block'))
             duplicate_action = menu.addAction(T.tr('block.duplicate', 'Duplicate block'))
+            copy_action = menu.addAction(T.tr('block.copy', 'Copy block'))
+            detach_action = delete_stack_action = None
+            definition = get_definition(item.block().get('type'))
+            if (definition is not None and definition['shape'] == 'hat'
+                    and item.block().get('body')):
+                # an event block owns what is stacked below it: offer to split
+                # the two apart, and to throw everything away in one go
+                detach_action = menu.addAction(T.tr('block.detach', 'Detach the blocks below'))
+                delete_stack_action = menu.addAction(
+                    T.tr('block.delete_stack', 'Delete the whole stack'))
             chosen = menu.exec(event.globalPos())
             if chosen == delete_action:
                 self.delete_selected()
             elif chosen == duplicate_action:
                 self.duplicate_selected()
+            elif chosen == copy_action:
+                self.copy_selected()
+            elif detach_action is not None and chosen is detach_action:
+                self.detach_body(item.block()['id'])
+            elif delete_stack_action is not None and chosen is delete_stack_action:
+                self.delete_stack(item.block()['id'])
             return
         menu.addAction(T.tr('block.nothing_here', 'No block here')).setEnabled(False)
+        if self._clipboard:
+            paste_action = menu.addAction(T.tr('block.paste', 'Paste'))
+            if menu.exec(event.globalPos()) == paste_action:
+                self.paste_blocks()
+            return
         menu.exec(event.globalPos())

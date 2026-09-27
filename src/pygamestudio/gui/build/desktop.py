@@ -30,8 +30,6 @@ class DesktopAppBuildWindow(QScrollArea):
         self._output_dir_label = QLabel()
         self._output_dir_lineedit = QLineEdit()
         self._output_dir_browse_button = QPushButton()
-        self._clean_cache_label = QLabel()
-        self._clean_cache_checkbox = QCheckBox()
         self._progress_bar = QProgressBar()
         self._build_button = QPushButton()
         self._run_button = QPushButton()
@@ -60,9 +58,6 @@ class DesktopAppBuildWindow(QScrollArea):
         self._output_dir_label.setText(T.tr('build.output_dir', 'Output Dir'))
         self._output_dir_lineedit.setPlaceholderText(T.tr('build.output_dir_placeholder', 'Please choose the output dir'))
         self._output_dir_browse_button.setIcon(QIcon(':/images/browse.png'))
-        self._clean_cache_label.setText(T.tr('build.clean_cache', 'Clean Cache'))
-        self._clean_cache_checkbox.setChecked(False)
-        self._clean_cache_checkbox.setToolTip(T.tr('build.clean_cache_tooltip', 'Clear the PyInstaller cache and temporary files before building'))
         self._progress_bar.setRange(0, 100)
         self._progress_bar.setValue(0)
         self._build_button.setText(T.tr('build.build', 'Build'))
@@ -103,9 +98,6 @@ class DesktopAppBuildWindow(QScrollArea):
         button_layout.addSpacing(5)
         button_layout.addWidget(self._open_output_dir_button)
         button_layout.addStretch()
-        button_layout.addWidget(self._clean_cache_label)
-        button_layout.addSpacing(5)
-        button_layout.addWidget(self._clean_cache_checkbox)
 
         main_g_layout = QGridLayout(self._central_widget)
         main_g_layout.setHorizontalSpacing(10)
@@ -149,11 +141,6 @@ class DesktopAppBuildWindow(QScrollArea):
             self._output_dir_lineedit.setText(project_config['build']['output_dir'])
         except Exception as e:
             self._output_dir_lineedit.clear()
-
-        try:
-            self._clean_cache_checkbox.setChecked(bool(project_config['build']['clean_cache']))
-        except Exception as e:
-            self._clean_cache_checkbox.setChecked(False)
 
     def _browse_app_icon(self):
         icon_path, _ = QFileDialog.getOpenFileName(self, T.tr('build.select_app_icon', 'Select App Icon'), self._game_manager.get_project_path(), 'Format (*png *.ico *.icns)')
@@ -296,7 +283,6 @@ class DesktopAppBuildWindow(QScrollArea):
             "app_name": app_name,
             "app_icon": app_icon,
             "output_dir": output_dir,
-            "clean_cache": self._clean_cache_checkbox.isChecked()
         }
         update_project_config('build', build_config)
 
@@ -309,8 +295,6 @@ class DesktopAppBuildWindow(QScrollArea):
         self._app_icon_lineedit.setPlaceholderText(T.tr('build.app_icon_placeholder', 'Please choose the app icon (.png/.ico/.icns)'))
         self._output_dir_label.setText(T.tr('build.output_dir', 'Output Dir'))
         self._output_dir_lineedit.setPlaceholderText(T.tr('build.output_dir_placeholder', 'Please choose the output dir'))
-        self._clean_cache_label.setText(T.tr('build.clean_cache', 'Clean Cache'))
-        self._clean_cache_checkbox.setToolTip(T.tr('build.clean_cache_tooltip', 'Clear the PyInstaller cache and temporary files before building'))
         self._build_button.setText(T.tr('build.build', 'Build'))
         self._run_button.setText(T.tr('build.run_game', 'Run Game'))
         self._open_output_dir_button.setText(T.tr('build.open_output_dir', 'Open Output Dir'))
@@ -442,8 +426,9 @@ class BuildThread(QThread):
         """Assemble the complete PyInstaller command line."""
         cmd = [sys.executable, '-m', 'PyInstaller', '-w', '-y']
 
-        if build_config.get('clean_cache'):
-            cmd.append('--clean')
+        # A stale PyInstaller cache is the usual cause of strange build
+        # results, so every build clears it (there is no option to skip).
+        cmd.append('--clean')
 
         # Project scripts are loaded at runtime, so their imports have to be
         # collected up front - PyInstaller's static analysis cannot see them.

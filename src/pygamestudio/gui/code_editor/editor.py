@@ -163,9 +163,36 @@ class CodeEditor(QPlainTextEdit):
         self._check_syntax()
         return True
 
+    def retarget_file(self, file_path):
+        """Point the editor at a moved/renamed file, keeping the buffer.
+
+        Used when the open file was renamed or moved on disk (asset panel
+        or MCP move_file): the content and the undo history stay, only the
+        path changes - a pending auto-save then writes the new location.
+        """
+        if self._file_path is None:
+            return
+        file_path = Path(file_path)
+        self._file_path = file_path
+        self._is_loading = True
+        self._highlighter.set_language(file_path.suffix)
+        self._is_loading = False
+        self._check_syntax()
+
     def close_file(self):
         """Flush any pending changes and reset the editor state."""
         self.auto_save()
+        self.clear_file()
+
+    def clear_file(self):
+        """Reset the editor and forget the file WITHOUT saving it.
+
+        Used when the shown file was deleted on disk (asset panel or MCP
+        delete_file): keeping the path would let a pending auto-save write
+        the deleted file back to disk.
+        """
+        self._auto_save_timer.stop()
+        self._syntax_check_timer.stop()
         self._file_path = None
         self._is_loading = True
         self.clear()
@@ -503,10 +530,9 @@ class CodeEditor(QPlainTextEdit):
                 # shortcut does not also fire).
                 self.save()
                 return
-            if event.key() == Qt.Key.Key_R:
-                # Ctrl+R: run the current project.
-                self.run_requested.emit()
-                return
+            # Ctrl+R is deliberately not handled here: it is an editor-global
+            # shortcut (Editor.keyPressEvent) that saves this file first when
+            # the code editor is the active panel.
 
         # Indentation: Tab indents with spaces (never a literal tab), Shift+Tab
         # / Ctrl+Shift+Tab unindents a whole level, Enter keeps the current

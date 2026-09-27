@@ -32,7 +32,7 @@ from pygamestudio.gui.inspector.component.spinbox import SuffixSpinBox
 from pygamestudio.gui.tile_map_editor.canvas import (TileMapCanvas, TOOL_PENCIL,
                                                      TOOL_ERASE, TOOL_FILL, TOOL_PICK)
 from pygamestudio.gui.tile_map_editor.palette import TilesetPalette
-from pygamestudio.gui.base.window import DetachButton, WindowBase
+from pygamestudio.gui.base.window import DetachButton, WindowBase, editor_run_handler
 
 IMAGE_FILTER = 'Image (*.png *.jpg *.jpeg *.gif *.bmp *.webp *.tga *.pcx)'
 
@@ -340,10 +340,14 @@ class TileMapEditorWindow(QWidget):
         """Undock the editor into its own frameless top-level window."""
         if self._is_detached or self._tab_widget is None:
             return
+        # Read the run entry point while the editor is still docked: the
+        # floating window forwards Ctrl+R to it (WindowBase.keyPressEvent).
+        run_handler = editor_run_handler(self)
         self._tab_widget.removeTab(self._tab_widget.indexOf(self))
         self.setParent(None)
         self._standalone_window = _TileMapEditorStandaloneWindow(
             self, self._window_title())
+        self._standalone_window.set_editor_run_handler(run_handler)
         self.show()
         self._standalone_window.show()
         self._is_detached = True

@@ -25,6 +25,8 @@ top of the obfuscated code.
 import hashlib
 import io
 import os
+import sys
+import tempfile
 from pathlib import Path
 
 from pygamestudio.common.utils.path import get_project_path
@@ -215,5 +217,53 @@ def read_text(path, encoding='utf-8') -> str:
 
 
 def open_stream(path) -> io.BytesIO:
-    """In-memory stream of an asset, for loaders that accept a file object."""
-    return io.BytesIO(read_bytes(path))
+    """In-memory stream of an asset, for loaders that accept a file object.
+
+    The bytes come decrypted when the file is protected, so loaders never see
+    the container format. The web (Emscripten) needs one extra step: there
+    pygame opens files by ``path`` only - a file object is read for its
+    ``name`` and opened by pygame itself, anything else raises
+    ``RuntimeError: can't access resource on platform`` - so the stream also
+    carries the path of a real file holding these bytes.
+    """
+    data = read_bytes(path)
+    if sys.platform == 'emscripten':
+        return _NamedStream(data, _web_stream_name(path, data))
+    return io.BytesIO(data)
+
+
+class _NamedStream(io.BytesIO):
+    """BytesIO that also carries a file path in ``name``.
+
+    Used on the web, where pygame's loader wrapper ignores the object's data
+    and only takes its ``name`` to open the file itself.
+    """
+
+    def __init__(self, data: bytes, name: str):
+        super().__init__(data)
+        self.name = name
+
+
+def _web_stream_name(path, data: bytes) -> str:
+    """A file ``name`` pygame-on-the-web can open for this asset's bytes.
+
+    A plain asset lives at its own path. A protected one stores the encrypted
+    container there, so the decrypted bytes are written once to a temporary
+    file (named after the asset and its file state) and that path is used.
+    """
+    resolved = resolve(path)
+    if not is_encrypted(resolved):
+        return str(resolved)
+
+    try:
+        stat = resolved.stat()
+        state = '{}-{}-{}'.format(resolved, stat.st_mtime_ns, stat.st_size)
+    except OSError:
+        state = str(resolved)
+    key = hashlib.sha256(state.encode('utf-8')).hexdigest()[:16]
+
+    temp_path = Path(tempfile.gettempdir()) / 'pygs-assets' / (key + (resolved.suffix or '.bin'))
+    if not temp_path.exists():
+        temp_path.parent.mkdir(parents=True, exist_ok=True)
+        temp_path.write_bytes(data)
+    return str(temp_path)

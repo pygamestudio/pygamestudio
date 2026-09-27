@@ -158,6 +158,14 @@ class PygameScreen(QWidget):
         if self._move_gizmo.get_object() and self._move_gizmo.get_object().uuid == object_uuid:
             self._move_gizmo.remove_object()
             self._move_gizmo.hide()
+        # The collision / physics overlay belongs to the SELECTED object: a
+        # deselected object must not keep its green / purple outline. Clicking
+        # the empty canvas deselects every object and then selects the canvas,
+        # which never becomes the overlay object - clearing the reference here
+        # is what makes the outline disappear.
+        if (self._final_selected_object is not None
+                and self._final_selected_object.uuid == object_uuid):
+            self._final_selected_object = None
         self._update_scene()
 
     def _on_object_moved(self, object_uuid):
@@ -385,29 +393,50 @@ class PygameScreen(QWidget):
                                  int(end + ox), int(value + oy))
         painter.restore()
 
+    def _selected_objects(self):
+        """Every selected object of the scene.
+
+        The canvas never shows the collision / physics overlay (its selection
+        lives in the tab, not in the shapes), so it is skipped - children of
+        every node are visited, so nested selections are included.
+        """
+        found = []
+
+        def _collect(node):
+            value = list(node.values())[0]
+            obj = value['object']
+            if obj.selected and obj.type != OBJECT_CANVAS:
+                found.append(obj)
+            for child_node in value['children']:
+                _collect(child_node)
+
+        _collect(self._game_manager.all_object_tree_struct)
+        return found
+
     def _draw_collision_overlay(self, painter):
-        """Outline the selected object's bodies while the switches are on.
+        """Outline EVERY selected object's bodies while the switches are on.
 
         Green (solid) = collision - the geometry/raycast system, drawn from the
         collision shape. Purple (dashed) = physics - the rigid body, drawn from
         its own rigid-body shape. Both can be shown at once; they are two
-        independent shapes."""
-        obj = self._final_selected_object
-        if obj is None or getattr(obj, 'type', '') == OBJECT_CANVAS:
-            return
-        collision_on = bool(getattr(obj, 'collision_enabled', False))
-        physics_on = bool(getattr(obj, 'physics_enabled', False))
-        if not collision_on and not physics_on:
+        independent shapes. The outlines follow the whole selection, so a
+        multi-selection shows every object that has one of the switches on -
+        not just the most recently selected one."""
+        objects = self._selected_objects()
+        if not objects:
             return
         ox, oy = self.scene_offset()
         painter.save()
         painter.setBrush(Qt.BrushStyle.NoBrush)
-        if collision_on and hasattr(obj, '_collision_geometry_world'):
-            self._draw_shape_overlay(painter, obj._collision_geometry_world(),
-                                     QColor(0, 255, 0), ox, oy)
-        if physics_on and hasattr(obj, '_physics_shape_geometry_world'):
-            self._draw_shape_overlay(painter, obj._physics_shape_geometry_world(),
-                                     QColor(168, 85, 247), ox, oy, dashed=True)
+        for obj in objects:
+            collision_on = bool(getattr(obj, 'collision_enabled', False))
+            physics_on = bool(getattr(obj, 'physics_enabled', False))
+            if collision_on and hasattr(obj, '_collision_geometry_world'):
+                self._draw_shape_overlay(painter, obj._collision_geometry_world(),
+                                         QColor(0, 255, 0), ox, oy)
+            if physics_on and hasattr(obj, '_physics_shape_geometry_world'):
+                self._draw_shape_overlay(painter, obj._physics_shape_geometry_world(),
+                                         QColor(168, 85, 247), ox, oy, dashed=True)
         painter.restore()
 
     def _draw_shape_overlay(self, painter, shape, color, ox, oy, dashed=False):

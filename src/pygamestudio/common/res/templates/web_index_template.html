@@ -123,9 +123,14 @@ try {
     pyodide.canvas.setCanvas2D(document.getElementById("canvas"));
     setProgress(95);
 
-    // No Start button, no extra click: the game starts as soon as it is ready
-    // and the loading bar disappears.
-    loaderElement.style.display = "none";
+    // The boot drives the rest: it reports progress while it prepares the
+    // game (physics install, project load) through these hooks and hides the
+    // loading bar only when the game loop is about to start. No Start
+    // button, no extra click.
+    globalThis.__pygsProgress = setProgress;
+    globalThis.__pygsGameStarted = () => {
+        loaderElement.style.display = "none";
+    };
     await pyodide.runPythonAsync(bootSource);
 } catch (error) {
     showError(error);

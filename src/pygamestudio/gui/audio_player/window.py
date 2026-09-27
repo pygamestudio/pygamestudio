@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (QFileDialog, QHBoxLayout, QLabel, QPushButton,
 from pygamestudio.gui.audio_player.engine import (AudioEngine, STATE_PLAYING,
                                                   STATE_PAUSED)
 from pygamestudio.gui.audio_player.widgets import AudioProgress
-from pygamestudio.gui.base.window import DetachButton, WindowBase
+from pygamestudio.gui.base.window import DetachButton, WindowBase, editor_run_handler
 from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.gui.console.logger import Logger
 
@@ -333,9 +333,13 @@ class AudioPlayerWindow(QWidget):
     def detach(self):
         if self._is_detached or self._tab_widget is None:
             return
+        # Read the run entry point while the panel is still docked: the
+        # floating window forwards Ctrl+R to it (WindowBase.keyPressEvent).
+        run_handler = editor_run_handler(self)
         self._tab_widget.removeTab(self._tab_widget.indexOf(self))
         self.setParent(None)
         self._standalone_window = _AudioPlayerStandaloneWindow(self, self._window_title())
+        self._standalone_window.set_editor_run_handler(run_handler)
         self.show()
         self._standalone_window.show()
         self._is_detached = True

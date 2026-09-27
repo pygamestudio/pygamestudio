@@ -1213,12 +1213,14 @@ class GameManager(QObject):
         return self._save_as()
     
     def _save_as(self):
+        """Ask for a file and save the scene there; False when cancelled."""
         path, _ = QFileDialog.getSaveFileName(QApplication.activeWindow(), T.tr('dialog.save_title', 'Save File'), self._project_path, f"{T.tr('dialog.format', 'Format')} (*.scene)")
         if not path:
-            return
+            return False
         
         self._current_scene_file_path = path
         self._save()
+        return True
 
     def load_scene(self, current_scene_file_path, silent=False):
         return self._load_scene(current_scene_file_path, silent=silent)
@@ -1291,18 +1293,44 @@ class GameManager(QObject):
     def clear(self):
         self._all_object_tree_struct = {}
 
+    def _ensure_scene_saved_before_run(self):
+        """Save the scene so the running game can load it; False = do not run.
+
+        The game reads the .scene file from disk: a scene that was never
+        saved would start it with an empty (black) screen, so this asks for a
+        file first (Save As) and tells the caller to skip the run when that
+        dialog is cancelled. Unsaved edits - and a file deleted outside the
+        editor - are persisted without asking.
+        """
+        if not self._current_scene_file_path:
+            try:
+                saved = self._save_as()
+            except Exception as e:
+                Logger.error(T.tr('scene.failed_to_save_before_run', 'Failed to save scene before running: {}').format(e))
+                return False
+            if not saved:
+                Logger.info(T.tr('scene.run_cancelled', 'Run cancelled: the scene was not saved to a .scene file yet.'))
+                return False
+            return True
+
+        if not self._is_current_scene_saved or not Path(self._current_scene_file_path).exists():
+            try:
+                self._save_scene()
+            except Exception as e:
+                Logger.error(T.tr('scene.failed_to_save_before_run', 'Failed to save scene before running: {}').format(e))
+        return True
+
     def run_project(self):
         """Launch the project's main.py in a separate process and forward its
-        stdout/stderr to the editor console (info for stdout, error for stderr)."""
-        # The game reads the .scene file from disk, so persist the current
-        # (possibly unsaved) scene first - otherwise edits made since the last
-        # save (e.g. a text input's max_length) would never reach the running
-        # game. Only save when a scene file already exists (no Save-As dialog).
-        try:
-            if self._current_scene_file_path and not self._is_current_scene_saved:
-                self._save_scene()
-        except Exception as e:
-            Logger.error(T.tr('scene.failed_to_save_before_run', 'Failed to save scene before running: {}').format(e))
+        stdout/stderr to the editor console (info for stdout, error for stderr).
+
+        The game loads the scene from disk, so it is saved first: a scene
+        without a .scene file asks for one (Save As) and the run is skipped
+        when that dialog is cancelled. Returns True when the game process was
+        started.
+        """
+        if not self._ensure_scene_saved_before_run():
+            return False
 
         try:
             # QProcess integrates with the Qt event loop, so the game's output
@@ -1328,8 +1356,10 @@ class GameManager(QObject):
             process.start(sys.executable, [str(Path(self._project_path) / 'main.py')])
             self._game_processes.append(process)
             Logger.info(T.tr('scene.run_project', 'Run Project {}').format(Path(self._project_path).name))
+            return True
         except Exception as e:
             Logger.error(T.tr('scene.failed_to_run_project', 'Failed to Run Project {}: {}').format(Path(self._project_path).name, e))
+            return False
 
     def _on_game_stdout_ready(self, process):
         """Forward the game's stdout lines to the console as info logs."""

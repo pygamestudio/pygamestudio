@@ -7,7 +7,10 @@ The bundle is a plain folder with a few files:
 * ``game.zip`` - the PROTECTED project (assets and scripts encrypted, code
   stripped/obfuscated, the build key in ``resources.cache`` - exactly like the
   desktop build), plus a COPY of the engine and a generated ``web_boot.py``;
-* one favicon file for the browser tab.
+* one favicon file for the browser tab;
+* ``pymunk-*.whl`` - only when the project uses physics: the Pyodide wheel of
+  pymunk (shipped with the engine), installed by the page from its own folder
+  so the browser simulates the physics without downloading anything.
 
 The engine copy is patched while the archive is written: a browser tab cannot
 block on ``Clock.tick()`` and cannot call ``sys.exit()``, so the copy gets an
@@ -63,8 +66,15 @@ _IGNORED_DIR_NAMES = {'__pycache__', '.git', '.github', '.vscode', '.idea',
 _ENGINE_DIRS = ('api', 'game', 'common')
 #: Editor files the runtime imports (the logger is plain Python, no Qt in it).
 _ENGINE_EXTRA_FILES = ('gui/__init__.py', 'gui/console/__init__.py', 'gui/console/logger.py')
-#: ``common/res`` data only the editor uses (fonts are per project).
-_ENGINE_RES_SKIP = ('fonts', 'qss', 'templates', 'audios')
+#: ``common/res`` data only the editor uses (fonts are per project). The
+#: physics wheels ship NEXT TO the bundle, never inside the archive.
+_ENGINE_RES_SKIP = ('fonts', 'qss', 'templates', 'audios', 'wheels')
+#: Folder in ``common/res`` holding the Pyodide wheels of the engine.
+WHEELS_DIR_NAME = 'wheels'
+#: Boot template placeholder holding the pymunk install source ('' = none).
+PYMUNK_SOURCE_PLACEHOLDER = '__PYGS_PYMUNK_SOURCE__'
+#: Install source used when the shipped pymunk wheel is missing (PyPI name).
+PYMUNK_PACKAGE_NAME = 'pymunk'
 #: File names never copied from the project root.
 _PROJECT_SKIP_SUFFIXES = ('.pyc', '.pyo')
 #: Engine file replaced by its patched copy in the bundle.
@@ -177,6 +187,7 @@ class _WebPreviewRequestHandler(http.server.SimpleHTTPRequestHandler):
         **http.server.SimpleHTTPRequestHandler.extensions_map,
         '.ico': 'image/x-icon',
         '.mjs': 'text/javascript',
+        '.whl': 'application/octet-stream',
         '.zip': 'application/zip',
     }
 
@@ -601,7 +612,8 @@ class WebAppBuilder:
         self._check_stopped()
 
         index_template = self._read_template('web_index_template.html')
-        boot_source = self._read_template('web_boot_template.py')
+        boot_source = self._read_template('web_boot_template.py').replace(
+            PYMUNK_SOURCE_PLACEHOLDER, self._prepare_physics(bundle_dir))
         self._progress(25)
 
         game_source_path = Path(pygamestudio.__file__).parent / GAME_SOURCE_RELATIVE_PATH
@@ -624,9 +636,6 @@ class WebAppBuilder:
 
         # The staging copy has done its job: only the page and the archive stay.
         shutil.rmtree(bundle_dir / PROTECTED_WORK_DIR_NAME, ignore_errors=True)
-
-        if self._uses_physics():
-            Logger.warning(T.tr('build.web_physics_unsupported', 'The project uses physics, which the browser cannot run yet (pymunk is not part of Pyodide): those objects will not be simulated in the web build'))
 
         Logger.info(T.tr('build.web_build_summary', 'Bundled {} project file(s) and {} engine file(s)').format(project_count, engine_count))
         self._check_stopped()
@@ -815,6 +824,41 @@ class WebAppBuilder:
             if '"physics_enabled": true' in text or '"physics_enabled":true' in text:
                 return True
         return False
+
+    def _prepare_physics(self, bundle_dir):
+        """Ship pymunk with the bundle when the project uses physics.
+
+        :return: the install source for the boot template - the shipped wheel
+            file name (installed from the page's own folder), the plain
+            package name when that wheel is missing (PyPI fallback), or ''
+            when the project has no physics (nothing is written).
+        """
+        if not self._uses_physics():
+            return ''
+
+        wheel_path = self._find_pymunk_wheel()
+        if wheel_path is None:
+            Logger.warning(T.tr('build.web_physics_pypi_fallback', 'The project uses physics but the shipped pymunk wheel is missing from the engine resources ({}): the page will download pymunk from PyPI instead').format(self._wheels_dir().as_posix()))
+            return PYMUNK_PACKAGE_NAME
+
+        shutil.copyfile(wheel_path, bundle_dir / wheel_path.name)
+        Logger.info(T.tr('build.web_physics_bundled', 'The project uses physics: pymunk ships next to the page and the browser runs the simulation'))
+        return wheel_path.name
+
+    def _wheels_dir(self):
+        """Folder with the Pyodide wheels shipped with the engine."""
+        return RES_PATH / WHEELS_DIR_NAME
+
+    def _find_pymunk_wheel(self):
+        """The Pyodide (WASM) wheel of pymunk shipped with the engine, if any."""
+        directory = self._wheels_dir()
+        if not directory.is_dir():
+            return None
+        for path in sorted(directory.glob('pymunk-*.whl')):
+            name = path.name.lower()
+            if 'wasm32' in name or 'pyemscripten' in name or 'pyodide' in name:
+                return path
+        return None
 
     def _progress(self, value):
         if self._progress_callback is not None:

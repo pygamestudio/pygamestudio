@@ -16,6 +16,7 @@ plain Python control flow and are shared by every object.
 """
 
 from pygamestudio.common.i18n.translator import Translator as T
+from pygamestudio.gui.block_editor.model import variable_type
 
 # ---------------------------------------------------------------- categories
 
@@ -51,6 +52,7 @@ FIELD_WIDTHS = {
     'text': 100,
     'value': 70,
     'number': 60,
+    'amount': 70,
     'property': 132,
     'expr': 132,
     'operator': 62,
@@ -63,8 +65,8 @@ FIELD_WIDTHS = {
 # (the canvas asks options_for() for the entries).
 OPTION_FIELD_KINDS = ('property', 'expr', 'operator', 'key', 'toggle', 'event')
 
-_DEFAULT_BY_KIND = {'text': '', 'value': '0', 'number': 0, 'property': None, 'operator': None,
-                    'choice': None}
+_DEFAULT_BY_KIND = {'text': '', 'value': '0', 'number': 0, 'amount': '0', 'property': None,
+                    'operator': None, 'choice': None}
 
 # Values a "property" field can produce (code expression, i18n key, default text).
 PROPERTY_OPTIONS = (
@@ -181,7 +183,7 @@ ORDER = []
 
 
 def _add(block_type, category, label, default_label, fields=(), code='', callback=None, params='',
-         shape=None, objects=None, header=None):
+         shape=None, objects=None, header=None, branch=None):
     definition = {
         'type': block_type,
         'category': category,
@@ -190,6 +192,9 @@ def _add(block_type, category, label, default_label, fields=(), code='', callbac
         # Some blocks read shorter on the canvas than in the palette (an
         # if/else block is labelled “If” on its header and “else” on its bar).
         'header': header,
+        # the role of a branch piece: 'if' starts an if / elif / else chain,
+        # 'elif' / 'else' continue it (see generator._emit_stack)
+        'branch': branch,
         'fields': [
             {'name': name,
              'kind': kind,
@@ -203,6 +208,11 @@ def _add(block_type, category, label, default_label, fields=(), code='', callbac
         'params': params,
         'has_body': '{body}' in code,
         'has_else': '{else_block}' in code,
+        # the statement lists the block owns, in render order
+        'slots': tuple(key for key, placeholder in (('body', '{body}'),
+                                                    ('elif', '{elif_block}'),
+                                                    ('else', '{else_block}'))
+                       if placeholder in code),
         'objects': tuple(objects) if objects else ALL_OBJECTS,
     }
     if shape is None:
@@ -217,6 +227,7 @@ def _add(block_type, category, label, default_label, fields=(), code='', callbac
     if shape == 'hat':
         # a hat owns the statements stacked below it (its function body)
         definition['has_body'] = True
+        definition['slots'] = ('body',)
     definition['shape'] = shape
     BLOCKS[block_type] = definition
     ORDER.append(block_type)
@@ -290,7 +301,7 @@ _add('action_set_property', 'action', 'block.act.set_property', 'Set property to
      fields=(('property', 'property'), ('value', 'value')),
      code='{property} = {value}')
 _add('action_change_property', 'action', 'block.act.change_property', 'Change property by',
-     fields=(('property', 'property'), ('delta', 'number')),
+     fields=(('property', 'property'), ('delta', 'amount')),
      code='{property} += {delta}')
 _add('action_move_to', 'action', 'block.act.move_to', 'Move to x y',
      fields=(('x', 'number'), ('y', 'number')),
@@ -373,11 +384,12 @@ _add('physics_set_gravity', 'physics', 'block.phy.set_gravity', 'World gravity x
 
 _add('control_if', 'control', 'block.ctl.if', 'If',
      fields=(('property', 'expr'), ('operator', 'operator'), ('value', 'value')),
-     code='if {property} {operator} {value}:\n{body}')
-_add('control_if_else', 'control', 'block.ctl.if_else', 'If / else',
+     code='if {property} {operator} {value}:\n{body}', branch='if')
+_add('control_elif', 'control', 'block.ctl.elif', 'else if',
      fields=(('property', 'expr'), ('operator', 'operator'), ('value', 'value')),
-     code='if {property} {operator} {value}:\n{body}\nelse:\n{else_block}',
-     header=('block.ctl.if', 'If'))
+     code='elif {property} {operator} {value}:\n{body}', branch='elif')
+_add('control_else', 'control', 'block.ctl.else', 'else',
+     code='else:\n{body}', branch='else')
 _add('control_repeat', 'control', 'block.ctl.repeat', 'Repeat',
      fields=(('times', 'number', 10),),
      code='for _ in range({times}):\n{body}')
@@ -510,13 +522,23 @@ def option_text(option):
     return T.tr(option[1], option[2])
 
 
-def options_for(kind):
-    """The dropdown options of a field kind."""
+def options_for(kind, variables=()):
+    """The dropdown options of a field kind.
+
+    ``variables`` threads the script's own variables into the assignable
+    property list, the condition operands and the “change by” amount, so
+    every block that reads or writes a property can use them besides the
+    object's properties.
+    """
     if kind == 'property':
-        return PROPERTY_OPTIONS
+        return _OBJECT_PROPERTY_OPTIONS + variable_options(variables) + _CALLBACK_VALUE_OPTIONS
     if kind == 'expr':
         # condition operands: the assignable fields plus the read-only values
-        return PROPERTY_OPTIONS + CONDITION_OPTIONS
+        return (_OBJECT_PROPERTY_OPTIONS + variable_options(variables) + CONDITION_OPTIONS
+                + _CALLBACK_VALUE_OPTIONS)
+    if kind == 'amount':
+        # “change property by” takes a number - or one of the number variables
+        return variable_options(variables, 'number')
     if kind == 'operator':
         return OPERATOR_OPTIONS
     if kind == 'key':
@@ -524,3 +546,33 @@ def options_for(kind):
     if kind == 'toggle':
         return TOGGLE_OPTIONS
     return ()
+
+
+# The assignable object properties (what “Set property” may write) and the
+# pseudo-values a callback receives (dt / value / text / other), split so the
+# script's own variables can be listed right after the object properties.
+_OBJECT_PROPERTY_OPTIONS = tuple(option for option in PROPERTY_OPTIONS
+                                 if option[0].startswith('self.obj.'))
+_CALLBACK_VALUE_OPTIONS = tuple(option for option in PROPERTY_OPTIONS
+                                if not option[0].startswith('self.obj.'))
+
+
+def variable_options(variables, value_type=None):
+    """[(code, i18n key, default label)] of the script's own variables.
+
+    A variable is a plain instance attribute (``self.speed``); its label is
+    the bare name, which reads the same in every language (like the literal
+    key options do), so the i18n key stays empty. ``value_type`` limits the
+    list to one type (the “change by” amount only offers number variables).
+    """
+    options = []
+    for variable in variables or ():
+        if not isinstance(variable, dict):
+            continue
+        name = str(variable.get('name') or '').strip()
+        if not name:
+            continue
+        if value_type is not None and variable_type(variable) != value_type:
+            continue
+        options.append(('self.{}'.format(name), '', name))
+    return tuple(options)
