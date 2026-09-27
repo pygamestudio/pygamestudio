@@ -53,8 +53,8 @@ If the Pygame Studio editor launches successfully, the installation is complete.
 | platformdirs | >=3.5.1 | 
 | numpy | >=1.26.0 | 
 | pyinstaller | >=6.18.0 |
-| pymunk | >=7.0 |
-| pyobfus | >=0.5 |
+| pymunk | >=7.3.0 |
+| pyobfus | >=0.5.26 |
 
 <br>
 
