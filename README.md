@@ -7,6 +7,7 @@
     <img src="https://static.pepy.tech/personalized-badge/pygamestudio?period=total&units=international_system&left_color=grey&right_color=blue&left_text=Downloads" />
     <img src="https://img.shields.io/pypi/v/pygamestudio.svg?maxAge=86400">
     <img src="https://img.shields.io/badge/python-3-red.svg" />
+    <img src="https://img.shields.io/badge/Buy Me a Coffee-KoFi-yellow.svg" />
     <br>
     <br>
 
@@ -21,10 +22,8 @@ English&nbsp; | &nbsp;[简体中文](https://github.com/pygamestudio/pygamestudi
 Install Pygame Studio easily via pip (ensure you have Python 3.9 or higher installed):
 
 ```bash
-pip install --upgrade pygamestudio
+pip install pygamestudio
 ```
-
-> **Note:** Since current releases are development versions, please include `--upgrade` to ensure pip installs the latest development version instead of an older cached one.
 
 <br>
 
@@ -54,6 +53,8 @@ If the Pygame Studio editor launches successfully, the installation is complete.
 | platformdirs | >=3.5.1 | 
 | numpy | >=1.26.0 | 
 | pyinstaller | >=6.18.0 |
+| pymunk | >=7.0 |
+| pyobfus | >=0.5 |
 
 <br>
 

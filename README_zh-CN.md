@@ -7,6 +7,7 @@
     <img src="https://static.pepy.tech/personalized-badge/pygamestudio?period=total&units=international_system&left_color=grey&right_color=blue&left_text=Downloads" />
     <img src="https://img.shields.io/pypi/v/pygamestudio.svg?maxAge=86400">
     <img src="https://img.shields.io/badge/python-3-red.svg" />
+    <img src="https://img.shields.io/badge/Buy Me a Coffee-KoFi-yellow.svg" />
     <br>
     <br>
 
@@ -21,10 +22,8 @@
 你可以通过 pip 快速安装 Pygame Studio（请确保已安装 Python 3.9 及以上版本）：
 
 ```bash
-pip install --upgrade pygamestudio
+pip install pygamestudio
 ```
-
-> **注意：** 当前版本均为开发测试版，请务必加上 --upgrade 参数，确保安装最新开发版，而非本地缓存的旧版本。
 
 <br>
 
@@ -54,6 +53,8 @@ pygs
 | platformdirs | >=3.5.1 | 
 | numpy | >=1.26.0 | 
 | pyinstaller | >=6.18.0 |
+| pymunk | >=7.0 |
+| pyobfus | >=0.5 |
 
 <br>
 
