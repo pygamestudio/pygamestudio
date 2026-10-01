@@ -42,6 +42,7 @@ OBJECTS = (
     {'key': 'progress_bar', 'label': 'item.progress_bar', 'default_label': 'Progress Bar'},
     {'key': 'slider', 'label': 'item.slider', 'default_label': 'Slider'},
     {'key': 'frame_sequence', 'label': 'item.frame_sequence', 'default_label': 'Frame Sequence'},
+    {'key': 'keyframe', 'label': 'item.keyframe', 'default_label': 'Keyframe'},
     {'key': 'particle', 'label': 'item.particle', 'default_label': 'Particle Emitter'},
     {'key': 'tile_map', 'label': 'item.tile_map', 'default_label': 'Tile Map'},
 )
@@ -275,10 +276,10 @@ EVENT_BLOCKS = (
     ('on_value_changed', 'value_changed', 'When the slider value changes (value)', 'value', ('slider',)),
     ('on_collision_enter', 'collision_enter', 'When a collision starts (other)', 'other', ALL_OBJECTS),
     ('on_collision_exit', 'collision_exit', 'When a collision ends (other)', 'other', ALL_OBJECTS),
-    ('on_animation_start', 'animation_start', 'When the animation starts', '', ('frame_sequence',)),
+    ('on_animation_start', 'animation_start', 'When the animation starts', '', ('frame_sequence', 'keyframe')),
     ('on_frame_changed', 'frame_changed', 'When the frame changes (frame_index)', 'frame_index',
      ('frame_sequence',)),
-    ('on_animation_finished', 'animation_finished', 'When the animation finishes', '', ('frame_sequence',)),
+    ('on_animation_finished', 'animation_finished', 'When the animation finishes', '', ('frame_sequence', 'keyframe')),
     ('on_particles_finished', 'particles_finished', 'When the particles are done', '', ('particle',)),
     ('on_progress_changed', 'progress_changed', 'When the progress changes (progress)', 'progress',
      ('progress_bar',)),
@@ -341,14 +342,17 @@ _add('action_print', 'action', 'block.act.print', 'Print',
      fields=(('text', 'text'),),
      code='print({text})')
 _add('action_play_animation', 'action', 'block.act.play_animation', 'Play animation',
-     code='self.obj.play()', objects=('frame_sequence',))
+     code='self.obj.play()', objects=('frame_sequence', 'keyframe'))
 _add('action_pause_animation', 'action', 'block.act.pause_animation', 'Pause animation',
-     code='self.obj.pause()', objects=('frame_sequence',))
+     code='self.obj.pause()', objects=('frame_sequence', 'keyframe'))
 _add('action_set_frame', 'action', 'block.act.set_frame', 'Go to frame (index)',
      fields=(('index', 'number'),),
      code='self.obj.set_frame_index({index})', objects=('frame_sequence',))
+_add('action_set_time', 'action', 'block.act.set_time', 'Go to time (s)',
+     fields=(('time', 'number'),),
+     code='self.obj.set_time({time})', objects=('keyframe',))
 _add('action_restart_animation', 'action', 'block.act.restart_animation', 'Restart animation',
-     code='self.obj.restart()', objects=('frame_sequence',))
+     code='self.obj.restart()', objects=('frame_sequence', 'keyframe'))
 _add('action_emit_particles', 'action', 'block.act.emit_particles', 'Emit particles',
      fields=(('count', 'number', 10),),
      code='self.obj.emit_particles({count})', objects=('particle',))

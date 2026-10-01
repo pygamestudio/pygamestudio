@@ -39,6 +39,23 @@ QPushButton:pressed {
     background-color: #c0c0c0;
 }
 
+/* Path line-edit buttons (browse / clear) stay flat until hovered, exactly
+   like the inspector's own buttons. */
+QPushButton#imagePathBrowseBtn, QPushButton#imagePathDeleteBtn {
+    background-color: transparent;
+    border: none;
+}
+
+QPushButton#imagePathBrowseBtn:hover, QPushButton#imagePathDeleteBtn:hover {
+    background-color: #e0e0e0;
+    border-radius: 5px;
+}
+
+QPushButton#imagePathBrowseBtn:pressed, QPushButton#imagePathDeleteBtn:pressed {
+    background-color: #c0c0c0;
+    border-radius: 5px;
+}
+
 QLineEdit {
     border-radius: 5px;
     border: 1px solid #c0c0c0;

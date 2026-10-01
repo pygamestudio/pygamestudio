@@ -20,6 +20,7 @@ from pygamestudio.game.object.text_input import *
 from pygamestudio.game.object.progress_bar import *
 from pygamestudio.game.object.slider import *
 from pygamestudio.game.object.frame_sequence import *
+from pygamestudio.game.object.keyframe import *
 from pygamestudio.game.object.tile_map import *
 from pygamestudio.api.config.project import get_project_config
 from pygamestudio.common.i18n.translator import Translator as T
@@ -170,6 +171,8 @@ class SceneLoader:
             obj = ObjectSlider(self, object_data, is_for_api=True)
         elif object_type == OBJECT_FRAME_SEQUENCE:
             obj = ObjectFrameSequence(self, object_data, is_for_api=True)
+        elif object_type == OBJECT_KEYFRAME:
+            obj = ObjectKeyframe(self, object_data, is_for_api=True)
         elif object_type == OBJECT_TILE_MAP:
             obj = ObjectTileMap(self, object_data, is_for_api=True)
         else:

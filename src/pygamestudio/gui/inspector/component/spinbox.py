@@ -239,6 +239,29 @@ class FrameSequenceSpinBox(SuffixSpinBox):
         self._inspector_container.set_object_frame_sequence_parameter(self._attr, new_value)
 
 
+class KeyframeSpinBox(SuffixSpinBox):
+    """Spinbox for one keyframe-animation parameter (the duration, ...)."""
+
+    _SUFFIXES = {
+        'duration': 'S',
+    }
+
+    def __init__(self, inspector_container, value, attr=''):
+        super().__init__()
+        self._inspector_container = inspector_container
+        self._attr = attr
+        self.setRange(0, 999999)
+        self.setSingleStep(0.1)
+        self.setDecimals(2)
+        self.setValue(value)
+        self.set_suffix(self._SUFFIXES.get(attr, ''))
+
+        self.valueChanged.connect(self._on_value_changed)
+
+    def _on_value_changed(self):
+        self._inspector_container.set_object_keyframe_parameter(self._attr, float(self.value()))
+
+
 class CollisionSpinBox(SuffixSpinBox):
     """Spinbox for one collision parameter: offset x/y or box size w/h. All
     values are integers (content pixels)."""

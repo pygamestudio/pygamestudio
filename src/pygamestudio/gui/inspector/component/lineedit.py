@@ -118,12 +118,14 @@ class ImagePathLineEdit(_PathLineEditDropMixin, QLineEdit):
             if not image_absolute_path.exists():
                 self.setStyleSheet('color: rgb(255, 0, 0);')
 
+        self._browse_button.setObjectName('imagePathBrowseBtn')
         self._browse_button.setFixedSize(18, 18)
         self._browse_button.setCursor(Qt.CursorShape.PointingHandCursor)
         pixmap = QPixmap(':/images/browse.png')
         scaled_pixmap = pixmap.scaled(self._browse_button.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         self._browse_button.setIcon(QIcon(scaled_pixmap))
         
+        self._delete_button.setObjectName('imagePathDeleteBtn')
         self._delete_button.setFixedSize(18, 18)
         self._delete_button.setCursor(Qt.CursorShape.PointingHandCursor)
         pixmap = QPixmap(':/images/close.png')

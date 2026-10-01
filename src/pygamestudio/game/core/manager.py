@@ -18,6 +18,7 @@ from pygamestudio.game.object.text_input import *
 from pygamestudio.game.object.progress_bar import *
 from pygamestudio.game.object.slider import *
 from pygamestudio.game.object.frame_sequence import *
+from pygamestudio.game.object.keyframe import *
 from pygamestudio.game.object.tile_map import *
 from pygamestudio.common.utils.config import *
 from pygamestudio.gui.console.logger import Logger
@@ -74,6 +75,7 @@ class GameManager(QObject):
     object_points_changed = Signal(str)
     object_particle_parameter_changed = Signal(str)
     object_frame_sequence_parameter_changed = Signal(str)
+    object_keyframe_parameter_changed = Signal(str)
     object_text_input_parameter_changed = Signal(str)
     object_tile_map_parameter_changed = Signal(str)
     object_progress_bar_parameter_changed = Signal(str)
@@ -282,6 +284,8 @@ class GameManager(QObject):
             obj = ObjectSlider(self, object_data)
         elif object_type == OBJECT_FRAME_SEQUENCE:
             obj = ObjectFrameSequence(self, object_data)
+        elif object_type == OBJECT_KEYFRAME:
+            obj = ObjectKeyframe(self, object_data)
         elif object_type == OBJECT_TILE_MAP:
             obj = ObjectTileMap(self, object_data)
 
@@ -610,6 +614,17 @@ class GameManager(QObject):
 
     def set_frame_sequence_parameter(self, object_uuid, attr, new_value):
         """Change one frame-sequence parameter (undoable)."""
+        obj = self._get_object(object_uuid)
+        old_value = getattr(obj, attr)
+
+        if old_value == new_value:
+            return
+
+        self._undo_stack.push(UpdateAttrValueCommand(self, obj, attr, old_value, new_value))
+
+    def set_keyframe_parameter(self, object_uuid, attr, new_value):
+        """Change one keyframe-animation parameter (undoable): the keyframes
+        list, duration, auto_play or loop."""
         obj = self._get_object(object_uuid)
         old_value = getattr(obj, attr)
 

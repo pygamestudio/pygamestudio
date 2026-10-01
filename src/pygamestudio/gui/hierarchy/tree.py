@@ -12,6 +12,9 @@ class HierarchyTreeView(QTreeView):
     # Emitted when a TILE_MAP object is double-clicked (the editor opens its
     # tile map editor tab on that object).
     edit_tile_map_requested = Signal(str)
+    # Emitted when a KEYFRAME object is double-clicked (the editor opens its
+    # animation editor tab on that object).
+    edit_animation_requested = Signal(str)
 
     def __init__(self, parent, game_manager):
         super().__init__(parent)
@@ -106,14 +109,19 @@ class HierarchyTreeView(QTreeView):
         self._game_manager.select(index_uuid)
 
     def _on_item_double_clicked(self, index):
-        """Double-clicking a Tile Map object opens the tile map editor on it."""
+        """Double-clicking a Tile Map object opens the tile map editor on it;
+        a Keyframe object opens the animation editor."""
         item = self._standard_model.itemFromIndex(self._proxy_model.mapToSource(index))
         item_uuid = item.data(Qt.ItemDataRole.UserRole+1) if item else None
         if not item_uuid:
             return
         obj = self._game_manager.get_object(item_uuid)
-        if obj is not None and getattr(obj, 'type', '') == OBJECT_TILE_MAP:
+        if obj is None:
+            return
+        if getattr(obj, 'type', '') == OBJECT_TILE_MAP:
             self.edit_tile_map_requested.emit(item_uuid)
+        elif getattr(obj, 'type', '') == OBJECT_KEYFRAME:
+            self.edit_animation_requested.emit(item_uuid)
 
     def _on_object_selected(self, object_uuid):
         self.selectionModel().blockSignals(True)

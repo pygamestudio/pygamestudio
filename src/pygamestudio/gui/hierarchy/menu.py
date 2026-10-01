@@ -34,6 +34,7 @@ class ContextMenu(QMenu):
         add_progress_bar_action = QAction(T.tr('item.progress_bar', 'Progress Bar'), self)
         add_slider_action = QAction(T.tr('item.slider', 'Slider'), self)
         add_frame_sequence_action = QAction(T.tr('item.frame_sequence', 'Frame Sequence'), self)
+        add_keyframe_action = QAction(T.tr('item.keyframe', 'Keyframe'), self)
         add_tile_map_action = QAction(T.tr('item.tile_map', 'Tile Map'), self)
         cut_action = QAction(T.tr('menu.cut', 'Cut'), self)
         copy_action = QAction(T.tr('menu.copy', 'Copy'), self)
@@ -57,6 +58,7 @@ class ContextMenu(QMenu):
         add_progress_bar_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_PROGRESS_BAR))
         add_slider_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_SLIDER))
         add_frame_sequence_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_FRAME_SEQUENCE))
+        add_keyframe_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_KEYFRAME))
         add_tile_map_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_TILE_MAP))
         cut_action.triggered.connect(self.cut_signal.emit)
         copy_action.triggered.connect(self.copy_signal.emit)
@@ -95,6 +97,7 @@ class ContextMenu(QMenu):
         add_ui_sub_menu.addAction(add_slider_action)
         add_effects_sub_menu.addAction(add_particle_action)
         add_animation_sub_menu.addAction(add_frame_sequence_action)
+        add_animation_sub_menu.addAction(add_keyframe_action)
         add_world_sub_menu.addAction(add_tile_map_action)
 
         # Right click on the blank area.

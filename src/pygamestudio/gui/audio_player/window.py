@@ -354,9 +354,10 @@ class AudioPlayerWindow(QWidget):
             standalone._editor_window = None
             standalone.hide()
             standalone.deleteLater()
-        # Re-dock right after the console tab (index 1).
-        self._tab_widget.insertTab(1, self, self._tab_title())
-        self._tab_widget.setCurrentIndex(1)
+        # Re-dock right after the console and the animation editor tabs
+        # (the animation editor sits at index 1, so the player follows it).
+        self._tab_widget.insertTab(2, self, self._tab_title())
+        self._tab_widget.setCurrentIndex(2)
         self.show()
         self._is_detached = False
         self._update_detach_button()

@@ -19,6 +19,7 @@ from pygamestudio.gui.about.window import AboutWindow
 from pygamestudio.gui.build.window import BuildWindow
 from pygamestudio.gui.code_editor.window import CodeEditorWindow
 from pygamestudio.gui.block_editor.window import BlockEditorWindow
+from pygamestudio.gui.animation_editor.window import AnimationEditorWindow
 from pygamestudio.gui.block_editor.storage import can_hold_blocks, is_block_script
 from pygamestudio.gui.image_editor.window import ImageEditorWindow
 from pygamestudio.gui.audio_player.window import AudioPlayerWindow
@@ -50,6 +51,7 @@ class EditorBody(QMainWindow):
         self._block_editor_window = BlockEditorWindow(game_manager)
         self._image_editor_window = ImageEditorWindow(game_manager)
         self._audio_player_window = AudioPlayerWindow(game_manager)
+        self._animation_editor_window = AnimationEditorWindow(game_manager)
         self._tile_map_editor_window = TileMapEditorWindow(game_manager)
         # The AI agent panel gets its own column on the right of the inspector,
         # so the conversation stays visible next to the properties.
@@ -104,6 +106,8 @@ class EditorBody(QMainWindow):
         self._tile_map_editor_window.set_tab_widget(self._center_top_tab_widget)
         self._center_bottom_tab_widget.addTab(self._console_window, T.tr('console.console', 'Console'))
         self._console_window.set_tab_widget(self._center_bottom_tab_widget)
+        self._center_bottom_tab_widget.addTab(self._animation_editor_window, T.tr('animation.editor', 'Animation Editor'))
+        self._animation_editor_window.set_tab_widget(self._center_bottom_tab_widget)
         self._center_bottom_tab_widget.addTab(self._audio_player_window, T.tr('audio.player', 'Audio Player'))
         self._audio_player_window.set_tab_widget(self._center_bottom_tab_widget)
         self._right_top_tab_widget.addTab(self._inspector_window, T.tr('inspector.inspector', 'Inspector'))
@@ -145,6 +149,7 @@ class EditorBody(QMainWindow):
         self._agent_window.apply_theme(is_dark)
         self._code_editor_window.apply_theme(is_dark)
         self._block_editor_window.apply_theme(is_dark)
+        self._animation_editor_window.apply_theme(is_dark)
 
     def _set_signal(self):
         self._editor_settings_window.theme_toggled.connect(self.apply_editor_theme)
@@ -167,6 +172,10 @@ class EditorBody(QMainWindow):
         self._asset_window.image_edit_signal.connect(self._image_editor_window.open_image)
         self._asset_window.audio_play_signal.connect(self._audio_player_window.open_audio)
         self._hierarchy_window.hierarchy_tree_view.edit_tile_map_requested.connect(self._on_edit_tile_map_requested)
+        self._hierarchy_window.hierarchy_tree_view.edit_animation_requested.connect(self._on_edit_animation_requested)
+        # The animation editor previews keyframe values on the selected object:
+        # it needs a way to repaint the scene view while scrubbing / playing.
+        self._animation_editor_window.set_scene_refresher(self._refresh_scene_from_animation)
         self._console_window.open_file_at_line_signal.connect(self._code_editor_window.open_file_at_line)
         self._center_top_tab_widget.currentChanged.connect(self._on_center_top_tab_changed)
         T.add_observer(self)
@@ -366,6 +375,7 @@ class EditorBody(QMainWindow):
         self._block_editor_window.get_ready_for_project()
         self._image_editor_window.get_ready_for_project()
         self._audio_player_window.get_ready_for_project()
+        self._animation_editor_window.get_ready_for_project()
         self._tile_map_editor_window.get_ready_for_project()
         self._game_manager.set_project_ready()
 
@@ -379,6 +389,7 @@ class EditorBody(QMainWindow):
         self._block_editor_window.clean_up()
         self._image_editor_window.clean_up()
         self._audio_player_window.clean_up()
+        self._animation_editor_window.clean_up()
         self._tile_map_editor_window.clean_up()
         self._agent_window.clean_up()
         self._game_manager.clean_up()
@@ -505,6 +516,17 @@ class EditorBody(QMainWindow):
         self._tile_map_editor_window.set_object(object_uuid)
         self._tile_map_editor_window.raise_editor()
 
+    def _on_edit_animation_requested(self, object_uuid):
+        """A Keyframe object was double-clicked in the hierarchy: open the
+        animation editor on it (docked tab or detached window)."""
+        self._animation_editor_window.set_object(object_uuid)
+        self._animation_editor_window.raise_editor()
+
+    def _refresh_scene_from_animation(self):
+        """Repaint the scene view while the animation editor previews a
+        keyframe timeline (values are applied to the object already)."""
+        self._scene_widnow._pygame_screen._update_scene()
+
     def _show_scene_editor(self, file_path):
         """A scene file was opened in the asset panel: bring the scene editor
         to the front.
@@ -611,6 +633,7 @@ class EditorBody(QMainWindow):
         self._block_editor_window.retranslate()
         self._image_editor_window.retranslate()
         self._audio_player_window.retranslate()
+        self._animation_editor_window.retranslate()
         self._tile_map_editor_window.retranslate()
         self._agent_window.retranslate()
 

@@ -18,6 +18,7 @@ from pygamestudio.gui.inspector.layout.button import INSPECTOR_LAYOUT_BUTTON
 from pygamestudio.gui.inspector.layout.particle import INSPECTOR_LAYOUT_PARTICLE
 from pygamestudio.gui.inspector.layout.text_input import INSPECTOR_LAYOUT_TEXT_INPUT
 from pygamestudio.gui.inspector.layout.frame_sequence import INSPECTOR_LAYOUT_FRAME_SEQUENCE
+from pygamestudio.gui.inspector.layout.keyframe import INSPECTOR_LAYOUT_KEYFRAME
 from pygamestudio.gui.inspector.layout.tile_map import INSPECTOR_LAYOUT_TILE_MAP
 from pygamestudio.gui.inspector.layout.progress_bar import INSPECTOR_LAYOUT_PROGRESS_BAR
 from pygamestudio.gui.inspector.layout.slider import INSPECTOR_LAYOUT_SLIDER
@@ -87,6 +88,7 @@ class Container(QFrame):
         self._game_manager.object_particle_parameter_changed.connect(self._on_object_particle_parameter_changed)
         self._game_manager.object_text_input_parameter_changed.connect(self._on_object_text_input_parameter_changed)
         self._game_manager.object_frame_sequence_parameter_changed.connect(self._on_object_frame_sequence_parameter_changed)
+        self._game_manager.object_keyframe_parameter_changed.connect(self._on_object_keyframe_parameter_changed)
         self._game_manager.object_tile_map_parameter_changed.connect(self._on_object_tile_map_parameter_changed)
         self._game_manager.object_progress_bar_parameter_changed.connect(self._on_object_progress_bar_parameter_changed)
         self._game_manager.object_slider_parameter_changed.connect(self._on_object_slider_parameter_changed)
@@ -322,6 +324,11 @@ class Container(QFrame):
 
     def set_object_frame_sequence_parameter(self, attr, new_value):
         self._game_manager.set_frame_sequence_parameter(self._object_uuid_in_inspection, attr, new_value)
+
+    def set_object_keyframe_parameter(self, attr, new_value):
+        """Change one keyframe-animation parameter (keyframes list, duration,
+        auto_play or loop) through the manager (undoable)."""
+        self._game_manager.set_keyframe_parameter(self._object_uuid_in_inspection, attr, new_value)
 
     def set_object_tile_map_parameter(self, attr, new_value):
         """Change one tile-map parameter (tile size, grid columns/rows, ...)
@@ -640,6 +647,26 @@ class Container(QFrame):
                 widget.blockSignals(True)
                 widget.setValue(getattr(obj, attr))
                 widget.blockSignals(False)
+
+        for attr in ('auto_play', 'loop'):
+            widget = self._find_widget(self._container_layout, attr)
+            if widget:
+                widget.blockSignals(True)
+                widget.setChecked(bool(getattr(obj, attr)))
+                widget.blockSignals(False)
+
+    def _on_object_keyframe_parameter_changed(self, object_uuid):
+        """Keep the keyframe editors in sync with an undone/redone parameter
+        change (keyframes list, duration, auto_play or loop)."""
+        if object_uuid != self._object_uuid_in_inspection:
+            return
+        obj = self._game_manager.get_object(object_uuid)
+
+        widget = self._find_widget(self._container_layout, 'duration')
+        if widget:
+            widget.blockSignals(True)
+            widget.setValue(getattr(obj, 'duration'))
+            widget.blockSignals(False)
 
         for attr in ('auto_play', 'loop'):
             widget = self._find_widget(self._container_layout, attr)
@@ -998,6 +1025,8 @@ class Container(QFrame):
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_SLIDER)
         elif obj.type == OBJECT_FRAME_SEQUENCE:
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_FRAME_SEQUENCE)
+        elif obj.type == OBJECT_KEYFRAME:
+            self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_KEYFRAME)
         elif obj.type == OBJECT_TILE_MAP:
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_TILE_MAP)
 

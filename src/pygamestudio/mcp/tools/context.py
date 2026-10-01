@@ -19,7 +19,7 @@ from pygamestudio.mcp.registry import ToolError, register_resource, text_result
 _OBJECT_TYPES = (
     'RECT', 'ELLIPSE', 'POLYGON', 'LINE', 'TEXT', 'IMAGE', 'BUTTON',
     'PARTICLE', 'TEXT_INPUT', 'PROGRESS_BAR', 'SLIDER', 'FRAME_SEQUENCE',
-    'TILE_MAP', 'CANVAS',
+    'KEYFRAME', 'TILE_MAP', 'CANVAS',
 )
 
 #: Attributes that hold a project file/folder path (relative input is resolved
@@ -578,14 +578,15 @@ def type_properties():
     """
     from pygamestudio.game.object.type import (
         OBJECT_BUTTON, OBJECT_ELLIPSE, OBJECT_FRAME_SEQUENCE, OBJECT_IMAGE,
-        OBJECT_LINE, OBJECT_PARTICLE, OBJECT_POLYGON, OBJECT_PROGRESS_BAR,
-        OBJECT_RECT, OBJECT_SLIDER, OBJECT_TEXT, OBJECT_TEXT_INPUT,
-        OBJECT_TILE_MAP, OBJECT_CANVAS,
+        OBJECT_KEYFRAME, OBJECT_LINE, OBJECT_PARTICLE, OBJECT_POLYGON,
+        OBJECT_PROGRESS_BAR, OBJECT_RECT, OBJECT_SLIDER, OBJECT_TEXT,
+        OBJECT_TEXT_INPUT, OBJECT_TILE_MAP, OBJECT_CANVAS,
     )
     from pygamestudio.gui.inspector.layout.button import INSPECTOR_LAYOUT_BUTTON
     from pygamestudio.gui.inspector.layout.canvas import INSPECTOR_LAYOUT_CANVAS
     from pygamestudio.gui.inspector.layout.ellipse import INSPECTOR_LAYOUT_ELLIPSE
     from pygamestudio.gui.inspector.layout.frame_sequence import INSPECTOR_LAYOUT_FRAME_SEQUENCE
+    from pygamestudio.gui.inspector.layout.keyframe import INSPECTOR_LAYOUT_KEYFRAME
     from pygamestudio.gui.inspector.layout.image import INSPECTOR_LAYOUT_IMAGE
     from pygamestudio.gui.inspector.layout.line import INSPECTOR_LAYOUT_LINE
     from pygamestudio.gui.inspector.layout.particle import INSPECTOR_LAYOUT_PARTICLE
@@ -621,6 +622,7 @@ def type_properties():
         OBJECT_PROGRESS_BAR: INSPECTOR_LAYOUT_PROGRESS_BAR,
         OBJECT_SLIDER: INSPECTOR_LAYOUT_SLIDER,
         OBJECT_FRAME_SEQUENCE: INSPECTOR_LAYOUT_FRAME_SEQUENCE,
+        OBJECT_KEYFRAME: INSPECTOR_LAYOUT_KEYFRAME,
         OBJECT_TILE_MAP: INSPECTOR_LAYOUT_TILE_MAP,
         OBJECT_CANVAS: INSPECTOR_LAYOUT_CANVAS,
     }

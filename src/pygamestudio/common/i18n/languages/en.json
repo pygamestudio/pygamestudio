@@ -185,6 +185,7 @@
             "pause_animation": "Pause animation",
             "set_frame": "Go to frame (index)",
             "restart_animation": "Restart animation",
+            "set_time": "Go to time (s)",
             "emit_particles": "Emit particles (count)",
             "set_slider_value": "Set slider value",
             "set_progress": "Set progress"
@@ -338,6 +339,7 @@
         "slider": "Slider",
         "animation": "Animation",
         "frame_sequence": "Frame Sequence",
+        "keyframe": "Keyframe",
         "world": "World",
         "tile_map": "Tile Map"
     },
@@ -457,6 +459,27 @@
         "attach": "Attach to Tabs"
     },
 
+    "animation": {
+        "editor": "Animation Editor",
+        "no_object": "Select a Keyframe object to edit its animation",
+        "hint": "Tip: double-click a Keyframe object in the Hierarchy to open it here",
+        "play": "Play",
+        "pause": "Pause",
+        "stop": "Stop",
+        "loop": "Loop",
+        "duration": "Duration",
+        "add_keyframe": "Add Keyframe",
+        "new_keyframe": "New Keyframe",
+        "delete_keyframe": "Delete Keyframe",
+        "easing": "Easing",
+        "easing_linear": "Linear",
+        "easing_ease_in": "Ease In",
+        "easing_ease_out": "Ease Out",
+        "easing_ease_in_out": "Ease In-Out",
+        "time": "Time",
+        "keyframes": "Keyframes"
+    },
+
     "inspector": {
         "inspector": "Inspector",
         "visibility": "Visibility",
@@ -495,6 +518,7 @@
         "spread_angle": "Spread Angle",
         "auto_play": "Auto Play",
         "loop": "Loop",
+        "duration": "Duration",
         "frame_rate": "Frame Rate",
         "frame_folder": "Frame Folder",
         "select_folder": "Select Frame Folder",
