@@ -28,9 +28,13 @@ class AssetWindow(DetachablePanel, QWidget):
         self._set_up()
     
     def _set_up(self):
+        self._set_widget()
         self._set_signal()
         self._set_layout()
         self._set_object_name()
+
+    def _set_widget(self):
+        self.setMinimumWidth(150)
 
     def _set_signal(self):
         self._search_line_edit.search_signal.connect(self._asset_tree_view.search)

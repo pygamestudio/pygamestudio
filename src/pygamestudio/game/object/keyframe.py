@@ -457,11 +457,34 @@ class ObjectKeyframe(ObjectBase):
         if image_path != self.image_path:
             self.image_path = image_path
 
+    def _physics_owns_transform(self):
+        """True while a DYNAMIC physics body drives this object's transform.
+
+        The body writes x/y/angle back into the object after every physics
+        step (see ``game/core/physics.py``); without this check the timeline
+        stomped them on the same frame and physics appeared to do nothing on
+        a Keyframe object. Kinematic bodies keep following the timeline:
+        writing x/y teleports them - that is how an animated platform pushes.
+        """
+        if not self.physics_enabled:
+            return False
+        if getattr(self, 'physics_type', 'dynamic') != 'dynamic':
+            return False
+        world = self._physics_world()
+        return world is not None and world.has_object(self)
+
     def _update_surface(self):
         if self._is_for_api:
             self._advance()
             values = self.evaluate_at(self._anim_time)
             if values is not None:
+                if self._physics_owns_transform():
+                    # Physics owns the transform while it drives this object;
+                    # scale, colour and the image keep animating.
+                    values = dict(values)
+                    values['x'] = float(self.x)
+                    values['y'] = float(self.y)
+                    values['angle'] = float(self.angle)
                 self._apply_values(values)
         self._refresh_surface()
 

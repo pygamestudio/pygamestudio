@@ -12,7 +12,7 @@ from pygamestudio.gui.asset.window import AssetWindow
 from pygamestudio.gui.console.window import ConsoleWindow
 from pygamestudio.gui.inspector.window import InspectorWindow
 from pygamestudio.gui.scene.window import SceneWindow
-from pygamestudio.gui.base.window import WindowBase
+from pygamestudio.gui.base.window import WindowBase, clamp_window_size
 from pygamestudio.gui.settings.project import ProjectSettingsWindow
 from pygamestudio.gui.settings.editor import EditorSettingsWindow
 from pygamestudio.gui.about.window import AboutWindow
@@ -88,7 +88,19 @@ class EditorBody(QMainWindow):
         
     def _set_widget(self):
         self.resize(1420, 900)
+        # The designed floor: every panel's minimum fits inside it, so small
+        # laptop screens (1280x720 logical pixels, or 1920 at 150% scaling)
+        # can still show the whole editor.
+        self.setMinimumSize(1024, 640)
         self.menuBar().setNativeMenuBar(False)
+
+        # Long tab labels elide and the tab bar scrolls, instead of a wide
+        # label forcing its whole column wider.
+        for tab_widget in (self._left_top_tab_widget, self._left_bottom_tab_widget,
+                           self._center_top_tab_widget, self._center_bottom_tab_widget,
+                           self._right_top_tab_widget, self._right_bottom_tab_widget):
+            tab_widget.setUsesScrollButtons(True)
+            tab_widget.setElideMode(Qt.TextElideMode.ElideRight)
 
         self._left_top_tab_widget.addTab(self._hierarchy_window, T.tr('hierarchy.hierarchy', 'Hierarchy'))
         self._hierarchy_window.set_tab_widget(self._left_top_tab_widget)
@@ -131,7 +143,7 @@ class EditorBody(QMainWindow):
         self._main_horizontal_splitter.addWidget(self._center_vertical_splitter)
         self._main_horizontal_splitter.addWidget(self._right_vertical_splitter)
         self._center_vertical_splitter.setSizes([600, 300])
-        self._main_horizontal_splitter.setSizes([270, 880, 270])
+        self._main_horizontal_splitter.setSizes([300, 850, 300])
 
         self.setCentralWidget(self._central_widget)
 
@@ -686,7 +698,9 @@ class Editor(WindowBase):
         self._set_signal()
 
     def _set_widget(self):
-        self.resize(1420, 930)
+        # Preferred size only: a small screen must open the editor INSIDE the
+        # available area instead of overflowing it.
+        clamp_window_size(self, 1420, 930)
         self.setWindowTitle('Pygame Studio')
         self._center()
         self.set_window_body(self._editor_body)

@@ -13,7 +13,8 @@ from PySide6.QtWidgets import (QHBoxLayout, QInputDialog, QLabel, QMessageBox, Q
 
 from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.common.utils.path import followed_path
-from pygamestudio.gui.base.window import DetachButton, WindowBase, editor_run_handler
+from pygamestudio.gui.base.window import (DetachButton, WindowBase,
+                                          clamp_window_size, editor_run_handler)
 from pygamestudio.gui.block_editor.canvas import BlockCanvas
 from pygamestudio.gui.block_editor.model import variable_type
 from pygamestudio.gui.block_editor.palette import BlockPalette
@@ -438,7 +439,7 @@ class _BlockEditorStandaloneWindow(WindowBase):
     def __init__(self, block_editor_window, title):
         super().__init__()
         self._block_editor_window = block_editor_window
-        self.resize(1100, 720)
+        clamp_window_size(self, 1100, 720)
         self.set_window_body(block_editor_window)
         self.window_title.set_title_name(title)
 

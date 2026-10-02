@@ -14,8 +14,9 @@ from pathlib import Path
 
 from PySide6.QtCore import QElapsedTimer, QSize, Qt, QTimer
 from PySide6.QtGui import QCursor, QIcon
-from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QHBoxLayout,
-                               QLabel, QMenu, QPushButton, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QFrame,
+                               QHBoxLayout, QLabel, QMenu, QPushButton,
+                               QScrollArea, QVBoxLayout, QWidget)
 
 from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.common.utils.path import get_project_path
@@ -23,7 +24,8 @@ from pygamestudio.game.object.keyframe import (EASING_CURVES,
                                                normalize_keyframes, snapshot_from_object)
 from pygamestudio.game.object.type import OBJECT_KEYFRAME
 from pygamestudio.gui.animation_editor.timeline import AnimationTimeline
-from pygamestudio.gui.base.window import DetachButton, WindowBase, editor_run_handler
+from pygamestudio.gui.base.window import (DetachButton, WindowBase,
+                                          clamp_window_size, editor_run_handler)
 from pygamestudio.gui.inspector.color import ColorPicker as ColorPickerPopup
 from pygamestudio.gui.inspector.component.lineedit import ImagePathLineEdit
 from pygamestudio.gui.inspector.component.picker import ColorPicker as ColorSwatchButton
@@ -134,10 +136,10 @@ class AnimationEditorWindow(QWidget):
         self._duration_spin.setDecimals(2)
         self._duration_spin.setSingleStep(0.1)
         self._duration_spin.set_suffix('S')
-        self._duration_spin.setFixedWidth(88)
+        self._duration_spin.setFixedWidth(80)
 
         self._easing_combo.setObjectName('animationEasingCombo')
-        self._easing_combo.setFixedWidth(110)
+        self._easing_combo.setFixedWidth(100)
 
         # Labelled value row: the very widgets the inspector uses (suffix
         # spin boxes, its colour swatch and its path line edit), one control
@@ -147,18 +149,45 @@ class AnimationEditorWindow(QWidget):
             spin.setDecimals(2 if channel.startswith('scale') else 1)
             spin.setSingleStep(0.1 if channel.startswith('scale') else 1.0)
             spin.setRange(-999999.0, 999999.0)
-            spin.setFixedWidth(78)
+            spin.setFixedWidth(64)
             # Keyboard tracking stays ON: the value commits while it is being
             # edited (no Enter needed), matching the inspector's spin boxes.
             spin.set_suffix({'x': 'X', 'y': 'Y',
                              'scale_x': 'X', 'scale_y': 'Y'}.get(channel, ''))
             self._value_spins[channel] = spin
 
-        self._color_btn.setFixedWidth(64)
-        self._image_edit.setFixedWidth(180)
+        self._color_btn.setFixedWidth(56)
+        self._image_edit.setMinimumWidth(120)
 
         self._hint_label.setObjectName('animationHintLabel')
         self._hint_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # Long tips must wrap: a one-line hint used to force the whole panel
+        # (and the tab dock next to it) to be as wide as the sentence.
+        self._hint_label.setWordWrap(True)
+
+    def _scroll_row(self, row_layout):
+        """Wrap one control row in a scroll strip.
+
+        The row keeps its natural width; a narrow panel scrolls it instead
+        of being forced wide (which used to push the whole bottom tab dock
+        wide for every page, because a tab widget inherits the widest
+        hidden page's minimum).
+        """
+        content = QWidget()
+        content.setLayout(row_layout)
+        scroll = QScrollArea()
+        scroll.setObjectName('animationRowScroll')
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidgetResizable(True)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setMinimumWidth(320)
+        scroll.setWidget(content)
+        # Reserve the scrollbar strip, so the row is never clipped when the
+        # scrollbar shows up.
+        scroll.setFixedHeight(content.sizeHint().height()
+                              + scroll.horizontalScrollBar().sizeHint().height())
+        return scroll
 
     def _set_signal(self):
         self._play_btn.clicked.connect(self.toggle_play)
@@ -203,7 +232,6 @@ class AnimationEditorWindow(QWidget):
         toolbar.addSpacing(6)
         toolbar.addWidget(self._play_btn)
         toolbar.addWidget(self._stop_btn)
-        toolbar.addWidget(self._loop_box)
         toolbar.addSpacing(10)
         toolbar.addWidget(self._add_btn)
         toolbar.addWidget(self._delete_btn)
@@ -213,6 +241,8 @@ class AnimationEditorWindow(QWidget):
         toolbar.addSpacing(10)
         toolbar.addWidget(self._duration_label)
         toolbar.addWidget(self._duration_spin)
+        toolbar.addSpacing(10)
+        toolbar.addWidget(self._loop_box)
         toolbar.addStretch(1)
         toolbar.addWidget(self._time_title_label)
         toolbar.addWidget(self._time_label)
@@ -240,10 +270,13 @@ class AnimationEditorWindow(QWidget):
         values.addWidget(self._color_btn)
         values.addStretch(1)
 
+        self._toolbar_scroll = self._scroll_row(toolbar)
+        self._values_scroll = self._scroll_row(values)
+
         window_layout = QVBoxLayout(self)
-        window_layout.addLayout(toolbar)
+        window_layout.addWidget(self._toolbar_scroll)
         window_layout.addWidget(self._timeline)
-        window_layout.addLayout(values)
+        window_layout.addWidget(self._values_scroll)
         window_layout.addWidget(self._hint_label)
         window_layout.setContentsMargins(0, 0, 0, 0)
         window_layout.setSpacing(4)
@@ -875,7 +908,7 @@ class _AnimationEditorStandaloneWindow(WindowBase):
     def __init__(self, editor_window, title):
         super().__init__()
         self._editor_window = editor_window
-        self.resize(900, 420)
+        clamp_window_size(self, 900, 420)
         self.set_window_body(editor_window)
         self.window_title.set_title_name(title)
 

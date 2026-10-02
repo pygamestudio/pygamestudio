@@ -452,6 +452,7 @@
         "previous": "Previous",
         "next": "Next",
         "size": "Size: {}",
+        "file_name": "File Name: {}",
         "load_failed": "Failed to load audio {}",
         "open": "Open Audio File",
         "empty_hint": "Choose an audio file",

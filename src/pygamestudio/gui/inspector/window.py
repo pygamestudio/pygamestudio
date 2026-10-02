@@ -23,12 +23,12 @@ class InspectorWindow(DetachablePanel, QWidget):
         self._set_object_name()
 
     def _set_widget(self):
-        self.setMinimumWidth(270)
+        self.setMinimumWidth(220)
         self._scroll_area = QScrollArea(self)
         self._scroll_area.setObjectName('inspectorScrollArea')
         self._scroll_area.setWidgetResizable(True)
         self._scroll_area.setFrameShape(QFrame.Shape.NoFrame)
-        self._scroll_area.setMinimumWidth(270)
+        self._scroll_area.setMinimumWidth(220)
         # A long property list must scroll instead of being clipped.
         self._scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)

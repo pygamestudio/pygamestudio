@@ -5,6 +5,21 @@ from pygamestudio.common.utils.theme import set_editor_theme
 from pygamestudio.common.i18n.translator import Translator as T
 
 
+def clamp_window_size(window, width, height, allow=0.95):
+    """Resize a to-be-shown window so it always fits on the current screen.
+
+    The preferred size is only an upper bound: small screens (1366x768, or
+    1920 at 150% scaling) must never get a window wider or taller than the
+    space they have.
+    """
+    screen = QApplication.primaryScreen()
+    if screen is not None:
+        available = screen.availableGeometry()
+        width = min(int(width), max(320, int(available.width() * allow)))
+        height = min(int(height), max(240, int(available.height() * allow)))
+    window.resize(int(width), int(height))
+
+
 class WindowTitleBase(QWidget):
     window_minimized = Signal()
     window_maximized = Signal()
@@ -107,8 +122,17 @@ class WindowTitleBase(QWidget):
         if event.button() == Qt.MouseButton.LeftButton:
             self._start_x = event.position().x()
             self._start_y = event.position().y()
-    
+            # Accept so this widget keeps the implicit mouse grab and always
+            # sees the release that ends the drag.
+            event.accept()
+
     def mouseMoveEvent(self, event):
+        if not (event.buttons() & Qt.MouseButton.LeftButton):
+            # A dropped release must never turn a bare hover into a window
+            # drag: without the button down the anchors are forgotten.
+            self._start_x = None
+            self._start_y = None
+            return
         if self._start_x is not None and self._start_y is not None:
             dis_x = event.position().x() - self._start_x
             dis_y = event.position().y() - self._start_y
@@ -180,8 +204,12 @@ class WindowBase(QWidget):
         self.window_title.window_minimized.connect(self.showMinimized)
 
     def __set_layout(self):
+        # The title bar must keep its natural height: without giving the body
+        # the stretch, a window taller than its content shares the spare
+        # space with the title bar (a floating panel with a non-expanding
+        # body ended up with a title bar half the window tall).
         self.central_v_layout.addWidget(self.window_title)
-        self.central_v_layout.addWidget(self.window_body)
+        self.central_v_layout.addWidget(self.window_body, 1)
         self.central_v_layout.setContentsMargins(5, 5, 5, 5)
 
         main_v_layout = QVBoxLayout(self)
@@ -271,15 +299,33 @@ class WindowBase(QWidget):
         return stretch_type
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton and self._stretch_type:
-            self._is_stretching = True
-            self._start_geometry = self.geometry()
-            self._start_global_pos = event.globalPosition().toPoint()
+        if event.button() == Qt.MouseButton.LeftButton:
+            # Forget any stale state, then hit-test the PRESS position: hover
+            # moves over child widgets that accept them never reach this
+            # window, so a stored stretch type can be stale (a click in the
+            # middle of a panel used to look like an edge grab).
+            self._end_stretch()
+            self._stretch_type = self._get_stretch_type(event.position().x(),
+                                                        event.position().y())
+            if self._stretch_type:
+                self._is_stretching = True
+                self._start_geometry = self.geometry()
+                self._start_global_pos = event.globalPosition().toPoint()
+                # Accept so THIS window keeps the implicit mouse grab: a press
+                # that propagated up from a child would otherwise leave the
+                # release to that child and the resize would keep following
+                # the bare cursor afterwards.
+                event.accept()
 
     def mouseMoveEvent(self, event):
-        self._stretch_type = self._get_stretch_type(event.position().x(), event.position().y())
-
-        if self._is_stretching and self._stretch_type:
+        if self._is_stretching and not (event.buttons() & Qt.MouseButton.LeftButton):
+            # A stale stretch (the release never reached this window) must
+            # never let a bare hover drag the border along - stop it first,
+            # so the hit-test below starts from a clean state.
+            self._end_stretch()
+        stretch_type = self._get_stretch_type(event.position().x(), event.position().y())
+        self._stretch_type = stretch_type
+        if self._is_stretching and stretch_type:
             self._resize_window(event.globalPosition().toPoint())
 
     def _resize_window(self, global_pos):
@@ -364,6 +410,10 @@ class WindowBase(QWidget):
         self.setGeometry(new_rect)
 
     def mouseReleaseEvent(self, event):
+        self._end_stretch()
+
+    def _end_stretch(self):
+        """Stop an (in-progress) edge resize and forget its geometry anchor."""
         self._is_stretching = False
         self._stretch_type = None
         self._start_geometry = None

@@ -32,7 +32,8 @@ from pygamestudio.gui.inspector.component.spinbox import SuffixSpinBox
 from pygamestudio.gui.tile_map_editor.canvas import (TileMapCanvas, TOOL_PENCIL,
                                                      TOOL_ERASE, TOOL_FILL, TOOL_PICK)
 from pygamestudio.gui.tile_map_editor.palette import TilesetPalette
-from pygamestudio.gui.base.window import DetachButton, WindowBase, editor_run_handler
+from pygamestudio.gui.base.window import (DetachButton, WindowBase,
+                                          clamp_window_size, editor_run_handler)
 
 IMAGE_FILTER = 'Image (*.png *.jpg *.jpeg *.gif *.bmp *.webp *.tga *.pcx)'
 
@@ -98,7 +99,7 @@ class TileMapEditorWindow(QWidget):
         self._canvas_scroll.setWidget(self._canvas)
         self._canvas_scroll.setWidgetResizable(False)
         self._canvas_scroll.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._canvas_scroll.setMinimumWidth(150)
+        self._canvas_scroll.setMinimumWidth(120)
         self._canvas_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
 
         self._palette_scroll.setWidget(self._palette)
@@ -106,7 +107,7 @@ class TileMapEditorWindow(QWidget):
         self._palette_scroll.setAlignment(Qt.AlignmentFlag.AlignCenter)
         # The palette pane is deliberately NOT fixed-width: the splitter handle
         # must stay draggable so the user can resize the left/right panes.
-        self._palette_scroll.setMinimumWidth(150)
+        self._palette_scroll.setMinimumWidth(120)
         self._palette_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
         self._palette.bind_scroll_area(self._palette_scroll)
 
@@ -140,7 +141,7 @@ class TileMapEditorWindow(QWidget):
             spin.setValue(1)
             spin.set_suffix(suffix)
             spin.setToolTip(T.tr(tooltip_key, default))
-            spin.setFixedWidth(78)
+            spin.setFixedWidth(64)
 
         # --- tool buttons (QToolButton + "active" highlight, like image
         # editor: NOT checkable so the icon never shifts when selected) ------
@@ -900,7 +901,7 @@ class _TileMapEditorStandaloneWindow(WindowBase):
     def __init__(self, editor_window, title):
         super().__init__()
         self._editor_window = editor_window
-        self.resize(1100, 720)
+        clamp_window_size(self, 1100, 720)
         self.set_window_body(editor_window)
         self.window_title.set_title_name(title)
 

@@ -8,7 +8,8 @@ from PySide6.QtWidgets import (QFileDialog, QHBoxLayout, QLabel, QPushButton,
 from pygamestudio.gui.audio_player.engine import (AudioEngine, STATE_PLAYING,
                                                   STATE_PAUSED)
 from pygamestudio.gui.audio_player.widgets import AudioProgress
-from pygamestudio.gui.base.window import DetachButton, WindowBase, editor_run_handler
+from pygamestudio.gui.base.window import (DetachButton, WindowBase,
+                                          clamp_window_size, editor_run_handler)
 from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.gui.console.logger import Logger
 
@@ -39,8 +40,9 @@ class AudioPlayerWindow(QWidget):
 
     A compact media-player panel: transport buttons (previous / play-pause /
     stop / next) sit top-left styled like the image editor's icon buttons, the
-    file name is shown by the tab itself, and a clickable waveform fills the
-    remaining space (current / total time drawn inside it).
+    opened file's name and size sit at the right of the toolbar (the tab and
+    the floating window always keep the panel name), and a clickable waveform
+    fills the remaining space (current / total time drawn inside it).
 
     Clicking anywhere on the waveform seeks: while paused it only moves the
     playhead (still paused - the next Play starts there); while playing the
@@ -72,6 +74,7 @@ class AudioPlayerWindow(QWidget):
         self._stop_btn = QPushButton()
         self._progress = AudioProgress()
         self._size_label = QLabel()
+        self._file_label = QLabel()
         self._time_label = QLabel()
 
         self._play_icon = QIcon(':/images/play.png')
@@ -120,6 +123,9 @@ class AudioPlayerWindow(QWidget):
         self._size_label.setObjectName('audioPlayerSizeLabel')
         self._size_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
+        self._file_label.setObjectName('audioPlayerFileLabel')
+        self._file_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+
         self._time_label.setObjectName('audioPlayerTimeLabel')
         self._time_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self._time_label.setMinimumWidth(88)
@@ -156,6 +162,8 @@ class AudioPlayerWindow(QWidget):
         toolbar.addStretch(1)
         toolbar.addWidget(self._size_label)
         toolbar.addSpacing(12)
+        toolbar.addWidget(self._file_label)
+        toolbar.addSpacing(12)
         toolbar.addWidget(self._detach_btn)
 
         main_layout = QVBoxLayout(self)
@@ -163,6 +171,22 @@ class AudioPlayerWindow(QWidget):
         main_layout.setSpacing(4)
         main_layout.addLayout(toolbar)
         main_layout.addWidget(self._progress, 1)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._update_responsive_labels()
+
+    def _update_responsive_labels(self):
+        """Low-priority labels step aside when the panel gets narrow.
+
+        The full information stays reachable through the labels' tooltips,
+        so nothing is lost - the toolbar just stops forcing a wide panel on
+        small screens.
+        """
+        width = self.width()
+        self._time_label.setVisible(width >= 420)
+        self._size_label.setVisible(width >= 520)
+        self._file_label.setVisible(width >= 620)
 
     # ------------------------------------------------------------------ state
     def _update_controls(self):
@@ -239,6 +263,7 @@ class AudioPlayerWindow(QWidget):
         else:
             self._progress.set_progress(0.0)
         self._time_label.setText(f'{format_time(position_ms)} / {format_time(duration)}')
+        self._time_label.setToolTip(self._time_label.text())
 
     # ------------------------------------------------------------------ playlist
     def _playlist(self):
@@ -286,8 +311,8 @@ class AudioPlayerWindow(QWidget):
             self.open_audio(path)
 
     def open_audio(self, file_path, raise_window=True):
-        """Load an audio file and play it once (the file name is shown by the
-        tab itself)."""
+        """Load an audio file and play it once (its name and size are shown
+        in the toolbar; the tab always keeps the panel name)."""
         file_path = Path(str(file_path))
         if not file_path.is_file():
             Logger.error(T.tr('audio.no_audio_path', 'The audio file {} does not exist.').format(file_path))
@@ -305,6 +330,10 @@ class AudioPlayerWindow(QWidget):
         self._progress.set_placeholder('')
         self._size_label.setText(
             T.tr('audio.size', 'Size: {}').format(format_size(self._current_size)))
+        self._size_label.setToolTip(self._size_label.text())
+        self._file_label.setText(
+            T.tr('audio.file_name', 'File Name: {}').format(file_path.name))
+        self._file_label.setToolTip(file_path.name)
 
         self._progress.set_envelope(self._engine.envelope())
         self._update_time_display()
@@ -383,8 +412,7 @@ class AudioPlayerWindow(QWidget):
 
     # ------------------------------------------------------------------ titles
     def _tab_title(self):
-        if self._current_path:
-            return self._current_path.name
+        """The tab always carries the panel name, never the file name."""
         return T.tr('audio.player', 'Audio Player')
 
     def _window_title(self):
@@ -417,6 +445,11 @@ class AudioPlayerWindow(QWidget):
         if self._current_size:
             self._size_label.setText(
                 T.tr('audio.size', 'Size: {}').format(format_size(self._current_size)))
+            self._size_label.setToolTip(self._size_label.text())
+        if self._current_path:
+            self._file_label.setText(
+                T.tr('audio.file_name', 'File Name: {}').format(self._current_path.name))
+            self._file_label.setToolTip(self._current_path.name)
         self._update_detach_button()
         self._update_titles()
 
@@ -430,6 +463,7 @@ class AudioPlayerWindow(QWidget):
             self._engine.unload()
             self._current_path = None
             self._size_label.setText('')
+            self._file_label.setText('')
             self._progress.set_envelope([])
             self._progress.set_placeholder(T.tr('audio.empty_hint', 'Choose an audio file'))
             self._update_time_display()
@@ -453,7 +487,7 @@ class _AudioPlayerStandaloneWindow(WindowBase):
     def __init__(self, editor_window, title):
         super().__init__()
         self._editor_window = editor_window
-        self.resize(640, 200)
+        clamp_window_size(self, 640, 200)
         self.set_window_body(editor_window)
         self.window_title.set_title_name(title)
 

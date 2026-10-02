@@ -12,7 +12,8 @@ from pygamestudio.gui.image_editor.canvas import (ImageCanvas, TOOL_PENCIL,
                                                   TOOL_ERASER, TOOL_LINE,
                                                   TOOL_RECT, TOOL_ELLIPSE,
                                                   TOOL_FILL, TOOL_PICKER)
-from pygamestudio.gui.base.window import DetachButton, WindowBase, editor_run_handler
+from pygamestudio.gui.base.window import (DetachButton, WindowBase,
+                                          clamp_window_size, editor_run_handler)
 from pygamestudio.gui.inspector.color import ColorPicker
 from pygamestudio.gui.inspector.component.spinbox import SuffixSpinBox
 from pygamestudio.common.i18n.translator import Translator as T
@@ -753,7 +754,7 @@ class _ImageEditorStandaloneWindow(WindowBase):
     def __init__(self, editor_window, title):
         super().__init__()
         self._editor_window = editor_window
-        self.resize(1000, 700)
+        clamp_window_size(self, 1000, 700)
         self.set_window_body(editor_window)
         self.window_title.set_title_name(title)
 

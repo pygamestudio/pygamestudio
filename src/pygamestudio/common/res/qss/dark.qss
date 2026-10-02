@@ -541,6 +541,17 @@ QPushButton:pressed#sceneRunProjectBtn, QPushButton:pressed#sceneRefreshBtn {
     background-color: #28292a;
 }
 
+/* ----- Animation Editor ----- */
+/* Disabled value controls read gray, like the inspector's disabled rows
+   (e.g. the Canvas name). */
+QWidget#animationEditorWindow QDoubleSpinBox:disabled,
+QWidget#animationEditorWindow QSpinBox:disabled,
+QWidget#animationEditorWindow QLineEdit:disabled,
+QWidget#animationEditorWindow QComboBox:disabled,
+QWidget#animationEditorWindow QLabel:disabled {
+    color: gray;
+}
+
 /* ----- Inspector ----- */
 QWidget#inspector, QWidget#inspectorContainer {
     background-color: #282828;

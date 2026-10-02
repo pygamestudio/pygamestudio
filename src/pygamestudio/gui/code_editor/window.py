@@ -7,7 +7,8 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWi
 
 from pygamestudio.gui.code_editor.editor import CodeEditor
 from pygamestudio.gui.scene.widget import RunProjectButton
-from pygamestudio.gui.base.window import DetachButton, WindowBase, editor_run_handler
+from pygamestudio.gui.base.window import (DetachButton, WindowBase,
+                                          clamp_window_size, editor_run_handler)
 from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.common.utils.path import followed_path
 
@@ -333,7 +334,7 @@ class _CodeEditorStandaloneWindow(WindowBase):
     def __init__(self, editor_window, title):
         super().__init__()
         self._editor_window = editor_window
-        self.resize(1000, 700)
+        clamp_window_size(self, 1000, 700)
         self.set_window_body(editor_window)
         self.window_title.set_title_name(title)
 

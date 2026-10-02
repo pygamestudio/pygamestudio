@@ -57,7 +57,7 @@ class Container(QFrame):
         self._set_object_name()
 
     def _set_widget(self):
-        self.setMinimumWidth(270)
+        self.setMinimumWidth(240)
 
     def _set_signal(self):
         T.add_observer(self)
