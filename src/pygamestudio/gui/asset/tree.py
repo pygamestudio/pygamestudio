@@ -98,7 +98,15 @@ class AssetTreeView(QTreeView):
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.setSelectionMode(QTreeWidget.SelectionMode.ExtendedSelection)
         self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-                
+
+        # The single visible column is never narrower than the viewport but
+        # grows to the widest row (indentation included), so long names and
+        # deep trees scroll horizontally - the same recipe the hierarchy
+        # tree uses.
+        self.header().setStretchLastSection(False)
+        self.header().setMinimumSectionSize(self.viewport().width())
+        self.header().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+
     def _set_signal(self):
         self.selectionModel().selectionChanged.connect(self._clear_highlight_items)
         self.customContextMenuRequested.connect(self._show_context_menu)
@@ -124,6 +132,12 @@ class AssetTreeView(QTreeView):
 
     def _set_object_name(self):
         self.setObjectName('assetTreeView')
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        # Keep the column floor in step with the viewport (see _set_widget):
+        # a viewport wider than the content must not produce a scrollbar.
+        self.header().setMinimumSectionSize(self.viewport().width())
 
     def _show_context_menu(self, pos):
         index = self.indexAt(pos)
