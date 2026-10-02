@@ -143,7 +143,7 @@ class EditorBody(QMainWindow):
         self._main_horizontal_splitter.addWidget(self._center_vertical_splitter)
         self._main_horizontal_splitter.addWidget(self._right_vertical_splitter)
         self._center_vertical_splitter.setSizes([600, 300])
-        self._main_horizontal_splitter.setSizes([300, 850, 300])
+        self._main_horizontal_splitter.setSizes([260, 850, 300])
 
         self.setCentralWidget(self._central_widget)
 
