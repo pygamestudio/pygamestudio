@@ -65,16 +65,6 @@ class AudioEditorWindow(QWidget):
     the toolbar's file name marks unsaved changes.
     """
 
-    #: Pitch presets, worded the way a user picks them (no music theory):
-    #: (i18n key, English default, semitones).
-    PITCH_CHOICES = (
-        ('audio.pitch_low_octave', 'Much lower (one octave)', -12.0),
-        ('audio.pitch_low', 'A little lower', -3.0),
-        ('audio.pitch_normal', 'Keep the pitch', 0.0),
-        ('audio.pitch_high', 'A little higher', 3.0),
-        ('audio.pitch_high_octave', 'Much higher (one octave)', 12.0),
-    )
-
     def __init__(self, game_manager=None):
         super().__init__()
         self._game_manager = game_manager
@@ -584,14 +574,10 @@ class AudioEditorWindow(QWidget):
         region = self._region()
         if region is None:
             return
-        labels = [T.tr(key, default) for key, default, _ in self.PITCH_CHOICES]
-        choice, accepted = QInputDialog.getItem(
+        semitones, accepted = QInputDialog.getDouble(
             self, T.tr('audio.pitch', 'Change Pitch'),
-            T.tr('audio.pitch_prompt', 'New pitch:'), labels, 2, False)
-        if not accepted or choice not in labels:
-            return
-        semitones = self.PITCH_CHOICES[labels.index(choice)][2]
-        if abs(semitones) < 1e-6:
+            T.tr('audio.pitch_prompt', 'Adjust pitch'), 0.0, -12.0, 12.0, 1)
+        if not accepted or abs(semitones) < 1e-6:
             return
         self._edit(lambda buffer: buffer.change_pitch(region[0], region[1], semitones))
 
