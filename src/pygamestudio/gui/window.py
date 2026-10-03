@@ -196,6 +196,10 @@ class EditorBody(QMainWindow):
         theme_code = get_editor_config().get('theme', 'dark')
         self._code_editor_window.apply_theme(theme_code == 'dark')
         self._block_editor_window.apply_theme(theme_code == 'dark')
+        # The animation timeline paints with its own colors (its constructor
+        # defaults to dark), so it must be told the startup theme too - a
+        # theme switch used to be the only way to fix a light-theme session.
+        self._animation_editor_window.apply_theme(theme_code == 'dark')
         self._agent_window.apply_theme(theme_code == 'dark')
 
     def _set_layout(self):
