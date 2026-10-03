@@ -29,7 +29,7 @@ not exposed (with the reason). Tool names are the MCP tool names.
 | Delete file/folder | context menu > Delete | `delete_file` (folders need `recursive`) |
 | Import a file from the computer | drag & drop, copy into the folder | `import_file` |
 | Open in terminal / file explorer | context menu | **no** - launches external processes, an agent should not need it |
-| Play audio, edit image, edit tile map | Audio Player / Image Editor / Tile Map Editor | `audio_player_open`, `audio_player_control`; `image_editor_open`, `image_editor_state`, `image_editor_set_tool`, `image_editor_set_color`, `image_editor_set_grid`, `image_editor_draw`, `image_editor_draw_shape`, `image_editor_fill`, `image_editor_pick_color`, `image_editor_transform`, `image_editor_save`, `image_editor_capture`; `tile_map_editor_open`, `tile_map_editor_paint`, `tile_map_editor_fill`, `tile_map_editor_layer` |
+| Play and edit audio, edit image, edit tile map | Audio Editor / Image Editor / Tile Map Editor | `audio_editor_open`, `audio_editor_state`, `audio_editor_control`; `audio_editor_edit` (delete / trim / silence / fade in-out / gain / pitch / speed - selection or whole file, undoable), `audio_editor_append` (concatenate files, one undo step), `audio_editor_save` (in place or Save As wav/flac/ogg/mp3); `image_editor_open`, `image_editor_state`, `image_editor_set_tool`, `image_editor_set_color`, `image_editor_set_grid`, `image_editor_draw`, `image_editor_draw_shape`, `image_editor_fill`, `image_editor_pick_color`, `image_editor_transform`, `image_editor_save`, `image_editor_capture`; `tile_map_editor_open`, `tile_map_editor_paint`, `tile_map_editor_fill`, `tile_map_editor_layer` |
 
 ## 3. Scenes
 
@@ -46,11 +46,12 @@ not exposed (with the reason). Tool names are the MCP tool names.
 
 | Capability | Editor entry point | MCP |
 | --- | --- | --- |
-| Create any object type (rect, ellipse, polygon, line, text, image, button, particle, text input, progress bar, slider, frame sequence, tile map) | Hierarchy > Add | `create_object`, `apply_scene_patch` |
+| Create any object type (rect, ellipse, polygon, line, text, image, button, particle, text input, progress bar, slider, frame sequence, keyframe, tile map) | Hierarchy > Add | `create_object`, `apply_scene_patch` |
 | Read one object (all inspector properties + world rect) | Inspector | `get_object` |
 | Find objects | Hierarchy search | `find_objects` (name/type/script/visibility) |
 | Which properties exist per type | Inspector layout | `object_types` |
-| Edit properties (move, resize, scale, rotate, color, text, font, image, collision, particle, slider, progress bar, frame sequence, ...) | Inspector widgets | `update_object`, `apply_scene_patch` |
+| Edit properties (move, resize, scale, rotate, color, text, font, image, collision, particle, slider, progress bar, frame sequence, keyframe, ...) | Inspector widgets | `update_object`, `apply_scene_patch` |
+| Keyframe animation (snapshot timeline: keyframes with easing, duration, loop, auto play; each keyframe stores x/y/scale/angle/color/image) | Animation Editor panel | `update_object` on a KEYFRAME object: `keyframes` (normalized + sorted), `duration`, `auto_play`, `loop`, `image_path` - all undoable |
 | Fit a text box to its text (a TEXT label is clipped to its width/height otherwise) | Inspector > Size (by hand) | `fit_object_size`; `create_object` / `update_object` accept `"auto_size": true` |
 | Rename | Hierarchy > Rename | `update_object` (`name`) |
 | Show / hide | Inspector > Visibility | `update_object` (`visible`) |
@@ -92,6 +93,7 @@ not exposed (with the reason). Tool names are the MCP tool names.
 | Capability | Editor entry point | MCP |
 | --- | --- | --- |
 | Look at the scene as the user sees it | Scene panel | `capture_scene_view` (PNG, whole canvas or a region, scalable) |
+| Understand a picture without seeing it (for text-only models): background colour + share, content position/margins, main colours with boxes, brightness, a coarse colour grid | - | `analyze_image` (fresh scene-view capture by default, or `path` for any project image, e.g. a screenshot a script saved) |
 | Which panels exist and are visible | tab bars | `list_editor_panels` |
 | Show a panel (select its tab, raise a detached window, re-show one hidden from the Window menu) | tab bars / Window menu | `open_panel` |
 | Pan/zoom/grid, gizmos, alignment guides | Scene panel + mouse | **no** - interactive only |
@@ -133,7 +135,7 @@ Every tool that changes the scene funnels through the editor's `QUndoStack`, and
 | Modal dialogs (file chooser, save prompt, message boxes) | a tool call must never block on a UI dialog; the tools use non-interactive paths (`silent=True`, explicit paths) |
 | Shell commands, opening terminals, deleting the project folder | nothing an agent needs, and hard to undo |
 | The dashboard (create/import/delete projects) | it runs before an editor session exists; project creation stays a human action |
-| Interactive editing (painting tiles/images, dragging gizmos) | painting is exposed as data edits (`tile_map_editor_paint`, `image_editor_draw`); gizmo dragging has no headless equivalent, `capture_scene_view` replaces the observable part |
+| Interactive editing (painting tiles/images, dragging gizmos) | painting is exposed as data edits (`tile_map_editor_paint`, `image_editor_draw`); gizmo dragging has no headless equivalent, `capture_scene_view` (and its text form `analyze_image`) replaces the observable part |
 
 ## 11. Resources (read-only documents)
 

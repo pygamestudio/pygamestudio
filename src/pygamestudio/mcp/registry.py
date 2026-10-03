@@ -91,8 +91,11 @@ INSTRUCTIONS = (
     'give TEXT labels `"auto_size": true` (or call `fit_object_size` after '
     'changing text/font_size) - otherwise long labels are cut off. Prefer '
     'several small calls; check the result of '
-    'each one. Use `run_project` + `get_console_logs` to verify a script, and '
-    '`capture_scene_view` to check how the scene looks.\n'
+    'each one. Use `run_project` + `get_console_logs` to verify a script '
+    '(temporary `print()` lines are a good probe - remove them afterwards). '
+    '`capture_scene_view` takes a screenshot; `analyze_image` describes the '
+    'scene view (or any project image) as text (background, content position, '
+    'colours) for models that cannot see pictures.\n'
     'Games are plain Python: the editor only stores the scene (.scene JSON) and '
     'attaches scripts from the project folder to objects.'
 )

@@ -68,7 +68,8 @@ READ_ONLY_TOOLS = {
     'editor_status', 'get_scene_tree', 'get_object', 'find_objects', 'object_types',
     'get_current_scene', 'list_scenes', 'list_files', 'read_file', 'get_project_info',
     'get_project_config', 'get_editor_settings', 'get_build_settings', 'get_console_logs',
-    'get_runtime_status', 'list_editor_panels', 'capture_scene_view', 'undo', 'redo',
+    'get_runtime_status', 'list_editor_panels', 'capture_scene_view', 'analyze_image',
+    'undo', 'redo',
     'open_panel', 'block_editor_list_types', 'block_editor_get_blocks',
     'image_editor_state', 'image_editor_capture', 'image_editor_set_grid',
     'image_editor_pick_color',
@@ -129,8 +130,9 @@ def render_tool_result(result: dict) -> str:
         if block.get('type') == 'text':
             parts.append(block.get('text', ''))
         elif block.get('type') == 'image':
-            parts.append('[image: {} bytes {} - the user can see it in the editor]'.format(
-                len(block.get('data', '')) * 3 // 4, block.get('mimeType', 'image/png')))
+            parts.append('[image: {} bytes {} - shown to the user in the chat, NOT visible '
+                         'to you; call analyze_image for a text description]'.format(
+                             len(block.get('data', '')) * 3 // 4, block.get('mimeType', 'image/png')))
     text = '\n'.join(part for part in parts if part)
     if result.get('isError'):
         text = 'ERROR: ' + text
@@ -167,8 +169,13 @@ def system_prompt() -> str:
         'but never delete or overwrite things the user did not ask about.\n'
         '- Read before you write: get_scene_tree / get_object / object_types tell you the exact '
         'names and properties; read_file before editing a script.\n'
-        '- After writing a script, run_project and then get_console_logs to check it works.\n'
-        '- capture_scene_view shows you the scene; do not guess what it looks like.\n'
+        '- After writing a script, run_project and then get_console_logs to check it '
+        'works; temporary print() lines (player x/y, event counts, collisions) are a '
+        'good probe - remove them afterwards.\n'
+        '- You cannot see pictures: analyze_image turns the scene view (or any project '
+        'image) into text - background, content position, colours. Use it to verify a '
+        'scene really shows what it should instead of guessing; capture_scene_view only '
+        'shows the screenshot to the user.\n'
         '- Answer in the language the user writes in, and keep answers short.\n'
         '\nTool reference:\n' + INSTRUCTIONS + '\n\nEditor state:\n' + '\n'.join(context)
     )
