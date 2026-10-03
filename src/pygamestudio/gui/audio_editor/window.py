@@ -244,12 +244,10 @@ class AudioEditorWindow(QWidget):
         toolbar.addWidget(self._open_btn)
         toolbar.addWidget(self._save_btn)
         toolbar.addWidget(self._save_as_btn)
-        toolbar.addSpacing(6)
         toolbar.addWidget(self._prev_btn)
         toolbar.addWidget(self._play_btn)
         toolbar.addWidget(self._stop_btn)
         toolbar.addWidget(self._next_btn)
-        toolbar.addSpacing(6)
         toolbar.addWidget(self._time_label)
         toolbar.addStretch(1)
         toolbar.addWidget(self._size_label)
@@ -264,19 +262,14 @@ class AudioEditorWindow(QWidget):
         edit_toolbar = QHBoxLayout()
         edit_toolbar.addWidget(self._undo_btn)
         edit_toolbar.addWidget(self._redo_btn)
-        edit_toolbar.addSpacing(8)
         for btn in (self._delete_btn, self._trim_btn):
             edit_toolbar.addWidget(btn)
-        edit_toolbar.addSpacing(8)
         for btn in (self._silence_btn, self._gain_btn):
             edit_toolbar.addWidget(btn)
-        edit_toolbar.addSpacing(8)
         for btn in (self._fade_in_btn, self._fade_out_btn, self._reverse_btn):
             edit_toolbar.addWidget(btn)
-        edit_toolbar.addSpacing(8)
         for btn in (self._copy_btn, self._paste_btn):
             edit_toolbar.addWidget(btn)
-        edit_toolbar.addSpacing(8)
         for btn in (self._append_btn, self._pitch_btn, self._speed_btn):
             edit_toolbar.addWidget(btn)
         edit_toolbar.addStretch(1)
