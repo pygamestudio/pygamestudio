@@ -812,11 +812,11 @@ QWidget#tileMapEditorWindow QLabel {
     background-color: transparent;
 }
 
-QWidget#audioPlayerWindow {
+QWidget#audioEditorWindow {
     background-color: #ffffff;
 }
 
-QWidget#audioPlayerWindow QLabel {
+QWidget#audioEditorWindow QLabel {
     color: #666666;
     background-color: transparent;
 }

@@ -6,10 +6,10 @@ from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (QFileDialog, QHBoxLayout, QInputDialog, QLabel,
                                QMessageBox, QPushButton, QVBoxLayout, QWidget)
 
-from pygamestudio.gui.audio_player import codec, dsp
-from pygamestudio.gui.audio_player.engine import (AudioEngine, STATE_PLAYING,
+from pygamestudio.gui.audio_editor import codec, dsp
+from pygamestudio.gui.audio_editor.engine import (AudioEngine, STATE_PLAYING,
                                                   STATE_PAUSED)
-from pygamestudio.gui.audio_player.widgets import AudioWaveformView
+from pygamestudio.gui.audio_editor.widgets import AudioWaveformView
 from pygamestudio.gui.base.window import (DetachButton, WindowBase,
                                           clamp_window_size, editor_run_handler)
 from pygamestudio.common.i18n.translator import Translator as T
@@ -44,8 +44,8 @@ def format_size(num_bytes):
     return f'{int(num_bytes)} B'
 
 
-class AudioPlayerWindow(QWidget):
-    """The built-in audio editor (formerly the audio player).
+class AudioEditorWindow(QWidget):
+    """The built-in audio editor.
 
     Transport buttons (previous / play-pause / stop / next) and the file
     controls sit on the first toolbar row; the second row holds the editing
@@ -127,7 +127,7 @@ class AudioPlayerWindow(QWidget):
         self._set_widget()
         self._set_signal()
         self._set_layout()
-        self.setObjectName('audioPlayerWindow')
+        self.setObjectName('audioEditorWindow')
 
     def _set_widget(self):
         self._update_detach_button()
@@ -191,13 +191,13 @@ class AudioPlayerWindow(QWidget):
             btn.setToolTip(T.tr(key, default))
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
 
-        self._size_label.setObjectName('audioPlayerSizeLabel')
+        self._size_label.setObjectName('audioEditorSizeLabel')
         self._size_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
-        self._file_label.setObjectName('audioPlayerFileLabel')
+        self._file_label.setObjectName('audioEditorFileLabel')
         self._file_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
-        self._time_label.setObjectName('audioPlayerTimeLabel')
+        self._time_label.setObjectName('audioEditorTimeLabel')
         self._time_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self._time_label.setMinimumWidth(88)
         self._time_label.setText('0:00 / 0:00')
@@ -723,7 +723,7 @@ class AudioPlayerWindow(QWidget):
         previous / next buttons have something real to step through."""
         if not self._current_path or not self._current_path.parent.is_dir():
             return []
-        from pygamestudio.gui.audio_player.engine import AUDIO_FILE_EXTENSIONS
+        from pygamestudio.gui.audio_editor.engine import AUDIO_FILE_EXTENSIONS
         try:
             files = [p for p in self._current_path.parent.iterdir()
                      if p.is_file() and p.suffix.lower() in AUDIO_FILE_EXTENSIONS]
@@ -914,7 +914,7 @@ class AudioPlayerWindow(QWidget):
         run_handler = editor_run_handler(self)
         self._tab_widget.removeTab(self._tab_widget.indexOf(self))
         self.setParent(None)
-        self._standalone_window = _AudioPlayerStandaloneWindow(self, self._window_title())
+        self._standalone_window = _AudioEditorStandaloneWindow(self, self._window_title())
         self._standalone_window.set_editor_run_handler(run_handler)
         self.show()
         self._standalone_window.show()
@@ -960,7 +960,7 @@ class AudioPlayerWindow(QWidget):
     # ------------------------------------------------------------------ titles
     def _tab_title(self):
         """The tab always carries the panel name, never the file name."""
-        return T.tr('audio.player', 'Audio Player')
+        return T.tr('audio.player', 'Audio Editor')
 
     def _window_title(self):
         return f' Pygame Studio - {self._tab_title()}'
@@ -1051,7 +1051,7 @@ class AudioPlayerWindow(QWidget):
         self._update_controls()
 
 
-class _AudioPlayerStandaloneWindow(WindowBase):
+class _AudioEditorStandaloneWindow(WindowBase):
     """Frameless top-level window hosting the audio editor while it is
     detached from the center bottom tab widget."""
 

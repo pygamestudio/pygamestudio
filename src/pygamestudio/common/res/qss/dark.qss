@@ -806,11 +806,11 @@ QWidget#tileMapEditorWindow QLabel {
     background-color: transparent;
 }
 
-QWidget#audioPlayerWindow {
+QWidget#audioEditorWindow {
     background-color: #1e1e1e;
 }
 
-QWidget#audioPlayerWindow QLabel {
+QWidget#audioEditorWindow QLabel {
     color: #9d9d9d;
     background-color: transparent;
 }

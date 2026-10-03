@@ -51,6 +51,22 @@ IMAGE_OPEN_FILTER = ('Images (*.png *.jpg *.jpeg *.bmp *.gif *.webp *.tga '
                      '*.tif *.tiff *.xpm *.ico *.ppm *.pgm *.pbm *.svg)')
 
 
+def _grid_icon():
+    """The pixel-grid toggle icon: a small 3 x 3 grid (no asset for it)."""
+    size = 16
+    pixmap = QPixmap(size, size)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+    painter.setPen(QPen(QColor(160, 160, 160), 1))
+    painter.drawRect(1, 1, 13, 13)
+    for pos in (5, 10):
+        painter.drawLine(pos, 1, pos, 14)
+        painter.drawLine(1, pos, 14, pos)
+    painter.end()
+    return QIcon(pixmap)
+
+
 class ImageEditorWindow(QWidget):
     """The image editor panel.
 
@@ -87,6 +103,7 @@ class ImageEditorWindow(QWidget):
         self._clear_btn = QPushButton()
         self._brush_spinbox = SuffixSpinBox()
         self._color_btn = QPushButton()
+        self._grid_btn = QToolButton()
         self._color_picker = ColorPicker()
         self._tool_buttons = {}
         self._file_label = QLabel()
@@ -191,6 +208,18 @@ class ImageEditorWindow(QWidget):
             self._tool_buttons[tool_id] = btn
         self._set_active_highlight(TOOL_PENCIL)
 
+        # Pixel-grid toggle: NOT checkable on purpose - a checked QToolButton
+        # shifts its icon on the native style. Like the tool buttons it is
+        # highlighted through the QSS "active" property instead (the grid
+        # itself only appears from 8x zoom on).
+        self._grid_btn.setIcon(_grid_icon())
+        self._grid_btn.setIconSize(QSize(18, 18))
+        self._grid_btn.setFixedSize(30, 30)
+        self._grid_btn.setToolTip(T.tr('image.grid', 'Grid'))
+        self._grid_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._grid_btn.setAutoRaise(False)
+        self._grid_btn.setProperty('active', self._canvas.grid_visible())
+
         # Brush size (same SuffixSpinBox style as the inspector: the up/down
         # arrows only appear while the mouse hovers over the control).
         self._brush_spinbox.setRange(1, 512)
@@ -242,6 +271,7 @@ class ImageEditorWindow(QWidget):
         self._actual_btn.clicked.connect(self._canvas.actual_size)
         self._brush_spinbox.valueChanged.connect(self._canvas.set_brush_size)
         self._color_btn.clicked.connect(self._choose_color)
+        self._grid_btn.clicked.connect(self.toggle_grid)
 
         for tool_id, btn in self._tool_buttons.items():
             btn.clicked.connect(lambda checked=False, t=tool_id: self._activate_tool(t))
@@ -261,10 +291,11 @@ class ImageEditorWindow(QWidget):
         row1.addWidget(self._actual_btn)
         row1.addWidget(self._fit_btn)
 
-        # Row 2: drawing tools + brush + color + detach.
+        # Row 2: drawing tools + grid + brush + color + detach.
         row2 = QHBoxLayout()
         for tool_id, btn in self._tool_buttons.items():
             row2.addWidget(btn)
+        row2.addWidget(self._grid_btn)
         row2.addSpacing(8)
         row2.addWidget(self._brush_spinbox)
         row2.addWidget(self._color_btn)
@@ -308,6 +339,24 @@ class ImageEditorWindow(QWidget):
                 btn.style().unpolish(btn)
                 btn.style().polish(btn)
                 btn.update()
+
+    def toggle_grid(self):
+        """Flip the pixel grid (the Grid button is not checkable, see
+        _set_widget)."""
+        self.set_grid_visible(not self._canvas.grid_visible())
+
+    def set_grid_visible(self, visible):
+        """Show/hide the pixel grid and keep the button highlight in sync.
+
+        The MCP tool image_editor_set_grid calls this as well.
+        """
+        visible = bool(visible)
+        self._canvas.set_grid_visible(visible)
+        if self._grid_btn.property('active') != visible:
+            self._grid_btn.setProperty('active', visible)
+            self._grid_btn.style().unpolish(self._grid_btn)
+            self._grid_btn.style().polish(self._grid_btn)
+            self._grid_btn.update()
 
     def _choose_color(self):
         """Open the built-in ColorPicker popup next to the cursor."""
@@ -657,7 +706,7 @@ class ImageEditorWindow(QWidget):
                     self._redo_btn, self._flip_h_btn, self._flip_v_btn,
                     self._rotate_cw_btn, self._rotate_ccw_btn, self._clear_btn,
                     self._zoom_in_btn, self._zoom_out_btn, self._fit_btn,
-                    self._actual_btn):
+                    self._actual_btn, self._grid_btn):
             btn.setEnabled(has)
         for btn in self._tool_buttons.values():
             btn.setEnabled(has)
@@ -731,6 +780,7 @@ class ImageEditorWindow(QWidget):
                 btn.setToolTip(T.tr(key, default))
 
         self._brush_spinbox.setToolTip(T.tr('image.brush_size', 'Brush Size'))
+        self._grid_btn.setToolTip(T.tr('image.grid', 'Grid'))
         self._update_color_button()   # keeps the colour swatch tooltip translated
 
     def retranslate(self):

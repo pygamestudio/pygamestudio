@@ -1,5 +1,5 @@
 """MCP tools for the editing panels: block editor, image editor, tile map
-editor and audio player - plus ``open_panel`` to bring any panel into view.
+editor and audio editor - plus ``open_panel`` to bring any panel into view.
 
 These tools drive the SAME widgets the user works in, so every change shows
 up immediately in the editor:
@@ -9,7 +9,8 @@ up immediately in the editor:
 * the image editor tools paint on its canvas and use its own undo stack;
 * the tile map tools paint cells and manage layers through the
   ``GameManager``, so they are undoable with the editor's Ctrl+Z;
-* the audio player tools open a file and control playback.
+* the audio editor tools open a file, play it and edit the open buffer
+  (the same operations the toolbar buttons run, each one undo step).
 
 Nothing here opens a modal dialog: paths and sizes are arguments, and an
 unsaved image is saved (or reported) instead of prompting.
@@ -32,7 +33,7 @@ _PANELS = {
     'image': ('_image_editor_window', 'Image Editor', None),
     'tile_map': ('_tile_map_editor_window', 'Tile Map Editor', None),
     'console': ('_console_window', 'Console', None),
-    'audio': ('_audio_player_window', 'Audio Player', None),
+    'audio': ('_audio_editor_window', 'Audio Editor', None),
     'hierarchy': ('_hierarchy_window', 'Hierarchy', None),
     'assets': ('_asset_window', 'Asset', None),
     'inspector': ('_inspector_window', 'Inspector', None),
@@ -600,6 +601,7 @@ def _image_state():
         'brush_size': canvas.brush_size(),
         'color': [color.red(), color.green(), color.blue(), color.alpha()],
         'zoom': round(canvas.zoom(), 4),
+        'grid': canvas.grid_visible(),
         'can_undo': canvas.can_undo(),
         'can_redo': canvas.can_redo(),
     }
@@ -676,7 +678,7 @@ def image_editor_open(args):
 @tool(
     'image_editor_state',
     'What the Image Editor shows: file, size, drawing tool, brush size, '
-    'color, zoom and undo state. Call it before the drawing tools.',
+    'color, zoom, pixel grid and undo state. Call it before the drawing tools.',
     {
         'type': 'object',
         'properties': {},
@@ -749,11 +751,41 @@ def image_editor_set_color(args):
 
 
 @tool(
+    'image_editor_set_grid',
+    'Show or hide the pixel grid of the image editor (the toolbar Grid '
+    'toggle). The grid lines themselves only appear from 8x zoom on.',
+    {
+        'type': 'object',
+        'properties': {
+            'visible': {'type': 'boolean',
+                        'description': 'True shows the grid, False hides it.'},
+        },
+        'required': ['visible'],
+        'additionalProperties': False,
+    },
+    annotations={'readOnlyHint': True, 'title': 'Toggle the image editor grid'},
+)
+def image_editor_set_grid(args):
+    window = _image_window()
+    canvas = _image_canvas()
+    visible = bool(args['visible'])
+    setter = getattr(window, 'set_grid_visible', None)
+    if callable(setter):
+        setter(visible)                     # keeps the toolbar button in sync
+    else:
+        canvas.set_grid_visible(visible)
+    return {'grid': canvas.grid_visible()}
+
+
+@tool(
     'image_editor_draw',
-    'Draw a polyline on the image with the current tool (pencil by default, '
-    'eraser to erase); each point is [x, y] in image pixels. Use '
-    'image_editor_fill for flood fill. One undo step (the image editor\'s '
-    'Ctrl+Z).',
+    'Draw a freehand pixel stroke through "points" ([[x, y], ...] in image '
+    'pixels) - the pencil: painted pixel by pixel with the current brush '
+    'size (1 = exactly one pixel, no antialiasing), in the current color or '
+    '"color". When the eraser is the selected tool the stroke erases '
+    'instead. For a straight line, rectangle or ellipse outline use '
+    'image_editor_draw_shape; for a flood fill use image_editor_fill. One '
+    'undo step (the image editor\'s Ctrl+Z).',
     {
         'type': 'object',
         'properties': {
@@ -790,11 +822,8 @@ def image_editor_draw(args):
             canvas.set_color(args['color'])
         if args.get('brush_size') is not None:
             canvas.set_brush_size(int(args['brush_size']))
-        previous = points[0]
-        canvas._stamp_point(previous, previous)
-        for point in points[1:]:
-            canvas._stamp_point(previous, point)
-            previous = point
+        # One pixel-exact stamp per pixel - the same path the mouse uses.
+        canvas.draw_polyline(points)
     finally:
         canvas.set_color(old_color)
         canvas.set_brush_size(old_brush)
@@ -838,6 +867,102 @@ def image_editor_fill(args):
     canvas._flood_fill(x, y, color)
     canvas.update()
     return {'filled_at': [x, y]}
+
+
+@tool(
+    'image_editor_draw_shape',
+    'Draw ONE line, rectangle or ellipse outline on the image, pixel exact '
+    'like the toolbar shape tools. "start" and "end" are [x, y] in image '
+    'pixels (the two corners for rect/ellipse); "brush_size" is the outline '
+    'width (1 = single pixels). One undo step.',
+    {
+        'type': 'object',
+        'properties': {
+            'shape': {'type': 'string', 'enum': ['line', 'rect', 'ellipse']},
+            'start': {'type': 'array', 'minItems': 2, 'maxItems': 2,
+                      'items': {'type': 'number'},
+                      'description': '[x, y] of the first point / corner.'},
+            'end': {'type': 'array', 'minItems': 2, 'maxItems': 2,
+                    'items': {'type': 'number'},
+                    'description': '[x, y] of the second point / opposite corner.'},
+            'color': {'type': 'array', 'minItems': 3, 'maxItems': 4,
+                      'items': {'type': 'integer', 'minimum': 0, 'maximum': 255},
+                      'description': 'Temporary color for this shape (optional).'},
+            'brush_size': {'type': 'integer', 'minimum': 1, 'maximum': 512,
+                           'description': 'Temporary brush size for this shape (optional).'},
+        },
+        'required': ['shape', 'start', 'end'],
+        'additionalProperties': False,
+    },
+    annotations={'title': 'Draw a shape on the image'},
+)
+def image_editor_draw_shape(args):
+    from pygamestudio.gui.image_editor import canvas as image_canvas_module
+
+    canvas = _image_canvas()
+    if not canvas.has_image():
+        raise ToolError('The image editor has no image open - call image_editor_open first.')
+
+    tools = {'line': image_canvas_module.TOOL_LINE,
+             'rect': image_canvas_module.TOOL_RECT,
+             'ellipse': image_canvas_module.TOOL_ELLIPSE}
+    start = (int(round(float(args['start'][0]))), int(round(float(args['start'][1]))))
+    end = (int(round(float(args['end'][0]))), int(round(float(args['end'][1]))))
+
+    old_color = canvas.current_color()
+    old_brush = canvas.brush_size()
+    old_tool = canvas.tool()
+    canvas._push_undo()
+    try:
+        if args.get('color') is not None:
+            canvas.set_color(args['color'])
+        if args.get('brush_size') is not None:
+            canvas.set_brush_size(int(args['brush_size']))
+        canvas.set_tool(tools[args['shape']])
+        canvas._shape_start = start
+        canvas._shape_current = end
+        canvas._commit_shape()      # exactly what a mouse release runs
+    finally:
+        canvas._shape_start = canvas._shape_current = None
+        canvas.set_tool(old_tool)
+        canvas.set_color(old_color)
+        canvas.set_brush_size(old_brush)
+    canvas.update()
+    return {'shape': args['shape'], 'start': list(start), 'end': list(end)}
+
+
+@tool(
+    'image_editor_pick_color',
+    'Read the colour of ONE image pixel (the eyedropper). With "apply" the '
+    'read colour also becomes the current drawing colour. Returns '
+    '[r, g, b, a], 0-255 per channel.',
+    {
+        'type': 'object',
+        'properties': {
+            'x': {'type': 'integer', 'minimum': 0},
+            'y': {'type': 'integer', 'minimum': 0},
+            'apply': {'type': 'boolean', 'default': False,
+                      'description': 'Also use it as the drawing colour.'},
+        },
+        'required': ['x', 'y'],
+        'additionalProperties': False,
+    },
+    annotations={'readOnlyHint': True, 'title': 'Pick a pixel colour'},
+)
+def image_editor_pick_color(args):
+    canvas = _image_canvas()
+    if not canvas.has_image():
+        raise ToolError('The image editor has no image open - call image_editor_open first.')
+    width, height = canvas.image_size()
+    x, y = int(args['x']), int(args['y'])
+    if not (0 <= x < width and 0 <= y < height):
+        raise ToolError('({}, {}) is outside the image ({}x{}).'.format(x, y, width, height))
+    color = canvas.image().pixelColor(x, y)
+    applied = bool(args.get('apply'))
+    if applied:
+        _image_window().set_color(color)
+    return {'color': [color.red(), color.green(), color.blue(), color.alpha()],
+            'applied': applied}
 
 
 @tool(
@@ -1344,14 +1469,22 @@ def tile_map_editor_fill(args):
     return {'filled': len(seen), 'layer': index}
 
 
-# ============================================================== audio player
-def _audio_window():
-    return _require_panel('_audio_player_window', 'Audio Player')
+# ============================================================== audio editor
+def _audio_editor_window():
+    return _require_panel('_audio_editor_window', 'Audio Editor')
+
+
+def _audio_buffer(window):
+    buffer = getattr(window, '_buffer', None)
+    if buffer is None:
+        raise ToolError('No editable audio is open - call audio_editor_open first.')
+    return buffer
 
 
 def _audio_state(window):
     engine = window._engine
     current = getattr(window, '_current_path', None)
+    buffer = getattr(window, '_buffer', None)
     try:
         playlist_count = len(window._playlist())
     except Exception:  # noqa: BLE001 - the playlist is a nicety
@@ -1363,13 +1496,17 @@ def _audio_state(window):
         'position_ms': engine.position_ms(),
         'duration_ms': engine.duration_ms(),
         'playlist_count': playlist_count,
+        'editable': buffer is not None,
+        'modified': bool(buffer is not None and buffer.is_modified()),
     }
 
 
 @tool(
-    'audio_player_open',
-    'Open a project audio file in the Audio Player panel and start playing '
-    'it ("play" false loads it without playing). Brings the panel into view.',
+    'audio_editor_open',
+    'Open a project audio file in the Audio Editor panel and start playing '
+    'it ("play" false loads it without playing). Brings the panel into view. '
+    'Editable formats (wav/flac/ogg/mp3/...) get the full editor; m4a and '
+    'friends are refused with a message telling the user to convert them.',
     {
         'type': 'object',
         'properties': {
@@ -1381,12 +1518,14 @@ def _audio_state(window):
         'required': ['path'],
         'additionalProperties': False,
     },
-    annotations={'title': 'Open audio in the audio player'},
+    annotations={'title': 'Open audio in the audio editor'},
 )
-def audio_player_open(args):
-    window = _audio_window()
+def audio_editor_open(args):
+    window = _audio_editor_window()
     target = safe_project_path(args['path'], must_exist=True)
-    if not window.open_audio(str(target), raise_window=True):
+    # interactive=False: an unsupported format must never pop a modal dialog
+    # here - the tool call fails with its own message instead.
+    if not window.open_audio(str(target), raise_window=True, interactive=False):
         raise ToolError('"{}" could not be loaded as audio (unsupported format?).'.format(
             args['path']))
     if args.get('play') is False:
@@ -1395,25 +1534,25 @@ def audio_player_open(args):
 
 
 @tool(
-    'audio_player_state',
-    'What the Audio Player shows: file, playing state, position and duration '
-    'in milliseconds, and how many files the previous/next buttons step '
-    'through.',
+    'audio_editor_state',
+    'What the Audio Editor shows: file, playing state, position and duration '
+    'in milliseconds, how many files the previous/next buttons step through, '
+    'and whether the open file is editable and has unsaved changes.',
     {
         'type': 'object',
         'properties': {},
         'additionalProperties': False,
     },
-    annotations={'readOnlyHint': True, 'title': 'Audio player state'},
+    annotations={'readOnlyHint': True, 'title': 'Audio editor state'},
 )
-def audio_player_state(args):
-    return _audio_state(_audio_window())
+def audio_editor_state(args):
+    return _audio_state(_audio_editor_window())
 
 
 @tool(
-    'audio_player_control',
-    'Control the Audio Player: toggle (play/pause), play, pause, stop, next '
-    'or previous (the same folder playlist), or seek to "position_ms".',
+    'audio_editor_control',
+    'Control Audio Editor playback: toggle (play/pause), play, pause, stop, '
+    'next or previous (the same folder playlist), or seek to "position_ms".',
     {
         'type': 'object',
         'properties': {
@@ -1428,10 +1567,10 @@ def audio_player_state(args):
     },
     annotations={'title': 'Control audio playback'},
 )
-def audio_player_control(args):
-    from pygamestudio.gui.audio_player.engine import STATE_PLAYING
+def audio_editor_control(args):
+    from pygamestudio.gui.audio_editor.engine import STATE_PLAYING
 
-    window = _audio_window()
+    window = _audio_editor_window()
     engine = window._engine
     action = args['action']
 
@@ -1461,3 +1600,160 @@ def audio_player_control(args):
     else:  # pragma: no cover - the schema enum already rejects this
         raise ToolError('Unknown action "{}".'.format(action))
     return _audio_state(window)
+
+
+@tool(
+    'audio_editor_edit',
+    'Edit the audio in the Audio Editor: delete, trim (keep only the range), '
+    'silence, fade_in, fade_out, reverse, gain (dB), pitch (semitones, length '
+    'kept) or speed (percent, pitch kept). Acts on the selection given by '
+    'start_ms/end_ms, or on the whole file when they are omitted. Each call is '
+    'one undo step (the user can Ctrl+Z it).',
+    {
+        'type': 'object',
+        'properties': {
+            'action': {'type': 'string',
+                       'enum': ['delete', 'trim', 'silence', 'fade_in', 'fade_out',
+                                'reverse', 'gain', 'pitch', 'speed']},
+            'start_ms': {'type': 'integer', 'minimum': 0,
+                         'description': 'Selection start in ms (omit both to edit the whole file).'},
+            'end_ms': {'type': 'integer', 'minimum': 0,
+                       'description': 'Selection end in ms.'},
+            'value': {'type': 'number',
+                      'description': 'gain: dB (-60..24); pitch: semitones '
+                                     '(-12..12); speed: percent (25..400). Required '
+                                     'for gain/pitch/speed.'},
+        },
+        'required': ['action'],
+        'additionalProperties': False,
+    },
+    annotations={'title': 'Edit the open audio'},
+)
+def audio_editor_edit(args):
+    window = _audio_editor_window()
+    buffer_ = _audio_buffer(window)
+    action = args['action']
+    frames = buffer_.frames
+    rate = buffer_.samplerate
+    start_ms = args.get('start_ms')
+    end_ms = args.get('end_ms')
+    if (start_ms is None) != (end_ms is None):
+        raise ToolError('Provide start_ms and end_ms together '
+                        '(or neither to edit the whole file).')
+    if start_ms is None:
+        start, end = 0, frames
+    else:
+        start = max(0, min(frames, int(round(float(start_ms) / 1000.0 * rate))))
+        end = max(start, min(frames, int(round(float(end_ms) / 1000.0 * rate))))
+    if end <= start:
+        raise ToolError('The selected range is empty.')
+
+    def value(limit_low, limit_high, label):
+        raw = args.get('value')
+        if raw is None:
+            raise ToolError('"value" is required for {} ({}..{}).'.format(
+                action, limit_low, limit_high))
+        number = float(raw)
+        if not limit_low <= number <= limit_high:
+            raise ToolError('{} must be between {} and {} (got {}).'.format(
+                label, limit_low, limit_high, number))
+        return number
+
+    def operation(buffer):
+        if action == 'delete':
+            buffer.delete_range(start, end)
+        elif action == 'trim':
+            buffer.trim_to(start, end)
+        elif action == 'silence':
+            buffer.silence_range(start, end)
+        elif action == 'fade_in':
+            buffer.fade_in(start, end)
+        elif action == 'fade_out':
+            buffer.fade_out(start, end)
+        elif action == 'reverse':
+            buffer.reverse(start, end)
+        elif action == 'gain':
+            buffer.change_gain(start, end, value(-60.0, 24.0, 'The gain in dB'))
+        elif action == 'pitch':
+            buffer.change_pitch(start, end, value(-12.0, 12.0, 'The pitch in semitones'))
+        elif action == 'speed':
+            buffer.change_speed(start, end, value(25.0, 400.0, 'The speed in percent') / 100.0)
+        else:  # pragma: no cover - the schema enum already rejects this
+            raise ToolError('Unknown action "{}".'.format(action))
+
+    window._edit(operation)
+    state = _audio_state(window)
+    state['frames'] = buffer_.frames
+    state['duration_ms'] = buffer_.duration_ms()
+    return state
+
+
+@tool(
+    'audio_editor_append',
+    'Concatenate project audio files onto the end of the audio that is open '
+    'in the Audio Editor. Each file is resampled to the open file\'s rate and '
+    'channel layout; everything lands in ONE undo step. Files that cannot be '
+    'decoded (m4a/AAC/wma, ...) are reported in "failed" and skipped.',
+    {
+        'type': 'object',
+        'properties': {
+            'paths': {'type': 'array', 'items': {'type': 'string'},
+                      'description': 'Project-relative audio files, in append order.'},
+        },
+        'required': ['paths'],
+        'additionalProperties': False,
+    },
+    annotations={'title': 'Append audio files'},
+)
+def audio_editor_append(args):
+    window = _audio_editor_window()
+    buffer_ = _audio_buffer(window)
+    targets = [safe_project_path(path, must_exist=True) for path in args['paths']]
+    if not targets:
+        raise ToolError('Give at least one path to append.')
+    added, failed = window.append_files([str(target) for target in targets])
+    if added == 0:
+        raise ToolError('Nothing could be appended ({}).'.format(', '.join(failed)))
+    state = _audio_state(window)
+    state['appended'] = added
+    state['failed'] = failed
+    state['frames'] = buffer_.frames
+    return state
+
+
+@tool(
+    'audio_editor_save',
+    'Save the audio that is open in the Audio Editor. Without "path" it '
+    'overwrites the opened file (same format); with "path" it saves to that '
+    'project file (".wav"/".flac"/".ogg"/".mp3") and keeps working on it.',
+    {
+        'type': 'object',
+        'properties': {
+            'path': {'type': 'string',
+                     'description': 'Optional project-relative target file.'},
+        },
+        'additionalProperties': False,
+    },
+    annotations={'title': 'Save the open audio'},
+)
+def audio_editor_save(args):
+    from pygamestudio.gui.audio_editor import codec
+
+    window = _audio_editor_window()
+    _audio_buffer(window)
+    path = args.get('path')
+    if path:
+        target = safe_project_path(path)
+        if target.suffix.lower() not in codec.SAVE_SUFFIXES:
+            raise ToolError('The target must end with {} (got "{}").'.format(
+                ', '.join(codec.SAVE_SUFFIXES), path))
+        if not window.save_to(str(target)):
+            raise ToolError('Saving to "{}" failed.'.format(path))
+    else:
+        if getattr(window, '_current_path', None) is None:
+            raise ToolError('This audio was never saved - pass a "path".')
+        if not window.save():
+            raise ToolError('Saving failed.')
+    state = _audio_state(window)
+    state['frames'] = window._buffer.frames
+    return state

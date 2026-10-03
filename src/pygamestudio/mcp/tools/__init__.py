@@ -7,7 +7,7 @@ Each module groups the tools of one area of the editor:
 ``scene``    scene files, the object tree, searching objects
 ``objects``  creating/updating/deleting/duplicating/moving/selecting objects
 ``runtime``  running and stopping the game, reading the console
-``panels``   block editor, image editor, tile map editor, audio player
+``panels``   block editor, image editor, tile map editor, audio editor
 ``build``    packaging the project into a desktop app
 
 See ``CAPABILITIES.md`` for the full map of editor features to tools.

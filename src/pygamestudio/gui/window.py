@@ -22,7 +22,7 @@ from pygamestudio.gui.block_editor.window import BlockEditorWindow
 from pygamestudio.gui.animation_editor.window import AnimationEditorWindow
 from pygamestudio.gui.block_editor.storage import can_hold_blocks, is_block_script
 from pygamestudio.gui.image_editor.window import ImageEditorWindow
-from pygamestudio.gui.audio_player.window import AudioPlayerWindow
+from pygamestudio.gui.audio_editor.window import AudioEditorWindow
 from pygamestudio.gui.tile_map_editor.window import TileMapEditorWindow
 from pygamestudio.gui.agent.window import AgentWindow
 from pygamestudio.game.core.manager import GameManager
@@ -50,7 +50,7 @@ class EditorBody(QMainWindow):
         self._code_editor_window = CodeEditorWindow(game_manager)
         self._block_editor_window = BlockEditorWindow(game_manager)
         self._image_editor_window = ImageEditorWindow(game_manager)
-        self._audio_player_window = AudioPlayerWindow(game_manager)
+        self._audio_editor_window = AudioEditorWindow(game_manager)
         self._animation_editor_window = AnimationEditorWindow(game_manager)
         self._tile_map_editor_window = TileMapEditorWindow(game_manager)
         # The AI agent panel gets its own column on the right of the inspector,
@@ -120,8 +120,8 @@ class EditorBody(QMainWindow):
         self._console_window.set_tab_widget(self._center_bottom_tab_widget)
         self._center_bottom_tab_widget.addTab(self._animation_editor_window, T.tr('animation.editor', 'Animation Editor'))
         self._animation_editor_window.set_tab_widget(self._center_bottom_tab_widget)
-        self._center_bottom_tab_widget.addTab(self._audio_player_window, T.tr('audio.player', 'Audio Player'))
-        self._audio_player_window.set_tab_widget(self._center_bottom_tab_widget)
+        self._center_bottom_tab_widget.addTab(self._audio_editor_window, T.tr('audio.player', 'Audio Editor'))
+        self._audio_editor_window.set_tab_widget(self._center_bottom_tab_widget)
         self._right_top_tab_widget.addTab(self._inspector_window, T.tr('inspector.inspector', 'Inspector'))
         self._inspector_window.set_tab_widget(self._right_top_tab_widget)
         # The AI agent is the second tab of the inspector column, right next to
@@ -182,7 +182,7 @@ class EditorBody(QMainWindow):
         self._code_editor_window.switch_to_block_requested.connect(self._on_switch_to_block_editor)
         self._block_editor_window.switch_to_code_requested.connect(self._on_switch_to_code_editor)
         self._asset_window.image_edit_signal.connect(self._image_editor_window.open_image)
-        self._asset_window.audio_play_signal.connect(self._audio_player_window.open_audio)
+        self._asset_window.audio_play_signal.connect(self._audio_editor_window.open_audio)
         self._hierarchy_window.hierarchy_tree_view.edit_tile_map_requested.connect(self._on_edit_tile_map_requested)
         self._hierarchy_window.hierarchy_tree_view.edit_animation_requested.connect(self._on_edit_animation_requested)
         # The animation editor previews keyframe values on the selected object:
@@ -386,7 +386,7 @@ class EditorBody(QMainWindow):
         self._code_editor_window.get_ready_for_project()
         self._block_editor_window.get_ready_for_project()
         self._image_editor_window.get_ready_for_project()
-        self._audio_player_window.get_ready_for_project()
+        self._audio_editor_window.get_ready_for_project()
         self._animation_editor_window.get_ready_for_project()
         self._tile_map_editor_window.get_ready_for_project()
         self._game_manager.set_project_ready()
@@ -400,7 +400,7 @@ class EditorBody(QMainWindow):
         self._code_editor_window.clean_up()
         self._block_editor_window.clean_up()
         self._image_editor_window.clean_up()
-        self._audio_player_window.clean_up()
+        self._audio_editor_window.clean_up()
         self._animation_editor_window.clean_up()
         self._tile_map_editor_window.clean_up()
         self._agent_window.clean_up()
@@ -644,7 +644,7 @@ class EditorBody(QMainWindow):
         self._code_editor_window.retranslate()
         self._block_editor_window.retranslate()
         self._image_editor_window.retranslate()
-        self._audio_player_window.retranslate()
+        self._audio_editor_window.retranslate()
         self._animation_editor_window.retranslate()
         self._tile_map_editor_window.retranslate()
         self._agent_window.retranslate()

@@ -70,8 +70,10 @@ READ_ONLY_TOOLS = {
     'get_project_config', 'get_editor_settings', 'get_build_settings', 'get_console_logs',
     'get_runtime_status', 'list_editor_panels', 'capture_scene_view', 'undo', 'redo',
     'open_panel', 'block_editor_list_types', 'block_editor_get_blocks',
-    'image_editor_state', 'image_editor_capture', 'tile_map_editor_state',
-    'audio_player_state',
+    'image_editor_state', 'image_editor_capture', 'image_editor_set_grid',
+    'image_editor_pick_color',
+    'tile_map_editor_state',
+    'audio_editor_state',
 }
 
 

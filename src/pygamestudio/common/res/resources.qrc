@@ -83,5 +83,15 @@
         <file>images/slider.png</file>
         <file>images/zoom_in.png</file>
         <file>images/zoom_out.png</file>
+        <file>images/cut_clip.png</file>
+        <file>images/mute.png</file>
+        <file>images/volume_up.png</file>
+        <file>images/fade_in.png</file>
+        <file>images/fade_out.png</file>
+        <file>images/reverse.png</file>
+        <file>images/copy.png</file>
+        <file>images/paste.png</file>
+        <file>images/pitch.png</file>
+        <file>images/speed.png</file>
     </qresource>
 </RCC>

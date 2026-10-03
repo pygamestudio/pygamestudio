@@ -16,7 +16,7 @@ from pygamestudio.common.utils.config import (
 )
 from pygamestudio.common.utils.system import send_to_trash
 from pygamestudio.common.utils.path import RES_PATH
-from pygamestudio.gui.audio_player.engine import AUDIO_FILE_EXTENSIONS
+from pygamestudio.gui.audio_editor.engine import AUDIO_FILE_EXTENSIONS
 from pygamestudio.gui.block_editor.storage import can_hold_blocks, is_block_script
 
 
@@ -567,7 +567,7 @@ class AssetTreeView(QTreeView):
         """Open the selected file: a scene file in the scene editor, block
         scripts in the block editor, other text files in the built-in code
         editor, images in the built-in image editor, audio in the built-in
-        audio player, everything else with the system's default application."""
+        audio editor, everything else with the system's default application."""
         target_path = self._get_selected_file_path()
         if not target_path:
             return
@@ -628,7 +628,7 @@ class AssetTreeView(QTreeView):
         loads in the scene editor, a custom script opens in the script editor
         the user last used (see _script_editor_for_double_click), other text
         files in the code editor, an image opens in the built-in image
-        editor, audio plays in the built-in audio player, and any other
+        editor, audio plays in the built-in audio editor, and any other
         file opens with the system's default application."""
         target_path = Path(self._file_model.filePath(self._proxy_model.mapToSource(index)))
         if target_path.is_dir():

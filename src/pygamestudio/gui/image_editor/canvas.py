@@ -6,7 +6,7 @@ import math
 from collections import deque
 
 from PySide6.QtCore import QPointF, QRectF, Qt, Signal
-from PySide6.QtGui import (QColor, QImage, QPainter, QPen, QPolygonF, QTransform)
+from PySide6.QtGui import (QColor, QImage, QPainter, QPen, QTransform)
 from PySide6.QtWidgets import QAbstractScrollArea, QWidget
 
 
@@ -24,6 +24,54 @@ _CHECKER_1 = QColor(205, 205, 205)
 _CHECKER_2 = QColor(235, 235, 235)
 
 MAX_UNDO = 30
+
+#: Zoom factor from which the pixel grid appears: every image pixel becomes
+#: a visible square (Aseprite style), so single pixels can be drawn by hand.
+PIXEL_GRID_MIN_ZOOM = 8.0
+#: Pixel-grid line colors: one thin line per pixel plus a stronger line every
+#: _GRID_ACCENT_STEP-th line (pixel-art rulers, like the scene grid).
+_GRID_COLOR = QColor(0, 0, 0, 48)
+_GRID_ACCENT_COLOR = QColor(0, 0, 0, 96)
+_GRID_ACCENT_STEP = 8
+
+
+def _line_pixels(points):
+    """The pixel path through ``points`` (Bresenham), every pixel once.
+
+    Stamping is per pixel and deduplicated, so a revisited pixel (a crossing
+    stroke, a back-and-forth scribble) is painted once - a translucent color
+    never stacks up to a darker one.
+    """
+    if not points:
+        return []
+    path = []
+    seen = set()
+
+    def visit(x, y):
+        if (x, y) not in seen:
+            seen.add((x, y))
+            path.append((x, y))
+
+    if len(points) == 1:
+        visit(points[0][0], points[0][1])
+        return path
+    for (x0, y0), (x1, y1) in zip(points, points[1:]):
+        dx, dy = abs(x1 - x0), abs(y1 - y0)
+        sx = 1 if x0 < x1 else -1
+        sy = 1 if y0 < y1 else -1
+        err = dx - dy
+        while True:
+            visit(x0, y0)
+            if x0 == x1 and y0 == y1:
+                break
+            err2 = 2 * err
+            if err2 > -dy:
+                err -= dy
+                x0 += sx
+            if err2 < dx:
+                err += dx
+                y0 += sy
+    return path
 
 
 def _alpha_blend(src_rgba, dst_rgba):
@@ -43,7 +91,11 @@ class ImageCanvas(QWidget):
 
     Holds one QImage and draws it scaled by ``_zoom``; transparent pixels are
     shown on a checkerboard. Editing operations (strokes, shapes, fill,
-    transforms) go through undoable snapshots.
+    transforms) go through undoable snapshots. Drawing is pixel exact (like a
+    pixel-art tool): strokes are stamped pixel by pixel with hard edges -
+    brush size 1 paints exactly one pixel - and from ``PIXEL_GRID_MIN_ZOOM``
+    on every pixel is outlined by a grid. A middle-button drag pans the view
+    (it scrolls the parent QScrollArea) and never paints.
     """
 
     modified_changed = Signal(bool)     # True while there are unsaved edits
@@ -61,6 +113,11 @@ class ImageCanvas(QWidget):
         self._modified = False
         self._img_w = -1
         self._img_h = -1
+        self._hover_point = None
+        self._grid_visible = True
+        self._panning = False
+        self._pan_origin = None
+        self._pan_scroll = (0, 0)
 
         self._undo_stack = []
         self._redo_stack = []
@@ -93,6 +150,9 @@ class ImageCanvas(QWidget):
         self._drawing = False
         self._shape_start = self._shape_current = None
         self._stroke_points = None
+        self._hover_point = None
+        self._panning = False
+        self._pan_origin = None
         self._modified = False
         self._sync_size()
         self.update()
@@ -167,8 +227,9 @@ class ImageCanvas(QWidget):
     # ------------------------------------------------------------ tools
     def set_tool(self, tool):
         self._tool = tool
-        self.setCursor(Qt.CursorShape.CrossCursor if tool in (TOOL_FILL, TOOL_PICKER, TOOL_LINE, TOOL_RECT, TOOL_ELLIPSE)
-                       else Qt.CursorShape.CrossCursor)
+        # A plain arrow everywhere: the hover marker below shows where the
+        # tool would act, so the old crosshair (every tool had it) is gone.
+        self.setCursor(Qt.CursorShape.ArrowCursor)
 
     def tool(self):
         return self._tool
@@ -180,7 +241,26 @@ class ImageCanvas(QWidget):
         return self._brush_size
 
     def set_color(self, color):
+        """Set the drawing color: a QColor, '#rrggbb' or [r, g, b(, a)].
+
+        The list form is what MCP/agent callers pass; QColor does not accept a
+        sequence itself, so it is unpacked here (same as the window helper).
+        """
+        if isinstance(color, (list, tuple)):
+            color = QColor(*[int(channel) for channel in color])
         self._color = QColor(color)
+
+    def grid_visible(self):
+        """Whether the pixel-grid toggle is on (see PIXEL_GRID_MIN_ZOOM)."""
+        return self._grid_visible
+
+    def set_grid_visible(self, visible):
+        """Show/hide the pixel grid (the toolbar toggle)."""
+        visible = bool(visible)
+        if visible == self._grid_visible:
+            return
+        self._grid_visible = visible
+        self.update()
 
     # ------------------------------------------------------------ transforms
     def flip_h(self):
@@ -292,70 +372,207 @@ class ImageCanvas(QWidget):
                         self._image.height() * self._zoom)
         painter.drawImage(target, self._image)
 
+        self._draw_pixel_grid(painter, event.rect())
+
         if self._shape_start is not None and self._shape_current is not None:
             self._draw_shape_preview(painter)
 
         if self._drawing and self._stroke_points:
             self._draw_stroke_preview(painter)
 
+        self._draw_hover_preview(painter)
+
     def _draw_shape_preview(self, painter):
+        """Show the shape exactly as the pixels releasing the button will paint.
+
+        The shape is rasterized at image resolution (the same code the commit
+        runs) and then drawn block by block, so a line/rectangle/ellipse is
+        already in pixel form while dragging - not a smooth vector outline
+        that only turns into pixels on release.
+        """
+        if self._image is None:
+            return
+        margin = max(1, self._brush_size)
+        x0 = max(0, min(self._shape_start[0], self._shape_current[0]) - margin)
+        y0 = max(0, min(self._shape_start[1], self._shape_current[1]) - margin)
+        x1 = min(self._image.width() - 1,
+                 max(self._shape_start[0], self._shape_current[0]) + margin)
+        y1 = min(self._image.height() - 1,
+                 max(self._shape_start[1], self._shape_current[1]) + margin)
+        width, height = x1 - x0 + 1, y1 - y0 + 1
+        if width <= 0 or height <= 0:
+            return
+        overlay = QImage(width, height, QImage.Format.Format_ARGB32)
+        overlay.fill(0)
+        raster = QPainter(overlay)
+        try:
+            raster.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+            pen = QPen(self._color, max(1, self._brush_size))
+            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+            raster.setPen(pen)
+            raster.translate(-x0, -y0)
+            self._paint_shape(raster)
+        finally:
+            raster.end()
+        zoom = self._zoom
         painter.save()
-        pen = QPen(self._color, max(1, self._brush_size), Qt.PenStyle.SolidLine)
-        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        painter.setPen(pen)
-        z = self._zoom
-        p1 = QPointF(self._shape_start[0] * z, self._shape_start[1] * z)
-        p2 = QPointF(self._shape_current[0] * z, self._shape_current[1] * z)
-        if self._tool == TOOL_LINE:
-            painter.drawLine(p1, p2)
-        elif self._tool in (TOOL_RECT, TOOL_ELLIPSE):
-            rect = QRectF(p1, p2).normalized()
-            if self._tool == TOOL_RECT:
-                painter.drawRect(rect)
-            else:
-                painter.drawEllipse(rect)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, False)
+        painter.drawImage(QRectF(x0 * zoom, y0 * zoom, width * zoom, height * zoom),
+                          overlay)
         painter.restore()
 
+    def _paint_shape(self, painter):
+        """Stroke the current line / rectangle / ellipse (start -> current).
+
+        Shared by the live preview and the commit, so the drag preview and
+        the finished pixels are rasterized by the very same code.
+        """
+        p1 = QPointF(self._shape_start[0], self._shape_start[1])
+        p2 = QPointF(self._shape_current[0], self._shape_current[1])
+        if self._tool == TOOL_LINE:
+            painter.drawLine(p1, p2)
+        elif self._tool == TOOL_RECT:
+            painter.drawRect(QRectF(p1, p2).normalized())
+        elif self._tool == TOOL_ELLIPSE:
+            painter.drawEllipse(QRectF(p1, p2).normalized())
+
     def _draw_stroke_preview(self, painter):
-        """Live overlay of the freehand pencil stroke while dragging."""
+        """Live overlay of the freehand stroke: the exact pixel blocks that
+        releasing the button will paint (brush size 1 = one square)."""
         pts = self._stroke_points
         if not pts:
             return
         z = self._zoom
-        pen = QPen(self._color, max(1.0, self._brush_size * z))
-        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
         painter.save()
-        painter.setPen(pen)
-        if len(pts) == 1:
-            x, y = pts[0]
-            painter.drawPoint(QPointF(x * z, y * z))
-        else:
-            poly = QPolygonF([QPointF(x * z, y * z) for (x, y) in pts])
-            painter.drawPolyline(poly)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+        for (x, y) in _line_pixels(pts):
+            rx, ry, rw, rh = self._brush_rect(x, y)
+            painter.fillRect(QRectF(rx * z, ry * z, rw * z, rh * z), self._color)
+        painter.restore()
+
+    def _draw_hover_preview(self, painter):
+        """Translucent marker showing where the current tool would act.
+
+        Shown for the pencil, eraser, fill and the shape tools (line,
+        rectangle, ellipse - the marker is the pen width there). The marker
+        is the brush block itself (brush size 1 = exactly one pixel), filled
+        with a translucent version of the current color (a neutral white for
+        the eraser) and outlined in dark gray so it stays visible on both
+        light and dark pixels. The color picker has no marker.
+        """
+        if (self._hover_point is None or self._drawing
+                or self._shape_start is not None
+                or self._tool == TOOL_PICKER):
+            return
+        zoom = self._zoom
+        x, y = self._hover_point
+        rx, ry, rw, rh = self._brush_rect(x, y)
+        rect = QRectF(rx * zoom, ry * zoom, rw * zoom, rh * zoom).toAlignedRect()
+        fill = QColor(255, 255, 255, 110) if self._tool == TOOL_ERASER else QColor(self._color)
+        if self._tool != TOOL_ERASER:
+            fill.setAlpha(96)
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+        painter.fillRect(rect, fill)
+        painter.setPen(QPen(QColor(0, 0, 0, 160), 1))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRect(rect.adjusted(0, 0, -1, -1))
+        painter.restore()
+
+    def _draw_pixel_grid(self, painter, clip):
+        """The Aseprite-style pixel grid: one square per image pixel.
+
+        Only drawn from ``PIXEL_GRID_MIN_ZOOM`` on, and only for the visible
+        part of the canvas (a zoomed-in image can be thousands of pixels
+        wide, so invisible lines are skipped).
+        """
+        if self._image is None or not self._grid_visible or self._zoom < PIXEL_GRID_MIN_ZOOM:
+            return
+        zoom = self._zoom
+        canvas_w = int(self._image.width() * zoom)
+        canvas_h = int(self._image.height() * zoom)
+        left = max(0, int(math.floor(clip.left() / zoom)))
+        right = min(self._image.width(), int(math.ceil(clip.right() / zoom)))
+        top = max(0, int(math.floor(clip.top() / zoom)))
+        bottom = min(self._image.height(), int(math.ceil(clip.bottom() / zoom)))
+        x0, x1 = max(0, clip.left()), min(canvas_w, clip.right())
+        y0, y1 = max(0, clip.top()), min(canvas_h, clip.bottom())
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+        for x in range(left, right + 1):
+            px = int(round(x * zoom))
+            if px < x0 - 1 or px > x1 + 1:
+                continue
+            painter.setPen(_GRID_ACCENT_COLOR if x % _GRID_ACCENT_STEP == 0
+                           else _GRID_COLOR)
+            painter.drawLine(px, y0, px, y1)
+        for y in range(top, bottom + 1):
+            py = int(round(y * zoom))
+            if py < y0 - 1 or py > y1 + 1:
+                continue
+            painter.setPen(_GRID_ACCENT_COLOR if y % _GRID_ACCENT_STEP == 0
+                           else _GRID_COLOR)
+            painter.drawLine(x0, py, x1, py)
         painter.restore()
 
     def _commit_stroke(self):
-        """Paint the collected freehand stroke into the image in a single
-        pass, so the alpha value is applied once (matching the translucent
-        look of line/rect/ellipse strokes)."""
+        """Paint the collected freehand stroke pixel by pixel (one stamp per
+        pixel, so a translucent color is applied once - no stacked alpha)."""
         if self._image is None or not self._stroke_points:
             return
-        pts = self._stroke_points
-        painter = self._painter()
-        try:
-            if len(pts) == 1:
-                x, y = pts[0]
-                painter.drawPoint(QPointF(x, y))
-            else:
-                poly = QPolygonF([QPointF(x, y) for (x, y) in pts])
-                painter.drawPolyline(poly)
-        finally:
-            painter.end()
+        self.draw_polyline(self._stroke_points)
+
+    # ------------------------------------------------------------ panning
+    def is_panning(self):
+        """True while a middle-drag moves the view."""
+        return self._panning
+
+    def _start_pan(self, event):
+        """Middle press: grab the view - dragging scrolls, nothing is drawn."""
+        scroll = self._parent_scroll_area()
+        if scroll is None:
+            return
+        self._panning = True
+        self._pan_origin = event.globalPosition()
+        self._pan_scroll = (scroll.horizontalScrollBar().value(),
+                            scroll.verticalScrollBar().value())
+        self._hover_point = None
+        self.setCursor(Qt.CursorShape.ClosedHandCursor)
+        self.update()
+        event.accept()
+
+    def _pan(self, event):
+        """Scroll the view so the grabbed spot stays under the cursor.
+
+        Global positions are used on purpose: scrolling moves the widget
+        under the cursor, so widget-local coordinates would drift.
+        """
+        scroll = self._parent_scroll_area()
+        if scroll is None or self._pan_origin is None:
+            return
+        delta = event.globalPosition() - self._pan_origin
+        scroll.horizontalScrollBar().setValue(
+            int(round(self._pan_scroll[0] - delta.x())))
+        scroll.verticalScrollBar().setValue(
+            int(round(self._pan_scroll[1] - delta.y())))
+        event.accept()
+
+    def _end_pan(self):
+        if not self._panning:
+            return
+        self._panning = False
+        self._pan_origin = None
+        self.setCursor(Qt.CursorShape.ArrowCursor)
 
     # ------------------------------------------------------------ mouse
     def mousePressEvent(self, event):
-        if self._image is None or event.button() != Qt.MouseButton.LeftButton:
+        if self._image is None:
+            return
+        if event.button() == Qt.MouseButton.MiddleButton:
+            self._start_pan(event)
+            return
+        if event.button() != Qt.MouseButton.LeftButton:
             return
         point = self._to_image(event.position())
         if point is None:
@@ -397,9 +614,19 @@ class ImageCanvas(QWidget):
     def mouseMoveEvent(self, event):
         if self._image is None:
             return
+        if self._panning:
+            if event.buttons() & Qt.MouseButton.MiddleButton:
+                self._pan(event)
+                return
+            self._end_pan()          # the middle button went up elsewhere
         point = self._to_image(event.position())
         if point is None:
             return
+
+        if point != self._hover_point:
+            self._hover_point = point
+            if not self._drawing and self._shape_start is None:
+                self.update()
 
         if self._drawing and (event.buttons() & Qt.MouseButton.LeftButton):
             if self._stroke_points is not None:
@@ -420,6 +647,9 @@ class ImageCanvas(QWidget):
             self.update()
 
     def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.MiddleButton:
+            self._end_pan()
+            return
         if event.button() != Qt.MouseButton.LeftButton:
             return
         if self._drawing:
@@ -434,6 +664,13 @@ class ImageCanvas(QWidget):
             self._shape_start = None
             self._shape_current = None
             self.update()
+
+    def leaveEvent(self, event):
+        """The hover marker only exists while the pointer is on the canvas."""
+        if self._hover_point is not None:
+            self._hover_point = None
+            self.update()
+        super().leaveEvent(event)
 
     def handle_wheel(self, event):
         """Apply one wheel notch: zoom the image. True when consumed.
@@ -484,7 +721,9 @@ class ImageCanvas(QWidget):
         painter = QPainter(self._image)
         if self._tool == TOOL_ERASER:
             painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Clear)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        # No antialiasing anywhere: every tool paints hard pixels (pixel-art
+        # editing), so brush size 1 covers exactly one pixel.
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
         pen = QPen(self._color if self._tool != TOOL_ERASER else QColor(0, 0, 0, 0),
                    max(1, self._brush_size))
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
@@ -492,17 +731,40 @@ class ImageCanvas(QWidget):
         painter.setPen(pen)
         return painter
 
+    def _brush_rect(self, x, y):
+        """The pixel block one brush stamp covers: size N = N x N pixels
+        around (x, y); brush size 1 is exactly the pixel (x, y)."""
+        offset = (self._brush_size - 1) // 2
+        return (x - offset, y - offset, self._brush_size, self._brush_size)
+
+    def draw_polyline(self, points):
+        """Paint a pixel-exact stroke through ``points`` (image pixels).
+
+        Every pixel of the (Bresenham) path is stamped exactly once with the
+        brush block, so strokes have hard edges, a translucent color is
+        applied once and brush size 1 paints single pixels - the way a
+        pixel-art editor draws (Aseprite style). The eraser clears the same
+        blocks instead. The caller pushes the undo snapshot.
+        """
+        if self._image is None or not points:
+            return
+        painter = self._painter()
+        try:
+            for (x, y) in _line_pixels(points):
+                rx, ry, rw, rh = self._brush_rect(x, y)
+                painter.fillRect(rx, ry, rw, rh, self._color)
+        finally:
+            painter.end()
+
     def _stamp_point(self, from_point, to_point):
-        """Stamp a pencil/eraser stroke segment between two image points."""
+        """Stamp the brush block along one drag segment (eraser live path)."""
         if self._image is None:
             return
         painter = self._painter()
         try:
-            if from_point == to_point:
-                painter.drawPoint(from_point[0], from_point[1])
-            else:
-                painter.drawLine(from_point[0], from_point[1],
-                                 to_point[0], to_point[1])
+            for (x, y) in _line_pixels([tuple(from_point), tuple(to_point)]):
+                rx, ry, rw, rh = self._brush_rect(x, y)
+                painter.fillRect(rx, ry, rw, rh, self._color)
         finally:
             painter.end()
 
@@ -510,16 +772,9 @@ class ImageCanvas(QWidget):
         """Paint the finished line/rect/ellipse into the image."""
         if self._image is None:
             return
-        p1 = QPointF(self._shape_start[0], self._shape_start[1])
-        p2 = QPointF(self._shape_current[0], self._shape_current[1])
         painter = self._painter()
         try:
-            if self._tool == TOOL_LINE:
-                painter.drawLine(p1, p2)
-            elif self._tool == TOOL_RECT:
-                painter.drawRect(QRectF(p1, p2).normalized())
-            elif self._tool == TOOL_ELLIPSE:
-                painter.drawEllipse(QRectF(p1, p2).normalized())
+            self._paint_shape(painter)
         finally:
             painter.end()
 

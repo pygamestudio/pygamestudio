@@ -1,4 +1,4 @@
-"""Playback + waveform for the built-in audio player.
+"""Playback + waveform for the built-in audio editor.
 
 Uses pygame.mixer (the same engine the generated games use) so every format
 the mixer can decode - wav / ogg / mp3 / flac ... - just works in the editor.
@@ -16,9 +16,10 @@ setting.
 import time
 from array import array
 
+import numpy as np
 import pygame
 
-# Audio suffixes the built-in audio player can preview (kept in sync with the
+# Audio suffixes the built-in audio editor can preview (kept in sync with the
 # asset browser routing in gui/asset/tree.py).
 AUDIO_FILE_EXTENSIONS = {
     '.wav', '.mp3', '.ogg', '.flac', '.aif', '.aiff', '.m4a',
@@ -61,6 +62,33 @@ def build_envelope_from_raw(raw, bucket_count=140):
     if maximum <= 0:
         return []
     return [peak / maximum for peak in peaks]
+
+
+def mixer_raw_from_samples(samples, samplerate, target_freq, target_channels):
+    """Interleaved int16 bytes for ``pygame.mixer.Sound(buffer=...)``.
+
+    The mixer plays one fixed format, so the samples are resampled when the
+    target rate differs and folded down to the target channel count. This is
+    playback quality only - saving keeps the file's own rate and channels.
+    """
+    data = np.asarray(samples, dtype=np.float32)
+    if data.ndim == 1:
+        data = data[:, None]
+    frames, channels = data.shape
+    if frames == 0:
+        return b''
+    if samplerate != target_freq and frames > 1:
+        target_frames = max(1, int(round(frames * target_freq / float(samplerate))))
+        x_old = np.linspace(0.0, 1.0, frames, dtype=np.float64)
+        x_new = np.linspace(0.0, 1.0, target_frames, dtype=np.float64)
+        data = np.stack([np.interp(x_new, x_old, data[:, ch])
+                         for ch in range(channels)], axis=1).astype(np.float32)
+    if channels > target_channels:
+        data = data[:, :target_channels]
+    elif channels < target_channels:
+        data = np.repeat(data[:, :1], target_channels, axis=1)
+    clipped = np.clip(data, -1.0, 1.0)
+    return (clipped * 32767.0).astype('<i2').tobytes()
 
 
 class AudioEngine:
@@ -128,6 +156,32 @@ class AudioEngine:
         self._playing_since = None
         return True
 
+    def load_buffer(self, samples, samplerate):
+        """Preview raw numpy samples (the editor's working audio).
+
+        The mixer plays one fixed 16-bit format, so the samples are
+        converted (resampled) into it for playback; the file itself keeps
+        its own rate and channels when it is saved later.
+        """
+        self.stop()
+        if not self._ensure_mixer():
+            return False
+        self._mixer_params()
+        raw = mixer_raw_from_samples(samples, samplerate, self._freq, self._channels)
+        if not raw:
+            return False
+        self._sound = None
+        self._raw = raw
+        self._path = None
+        self._duration_ms = int(round(
+            len(raw) / float(self._bytes_per_sample * self._channels * self._freq) * 1000))
+        self._envelope = build_envelope_from_raw(raw)
+        self._state = STATE_STOPPED
+        self._channel = None
+        self._start_ms = 0
+        self._playing_since = None
+        return True
+
     def unload(self):
         self.stop()
         self._sound = None
@@ -142,7 +196,7 @@ class AudioEngine:
         return self._path
 
     def is_loaded(self):
-        return self._sound is not None
+        return bool(self._raw)
 
     def state(self):
         return self._state
@@ -193,7 +247,7 @@ class AudioEngine:
 
     def play(self):
         """Start (or resume) from the current start position."""
-        if self._sound is None or not self._ensure_mixer():
+        if not self._raw or not self._ensure_mixer():
             return False
         return self._start_channel(self._start_ms)
 
@@ -235,7 +289,7 @@ class AudioEngine:
         or stopped it only stores the position so the next ``play()`` starts
         there (a paused state stays paused).
         """
-        if self._sound is None:
+        if not self._raw:
             return
         position_ms = max(0, min(self._duration_ms, int(position_ms)))
         if self._state == STATE_PLAYING:

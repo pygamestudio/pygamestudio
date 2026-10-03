@@ -29,7 +29,7 @@ not exposed (with the reason). Tool names are the MCP tool names.
 | Delete file/folder | context menu > Delete | `delete_file` (folders need `recursive`) |
 | Import a file from the computer | drag & drop, copy into the folder | `import_file` |
 | Open in terminal / file explorer | context menu | **no** - launches external processes, an agent should not need it |
-| Play audio, edit image, edit tile map | Audio Player / Image Editor / Tile Map Editor | `audio_player_open`, `audio_player_control`; `image_editor_open`, `image_editor_draw`, `image_editor_fill`, `image_editor_transform`, `image_editor_save`, `image_editor_capture`; `tile_map_editor_open`, `tile_map_editor_paint`, `tile_map_editor_fill`, `tile_map_editor_layer` |
+| Play audio, edit image, edit tile map | Audio Player / Image Editor / Tile Map Editor | `audio_player_open`, `audio_player_control`; `image_editor_open`, `image_editor_state`, `image_editor_set_tool`, `image_editor_set_color`, `image_editor_set_grid`, `image_editor_draw`, `image_editor_draw_shape`, `image_editor_fill`, `image_editor_pick_color`, `image_editor_transform`, `image_editor_save`, `image_editor_capture`; `tile_map_editor_open`, `tile_map_editor_paint`, `tile_map_editor_fill`, `tile_map_editor_layer` |
 
 ## 3. Scenes
 

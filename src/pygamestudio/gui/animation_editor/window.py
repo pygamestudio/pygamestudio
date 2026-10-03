@@ -8,7 +8,7 @@ rotation, colour, image); the preview applies the timeline values to the
 object transiently (no undo entries) and restores the object's own values
 when it stops.
 
-Docked as a center bottom tab between the console and the audio player.
+Docked as a center bottom tab between the console and the audio editor.
 """
 from pathlib import Path
 
@@ -31,7 +31,7 @@ from pygamestudio.gui.inspector.component.lineedit import ImagePathLineEdit
 from pygamestudio.gui.inspector.component.picker import ColorPicker as ColorSwatchButton
 from pygamestudio.gui.inspector.component.spinbox import SuffixSpinBox
 
-TAB_INDEX = 1  # between the console tab (0) and the audio player tab (2)
+TAB_INDEX = 1  # between the console tab (0) and the audio editor tab (2)
 
 PREVIEW_INTERVAL_MS = 16
 TIME_EPSILON = 1e-4
@@ -805,7 +805,7 @@ class AnimationEditorWindow(QWidget):
             standalone._editor_window = None
             standalone.hide()
             standalone.deleteLater()
-        # Re-dock between the console (0) and the audio player.
+        # Re-dock between the console (0) and the audio editor.
         self._tab_widget.insertTab(TAB_INDEX, self, self._tab_title())
         self._tab_widget.setCurrentIndex(TAB_INDEX)
         self.show()
