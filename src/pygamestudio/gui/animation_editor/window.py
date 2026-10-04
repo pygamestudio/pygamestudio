@@ -23,9 +23,12 @@ from pygamestudio.common.utils.path import get_project_path
 from pygamestudio.game.object.keyframe import (EASING_CURVES,
                                                normalize_keyframes, snapshot_from_object)
 from pygamestudio.game.object.type import OBJECT_KEYFRAME
+from pygamestudio.gui.animation_editor.slicer import (SpriteSheetDialog,
+                                                      slice_done_text)
 from pygamestudio.gui.animation_editor.timeline import AnimationTimeline
 from pygamestudio.gui.base.window import (DetachButton, WindowBase,
                                           clamp_window_size, editor_run_handler)
+from pygamestudio.gui.console.logger import Logger
 from pygamestudio.gui.inspector.color import ColorPicker as ColorPickerPopup
 from pygamestudio.gui.inspector.component.lineedit import ImagePathLineEdit
 from pygamestudio.gui.inspector.component.picker import ColorPicker as ColorSwatchButton
@@ -63,6 +66,8 @@ class AnimationEditorWindow(QWidget):
 
         self._object_uuid = None
         self._scene_refresher = None
+        self._asset_refresher = None
+        self._slicer_dialog = None
         self._updating = False
         self._selected_index = -1
         self._preview_time = 0.0
@@ -78,6 +83,7 @@ class AnimationEditorWindow(QWidget):
 
         self._play_btn = QPushButton()
         self._stop_btn = QPushButton()
+        self._slice_btn = QPushButton()
         self._loop_box = QCheckBox()
         self._duration_spin = SuffixSpinBox()
         self._duration_label = QLabel()
@@ -120,7 +126,8 @@ class AnimationEditorWindow(QWidget):
         self._detach_btn.setObjectName('blockEditorToolBtn')
 
         for button, icon_name in ((self._play_btn, 'play'), (self._stop_btn, 'stop'),
-                                  (self._add_btn, 'add'), (self._delete_btn, 'delete')):
+                                  (self._add_btn, 'add'), (self._delete_btn, 'delete'),
+                                  (self._slice_btn, 'cut_clip')):
             button.setObjectName('blockEditorToolBtn')
             button.setIcon(QIcon(':/images/{}.png'.format(icon_name)))
             button.setIconSize(QSize(16, 16))
@@ -210,6 +217,7 @@ class AnimationEditorWindow(QWidget):
         self._timeline.keyframe_moved.connect(self._on_keyframe_moved)
         self._timeline.keyframe_menu_requested.connect(self._show_keyframe_menu)
         self._detach_btn.clicked.connect(self.toggle_detached)
+        self._slice_btn.clicked.connect(self.open_sprite_slicer)
 
         if self._game_manager is not None:
             self._game_manager.object_keyframe_parameter_changed.connect(
@@ -247,6 +255,8 @@ class AnimationEditorWindow(QWidget):
         toolbar.addWidget(self._time_title_label)
         toolbar.addWidget(self._time_label)
         toolbar.addSpacing(10)
+        toolbar.addWidget(self._slice_btn)
+        toolbar.addSpacing(6)
         toolbar.addWidget(self._detach_btn)
 
         values = QHBoxLayout()
@@ -708,6 +718,32 @@ class AnimationEditorWindow(QWidget):
         if callable(self._scene_refresher):
             self._scene_refresher()
 
+    def set_asset_refresher(self, callback):
+        """The editor hands in a callable that refreshes the asset panel."""
+        self._asset_refresher = callback
+
+    def _refresh_assets(self):
+        if callable(self._asset_refresher):
+            self._asset_refresher()
+
+    # ------------------------------------------------------------------ slicer
+    def open_sprite_slicer(self):
+        """Open the sprite-sheet slicer (a project tool: no object needed)."""
+        if self._slicer_dialog is None:
+            self._slicer_dialog = SpriteSheetDialog(self)
+            self._slicer_dialog.sliced.connect(self._on_sheet_sliced)
+        self._slicer_dialog.retranslate()
+        self._slicer_dialog.exec()
+
+    def close_sprite_slicer(self):
+        if self._slicer_dialog is not None:
+            self._slicer_dialog.close()
+
+    def _on_sheet_sliced(self, folder_text, count):
+        """The slicer wrote new frame files: log it and show them."""
+        Logger.info(slice_done_text(count, folder_text))
+        self._refresh_assets()
+
     def _update_play_button(self):
         icon_name = 'pause' if self._playing else 'play'
         self._play_btn.setIcon(QIcon(':/images/{}.png'.format(icon_name)))
@@ -861,6 +897,7 @@ class AnimationEditorWindow(QWidget):
         self._stop_btn.setToolTip(T.tr('animation.stop', 'Stop'))
         self._add_btn.setToolTip(T.tr('animation.add_keyframe', 'Add Keyframe'))
         self._delete_btn.setToolTip(T.tr('animation.delete_keyframe', 'Delete Keyframe'))
+        self._slice_btn.setToolTip(T.tr('animation.slice_sheet', 'Slice Sprite Sheet'))
         self._loop_box.setText(T.tr('animation.loop', 'Loop'))
         self._duration_label.setText(T.tr('animation.duration', 'Duration'))
         self._easing_label.setText(T.tr('animation.easing', 'Easing'))
@@ -892,10 +929,12 @@ class AnimationEditorWindow(QWidget):
     # ------------------------------------------------------------------ hooks
     def get_ready_for_project(self):
         """A project switch must not leave another project's animation loaded."""
+        self.close_sprite_slicer()
         self._restore_preview()
         self._clear_ui()
 
     def clean_up(self):
+        self.close_sprite_slicer()
         self._restore_preview()
         self._color_popup.close()
         self._clear_ui()

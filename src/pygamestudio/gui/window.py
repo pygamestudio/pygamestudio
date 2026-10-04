@@ -188,6 +188,9 @@ class EditorBody(QMainWindow):
         # The animation editor previews keyframe values on the selected object:
         # it needs a way to repaint the scene view while scrubbing / playing.
         self._animation_editor_window.set_scene_refresher(self._refresh_scene_from_animation)
+        # The sprite slicer (animation editor) writes new frame files: the
+        # asset panel must show them without a manual refresh.
+        self._animation_editor_window.set_asset_refresher(self._refresh_assets_from_animation)
         self._console_window.open_file_at_line_signal.connect(self._code_editor_window.open_file_at_line)
         self._center_top_tab_widget.currentChanged.connect(self._on_center_top_tab_changed)
         T.add_observer(self)
@@ -542,6 +545,11 @@ class EditorBody(QMainWindow):
         """Repaint the scene view while the animation editor previews a
         keyframe timeline (values are applied to the object already)."""
         self._scene_widnow._pygame_screen._update_scene()
+
+    def _refresh_assets_from_animation(self):
+        """The animation editor's sprite slicer wrote new files on disk:
+        re-read the asset tree so the frames show up right away."""
+        self._asset_window._asset_tree_view.refresh()
 
     def _show_scene_editor(self, file_path):
         """A scene file was opened in the asset panel: bring the scene editor
