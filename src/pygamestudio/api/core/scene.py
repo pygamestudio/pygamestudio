@@ -24,6 +24,7 @@ from pygamestudio.game.object.slider import *
 from pygamestudio.game.object.frame_sequence import *
 from pygamestudio.game.object.keyframe import *
 from pygamestudio.game.object.tile_map import *
+from pygamestudio.game.object.node import *
 from pygamestudio.api.config.project import get_project_config
 from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.common.utils import assets
@@ -177,6 +178,8 @@ class SceneLoader:
             obj = ObjectKeyframe(self, object_data, is_for_api=True)
         elif object_type == OBJECT_TILE_MAP:
             obj = ObjectTileMap(self, object_data, is_for_api=True)
+        elif object_type == OBJECT_NODE:
+            obj = ObjectNode(self, object_data, is_for_api=True)
         else:
             raise RuntimeError(T.tr('api.unknown_object_type', 'Unknown object type: {}').format(object_type))
 

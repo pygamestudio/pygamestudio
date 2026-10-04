@@ -39,7 +39,7 @@ ENGINE_CLASSES = (
     'ObjectBase', 'ObjectCanvas', 'ObjectRect', 'ObjectEllipse', 'ObjectPolygon',
     'ObjectLine', 'ObjectText', 'ObjectImage', 'ObjectButton', 'ObjectParticle',
     'ObjectFrameSequence', 'ObjectTextInput', 'ObjectProgressBar', 'ObjectSlider',
-    'ObjectTileMap', 'ObjectKeyframe',
+    'ObjectTileMap', 'ObjectKeyframe', 'ObjectNode',
 )
 
 # object lifecycle and event callbacks (define only the ones you use)

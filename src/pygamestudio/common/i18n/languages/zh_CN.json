@@ -340,6 +340,7 @@
         "animation": "动画",
         "frame_sequence": "帧序列",
         "keyframe": "关键帧",
+        "node": "空节点",
         "world": "世界",
         "tile_map": "瓦片地图"
     },

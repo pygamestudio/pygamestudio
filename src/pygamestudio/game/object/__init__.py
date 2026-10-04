@@ -5,6 +5,7 @@ from .frame_sequence import ObjectFrameSequence
 from .keyframe import ObjectKeyframe
 from .image import ObjectImage
 from .line import ObjectLine
+from .node import ObjectNode
 from .particle import ObjectParticle
 from .text_input import ObjectTextInput
 from .polygon import ObjectPolygon

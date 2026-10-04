@@ -53,6 +53,7 @@ class AddItemButton(QPushButton):
     def _show_context_menu(self, pos):
         menu = QMenu(self)
         add_line_action = QAction(T.tr('item.line', 'Line'), self)
+        add_node_action = QAction(T.tr('item.node', 'Empty Node'), self)
         add_rect_action = QAction(T.tr('item.rect', 'Rect'), self)
         add_ellipse_action = QAction(T.tr('item.ellipse', 'Ellipse'), self)
         add_text_action = QAction(T.tr('item.text', 'Text'), self)
@@ -64,6 +65,7 @@ class AddItemButton(QPushButton):
         add_tile_map_action = QAction(T.tr('item.tile_map', 'Tile Map'), self)
 
         add_line_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_LINE))
+        add_node_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_NODE))
         add_rect_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_RECT))
         add_ellipse_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_ELLIPSE))
         add_text_action.triggered.connect(lambda: self.add_signal.emit(OBJECT_TEXT))
@@ -77,6 +79,9 @@ class AddItemButton(QPushButton):
         add_shape_sub_menu = QMenu(title=T.tr('item.shape', 'Shape'), parent=self)
         add_ui_sub_menu = QMenu(title='UI', parent=self)
         add_world_sub_menu = QMenu(title=T.tr('item.world', 'World'), parent=self)
+        # The empty node is a plain action directly inside the Add menu, at
+        # the same level as the shape / UI / world submenus.
+        menu.addAction(add_node_action)
         menu.addMenu(add_shape_sub_menu)
         menu.addMenu(add_ui_sub_menu)
         menu.addMenu(add_world_sub_menu)

@@ -22,6 +22,7 @@ from pygamestudio.game.object.slider import *
 from pygamestudio.game.object.frame_sequence import *
 from pygamestudio.game.object.keyframe import *
 from pygamestudio.game.object.tile_map import *
+from pygamestudio.game.object.node import *
 from pygamestudio.common.utils.config import *
 from pygamestudio.gui.console.logger import Logger
 from pygamestudio.common.i18n.translator import Translator as T
@@ -290,6 +291,8 @@ class GameManager(QObject):
             obj = ObjectKeyframe(self, object_data)
         elif object_type == OBJECT_TILE_MAP:
             obj = ObjectTileMap(self, object_data)
+        elif object_type == OBJECT_NODE:
+            obj = ObjectNode(self, object_data)
 
         object_tree_struct = {
             obj.uuid: {

@@ -46,7 +46,7 @@ not exposed (with the reason). Tool names are the MCP tool names.
 
 | Capability | Editor entry point | MCP |
 | --- | --- | --- |
-| Create any object type (rect, ellipse, polygon, line, text, image, button, particle, text input, progress bar, slider, frame sequence, keyframe, tile map) | Hierarchy > Add | `create_object`, `apply_scene_patch` |
+| Create any object type (rect, ellipse, polygon, line, text, image, button, particle, text input, progress bar, slider, frame sequence, keyframe, tile map, empty node) | Hierarchy > Add | `create_object`, `apply_scene_patch` |
 | Read one object (all inspector properties + world rect) | Inspector | `get_object` |
 | Find objects | Hierarchy search | `find_objects` (name/type/script/visibility) |
 | Which properties exist per type | Inspector layout | `object_types` |

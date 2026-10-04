@@ -474,21 +474,26 @@ class PygameScreen(QWidget):
         self._mouse_y = None
 
     def _object_at(self, world_pos):
-        """Topmost visible object (not the canvas) under ``world_pos``."""
+        """Topmost visible object (not the canvas) under ``world_pos``.
+
+        Children are composited ON TOP of their parent, so a click that hits
+        pixels of both belongs to the child: the search descends into the
+        children first (from the last drawn sibling backwards) and only tests
+        the object itself when none of them matched.
+        """
         found = None
 
         def _find(node, pos):
             nonlocal found
             value = list(node.values())[0]
             obj = value['object']
-            if obj.type != OBJECT_CANVAS and obj.visible \
-                    and obj._check_click_collision((pos.x(), pos.y())):
-                found = obj
-                return
             for child_node in reversed(value['children']):
                 _find(child_node, pos)
                 if found:
                     return
+            if obj.type != OBJECT_CANVAS and obj.visible \
+                    and obj._check_click_collision((pos.x(), pos.y())):
+                found = obj
 
         _find(self._game_manager.all_object_tree_struct, world_pos)
         return found

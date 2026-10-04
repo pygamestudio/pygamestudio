@@ -11,6 +11,7 @@ from pygamestudio.gui.inspector.layout.rect import INSPECTOR_LAYOUT_RECT
 from pygamestudio.gui.inspector.layout.ellipse import INSPECTOR_LAYOUT_ELLIPSE
 from pygamestudio.gui.inspector.layout.polygon import INSPECTOR_LAYOUT_POLYGON
 from pygamestudio.gui.inspector.layout.line import INSPECTOR_LAYOUT_LINE
+from pygamestudio.gui.inspector.layout.node import INSPECTOR_LAYOUT_NODE
 from pygamestudio.gui.inspector.layout.canvas import INSPECTOR_LAYOUT_CANVAS
 from pygamestudio.gui.inspector.layout.text import INSPECTOR_LAYOUT_TEXT
 from pygamestudio.gui.inspector.layout.image import INSPECTOR_LAYOUT_IMAGE
@@ -1029,6 +1030,8 @@ class Container(QFrame):
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_KEYFRAME)
         elif obj.type == OBJECT_TILE_MAP:
             self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_TILE_MAP)
+        elif obj.type == OBJECT_NODE:
+            self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_NODE)
 
         # Every object (except the canvas root) can carry a collision body and
         # a rigid body. The physics section comes first and has its own shape

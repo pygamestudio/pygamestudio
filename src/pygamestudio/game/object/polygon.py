@@ -27,9 +27,9 @@ class ObjectPolygon(ObjectBase):
             'name': 'Polygon',
             'type': OBJECT_POLYGON,
             'uuid': str(uuid.uuid4()),
-            'x': 20,
-            'y': 20,
-            'pos': (20, 20),
+            'x': 0,
+            'y': 0,
+            'pos': (0, 0),
             'width': 60,
             'height': 60,
             'size': (60, 60),
@@ -39,7 +39,7 @@ class ObjectPolygon(ObjectBase):
             'angle': 0,
             'color': (255, 255, 255, 255),
             'visible': True,
-            'points': [(30, 4), (54, 24), (45, 52), (15, 52), (6, 24)],
+            'points': [(24, 0), (48, 20), (39, 48), (9, 48), (0, 20)],
         }
 
         for key, value in common_properties.items():

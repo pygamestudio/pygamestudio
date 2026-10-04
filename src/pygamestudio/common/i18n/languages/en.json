@@ -340,6 +340,7 @@
         "animation": "Animation",
         "frame_sequence": "Frame Sequence",
         "keyframe": "Keyframe",
+        "node": "Empty Node",
         "world": "World",
         "tile_map": "Tile Map"
     },
