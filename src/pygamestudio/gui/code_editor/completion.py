@@ -39,7 +39,7 @@ ENGINE_CLASSES = (
     'ObjectBase', 'ObjectCanvas', 'ObjectRect', 'ObjectEllipse', 'ObjectPolygon',
     'ObjectLine', 'ObjectText', 'ObjectImage', 'ObjectButton', 'ObjectParticle',
     'ObjectFrameSequence', 'ObjectTextInput', 'ObjectProgressBar', 'ObjectSlider',
-    'ObjectTileMap',
+    'ObjectTileMap', 'ObjectKeyframe',
 )
 
 # object lifecycle and event callbacks (define only the ones you use)
@@ -131,6 +131,9 @@ ENGINE_OBJECT_API = (
     'get_loop', 'set_loop', 'get_loop_state', 'set_loop_state',
     'get_frame_index', 'set_frame_index', 'get_frame_count',
     'play', 'pause', 'stop', 'restart', 'is_playing',
+    # keyframe timeline API (ObjectKeyframe / the Animation Editor's model)
+    'get_keyframes', 'set_keyframes', 'get_duration', 'set_duration',
+    'get_timeline_length', 'get_time', 'set_time', 'evaluate_at', 'preview_at',
 )
 
 # object attribute names: the fields a script reads or writes directly
@@ -143,6 +146,8 @@ ENGINE_OBJECT_ATTRIBUTES = (
     # specialised object fields
     'text', 'font_size', 'font_path', 'image_path', 'points',
     'start_point', 'end_point', 'thickness', 'frame_folder',
+    # keyframe timeline fields
+    'keyframes', 'duration', 'auto_play', 'loop',
     # collision shape
     'collision_enabled', 'collision_type',
     'collision_offset_x', 'collision_offset_y',
@@ -158,7 +163,8 @@ ENGINE_OBJECT_ATTRIBUTES = (
 # studio.* runtime helpers
 ENGINE_RUNTIME_API = (
     # scene / objects
-    'load_scene', 'create_object', 'destroy_object', 'get_object_by_path',
+    'load_scene', 'create_object', 'duplicate_object', 'destroy_object',
+    'get_object_by_path',
     'get_object_by_uuid', 'get_parent_object', 'get_root_object', 'get_children',
     'get_all_objects', 'find_objects', 'get_scene_path',
     # game loop / state / input
@@ -174,6 +180,7 @@ ENGINE_RUNTIME_API = (
     # physics world
     'get_physics_world', 'set_gravity', 'get_gravity', 'physics_raycast',
     'set_physics_time_scale', 'get_physics_time_scale',
+    'set_physics_enabled', 'is_physics_enabled',
     # window
     'set_window_title', 'get_window_title', 'set_window_icon',
     'get_window_size', 'set_window_size', 'get_window_position',
@@ -184,6 +191,9 @@ ENGINE_RUNTIME_API = (
     'set_allow_screensaver', 'is_allow_screensaver',
     # project
     'get_project_config', 'get_project_path',
+    # keyframe animation helpers (game/object/keyframe.py)
+    'normalize_keyframes', 'snapshot_from_object', 'ease_progress',
+    'DEFAULT_EASING', 'EASING_CURVES', 'KEYFRAME_CHANNELS',
 )
 
 ENGINE_NAMES = (ENGINE_CLASSES + ENGINE_EVENTS + ENGINE_OBJECT_API

@@ -57,7 +57,7 @@ not exposed (with the reason). Tool names are the MCP tool names.
 | Show / hide | Inspector > Visibility | `update_object` (`visible`) |
 | Delete (with children) | Hierarchy > Delete | `delete_object` |
 | Duplicate (with children) | Hierarchy > Duplicate | `duplicate_object` |
-| Cut / copy / paste | Edit menu | **partly** - `duplicate_object` + `move_object` cover the intent; the editor clipboard itself is not exposed |
+| Cut / copy / paste | Edit menu / hierarchy context menu | `copy_objects` + `paste_objects` (paste under any parent, fresh uuids, one undo step; the clipboard is a data snapshot and survives switching scenes); cut stays UI-only (cut + `paste_objects` is not supported) |
 | Re-parent (drag under another object) | Hierarchy drag & drop | `move_object` |
 | Reorder siblings | Hierarchy drag & drop | **no** - no undoable primitive exists for it yet |
 | Select objects (and show the user what is happening) | Hierarchy / Scene | `select_objects` |

@@ -391,6 +391,84 @@ def duplicate_object(args):
 
 
 @tool(
+    'copy_objects',
+    'Copy objects (with their children) into the editor clipboard; '
+    'paste_objects then places fresh copies under any parent. The clipboard '
+    'is a data snapshot, so it also survives switching scenes. Default: the '
+    'current selection.',
+    {
+        'type': 'object',
+        'properties': {
+            'refs': {'type': 'array', 'items': {'type': 'string'},
+                     'description': 'Uuids, paths or names (default: the selection).'},
+        },
+        'additionalProperties': False,
+    },
+    annotations={'title': 'Copy objects to the clipboard'},
+)
+def copy_objects(args):
+    manager_ = manager()
+    refs = args.get('refs')
+    if refs:
+        chosen = [resolve_object(ref) for ref in refs]
+    else:
+        chosen = manager_.get_selected_objects()
+        if not chosen:
+            raise ToolError('Nothing is selected - pass "refs" or select objects first.')
+    uuids = [obj.uuid for obj in chosen if obj.uuid != manager_.canvas_object_uuid]
+    if not uuids:
+        raise ToolError('The canvas itself cannot be copied.')
+    manager_.copy(uuids)
+    return {
+        'copied': len(uuids),
+        'objects': [_object_ref(manager_.get_object(obj_uuid)) for obj_uuid in uuids],
+    }
+
+
+@tool(
+    'paste_objects',
+    'Paste the editor clipboard as new objects (fresh uuids, one undo step). '
+    '"parent" names the parent to paste under by uuid, path or name; default: '
+    'the canvas. Use copy_objects first - the clipboard survives scene switches.',
+    {
+        'type': 'object',
+        'properties': {
+            'parent': {'type': 'string',
+                       'description': 'Uuid, path or name of the parent (default: the canvas).'},
+        },
+        'additionalProperties': False,
+    },
+    annotations={'title': 'Paste objects from the clipboard'},
+)
+def paste_objects(args):
+    manager_ = manager()
+    if not manager_.get_clipboard_content():
+        raise ToolError('The clipboard is empty - copy something first (copy_objects).')
+    parent = manager_.get_object(manager_.canvas_object_uuid)
+    if args.get('parent'):
+        parent = resolve_object(args['parent'])
+    before = {item.uuid for item in iter_objects()}
+    manager_.paste(parent.uuid)
+    created = [item for item in iter_objects() if item.uuid not in before]
+    if not created:
+        raise ToolError('Nothing was pasted (the clipboard may be stale - copy again).')
+    manager_.deselect_all()
+    roots = [item for item in created
+             if (parent_of(item) is not None and parent_of(item).uuid == parent.uuid)]
+    for item in (roots or created):
+        manager_.select(item.uuid)
+    return {
+        'pasted': len(created),
+        'objects': [_object_ref(item) for item in (roots or created)],
+    }
+
+
+def _object_ref(obj):
+    """{uuid, name, path} summary used by the clipboard tools."""
+    return {'uuid': obj.uuid, 'name': obj.name, 'path': object_path(obj)}
+
+
+@tool(
     'move_object',
     'Move an object to another parent (re-parent it, with its children). '
     'Undoable as one step.',

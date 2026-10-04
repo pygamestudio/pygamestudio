@@ -1,7 +1,9 @@
 import os
 import sys
 import re
+import copy
 import json
+import uuid
 import inspect
 import pygame
 from pathlib import Path
@@ -507,6 +509,76 @@ class SceneLoader:
         if created is not None:
             self._start_script(created)
         return created
+
+    def duplicate_object(self, obj) -> object:
+        """Duplicate an object (with its whole subtree) and return the copy.
+
+        The copy is rebuilt from the object's serialized data - exactly the
+        fields a scene save/load round-trip keeps - so its properties,
+        children, attached script and name are the source's, while every node
+        gets a FRESH uuid. The copy is placed right after the original inside
+        the same parent; its scripts' on_start fires right away and physics
+        bodies are built for it. Returns None when ``obj`` is not part of the
+        running scene, or when it is the scene root (the canvas has no parent
+        to hold a second copy).
+        """
+        target = self._resolve_object(obj)
+        if target is None:
+            return None
+        source_struct = self._get_object_tree_struct_by_uuid(target.uuid)
+        if not source_struct:
+            return None
+        parent = self.get_parent_object(target.uuid)
+        if parent is None:
+            return None
+
+        copy_struct = self._duplicate_subtree(parent.uuid,
+                                              self._snapshot_tree_struct(source_struct))
+
+        # Sit right after the original (draw order stays predictable), not at
+        # the end of the parent's children.
+        parent_struct = self._get_object_tree_struct_by_uuid(parent.uuid)
+        children = list(parent_struct.values())[0]['children']
+        children.remove(copy_struct)
+        position = len(children)
+        for index, child_struct in enumerate(children):
+            if list(child_struct.keys())[0] == target.uuid:
+                position = index + 1
+                break
+        children.insert(position, copy_struct)
+
+        for new_obj in self._iter_tree_struct_objects(copy_struct):
+            self._start_script(new_obj)
+        return list(copy_struct.values())[0]['object']
+
+    def _snapshot_tree_struct(self, object_tree_struct):
+        """Pure-data copy of a subtree (persistent fields, see _to_dict)."""
+        value = list(object_tree_struct.values())[0]
+        obj = value['object']
+        return {obj.uuid: {
+            'object': copy.deepcopy(obj._to_dict()),
+            'children': [self._snapshot_tree_struct(child) for child in value['children']],
+        }}
+
+    def _duplicate_subtree(self, parent_uuid, snapshot_struct):
+        """Build one snapshot node (and its children) under ``parent_uuid``.
+
+        Mirrors ``_add``: the object enters the tree first, then its physics
+        body is built (placing it needs the parent offsets), then its own
+        children are constructed - so the subtree stands exactly where the
+        source did.
+        """
+        key = list(snapshot_struct.keys())[0]
+        value = snapshot_struct[key]
+        object_data = dict(value['object'])
+        object_data['uuid'] = str(uuid.uuid4())
+        obj = self._new_object(object_data['type'], object_data)
+        node = {obj.uuid: {'object': obj, 'children': []}}
+        self._add_object_tree_struct(parent_uuid, node)
+        self._register_physics_object(obj)
+        for child_snapshot in value['children']:
+            self._duplicate_subtree(obj.uuid, child_snapshot)
+        return node
 
     # ------------------------------------------------- object tree management
     def _resolve_object(self, ref):
@@ -1108,6 +1180,20 @@ def create_object(object_type:str, parent:str='', name:str='', properties:dict=N
     and it is updated/drawn from the next frame on.
     """
     return scene_loader.create_object(object_type, parent, name, properties)
+
+def duplicate_object(obj) -> object:
+    """
+    在游戏运行时复制一个对象（连同它的所有子对象）并返回副本。
+    :param obj: 要复制的对象（用 get_object_by_path / get_object_by_uuid 获取）
+    :return: 副本对象；对象不在当前场景中或是场景根对象时返回 None
+
+    Duplicate an object (with its children) at runtime and return the copy.
+    The copy sits right after the original under the same parent and keeps the
+    same properties, children, script and name - only the uuids are fresh. Its
+    scripts' on_start fires immediately and it is updated/drawn from the next
+    frame on (the same rules as create_object).
+    """
+    return scene_loader.duplicate_object(obj)
 
 def destroy_object(obj) -> bool:
     """

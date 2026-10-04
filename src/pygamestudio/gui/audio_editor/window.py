@@ -576,7 +576,7 @@ class AudioEditorWindow(QWidget):
             return
         semitones, accepted = QInputDialog.getDouble(
             self, T.tr('audio.pitch', 'Change Pitch'),
-            T.tr('audio.pitch_prompt', 'Adjust pitch'), 0.0, -12.0, 12.0, 1)
+            T.tr('audio.pitch_prompt', 'Adjust pitch (-12, 12)'), 0.0, -12.0, 12.0, 1)
         if not accepted or abs(semitones) < 1e-6:
             return
         self._edit(lambda buffer: buffer.change_pitch(region[0], region[1], semitones))

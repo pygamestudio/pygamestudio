@@ -1,5 +1,7 @@
 import sys
 import json
+import copy
+import uuid
 from PySide6.QtGui import *
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
@@ -1012,7 +1014,15 @@ class GameManager(QObject):
         self.object_cut.emit()
 
     def copy(self, object_uuid_list):
-        """Remember the selected subtrees for a later paste (no originals removed)."""
+        """Remember the selected subtrees for a later paste (no originals removed).
+
+        The clipboard stores a pure-DATA snapshot of each subtree (see
+        _serialize_tree) instead of live object references: the snapshot is
+        detached from the scene (deep-copied), so later edits or deletions of
+        the originals cannot change what a paste produces - and it survives
+        opening another scene. Paste rebuilds fresh objects from it, as often
+        as wanted.
+        """
         def is_to_discard(object_uuid):
             for object_tree_struct in self._clipboard_content:
                 return self._get_object_tree_struct(object_uuid, object_tree_struct)
@@ -1029,16 +1039,31 @@ class GameManager(QObject):
                 continue
 
             object_tree_struct = self._get_object_tree_struct(object_uuid)
-            self._clipboard_content.append(object_tree_struct)
+            self._clipboard_content.append(
+                copy.deepcopy(self._serialize_tree(object_tree_struct)))
         
         self.object_copied.emit()
 
     def paste(self, parent_uuid):
+        if self._is_cut and not self._cut_still_holds_current_objects():
+            # The cut originals are not part of the open scene any more (for
+            # example another scene was opened in between): pasting would add
+            # copies while deleting nothing. Drop the stale cut instead.
+            self._clipboard_content.clear()
+            self._is_cut = False
+            return
         if self._is_cut:
             self._paste_for_cut(parent_uuid)
         else:
             self._paste_for_copy(parent_uuid)
         self._mark_scene_changed()
+
+    def _cut_still_holds_current_objects(self):
+        """True while every cut object still exists in the open scene."""
+        return all(
+            self._get_object_tree_struct(list(struct.keys())[0]) is not None
+            for struct in self._clipboard_content
+        )
 
     def _paste_for_cut(self, parent_uuid):
         # Don't paste to the cut object or its children.
@@ -1069,15 +1094,32 @@ class GameManager(QObject):
         self._is_cut = False
 
     def _paste_for_copy(self, parent_uuid):
-        for i, object_tree_struct in enumerate(self._clipboard_content):
-            new_object_tree_struct = self._deep_copy_object_tree_struct(object_tree_struct, True)
-            self._clipboard_content[i] = new_object_tree_struct
+        # The clipboard holds data snapshots: every paste builds FRESH objects
+        # (new uuids) from the same source data, so pasting twice - or pasting
+        # after opening another scene - behaves the same way and never clones
+        # a clone.
+        rebuilt = [self._rebuild_snapshot_tree_struct(snapshot)
+                   for snapshot in self._clipboard_content]
 
         self._undo_stack.beginMacro('Copy')
-        for new_object_tree_struct in self._clipboard_content:
+        for new_object_tree_struct in rebuilt:
             self._undo_stack.push(AddObjectCommand(self, parent_uuid, new_object_tree_struct, -1))
 
         self._undo_stack.endMacro()
+
+    def _rebuild_snapshot_tree_struct(self, snapshot_struct):
+        """Rebuild one clipboard snapshot into live objects (fresh uuids)."""
+        key = list(snapshot_struct.keys())[0]
+        value = snapshot_struct[key]
+        object_data = dict(value['object'])
+        object_data['uuid'] = str(uuid.uuid4())
+        new_uuid = object_data['uuid']
+        obj = self._new_object(object_data['type'], object_data)[0]
+        return {new_uuid: {
+            'object': obj,
+            'children': [self._rebuild_snapshot_tree_struct(child)
+                         for child in value['children']],
+        }}
 
     def _deep_copy_object_tree_struct(self, object_tree_struct, is_new_uuid):
         """Deep-copy a subtree by re-creating every object from its data.
