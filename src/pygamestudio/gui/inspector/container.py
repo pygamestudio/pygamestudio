@@ -104,6 +104,19 @@ class Container(QFrame):
     def _set_object_name(self):
         self.setObjectName('inspectorContainer')
 
+    def inspected_object_uuid(self):
+        """The uuid of the object the property rows are built for (None when empty)."""
+        return self._object_uuid_in_inspection
+
+    def set_properties_locked(self, locked):
+        """Disable every property control (the animation editor owns the object).
+
+        While a Keyframe object is edited in the animation editor, the values
+        stored on the object are not what the scene shows (the keyframes
+        are), so the rows stay READABLE but must not be editable.
+        """
+        self.setEnabled(not locked)
+
     def get_ready_for_project(self):
         self._clear_selection_history()
 
@@ -1049,6 +1062,12 @@ class Container(QFrame):
                                           obj.physics_type))
             self._add_layout_for_specific_object(
                 obj, build_collision_layout(obj.collision_enabled, obj.collision_type))
+
+        # The animation editor may be editing exactly this object: the
+        # inspector's hint and property lock follow the selection.
+        update_lock = getattr(self._inspector_window, 'update_animation_editing_lock', None)
+        if update_lock is not None:
+            update_lock()
 
     def _clear_layout(self, layout):
         if layout is None:

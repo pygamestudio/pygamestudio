@@ -191,6 +191,15 @@ class EditorBody(QMainWindow):
         # The sprite slicer (animation editor) writes new frame files: the
         # asset panel must show them without a manual refresh.
         self._animation_editor_window.set_asset_refresher(self._refresh_assets_from_animation)
+        # Which object the animation editor is editing right now decides whether
+        # the inspector's property rows are editable: while the keyframes are
+        # edited (the panel on screen), the object's own values are not what
+        # the scene shows.
+        self._animation_editor_window.editing_state_changed.connect(
+            self._inspector_window.set_animation_editing_object)
+        # The inspector hint's close button: leave the animation editing.
+        self._inspector_window.animation_hint_closed.connect(
+            self._close_animation_editing_hint)
         self._console_window.open_file_at_line_signal.connect(self._code_editor_window.open_file_at_line)
         self._center_top_tab_widget.currentChanged.connect(self._on_center_top_tab_changed)
         T.add_observer(self)
@@ -540,6 +549,18 @@ class EditorBody(QMainWindow):
         animation editor on it (docked tab or detached window)."""
         self._animation_editor_window.set_object(object_uuid)
         self._animation_editor_window.raise_editor()
+
+    def _close_animation_editing_hint(self):
+        """The inspector hint's close button: leave the animation editing.
+
+        Switching the dock to the console tab releases the object - the
+        animation editor only claims it while it is the tab in view, so this
+        is exactly what switching tabs by hand does. A detached editor docks
+        back first, otherwise the console tab would stay hidden behind it.
+        """
+        if self._animation_editor_window.is_detached():
+            self._animation_editor_window.attach()
+        self._center_bottom_tab_widget.setCurrentWidget(self._console_window)
 
     def _refresh_scene_from_animation(self):
         """Repaint the scene view while the animation editor previews a

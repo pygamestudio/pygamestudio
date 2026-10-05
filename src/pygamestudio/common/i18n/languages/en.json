@@ -536,11 +536,18 @@
         "slice_tip_spacing": "Empty pixels between two cells",
         "slice_tip_output": "Folder the frame files are written to",
         "slice_tip_run": "Cut the sheet into frame files now",
-        "slice_tip_preview": "Wheel: zoom - middle-drag: move - double-click: reset"
+        "slice_tip_preview": "Wheel: zoom - middle-drag: move - double-click: reset",
+        "drop_frames": "Added {count} keyframes from the dropped images",
+        "drop_need_object": "Select a Keyframe object first, then drop the frames",
+        "timeline_tip": "Wheel: stretch / compact the ruler - middle-drag: move - double-click: fit",
+        "speed": "Speed",
+        "speed_tip": "Preview playback speed"
     },
 
     "inspector": {
         "inspector": "Inspector",
+        "animation_editing": "This object is being edited in the Anim Editor",
+        "animation_editing_close": "Close and switch to the Console",
         "visibility": "Visibility",
         "name": "Name",
         "pos": "Pos",

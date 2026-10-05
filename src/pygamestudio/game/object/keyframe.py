@@ -17,6 +17,7 @@ Design notes:
   so incidental scene refreshes can never silently rewrite the saved values.
   The Animation Editor drives previews explicitly through ``preview_at``.
 """
+import math
 import uuid
 import pygame
 from pathlib import Path
@@ -253,7 +254,23 @@ class ObjectKeyframe(ObjectBase):
         return self.duration
 
     def set_duration(self, duration):
+        """Set the timeline length in whole seconds (never below 1)."""
         self.duration = duration
+
+    def clamp_duration(self, duration):
+        """A duration as whole seconds, at least 1 and at least the last
+        keyframe.
+
+        The duration box only takes whole seconds and the keyframes always
+        play (the timeline is as long as the LATER of the duration and the
+        last keyframe - see get_timeline_length), so every write is rounded
+        UP: the stored value, what the spin box shows and the ruler all agree,
+        and a value like 0.005 comes back as 1.
+        """
+        value = max(1.0, float(math.ceil(_number(duration, 2.0))))
+        if self.keyframes:
+            value = max(value, float(math.ceil(float(self.keyframes[-1]['time']))))
+        return value
 
     def get_timeline_length(self):
         """The effective timeline length: max(duration, last keyframe time)."""
@@ -391,7 +408,7 @@ class ObjectKeyframe(ObjectBase):
         elif name == 'keyframes':
             super().__setattr__('keyframes', normalize_keyframes(value))
         elif name == 'duration':
-            super().__setattr__('duration', max(0.0, _number(value, 2.0)))
+            super().__setattr__('duration', self.clamp_duration(value))
         elif name == 'auto_play':
             # Pausing re-arms the start notification: the animation reports
             # itself as started again when it resumes (including through a

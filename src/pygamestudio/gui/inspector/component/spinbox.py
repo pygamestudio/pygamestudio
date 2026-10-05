@@ -250,9 +250,11 @@ class KeyframeSpinBox(SuffixSpinBox):
         super().__init__()
         self._inspector_container = inspector_container
         self._attr = attr
-        self.setRange(0, 999999)
-        self.setSingleStep(0.1)
-        self.setDecimals(2)
+        # Whole seconds, at least one: the duration is stored that way (see
+        # ObjectKeyframe.clamp_duration), matching the animation editor.
+        self.setRange(1, 999999)
+        self.setSingleStep(1)
+        self.setDecimals(0)
         self.setValue(value)
         self.set_suffix(self._SUFFIXES.get(attr, ''))
 

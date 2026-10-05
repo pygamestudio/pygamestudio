@@ -8,11 +8,14 @@ rotation, colour, image); the preview applies the timeline values to the
 object transiently (no undo entries) and restores the object's own values
 when it stops.
 
+Frame images (or a folder of them, e.g. the sprite sheet slicer's output)
+dropped on the panel become one keyframe per image in one undo step.
+
 Docked as a center bottom tab between the console and the audio editor.
 """
 from pathlib import Path
 
-from PySide6.QtCore import QElapsedTimer, QSize, Qt, QTimer
+from PySide6.QtCore import QElapsedTimer, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QCursor, QIcon
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QFrame,
                                QHBoxLayout, QLabel, QMenu, QPushButton,
@@ -23,6 +26,8 @@ from pygamestudio.common.utils.path import get_project_path
 from pygamestudio.game.object.keyframe import (EASING_CURVES,
                                                normalize_keyframes, snapshot_from_object)
 from pygamestudio.game.object.type import OBJECT_KEYFRAME
+from pygamestudio.gui.animation_editor.frames import (collect_frame_images,
+                                                      mime_paths)
 from pygamestudio.gui.animation_editor.slicer import (SpriteSheetDialog,
                                                       slice_done_text)
 from pygamestudio.gui.animation_editor.timeline import AnimationTimeline
@@ -38,6 +43,9 @@ TAB_INDEX = 1  # between the console tab (0) and the audio editor tab (2)
 
 PREVIEW_INTERVAL_MS = 16
 TIME_EPSILON = 1e-4
+#: Seconds between the keyframes built from dropped frame images (10 fps):
+#: an image sequence cycles through its frames at this even pace.
+FRAME_DROP_INTERVAL = 0.1
 
 
 class _ValueRowHost:
@@ -57,17 +65,26 @@ class _ValueRowHost:
 class AnimationEditorWindow(QWidget):
     """The animation editor panel (timeline + preview for Keyframe objects)."""
 
+    #: The uuid of the Keyframe object this panel is editing RIGHT NOW (''
+    #: when the panel is not the editing surface in view - another tab is
+    #: open, or nothing is loaded). The inspector locks that object's own
+    #: properties while this says so.
+    editing_state_changed = Signal(str)
+
     def __init__(self, game_manager=None):
         super().__init__()
         self._game_manager = game_manager
         self._tab_widget = None
         self._is_detached = False
         self._standalone_window = None
+        self._editing_state = ''
 
         self._object_uuid = None
         self._scene_refresher = None
         self._asset_refresher = None
         self._slicer_dialog = None
+        self._drop_mime = None
+        self._drop_images = []
         self._updating = False
         self._selected_index = -1
         self._preview_time = 0.0
@@ -87,6 +104,9 @@ class AnimationEditorWindow(QWidget):
         self._loop_box = QCheckBox()
         self._duration_spin = SuffixSpinBox()
         self._duration_label = QLabel()
+        self._speed_spin = SuffixSpinBox()
+        self._speed_label = QLabel()
+        self._playback_speed = 1.0
         self._add_btn = QPushButton()
         self._delete_btn = QPushButton()
         self._easing_combo = QComboBox()
@@ -123,7 +143,18 @@ class AnimationEditorWindow(QWidget):
 
     # ------------------------------------------------------------------ widgets
     def _set_widget(self):
+        # Frame images can be dropped anywhere on the panel (the timeline,
+        # the toolbars): the drag only READS the files, so the drop action
+        # is always Copy - a file dragged in from the file manager is never
+        # moved or deleted.
+        self.setAcceptDrops(True)
+        # Space is the preview shortcut and acts while the panel has the
+        # focus: the timeline takes the focus when the panel is clicked or
+        # opened, and the controls below stay out of the tab order (a focused
+        # button would eat the Space key instead of playing).
+        self._timeline.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self._detach_btn.setObjectName('blockEditorToolBtn')
+        self._detach_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
         for button, icon_name in ((self._play_btn, 'play'), (self._stop_btn, 'stop'),
                                   (self._add_btn, 'add'), (self._delete_btn, 'delete'),
@@ -133,17 +164,32 @@ class AnimationEditorWindow(QWidget):
             button.setIconSize(QSize(16, 16))
             button.setFixedSize(26, 26)
             button.setCursor(Qt.CursorShape.PointingHandCursor)
+            button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
         self._loop_box.setObjectName('animationLoopCheckBox')
+        self._loop_box.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
         # The duration box uses the inspector's spin style: the unit is
         # pinned to the right edge and the arrows only appear while hovered.
+        # Whole seconds only, at least one; the stored value is rounded up
+        # to whole seconds and the last keyframe (see ObjectKeyframe
+        # .clamp_duration), so typing 0.005 comes back as 1.
         self._duration_spin.setObjectName('animationDurationSpin')
-        self._duration_spin.setRange(0.0, 9999.0)
-        self._duration_spin.setDecimals(2)
-        self._duration_spin.setSingleStep(0.1)
+        self._duration_spin.setRange(1.0, 9999.0)
+        self._duration_spin.setDecimals(0)
+        self._duration_spin.setSingleStep(1)
         self._duration_spin.set_suffix('S')
         self._duration_spin.setFixedWidth(80)
+
+        # Preview playback rate (1.00 = real time): an editor tool, it does
+        # not touch the object - the runtime plays at its own pace.
+        self._speed_spin.setObjectName('animationSpeedSpin')
+        self._speed_spin.setRange(0.1, 8.0)
+        self._speed_spin.setDecimals(2)
+        self._speed_spin.setSingleStep(0.1)
+        self._speed_spin.set_suffix('X')
+        self._speed_spin.setFixedWidth(64)
+        self._speed_spin.setValue(self._playback_speed)
 
         self._easing_combo.setObjectName('animationEasingCombo')
         self._easing_combo.setFixedWidth(100)
@@ -201,6 +247,7 @@ class AnimationEditorWindow(QWidget):
         self._stop_btn.clicked.connect(self.stop_preview)
         self._loop_box.toggled.connect(self._on_loop_toggled)
         self._duration_spin.valueChanged.connect(self._on_duration_changed)
+        self._speed_spin.valueChanged.connect(self._on_speed_changed)
         self._add_btn.clicked.connect(self.add_keyframe_at_playhead)
         self._delete_btn.clicked.connect(self.delete_selected_keyframe)
         self._easing_combo.currentIndexChanged.connect(self._on_easing_changed)
@@ -249,6 +296,9 @@ class AnimationEditorWindow(QWidget):
         toolbar.addSpacing(10)
         toolbar.addWidget(self._duration_label)
         toolbar.addWidget(self._duration_spin)
+        toolbar.addSpacing(10)
+        toolbar.addWidget(self._speed_label)
+        toolbar.addWidget(self._speed_spin)
         toolbar.addSpacing(10)
         toolbar.addWidget(self._loop_box)
         toolbar.addStretch(1)
@@ -300,6 +350,30 @@ class AnimationEditorWindow(QWidget):
             return obj
         return None
 
+    def editing_object(self):
+        """The uuid of the Keyframe object this panel is editing right now.
+
+        The panel only claims the object while it is the editing surface in
+        view: the current tab of the dock, or the detached standalone window.
+        The inspector uses this to lock the object's own properties - while
+        the keyframes animate it, those stored values are not what the scene
+        shows, so editing them there would mislead. Leaving the tab (or the
+        inspector hint's close button) releases the object.
+        """
+        if self._object() is None:
+            return ''
+        if self._is_detached:
+            return self._object_uuid if self._standalone_window is not None else ''
+        if self._tab_widget is not None:
+            return self._object_uuid if self._tab_widget.currentWidget() is self else ''
+        return self._object_uuid if self.isVisible() else ''
+
+    def _notify_editing_state(self):
+        state = self.editing_object()
+        if state != self._editing_state:
+            self._editing_state = state
+            self.editing_state_changed.emit(state)
+
     def set_object(self, object_uuid, raise_window=True):
         """Edit the given Keyframe object (other object types are ignored)."""
         if self._game_manager is None:
@@ -310,15 +384,18 @@ class AnimationEditorWindow(QWidget):
         if object_uuid == self._object_uuid:
             if raise_window:
                 self.raise_editor()
+            self._notify_editing_state()
             return
         self._restore_preview()
         self._object_uuid = object_uuid
         self._preview_time = 0.0
         self._selected_index = -1
         self._timeline.set_selected(-1)
+        self._timeline.reset_view()
         self._load_from_object()
         if raise_window:
             self.raise_editor()
+        self._notify_editing_state()
 
     def _load_from_object(self):
         """Reload every widget from the object (also used after undo/redo)."""
@@ -355,6 +432,7 @@ class AnimationEditorWindow(QWidget):
             self._timeline.set_length(1.0)
             self._timeline.set_time(0.0)
             self._timeline.set_selected(-1)
+            self._timeline.reset_view()
             self._loop_box.setChecked(True)
             self._duration_spin.setValue(2.0)
             self._refresh_value_editors()
@@ -363,6 +441,7 @@ class AnimationEditorWindow(QWidget):
             self._updating = False
         self._update_enabled_state()
         self._update_titles()
+        self._notify_editing_state()
 
     def _update_enabled_state(self):
         has_object = self._object() is not None
@@ -507,9 +586,11 @@ class AnimationEditorWindow(QWidget):
         if 0 <= index < len(frames):
             # Jump to the keyframe and show it: the value row edits that pose.
             self._apply_preview(frames[index]['time'])
-        else:
-            # Nothing is being edited: the scene goes back to the object's
-            # own values (what the inspector edits) while the playhead stays.
+        elif not self._apply_left_frame(self._preview_time):
+            # Nothing is being edited: the scene keeps showing the animation
+            # - the nearest frame on the LEFT of the playhead - and only
+            # falls back to the object's own values when there is no
+            # timeline at all.
             self._restore_preview()
 
     def _on_keyframe_context_selected(self, index):
@@ -557,6 +638,11 @@ class AnimationEditorWindow(QWidget):
             return
         self._game_manager.set_keyframe_parameter(self._object_uuid, 'duration',
                                                   float(value))
+
+    def _on_speed_changed(self, value):
+        if self._updating:
+            return
+        self._playback_speed = max(0.1, float(value))
 
     # -------------------------------------------------------------- values
     def _write_channel(self, channel, value):
@@ -622,6 +708,13 @@ class AnimationEditorWindow(QWidget):
         if obj is None:
             return
         self._snapshot_base()
+        # Play after a play-once animation ran to its end restarts it: with
+        # the playhead still sitting on the end the very first tick paused
+        # again, so Play looked dead until Stop moved the playhead back.
+        length = obj.get_timeline_length()
+        if (not obj.loop and length > 0
+                and self._preview_time >= length - TIME_EPSILON):
+            self._apply_preview(0.0)
         self._playing = True
         self._clock.restart()
         self._preview_timer.start()
@@ -637,7 +730,7 @@ class AnimationEditorWindow(QWidget):
         if obj is None:
             self._pause_clock()
             return
-        elapsed = self._clock.restart() / 1000.0
+        elapsed = self._clock.restart() / 1000.0 * self._playback_speed
         self._preview_time += elapsed
         length = obj.get_timeline_length()
         if length > 0:
@@ -694,16 +787,55 @@ class AnimationEditorWindow(QWidget):
         self._base_values = None
         self._dirty_preview = False
 
+    def _left_frame_time(self, frames, moment):
+        """The time of the nearest keyframe at or before ``moment``.
+
+        In front of the first keyframe the runtime holds the first snapshot,
+        so the first frame is the one shown there.
+        """
+        left = float(frames[0]['time'])
+        for frame in frames:
+            if float(frame['time']) <= moment:
+                left = float(frame['time'])
+            else:
+                break
+        return left
+
+    def _apply_left_frame(self, moment):
+        """Transiently show the nearest frame LEFT of ``moment`` (no undo).
+
+        Used whenever the playhead moves while no keyframe is being edited:
+        the scene then keeps showing the ANIMATION instead of the object's
+        own values - after moving the object on the canvas those read like
+        a frame of the timeline, which they are not. Returns False when
+        there is nothing to show (no keyframes yet).
+        """
+        obj = self._object()
+        if obj is None:
+            return False
+        frames = obj.get_keyframes()
+        if not frames:
+            return False
+        self._snapshot_base()
+        if obj.preview_at(self._left_frame_time(frames, moment)):
+            self._dirty_preview = True
+        self._refresh_scene()
+        return True
+
     def _on_scrubbed(self, moment):
         self._pause_clock()
+        moment = max(0.0, float(moment))
         if self._selected_index >= 0:
             self._apply_preview(moment)
             return
-        # No keyframe is being edited: only the playhead moves, the scene
-        # keeps showing the object's own (inspector) values.
-        self._restore_preview()
-        self._preview_time = max(0.0, float(moment))
-        self._timeline.set_time(self._preview_time)
+        # No keyframe is being edited: the playhead moves and the scene
+        # shows the animation (the nearest frame on the LEFT of the
+        # playhead) - the object's own values are what the inspector edits
+        # and would be mistaken for a frame of the timeline.
+        if not self._apply_left_frame(moment):
+            self._restore_preview()
+        self._preview_time = moment
+        self._timeline.set_time(moment)
         self._update_time_label()
 
     def _on_scrub_finished(self, moment):
@@ -743,6 +875,110 @@ class AnimationEditorWindow(QWidget):
         """The slicer wrote new frame files: log it and show them."""
         Logger.info(slice_done_text(count, folder_text))
         self._refresh_assets()
+
+    # ------------------------------------------------------- dropped frames
+    def _dropped_frame_images(self, mime):
+        """The image files of a drag, cached while THAT drag is over us.
+
+        dragMoveEvent fires continuously, and a folder holding hundreds of
+        frames must not be re-read on every move.
+        """
+        if mime is not self._drop_mime:
+            self._drop_mime = mime
+            self._drop_images = collect_frame_images(mime_paths(mime))
+        return self._drop_images
+
+    def dragEnterEvent(self, event):
+        """Accept a drag that carries frame images (it is only read)."""
+        if self._dropped_frame_images(event.mimeData()):
+            event.setDropAction(Qt.DropAction.CopyAction)
+            event.accept()
+            return
+        super().dragEnterEvent(event)
+
+    def dragMoveEvent(self, event):
+        if self._dropped_frame_images(event.mimeData()):
+            event.setDropAction(Qt.DropAction.CopyAction)
+            event.accept()
+            return
+        super().dragMoveEvent(event)
+
+    def dropEvent(self, event):
+        images = self._dropped_frame_images(event.mimeData())
+        if images:
+            event.setDropAction(Qt.DropAction.CopyAction)
+            event.accept()
+            self.add_frames(images)
+            return
+        super().dropEvent(event)
+
+    def add_frames(self, images):
+        """One keyframe per dropped image, as ONE undo step.
+
+        The frames are spaced FRAME_DROP_INTERVAL seconds apart. On an empty
+        timeline the first frame lands on 0 and the duration becomes exactly
+        the length of the sequence, so a loop cycles through the images;
+        dropped onto an existing timeline the frames are appended after the
+        last keyframe and the duration only grows when they reach past it.
+        Each new keyframe keeps the pose the timeline already defines at its
+        time - only the image differs, which is what an image sequence is.
+        """
+        obj = self._object()
+        if obj is None:
+            Logger.warning(T.tr(
+                'animation.drop_need_object',
+                'Select a Keyframe object first, then drop the frames'))
+            return False
+        if not images:
+            return False
+
+        frames = obj.get_keyframes()
+        # The first dropped frame starts the timeline at 0, or continues one
+        # interval after the last existing keyframe. Rounded to microseconds:
+        # adding 0.1 repeatedly otherwise leaves 0.20000000000000004 in the
+        # saved scene.
+        start = float(frames[-1]['time']) if frames else -FRAME_DROP_INTERVAL
+        moments = [round(start + (index + 1) * FRAME_DROP_INTERVAL, 6)
+                   for index in range(len(images))]
+
+        additions = []
+        for moment, image in zip(moments, images):
+            values = obj.evaluate_at(moment)
+            if values is None:
+                snapshot = snapshot_from_object(obj, moment)
+            else:
+                snapshot = {'time': moment, 'easing': 'linear',
+                            'color': list(values['color']),
+                            'image_path': values.get('image_path', '')}
+                for channel in ('x', 'y', 'scale_x', 'scale_y', 'angle'):
+                    snapshot[channel] = values[channel]
+            snapshot['time'] = moment
+            snapshot['image_path'] = str(image)
+            additions.append(snapshot)
+
+        combined = normalize_keyframes(frames + additions)
+        last_moment = round(moments[-1] + FRAME_DROP_INTERVAL, 6)
+        duration = max(float(obj.duration), last_moment) if frames else last_moment
+
+        undo_stack = self._game_manager.undo_stack
+        undo_stack.beginMacro('Drop Frames')
+        try:
+            self._commit_keyframes(combined)
+            self._game_manager.set_keyframe_parameter(obj.uuid, 'duration',
+                                                      float(duration))
+        finally:
+            undo_stack.endMacro()
+
+        # Show the first dropped frame: that is the keyframe being edited now.
+        index = min(range(len(combined)),
+                    key=lambda position: abs(combined[position]['time'] - moments[0]))
+        self._timeline.set_selected(index)
+        self._load_from_object()
+        self._apply_preview(moments[0])
+        Logger.info(T.tr('animation.drop_frames',
+                         'Added {count} keyframes from the dropped images')
+                    .format(count=len(images)))
+        return True
 
     def _update_play_button(self):
         icon_name = 'pause' if self._playing else 'play'
@@ -812,6 +1048,15 @@ class AnimationEditorWindow(QWidget):
     # ------------------------------------------------------------------ detach
     def set_tab_widget(self, tab_widget):
         self._tab_widget = tab_widget
+        if tab_widget is not None:
+            # Leaving / entering the tab decides whether the panel is the
+            # editing surface in view: the inspector unlocks the object on
+            # the way out and locks it again on the way back in.
+            tab_widget.currentChanged.connect(self._on_tab_current_changed)
+        self._notify_editing_state()
+
+    def _on_tab_current_changed(self, index):
+        self._notify_editing_state()
 
     def toggle_detached(self):
         if self._is_detached:
@@ -831,6 +1076,7 @@ class AnimationEditorWindow(QWidget):
         self._standalone_window.show()
         self._is_detached = True
         self._update_detach_button()
+        self._notify_editing_state()
 
     def attach(self):
         if not self._is_detached or self._tab_widget is None:
@@ -847,6 +1093,7 @@ class AnimationEditorWindow(QWidget):
         self.show()
         self._is_detached = False
         self._update_detach_button()
+        self._notify_editing_state()
 
     def closeEvent(self, event):
         if self._is_detached:
@@ -866,10 +1113,34 @@ class AnimationEditorWindow(QWidget):
                 self._standalone_window.activateWindow()
         elif self._tab_widget is not None:
             self._tab_widget.setCurrentWidget(self)
+        # The panel is in view now: put the focus on the timeline so Space
+        # plays right away (the toolbar controls never hold the focus).
+        self._timeline.setFocus()
 
     def raise_editor(self):
         """Bring this editor into view (its tab, or its detached window)."""
         self._raise_window()
+
+    # ------------------------------------------------------------------ keys
+    def keyPressEvent(self, event):
+        """Space plays / pauses the preview while the panel has the focus."""
+        if (event.key() == Qt.Key.Key_Space
+                and event.modifiers() == Qt.KeyboardModifier.NoModifier
+                and not event.isAutoRepeat()):
+            self.toggle_play()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+    def showEvent(self, event):
+        """Take the focus when the panel becomes visible (tab click, open).
+
+        The Space shortcut acts while the panel holds the focus, so switching
+        to the animation tab must not leave the focus in the panel the user
+        came from - otherwise Space would seem dead until a click.
+        """
+        super().showEvent(event)
+        self._timeline.setFocus()
 
     # ------------------------------------------------------------------ titles / i18n
     def _tab_title(self):
@@ -898,8 +1169,14 @@ class AnimationEditorWindow(QWidget):
         self._add_btn.setToolTip(T.tr('animation.add_keyframe', 'Add Keyframe'))
         self._delete_btn.setToolTip(T.tr('animation.delete_keyframe', 'Delete Keyframe'))
         self._slice_btn.setToolTip(T.tr('animation.slice_sheet', 'Slice Sprite Sheet'))
+        self._timeline.setToolTip(T.tr(
+            'animation.timeline_tip',
+            'Wheel: stretch / compact the ruler - middle-drag: move - double-click: fit'))
         self._loop_box.setText(T.tr('animation.loop', 'Loop'))
         self._duration_label.setText(T.tr('animation.duration', 'Duration'))
+        self._speed_label.setText(T.tr('animation.speed', 'Speed'))
+        self._speed_spin.setToolTip(T.tr('animation.speed_tip',
+                                         'Preview playback speed'))
         self._easing_label.setText(T.tr('animation.easing', 'Easing'))
         self._time_title_label.setText(T.tr('animation.time', 'Time'))
         self._pos_label.setText(T.tr('inspector.pos', 'Pos'))

@@ -4,7 +4,15 @@ One track of keyframe diamonds (snapshot-style keyframes: each diamond holds
 the whole set of animated channels), a time ruler and a draggable playhead.
 The widget only handles times and indexes - the window owns the object, the
 undo commands and the preview.
+
+The ruler divides every 0.1 s (the durations are whole seconds, so that is
+the useful unit); divisions too close to read are thinned out while
+painting. The wheel stretches / compacts the time axis around the cursor
+(with limits) and a middle drag moves it; a double click fits the whole
+timeline again.
 """
+import math
+
 from PySide6.QtCore import QPoint, QPointF, Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPen, QPolygonF
 from PySide6.QtWidgets import QWidget
@@ -17,21 +25,39 @@ DIAMOND_RADIUS = 6
 HIT_RADIUS = 11
 MIN_LENGTH = 0.001
 
-_STEPS = (0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 15.0, 30.0, 60.0, 120.0)
+#: The ruler's division: one grid line every 0.1 s.
+TICK_INTERVAL = 0.1
+#: The preview time resolution (what scrubbing / retiming snaps to).
+TIME_DECIMALS = 3
+#: Ruler divisions closer than this are thinned out while painting (the
+#: wheel zooms in to reveal them); labels are at least this far apart.
+TICK_MIN_PX = 4.0
+LABEL_MIN_PX = 42.0
+#: One wheel notch stretches / compacts the axis by this factor ...
+WHEEL_ZOOM_STEP = 1.25
+#: ... and the visible span stays between this much time and the whole
+#: timeline (so the view can neither stretch nor compact without limits).
+MIN_VIEW_SPAN = 0.002
+
+_STEP_FACTORS = (1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000,
+                 10000, 20000, 50000, 100000)
 
 
-def _tick_step(length):
-    """A tick spacing that yields ~10 ticks over the timeline."""
-    for step in _STEPS:
-        if length / step <= 10:
+def _scaled_step(base, minimum_pixels, pixels_per_second):
+    """The smallest multiple of ``base`` drawn at least ``minimum_pixels``
+    wide: keeps the ruler readable at any zoom, never finer than ``base``."""
+    for factor in _STEP_FACTORS:
+        step = base * factor
+        if step * pixels_per_second >= minimum_pixels:
             return step
-    return _STEPS[-1]
+    return base * _STEP_FACTORS[-1]
 
 
 def _format_time(seconds, step):
     if step >= 1.0:
         return '{}s'.format(int(round(seconds)))
-    return '{}s'.format(round(seconds, 2))
+    decimals = max(1, int(round(-math.log10(step))))
+    return '{}s'.format(round(seconds, decimals))
 
 
 class AnimationTimeline(QWidget):
@@ -54,6 +80,10 @@ class AnimationTimeline(QWidget):
         self._drag_index = None
         self._drag_time = 0.0
         self._scrubbing = False
+        self._view = (0.0, self._length)   # visible (start, end) seconds
+        self._panning = False
+        self._pan_origin = None
+        self._pan_view = None
         self._colors = self._theme_colors(True)
         self.setMinimumHeight(TRACK_TOP + TRACK_HEIGHT + 14)
         self.setCursor(Qt.CursorShape.ArrowCursor)
@@ -70,7 +100,15 @@ class AnimationTimeline(QWidget):
         return list(self._keyframes)
 
     def set_length(self, length):
+        """Set the timeline length; a fitted view follows it, a zoomed one
+        is only clamped into the new range."""
+        fitted = (self._view[0] <= 1e-9
+                  and abs((self._view[1] - self._view[0]) - self._length) <= 1e-9)
         self._length = max(float(length), MIN_LENGTH)
+        if fitted:
+            self._view = (0.0, self._length)
+        else:
+            self._clamp_view()
         self.update()
 
     def length(self):
@@ -122,12 +160,52 @@ class AnimationTimeline(QWidget):
     def _track_width(self):
         return max(1, self.width() - 2 * PAD)
 
+    def _clamp_view(self):
+        """Keep the visible window inside the timeline and its limits."""
+        start, end = self._view
+        span = min(max(end - start, min(MIN_VIEW_SPAN, self._length)),
+                   self._length)
+        start = max(0.0, min(start, self._length - span))
+        self._view = (start, start + span)
+
+    def view(self):
+        """The visible (start, end) times in seconds."""
+        return self._view
+
+    def reset_view(self):
+        """Show the whole timeline again (double click, new object)."""
+        self._view = (0.0, self._length)
+        self.update()
+
+    def _pixels_per_second(self):
+        span = max(self._view[1] - self._view[0], 1e-9)
+        return self._track_width() / span
+
     def _time_to_x(self, time):
-        return PAD + self._track_width() * (time / self._length)
+        return PAD + (time - self._view[0]) * self._pixels_per_second()
 
     def _x_to_time(self, x):
-        fraction = (x - PAD) / self._track_width()
-        return max(0.0, min(fraction, 1.0)) * self._length
+        time = self._view[0] + (x - PAD) / self._pixels_per_second()
+        return max(0.0, min(time, self._length))
+
+    def _tick_interval(self):
+        """The ruler's division: 0.1 s.
+
+        Durations are whole seconds, so 0.1 s is the useful unit; divisions
+        too close to read are thinned out while painting (see TICK_MIN_PX)
+        and the wheel zooms in to stretch them apart.
+        """
+        return TICK_INTERVAL
+
+    def _tick_label_x(self, painter, x, text):
+        """Where a tick label is drawn: right of its tick, flipped to the
+        left when it would run out of the widget (the last label at the edge
+        used to be clipped to '1.')."""
+        metrics = painter.fontMetrics()
+        label_x = x + 3
+        if label_x + metrics.horizontalAdvance(text) > self.width() - 2:
+            label_x = x - 3 - metrics.horizontalAdvance(text)
+        return label_x
 
     def _diamond_time(self, index):
         if self._drag_index == index:
@@ -163,16 +241,27 @@ class AnimationTimeline(QWidget):
         painter.setPen(colors['line'])
         painter.drawLine(0, RULER_HEIGHT, width, RULER_HEIGHT)
 
-        # Ruler ticks + labels.
-        step = _tick_step(self._length)
-        painter.setPen(colors['text'])
-        moment = 0.0
-        while moment <= self._length + 1e-9:
+        # Ruler ticks + labels: the finest division is the duration's own
+        # precision, thinned out to whatever stays readable at this zoom.
+        interval = self._tick_interval()
+        pixels_per_second = self._pixels_per_second()
+        tick_step = _scaled_step(interval, TICK_MIN_PX, pixels_per_second)
+        label_step = _scaled_step(interval, LABEL_MIN_PX, pixels_per_second)
+        view_start, view_end = self._view
+        last_moment = min(view_end, self._length)
+        first_index = max(0, int(math.ceil((view_start - 1e-9) / tick_step)))
+        moment = first_index * tick_step
+        while moment <= last_moment + 1e-9:
             x = self._time_to_x(moment)
-            painter.drawLine(QPointF(x, RULER_HEIGHT - 6), QPointF(x, RULER_HEIGHT))
-            painter.drawText(QPointF(x + 3, RULER_HEIGHT - 10),
-                             _format_time(moment, step))
-            moment += step
+            ratio = moment / label_step
+            labelled = abs(ratio - round(ratio)) < 1e-6
+            painter.drawLine(QPointF(x, RULER_HEIGHT - 6 if labelled else RULER_HEIGHT - 3),
+                             QPointF(x, RULER_HEIGHT))
+            if labelled:
+                text = _format_time(moment, label_step)
+                painter.drawText(QPointF(self._tick_label_x(painter, x, text),
+                                         RULER_HEIGHT - 10), text)
+            moment = round(moment + tick_step, 9)
 
         # Keyframe diamonds.
         for index in range(len(self._keyframes)):
@@ -196,6 +285,14 @@ class AnimationTimeline(QWidget):
 
     # ------------------------------------------------------------- mouse
     def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.MiddleButton:
+            # Middle button: move the (zoomed) view, like the audio waveform.
+            self._panning = True
+            self._pan_origin = event.globalPosition()
+            self._pan_view = self._view
+            self.setCursor(Qt.CursorShape.ClosedHandCursor)
+            event.accept()
+            return
         if event.button() != Qt.MouseButton.LeftButton:
             return
         pos = event.position()
@@ -221,10 +318,16 @@ class AnimationTimeline(QWidget):
 
     def mouseMoveEvent(self, event):
         pos = event.position()
+        if self._panning:
+            if event.buttons() & Qt.MouseButton.MiddleButton:
+                self._pan(event)
+            else:
+                self._end_pan()               # the middle button went up elsewhere
+            return
         if self._scrubbing:
             self._scrub_to(pos.x())
         elif self._drag_index is not None:
-            self._drag_time = round(self._x_to_time(pos.x()), 2)
+            self._drag_time = round(self._x_to_time(pos.x()), TIME_DECIMALS)
             self.update()
             self.keyframe_dragged.emit(self._drag_index, self._drag_time)
         else:
@@ -248,6 +351,9 @@ class AnimationTimeline(QWidget):
                                           QPoint(event.globalPos()))
 
     def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.MiddleButton and self._panning:
+            self._end_pan()
+            return
         if event.button() != Qt.MouseButton.LeftButton:
             return
         if self._scrubbing:
@@ -261,7 +367,56 @@ class AnimationTimeline(QWidget):
             self.update()
             self.keyframe_moved.emit(index, moment)
 
+    def mouseDoubleClickEvent(self, event):
+        """Double click fits the whole timeline again."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.reset_view()
+            event.accept()
+            return
+        super().mouseDoubleClickEvent(event)
+
+    def wheelEvent(self, event):
+        """Stretch / compact the time axis around the cursor (with limits)."""
+        delta = event.angleDelta().y()
+        if not delta:
+            super().wheelEvent(event)
+            return
+        start, end = self._view
+        span = end - start
+        factor = 1 / WHEEL_ZOOM_STEP if delta > 0 else WHEEL_ZOOM_STEP
+        new_span = max(min(MIN_VIEW_SPAN, self._length),
+                       min(span * factor, self._length))
+        fraction = max(0.0, min(1.0,
+                               (event.position().x() - PAD) / self._track_width()))
+        anchor = start + span * fraction
+        new_start = max(0.0, min(anchor - new_span * fraction,
+                                  self._length - new_span))
+        self._view = (new_start, new_start + new_span)
+        self._clamp_view()
+        self.update()
+        event.accept()
+
+    def _pan(self, event):
+        """Scroll the view so the grabbed spot stays under the cursor."""
+        if self._pan_origin is None or self._pan_view is None:
+            return
+        delta = event.globalPosition() - self._pan_origin
+        start, end = self._pan_view
+        shift = -delta.x() / max(1, self.width()) * (end - start)
+        self._view = (start + shift, end + shift)
+        self._clamp_view()
+        self.update()
+        event.accept()
+
+    def _end_pan(self):
+        if not self._panning:
+            return
+        self._panning = False
+        self._pan_origin = None
+        self._pan_view = None
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+
     def _scrub_to(self, x):
-        self._time = round(self._x_to_time(x), 2)
+        self._time = round(self._x_to_time(x), TIME_DECIMALS)
         self.update()
         self.time_scrubbed.emit(self._time)

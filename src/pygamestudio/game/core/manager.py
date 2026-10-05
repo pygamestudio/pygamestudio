@@ -633,7 +633,17 @@ class GameManager(QObject):
         obj = self._get_object(object_uuid)
         old_value = getattr(obj, attr)
 
+        if attr == 'duration' and hasattr(obj, 'clamp_duration'):
+            # The duration is stored as whole seconds, never below the last
+            # keyframe (see ObjectKeyframe.clamp_duration): clamp before
+            # comparing, so the widgets resync instead of pushing a no-op.
+            new_value = obj.clamp_duration(new_value)
+
         if old_value == new_value:
+            if attr == 'duration':
+                # The box may display a value the clamp refused: let every
+                # panel mirror what is really stored.
+                self.object_keyframe_parameter_changed.emit(object_uuid)
             return
 
         self._undo_stack.push(UpdateAttrValueCommand(self, obj, attr, old_value, new_value))

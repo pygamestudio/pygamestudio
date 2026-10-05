@@ -536,11 +536,18 @@
         "slice_tip_spacing": "两帧之间的空隙像素",
         "slice_tip_output": "帧图片的输出文件夹",
         "slice_tip_run": "立即按当前设置切割",
-        "slice_tip_preview": "滚轮缩放，中键拖动，双击重置"
+        "slice_tip_preview": "滚轮缩放，中键拖动，双击重置",
+        "drop_frames": "已从拖入的图片添加 {count} 个关键帧",
+        "drop_need_object": "请先选中关键帧对象，再拖入序列帧",
+        "timeline_tip": "滚轮：拉伸 / 收紧时间轴，中键拖动平移，双击复位",
+        "speed": "速度",
+        "speed_tip": "预览播放速度"
     },
 
     "inspector": {
         "inspector": "属性检查器",
+        "animation_editing": "该对象正在动画编辑器中编辑",
+        "animation_editing_close": "关闭并切换到控制台",
         "visibility": "可见性",
         "name": "名称",
         "pos": "位置",
