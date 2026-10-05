@@ -37,6 +37,13 @@ class ObjectRect(ObjectBase):
         for key, value in common_properties.items():
             setattr(self, key, object_data.get(key, value))
 
+        # Caches: composing the surface (fill, rounded corners, scale,
+        # rotate, alpha) costs far more than blitting it, while a rectangle
+        # usually looks the same for many frames - a background made of a few
+        # hundred RECT objects used to rebuild every one of them per frame.
+        self._render_cache = None
+        self._render_state = None
+
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
         self._is_initialized = True
 
@@ -83,15 +90,45 @@ class ObjectRect(ObjectBase):
             self.border_bottom_left_radius = radius
             self.border_bottom_right_radius = radius
 
-    def _update_surface(self):
-        self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
-        pygame.draw.rect(self.surface, self.color[0:3], self.surface.get_rect(), width=0,
+    def _surface_state(self):
+        """Everything the composed surface is built from. While it is
+        unchanged the previous surface is reused instead of being composed
+        again, which is what happens on most frames."""
+        return (tuple(self.size), tuple(self.color),
+                self.scale_x, self.scale_y, self.angle,
+                self.border_top_left_radius, self.border_top_right_radius,
+                self.border_bottom_left_radius, self.border_bottom_right_radius)
+
+    def _render_surface(self):
+        """Compose the rectangle's surface (cache-miss path)."""
+        surface = pygame.Surface(self.size, pygame.SRCALPHA)
+        pygame.draw.rect(surface, self.color[0:3], surface.get_rect(), width=0,
                          border_radius=-1, border_top_left_radius=self.border_top_left_radius, border_top_right_radius=self.border_top_right_radius,
                          border_bottom_left_radius=self.border_bottom_left_radius, border_bottom_right_radius=self.border_bottom_right_radius)
-        
-        scaled_size = (self.surface.width * self.scale_x, self.surface.height * self.scale_y)
-        scaled_surface = pygame.transform.scale(self.surface, scaled_size)
-        rotated_surface = pygame.transform.rotate(scaled_surface, self.angle)
-        self.surface = self._apply_alpha(rotated_surface)
 
+        scaled_size = (surface.width * self.scale_x, surface.height * self.scale_y)
+        scaled_surface = pygame.transform.scale(surface, scaled_size)
+        rotated_surface = pygame.transform.rotate(scaled_surface, self.angle)
+        self._render_cache = self._apply_alpha(rotated_surface)
+
+    def _update_surface(self):
+        # The editor's selection outline is drawn by ObjectBase._draw around
+        # the object (and, for a selected top-level object, into the surface
+        # _get_surface returns), so it is deliberately not baked in here.
+        state = self._surface_state()
+        if state != self._render_state:
+            self._render_state = state
+            self._render_surface()
+
+        self.surface = self._render_cache
         super()._update_surface()
+
+    def _get_surface(self):
+        """The surface the caller may read from or composite children into.
+
+        The cached render is shared, so the first such caller of a frame gets
+        a private copy instead of a surface that is about to be drawn into.
+        """
+        if self.surface is self._render_cache:
+            self.surface = self._render_cache.copy()
+        return self.surface

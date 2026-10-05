@@ -11,6 +11,21 @@ from pygamestudio.common.utils.path import get_project_path
 from pygamestudio.common.i18n.translator import Translator as T
 
 
+#: Memo of asset file states, shared by every object: absolute path ->
+#: (checked_at, state, phase fraction). See ObjectBase._asset_file_state.
+_FILE_STATE_MEMO = {}
+
+
+def _file_state_phase(key):
+    """A stable 0..1 phase for one memo key.
+
+    It delays the re-check of this file by up to one interval, which is what
+    keeps hundreds of different files from all re-reading their disk state on
+    the same frame (that lands as a periodic hitch while a game runs).
+    """
+    return (abs(hash(key)) % 1000) / 1000.0
+
+
 class ObjectBase:
     """Base class for every scene object (rect, text, image, ...).
 
@@ -24,8 +39,9 @@ class ObjectBase:
     """
 
     # How often the disk state of a cached asset (font, image) is re-read while
-    # the game runs: replacing the file is picked up within this many seconds.
-    # Set to 0 to look on every frame (used by the tests).
+    # the game runs: replacing the file is picked up within this many seconds
+    # (plus the per-file phase below). Set to 0 to look on every frame (used by
+    # the tests).
     ASSET_CHECK_INTERVAL = 0.25
 
     def __init__(self, game_manager, object_data={}, is_for_api=False):
@@ -1006,23 +1022,27 @@ class ObjectBase:
         return (stat.st_mtime_ns, stat.st_size)
 
     def _asset_file_state(self, asset_path):
-        """Like _file_state for a path relative to the project, memoized so
-        asking for it on every frame does not mean a disk access every frame.
+        """Like _file_state for a path relative to the project, memoized per
+        FILE (not per object) so asking for it on every frame stays cheap.
 
-        The file is re-read at most every ``ASSET_CHECK_INTERVAL`` seconds:
-        that is the delay before a replaced font/image file shows up.
+        The memo is shared by every object: a background made of several
+        hundred IMAGE objects that all use the same texture stats the file
+        once per interval instead of once per object (that burst alone used to
+        cost several milliseconds on one frame - four times per second - and
+        grew with the object count).
+
+        Each file also gets a deterministic phase (0..interval) so that many
+        DIFFERENT files do not all re-stat on the same frame; a replaced file
+        shows up within ``ASSET_CHECK_INTERVAL`` (0.25 s) to 2x that.
         """
-        memo = getattr(self, '_file_state_cache', None)
-        if memo is None:
-            memo = self._file_state_cache = {}
-
+        key = (get_project_path(), asset_path)
         now = time.monotonic()
-        entry = memo.get(asset_path)
-        if entry is not None and now - entry[0] < self.ASSET_CHECK_INTERVAL:
+        entry = _FILE_STATE_MEMO.get(key)
+        if entry is not None and now - entry[0] < self.ASSET_CHECK_INTERVAL * (1.0 + entry[2]):
             return entry[1]
 
-        state = self._file_state(Path(get_project_path()) / asset_path)
-        memo[asset_path] = (now, state)
+        state = self._file_state(Path(key[0]) / asset_path)
+        _FILE_STATE_MEMO[key] = (now, state, _file_state_phase(key))
         return state
 
     def _apply_alpha(self, surface):

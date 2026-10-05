@@ -43,6 +43,18 @@ class ObjectImage(ObjectBase):
         for key, value in common_properties.items():
             setattr(self, key, object_data.get(key, value))
 
+        # Caches. Decoding the PNG and composing the whole pipeline (scale,
+        # rounded corners, rotate, alpha, tint) is orders of magnitude more
+        # expensive than blitting the result, while an image usually looks the
+        # same for many frames - a tiled background of a few hundred IMAGE
+        # objects used to re-decode every file on every frame. The decoded
+        # file and the composed surface are kept until one of the properties
+        # they depend on changes.
+        self._image_cache = None
+        self._image_cache_key = None
+        self._render_cache = None
+        self._render_state = None
+
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)        
         self._is_initialized = True
 
@@ -53,19 +65,34 @@ class ObjectImage(ObjectBase):
 
     def set_image_path(self, image_path:str):
         self.image_path = image_path
-        
+
+    def _image_state(self):
+        """What the cached image depends on: the path, the file's
+        mtime/size (so replacing the image on disk is picked up in the
+        running game without a restart) and the object size it is scaled to."""
+        if not self.image_path:
+            return None
+
+        return (self.image_path,
+                self._asset_file_state(self.image_path),
+                tuple(self.size))
+
     def _load_image(self):
+        """The image file scaled to the object's size, or a blank surface when
+        no image is set or the file is missing. Loaded once and cached."""
+        state = self._image_state()
+        if self._image_cache is not None and state == self._image_cache_key:
+            return self._image_cache
+
         image_absolute_path = Path(get_project_path()) / self.image_path
         if self.image_path == '' or not image_absolute_path.exists():
-            self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
+            surface = pygame.Surface(self.size, pygame.SRCALPHA)
         else:
-            self.surface = pygame.image.load(assets.open_stream(image_absolute_path)).convert(self.surface)
+            surface = pygame.image.load(assets.open_stream(image_absolute_path)).convert(self.surface)
 
-        self.surface = pygame.transform.scale(self.surface, self.size)
-        # if self.keep_aspect_ratio:
-        #     self.surface = self._fit_aspect_ratio(self.surface, self.size)
-        # else:
-        #     self.surface = pygame.transform.scale(self.surface, self.size)
+        self._image_cache = pygame.transform.scale(surface, self.size)
+        self._image_cache_key = state
+        return self._image_cache
 
     def _fit_aspect_ratio(self, surface, target_size):
         orig_w, orig_h = surface.get_size()
@@ -94,17 +121,52 @@ class ObjectImage(ObjectBase):
         return surface
 
     def _update_surface(self):
-        self._load_image()
+        # The editor's selection outline is drawn by ObjectBase._draw around
+        # the object (and, for a selected top-level object, into the surface
+        # _get_surface returns), so it is deliberately not baked in here.
+        state = self._surface_state()
+        if state != self._render_state:
+            self._render_state = state
+            self._render_surface()
 
-        scaled_size = (int(self.surface.get_width() * self.scale_x), int(self.surface.get_height() * self.scale_y))
-        scaled_surface = pygame.transform.scale(self.surface, scaled_size)
+        # The render cache is shared between frames; self.surface only splits
+        # off into a private copy when a caller needs one it may write into
+        # (see _get_surface).
+        self.surface = self._render_cache
+        super()._update_surface()
+
+    def _surface_state(self):
+        """Everything the composed surface is built from. While it is
+        unchanged the previous surface is reused instead of being composed
+        again, which is what happens on most frames."""
+        return (self.image_path, tuple(self.size), tuple(self.color),
+                self.scale_x, self.scale_y, self.angle,
+                self.border_top_left_radius, self.border_top_right_radius,
+                self.border_bottom_left_radius, self.border_bottom_right_radius,
+                self._image_state())
+
+    def _render_surface(self):
+        """Compose the object's surface (cache-miss path): the image, scaled,
+        with rounded corners, rotated, alpha-applied and tinted by the color."""
+        surface = self._load_image()
+
+        scaled_size = (int(surface.get_width() * self.scale_x), int(surface.get_height() * self.scale_y))
+        scaled_surface = pygame.transform.scale(surface, scaled_size)
         rounded_surface = self._apply_border_radius(scaled_surface)
         rotated_surface = pygame.transform.rotate(rounded_surface, self.angle)
-        self.surface = self._apply_alpha(rotated_surface)
+        self._render_cache = self._apply_alpha(rotated_surface)
 
-        self.surface.fill(self.color[0:3], special_flags=pygame.BLEND_RGBA_MULT)
+        self._render_cache.fill(self.color[0:3], special_flags=pygame.BLEND_RGBA_MULT)
 
-        super()._update_surface()
+    def _get_surface(self):
+        """The surface the caller may read from or composite children into.
+
+        The cached render is shared, so the first such caller of a frame gets
+        a private copy instead of a surface that is about to be drawn into.
+        """
+        if self.surface is self._render_cache:
+            self.surface = self._render_cache.copy()
+        return self.surface
 
     def __setattr__(self, name, value):
         if not hasattr(self, '_is_initialized') or not self._is_initialized:

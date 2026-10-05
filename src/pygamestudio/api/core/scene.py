@@ -50,6 +50,18 @@ class SceneLoader:
     def __init__(self):
         self._current_scene_path = ''
         self._all_object_tree_struct = {}
+        # uuid -> object and uuid -> parent uuid, both maintained whenever the
+        # tree changes (load, create, duplicate, destroy). Hit tests and hover
+        # checks walk up from every object to its world position: searching the
+        # whole scene for each of those steps made every mouse event cost tens
+        # of milliseconds in a scene with a few hundred objects (O(n^2)).
+        self._object_by_uuid = {}
+        self._parent_by_uuid = {}
+        # Objects whose script listens to on_mouse_enter / on_mouse_leave. When
+        # there is none, moving the pointer does not have to walk the scene at
+        # all (the common case: a game whose objects only react to clicks, or
+        # a background made of hundreds of objects).
+        self._hoverable_uuids = set()
         # Objects marked by destroy_object(): they leave the scene at the end
         # of the frame, so a script can destroy anything while the tree is
         # being walked without pulling the ground away from the running frame.
@@ -102,6 +114,9 @@ class SceneLoader:
             self._destroy_scripts()
         self._reset_runtime_input_state()
         self._all_object_tree_struct = {}
+        self._object_by_uuid = {}
+        self._parent_by_uuid = {}
+        self._hoverable_uuids = set()
         # Nothing is left to destroy: the whole tree is gone already.
         self._pending_destroy = []
         self._current_scene_path = str(scene_path)
@@ -186,6 +201,9 @@ class SceneLoader:
         # Attach the behavior script (if any) so the script's lifecycle hooks
         # can be driven later (see ObjectBase._start/_update_surface/_destroy).
         obj.script_instance = self._load_script(obj)
+        # Remember the objects that need hover tracking (see _hoverable_uuids).
+        if self._implements_event(obj, self._HOVER_EVENTS):
+            self._hoverable_uuids.add(obj.uuid)
         return obj
 
     def _load_script(self, obj):
@@ -239,6 +257,7 @@ class SceneLoader:
     def _add_object_tree_struct(self, parent_uuid, object_tree_struct_to_add): 
         if not self._all_object_tree_struct:
             self._all_object_tree_struct.update(object_tree_struct_to_add)
+            self._register_tree_struct('', object_tree_struct_to_add)
             return
         
         def _add(parent_uuid, object_tree_struct_to_update, object_tree_struct_to_add):
@@ -256,7 +275,18 @@ class SceneLoader:
                 
             return False
         
-        _add(parent_uuid, self._all_object_tree_struct, object_tree_struct_to_add)
+        if _add(parent_uuid, self._all_object_tree_struct, object_tree_struct_to_add):
+            self._register_tree_struct(parent_uuid, object_tree_struct_to_add)
+
+    def _register_tree_struct(self, parent_uuid, object_tree_struct):
+        """Record uuid -> object / uuid -> parent for one subtree (see
+        _object_by_uuid / _parent_by_uuid)."""
+        value = list(object_tree_struct.values())[0]
+        obj = value['object']
+        self._object_by_uuid[obj.uuid] = obj
+        self._parent_by_uuid[obj.uuid] = parent_uuid
+        for child_object_tree_struct in value['children']:
+            self._register_tree_struct(obj.uuid, child_object_tree_struct)
 
     def _update_scene(self, screen_surface:pygame.Surface):
         screen_surface.fill((0, 0, 0))
@@ -454,10 +484,18 @@ class SceneLoader:
         return list(object_tree_struct.values())[0]['object'] if object_tree_struct else None
     
     def get_object_by_uuid(self, object_uuid:str):
+        obj = self._object_by_uuid.get(object_uuid)
+        if obj is not None:
+            return obj
+        # Fallback for a tree that was built without the uuid map.
         object_tree_struct = self._get_object_tree_struct_by_uuid(object_uuid)
         return object_tree_struct[object_uuid]['object'] if object_tree_struct else None
     
     def get_parent_object(self, object_uuid:str):
+        if object_uuid in self._parent_by_uuid:
+            parent_uuid = self._parent_by_uuid[object_uuid]
+            return self._object_by_uuid.get(parent_uuid) if parent_uuid else None
+
         def _get(object_uuid, object_tree_struct):
             value = list(object_tree_struct.values())[0]
 
@@ -689,6 +727,8 @@ class SceneLoader:
             for obj in self._iter_tree_struct_objects(object_tree_struct):
                 self._destroy_script(obj)
             self._all_object_tree_struct = {}
+            self._object_by_uuid = {}
+            self._parent_by_uuid = {}
             self._current_scene_path = ''
             self._reset_runtime_input_state()
             return True
@@ -703,12 +743,15 @@ class SceneLoader:
             for obj in self._iter_tree_struct_objects(child_object_tree_struct):
                 self._destroy_script(obj)
                 self._forget_runtime_state(obj)
+                self._object_by_uuid.pop(obj.uuid, None)
+                self._parent_by_uuid.pop(obj.uuid, None)
             del children[index]
             return True
         return False
 
     def _forget_runtime_state(self, obj):
         """Drop every runtime reference to an object that left the scene."""
+        self._hoverable_uuids.discard(obj.uuid)
         if self._focused_text_input is obj:
             self._clear_text_input_focus(notify=False)
         if self._active_slider is obj:
@@ -859,6 +902,11 @@ class SceneLoader:
 
     def _update_hover_target(self, pos):
         """Fire on_mouse_leave / on_mouse_enter when the pointed object changes."""
+        if not self._hoverable_uuids:
+            # Nothing in the scene listens to hover events: walking every
+            # object on every pointer move would be pure waste.
+            return
+
         hovered = self._event_target(pos, self._HOVER_EVENTS)
         if hovered is self._hovered_object:
             return
