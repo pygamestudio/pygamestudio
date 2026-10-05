@@ -1868,8 +1868,9 @@ def animation_editor_state(args):
     'playback, seek to a time in seconds (moves the playhead and shows that '
     'pose in the scene, so capture_scene_view shows the animation), select a '
     'keyframe by index (-1 clears the selection; the scene then holds the '
-    'nearest frame on the LEFT of the playhead) and set the preview playback '
-    'speed. With a keyframe selected, seek interpolates between keyframes.',
+    'nearest frame on the LEFT of the playhead) and set the playback speed '
+    '(a real animation parameter: the game plays at it too). With a keyframe '
+    'selected, seek interpolates between keyframes.',
     {
         'type': 'object',
         'properties': {

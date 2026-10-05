@@ -678,16 +678,17 @@ class Container(QFrame):
 
     def _on_object_keyframe_parameter_changed(self, object_uuid):
         """Keep the keyframe editors in sync with an undone/redone parameter
-        change (keyframes list, duration, auto_play or loop)."""
+        change (keyframes list, duration, playback speed, auto_play or loop)."""
         if object_uuid != self._object_uuid_in_inspection:
             return
         obj = self._game_manager.get_object(object_uuid)
 
-        widget = self._find_widget(self._container_layout, 'duration')
-        if widget:
-            widget.blockSignals(True)
-            widget.setValue(getattr(obj, 'duration'))
-            widget.blockSignals(False)
+        for attr in ('duration', 'playback_speed'):
+            widget = self._find_widget(self._container_layout, attr)
+            if widget:
+                widget.blockSignals(True)
+                widget.setValue(getattr(obj, attr))
+                widget.blockSignals(False)
 
         for attr in ('auto_play', 'loop'):
             widget = self._find_widget(self._container_layout, attr)

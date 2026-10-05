@@ -542,7 +542,7 @@
         "drop_need_object": "请先选中关键帧对象，再拖入序列帧",
         "timeline_tip": "滚轮：拉伸 / 收紧时间轴，中键拖动平移，双击复位",
         "speed": "速度",
-        "speed_tip": "预览播放速度"
+        "speed_tip": "播放速度（游戏运行时同样生效）"
     },
 
     "inspector": {
@@ -586,6 +586,7 @@
         "auto_play": "自动播放",
         "loop": "循环播放",
         "duration": "时长",
+        "playback_speed": "播放速度",
         "frame_rate": "帧率",
         "frame_folder": "帧文件夹",
         "select_folder": "选择帧文件夹",

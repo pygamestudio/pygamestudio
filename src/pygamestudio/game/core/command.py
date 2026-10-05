@@ -122,7 +122,7 @@ class UpdateAttrValueCommand(QUndoCommand):
                       'particle_speed', 'particle_size', 'particle_image',
                       'gravity', 'spread_angle'):
             self._game_manager.object_particle_parameter_changed.emit(self._obj.uuid)
-        elif attr in ('keyframes', 'duration') or (
+        elif attr in ('keyframes', 'duration', 'playback_speed') or (
                 attr in ('auto_play', 'loop')
                 and getattr(self._obj, 'type', '') == OBJECT_KEYFRAME):
             self._game_manager.object_keyframe_parameter_changed.emit(self._obj.uuid)

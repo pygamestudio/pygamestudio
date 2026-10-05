@@ -13,6 +13,9 @@ Design notes:
   advances its clock, evaluates the timeline and applies the values to its own
   attributes (like any other object, so nested objects, collision, physics and
   scripts all see the animated state).
+* ``playback_speed`` scales that clock (1.0 = real time, 2.0 = twice as
+  fast); the Animation Editor's speed box is the same value, so what the
+  preview shows is what the game plays.
 * In the EDITOR the playback clock stays still (``_advance`` is runtime-only),
   so incidental scene refreshes can never silently rewrite the saved values.
   The Animation Editor drives previews explicitly through ``preview_at``.
@@ -212,6 +215,7 @@ class ObjectKeyframe(ObjectBase):
             'duration': 2.0,       # timeline length in seconds
             'auto_play': True,
             'loop': True,
+            'playback_speed': 1.0,  # clock scale: 1 = real time, 2 = twice as fast
         }
 
         for key, value in common_properties.items():
@@ -254,22 +258,32 @@ class ObjectKeyframe(ObjectBase):
         return self.duration
 
     def set_duration(self, duration):
-        """Set the timeline length in whole seconds (never below 1)."""
+        """Set the timeline length in seconds (hundredths, never below 1)."""
         self.duration = duration
 
-    def clamp_duration(self, duration):
-        """A duration as whole seconds, at least 1 and at least the last
-        keyframe.
+    def get_playback_speed(self):
+        """Clock scale: 1.0 plays in real time, 2.0 twice as fast."""
+        return self.playback_speed
 
-        The duration box only takes whole seconds and the keyframes always
-        play (the timeline is as long as the LATER of the duration and the
-        last keyframe - see get_timeline_length), so every write is rounded
-        UP: the stored value, what the spin box shows and the ruler all agree,
-        and a value like 0.005 comes back as 1.
+    def set_playback_speed(self, playback_speed):
+        """Set the clock scale (never zero or negative)."""
+        self.playback_speed = playback_speed
+
+    def clamp_duration(self, duration):
+        """A duration in hundredths of a second, at least 1 and at least the
+        last keyframe.
+
+        The duration boxes take hundredths (1.2 s for a 13-frame sequence at
+        0.1 s per frame) and the keyframes always play (the timeline is as
+        long as the LATER of the duration and the last keyframe - see
+        get_timeline_length), so every write is rounded to hundredths and
+        raised to the last keyframe's time: the stored value, what the spin
+        boxes show and the ruler all agree, and 0.005 still comes back as 1.
         """
-        value = max(1.0, float(math.ceil(_number(duration, 2.0))))
+        value = max(1.0, round(_number(duration, 2.0), 2))
         if self.keyframes:
-            value = max(value, float(math.ceil(float(self.keyframes[-1]['time']))))
+            last = round(float(self.keyframes[-1]['time']) * 100.0, 6)
+            value = max(value, math.ceil(last) / 100.0)
         return value
 
     def get_timeline_length(self):
@@ -395,6 +409,7 @@ class ObjectKeyframe(ObjectBase):
             data.pop(key, None)
         data['keyframes'] = normalize_keyframes(data.get('keyframes'))
         data['duration'] = float(data.get('duration', 2.0))
+        data['playback_speed'] = max(0.01, _number(data.get('playback_speed'), 1.0))
         return data
 
     # ---------------------------------------------------------------- internals
@@ -409,6 +424,9 @@ class ObjectKeyframe(ObjectBase):
             super().__setattr__('keyframes', normalize_keyframes(value))
         elif name == 'duration':
             super().__setattr__('duration', self.clamp_duration(value))
+        elif name == 'playback_speed':
+            # Never zero or negative: the clock would stop or run backwards.
+            super().__setattr__('playback_speed', max(0.01, _number(value, 1.0)))
         elif name == 'auto_play':
             # Pausing re-arms the start notification: the animation reports
             # itself as started again when it resumes (including through a
@@ -448,7 +466,7 @@ class ObjectKeyframe(ObjectBase):
         if length <= 0:
             return
 
-        self._anim_time += elapsed
+        self._anim_time += elapsed * self.playback_speed
         if self.loop:
             self._anim_time = self._anim_time % length
             self._finished_emitted = False

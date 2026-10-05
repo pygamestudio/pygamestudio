@@ -116,6 +116,17 @@ INSPECTOR_LAYOUT_KEYFRAME = {
             'widget': [KeyframeSpinBox]
         }
     },
+    'playback_speed': {
+        'i18n': {
+            'key': 'inspector.playback_speed',
+            'default': 'Playback Speed'
+        },
+        'component': {
+            'enabled': [True],
+            'attribute': ['playback_speed'],
+            'widget': [KeyframeSpinBox]
+        }
+    },
     'image_path': {
         'i18n': {
             'key': 'inspector.image_path',

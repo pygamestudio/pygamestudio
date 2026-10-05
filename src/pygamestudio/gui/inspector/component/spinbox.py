@@ -240,21 +240,29 @@ class FrameSequenceSpinBox(SuffixSpinBox):
 
 
 class KeyframeSpinBox(SuffixSpinBox):
-    """Spinbox for one keyframe-animation parameter (the duration, ...)."""
+    """Spinbox for one keyframe-animation parameter (duration or the
+    playback speed)."""
 
     _SUFFIXES = {
         'duration': 'S',
+        'playback_speed': 'X',
     }
 
     def __init__(self, inspector_container, value, attr=''):
         super().__init__()
         self._inspector_container = inspector_container
         self._attr = attr
-        # Whole seconds, at least one: the duration is stored that way (see
-        # ObjectKeyframe.clamp_duration), matching the animation editor.
-        self.setRange(1, 999999)
-        self.setSingleStep(1)
-        self.setDecimals(0)
+        if attr == 'playback_speed':
+            # A multiplier, 1 = real time: the same range as the animation
+            # editor's speed box, and the game plays at it too.
+            self.setRange(0.1, 8.0)
+        else:
+            # Hundredths of a second, at least one: the duration is stored
+            # that way (see ObjectKeyframe.clamp_duration), matching the
+            # animation editor.
+            self.setRange(1.0, 999999.0)
+        self.setSingleStep(0.1)
+        self.setDecimals(2)
         self.setValue(value)
         self.set_suffix(self._SUFFIXES.get(attr, ''))
 

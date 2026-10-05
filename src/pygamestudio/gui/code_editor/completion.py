@@ -133,6 +133,7 @@ ENGINE_OBJECT_API = (
     'play', 'pause', 'stop', 'restart', 'is_playing',
     # keyframe timeline API (ObjectKeyframe / the Animation Editor's model)
     'get_keyframes', 'set_keyframes', 'get_duration', 'set_duration',
+    'get_playback_speed', 'set_playback_speed',
     'get_timeline_length', 'get_time', 'set_time', 'evaluate_at', 'preview_at',
 )
 
@@ -147,7 +148,7 @@ ENGINE_OBJECT_ATTRIBUTES = (
     'text', 'font_size', 'font_path', 'image_path', 'points',
     'start_point', 'end_point', 'thickness', 'frame_folder',
     # keyframe timeline fields
-    'keyframes', 'duration', 'auto_play', 'loop',
+    'keyframes', 'duration', 'auto_play', 'loop', 'playback_speed',
     # collision shape
     'collision_enabled', 'collision_type',
     'collision_offset_x', 'collision_offset_y',

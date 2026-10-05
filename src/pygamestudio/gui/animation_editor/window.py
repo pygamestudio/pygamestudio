@@ -171,18 +171,18 @@ class AnimationEditorWindow(QWidget):
 
         # The duration box uses the inspector's spin style: the unit is
         # pinned to the right edge and the arrows only appear while hovered.
-        # Whole seconds only, at least one; the stored value is rounded up
-        # to whole seconds and the last keyframe (see ObjectKeyframe
+        # Hundredths of a second, at least one; the stored value is rounded
+        # to hundredths and raised to the last keyframe (see ObjectKeyframe
         # .clamp_duration), so typing 0.005 comes back as 1.
         self._duration_spin.setObjectName('animationDurationSpin')
         self._duration_spin.setRange(1.0, 9999.0)
-        self._duration_spin.setDecimals(0)
-        self._duration_spin.setSingleStep(1)
+        self._duration_spin.setDecimals(2)
+        self._duration_spin.setSingleStep(0.1)
         self._duration_spin.set_suffix('S')
-        self._duration_spin.setFixedWidth(80)
+        self._duration_spin.setFixedWidth(84)
 
-        # Preview playback rate (1.00 = real time): an editor tool, it does
-        # not touch the object - the runtime plays at its own pace.
+        # Playback rate of the animation (1.00 = real time). A real, SAVED
+        # animation parameter: the preview uses it and the game plays at it.
         self._speed_spin.setObjectName('animationSpeedSpin')
         self._speed_spin.setRange(0.1, 8.0)
         self._speed_spin.setDecimals(2)
@@ -415,6 +415,8 @@ class AnimationEditorWindow(QWidget):
             self._selected_index = self._timeline.selected_index()
             self._loop_box.setChecked(bool(obj.loop))
             self._duration_spin.setValue(float(obj.duration))
+            self._playback_speed = max(0.01, float(getattr(obj, 'playback_speed', 1.0)))
+            self._speed_spin.setValue(self._playback_speed)
             self._refresh_value_editors()
             self._update_time_label()
         finally:
@@ -435,6 +437,8 @@ class AnimationEditorWindow(QWidget):
             self._timeline.reset_view()
             self._loop_box.setChecked(True)
             self._duration_spin.setValue(2.0)
+            self._playback_speed = 1.0
+            self._speed_spin.setValue(1.0)
             self._refresh_value_editors()
             self._update_time_label()
         finally:
@@ -643,6 +647,13 @@ class AnimationEditorWindow(QWidget):
         if self._updating:
             return
         self._playback_speed = max(0.1, float(value))
+        obj = self._object()
+        if obj is None:
+            return
+        # The speed is a real animation parameter (undoable, saved with the
+        # object): the game plays at it too, not only the preview.
+        self._game_manager.set_keyframe_parameter(obj.uuid, 'playback_speed',
+                                                  self._playback_speed)
 
     # -------------------------------------------------------------- values
     def _write_channel(self, channel, value):
@@ -917,9 +928,10 @@ class AnimationEditorWindow(QWidget):
 
         The frames are spaced FRAME_DROP_INTERVAL seconds apart. On an empty
         timeline the first frame lands on 0 and the duration becomes exactly
-        the length of the sequence, so a loop cycles through the images;
-        dropped onto an existing timeline the frames are appended after the
-        last keyframe and the duration only grows when they reach past it.
+        the time of the LAST frame, so the timeline ends where the content
+        ends (a 12-frame drop at 0.1 s closes at 1.1 s); dropped onto an
+        existing timeline the frames are appended after the last keyframe
+        and the duration only grows when they reach past it.
         Each new keyframe keeps the pose the timeline already defines at its
         time - only the image differs, which is what an image sequence is.
         """
@@ -957,7 +969,10 @@ class AnimationEditorWindow(QWidget):
             additions.append(snapshot)
 
         combined = normalize_keyframes(frames + additions)
-        last_moment = round(moments[-1] + FRAME_DROP_INTERVAL, 6)
+        # The sequence ends AT its last frame (a 12-frame drop at 0.1 s is
+        # 1.1 s long): no extra interval, so the duration box and the
+        # timeline show exactly the length of what was dropped.
+        last_moment = round(moments[-1], 6)
         duration = max(float(obj.duration), last_moment) if frames else last_moment
 
         undo_stack = self._game_manager.undo_stack

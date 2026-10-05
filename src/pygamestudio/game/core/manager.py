@@ -629,7 +629,7 @@ class GameManager(QObject):
 
     def set_keyframe_parameter(self, object_uuid, attr, new_value):
         """Change one keyframe-animation parameter (undoable): the keyframes
-        list, duration, auto_play or loop."""
+        list, duration, playback speed, auto_play or loop."""
         obj = self._get_object(object_uuid)
         old_value = getattr(obj, attr)
 

@@ -5,11 +5,12 @@ the whole set of animated channels), a time ruler and a draggable playhead.
 The widget only handles times and indexes - the window owns the object, the
 undo commands and the preview.
 
-The ruler divides every 0.1 s (the durations are whole seconds, so that is
-the useful unit); divisions too close to read are thinned out while
-painting. The wheel stretches / compacts the time axis around the cursor
-(with limits) and a middle drag moves it; a double click fits the whole
-timeline again.
+The ruler divides every 0.1 s (the finest useful division for durations in
+seconds); divisions too close to read are thinned out while painting, and
+the EXACT length is labelled at the right end (a duration like 1.24 s has
+no tick of its own). The wheel stretches / compacts the time axis around
+the cursor (with limits) and a middle drag moves it; a double click fits
+the whole timeline again.
 """
 import math
 
@@ -58,6 +59,15 @@ def _format_time(seconds, step):
         return '{}s'.format(int(round(seconds)))
     decimals = max(1, int(round(-math.log10(step))))
     return '{}s'.format(round(seconds, decimals))
+
+
+def _format_length(seconds):
+    """The exact timeline length: '2.0s', '1.2s', '1.24s' (hundredths only
+    when the duration really has any)."""
+    text = '{:.2f}'.format(round(float(seconds), 2)).rstrip('0')
+    if text.endswith('.'):
+        text += '0'
+    return '{}s'.format(text)
 
 
 class AnimationTimeline(QWidget):
@@ -191,9 +201,9 @@ class AnimationTimeline(QWidget):
     def _tick_interval(self):
         """The ruler's division: 0.1 s.
 
-        Durations are whole seconds, so 0.1 s is the useful unit; divisions
-        too close to read are thinned out while painting (see TICK_MIN_PX)
-        and the wheel zooms in to stretch them apart.
+        Divisions too close to read are thinned out while painting (see
+        TICK_MIN_PX) and the wheel zooms in to stretch them apart; the
+        exact length is labelled at the right end (see paintEvent).
         """
         return TICK_INTERVAL
 
@@ -241,8 +251,8 @@ class AnimationTimeline(QWidget):
         painter.setPen(colors['line'])
         painter.drawLine(0, RULER_HEIGHT, width, RULER_HEIGHT)
 
-        # Ruler ticks + labels: the finest division is the duration's own
-        # precision, thinned out to whatever stays readable at this zoom.
+        # Ruler ticks + labels: the finest division is 0.1 s, thinned out to
+        # whatever stays readable at this zoom.
         interval = self._tick_interval()
         pixels_per_second = self._pixels_per_second()
         tick_step = _scaled_step(interval, TICK_MIN_PX, pixels_per_second)
@@ -251,6 +261,16 @@ class AnimationTimeline(QWidget):
         last_moment = min(view_end, self._length)
         first_index = max(0, int(math.ceil((view_start - 1e-9) / tick_step)))
         moment = first_index * tick_step
+        metrics = painter.fontMetrics()
+        # The EXACT length is labelled at the right end (a duration like
+        # 1.24 s has no tick of its own): a tick label that would collide
+        # with it is left out instead of being painted underneath.
+        end_visible = view_end >= self._length - 1e-9
+        end_text = _format_length(self._length) if end_visible else ''
+        end_label_x = (self._tick_label_x(painter, self._time_to_x(self._length),
+                                          end_text) if end_visible else 0.0)
+        end_left = end_label_x - 2
+        end_right = end_label_x + metrics.horizontalAdvance(end_text) + 2
         while moment <= last_moment + 1e-9:
             x = self._time_to_x(moment)
             ratio = moment / label_step
@@ -259,9 +279,15 @@ class AnimationTimeline(QWidget):
                              QPointF(x, RULER_HEIGHT))
             if labelled:
                 text = _format_time(moment, label_step)
-                painter.drawText(QPointF(self._tick_label_x(painter, x, text),
-                                         RULER_HEIGHT - 10), text)
+                label_x = self._tick_label_x(painter, x, text)
+                collides = (end_visible
+                            and label_x - 2 < end_right
+                            and end_left < label_x + metrics.horizontalAdvance(text) + 2)
+                if not collides:
+                    painter.drawText(QPointF(label_x, RULER_HEIGHT - 10), text)
             moment = round(moment + tick_step, 9)
+        if end_visible:
+            painter.drawText(QPointF(end_label_x, RULER_HEIGHT - 10), end_text)
 
         # Keyframe diamonds.
         for index in range(len(self._keyframes)):

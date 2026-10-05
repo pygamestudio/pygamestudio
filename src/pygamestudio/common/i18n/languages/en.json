@@ -542,7 +542,7 @@
         "drop_need_object": "Select a Keyframe object first, then drop the frames",
         "timeline_tip": "Wheel: stretch / compact the ruler - middle-drag: move - double-click: fit",
         "speed": "Speed",
-        "speed_tip": "Preview playback speed"
+        "speed_tip": "Playback speed (the game plays at it too)"
     },
 
     "inspector": {
@@ -586,6 +586,7 @@
         "auto_play": "Auto Play",
         "loop": "Loop",
         "duration": "Duration",
+        "playback_speed": "Playback Speed",
         "frame_rate": "Frame Rate",
         "frame_folder": "Frame Folder",
         "select_folder": "Select Frame Folder",
