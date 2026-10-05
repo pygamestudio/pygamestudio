@@ -499,10 +499,19 @@ class HierarchyTreeView(QTreeView):
         painter.restore()
 
     def dropEvent(self, event):
-        # Rewirte the drop event. The logic is like cut and paste.
-        parent_item = self._standard_model.itemFromIndex(self._proxy_model.mapToSource(self.indexAt(event.pos())))
-        if not parent_item:
-            parent_item  = self._canvas_item
+        """Move the dragged objects where the drop indicator points.
+
+        The logic is cut + paste. Qt says WHERE the indicator sits:
+
+        * ON a row: the objects become CHILDREN of that row;
+        * ABOVE / BELOW a row: they become SIBLINGS of it, right at that spot
+          (dropping "below" a node used to make it a child of that node - not
+          what a tree does and not what the indicator promised);
+        * on empty space: the objects go under the canvas.
+        """
+        target_item = self._standard_model.itemFromIndex(
+            self._proxy_model.mapToSource(self.indexAt(event.pos())))
+        position = self.dropIndicatorPosition()
 
         item_uuid_list = []
         for index in self.selectedIndexes():
@@ -511,8 +520,27 @@ class HierarchyTreeView(QTreeView):
 
         self._game_manager.cut(item_uuid_list)
 
-        parent_uuid = parent_item.data(Qt.ItemDataRole.UserRole+1)
-        self._game_manager.paste(parent_uuid)
+        canvas_uuid = ''
+        if self._canvas_item is not None:
+            canvas_uuid = self._canvas_item.data(Qt.ItemDataRole.UserRole+1)
+
+        if target_item is None or position == QAbstractItemView.DropIndicatorPosition.OnViewport:
+            self._game_manager.paste(canvas_uuid)
+            return
+
+        target_uuid = target_item.data(Qt.ItemDataRole.UserRole+1)
+        if position == QAbstractItemView.DropIndicatorPosition.OnItem:
+            self._game_manager.paste(target_uuid)
+            return
+
+        # Above / below that row: same parent, inserted right next to it.
+        parent_item = target_item.parent() or self._canvas_item
+        parent_uuid = canvas_uuid
+        if parent_item is not None:
+            parent_uuid = parent_item.data(Qt.ItemDataRole.UserRole+1)
+        self._game_manager.paste(
+            parent_uuid, sibling_uuid=target_uuid,
+            below=position == QAbstractItemView.DropIndicatorPosition.BelowItem)
 
     def keyPressEvent(self, event):
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:

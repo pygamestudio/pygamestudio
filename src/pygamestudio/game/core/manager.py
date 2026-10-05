@@ -640,7 +640,7 @@ class GameManager(QObject):
         old_value = getattr(obj, attr)
 
         if attr == 'duration' and hasattr(obj, 'clamp_duration'):
-            # The duration is stored as whole seconds, never below the last
+            # The duration keeps hundredths and never goes below the last
             # keyframe (see ObjectKeyframe.clamp_duration): clamp before
             # comparing, so the widgets resync instead of pushing a no-op.
             new_value = obj.clamp_duration(new_value)
@@ -1089,7 +1089,16 @@ class GameManager(QObject):
         
         self.object_copied.emit()
 
-    def paste(self, parent_uuid):
+    def paste(self, parent_uuid, sibling_uuid='', below=False):
+        """Paste the clipboard under ``parent_uuid`` (undoable).
+
+        ``sibling_uuid`` + ``below`` place the pasted objects right NEXT TO an
+        existing child of that parent instead of appending them at the end -
+        that is how a hierarchy drop between two rows lands as a SIBLING
+        instead of becoming a child of the row above (see the tree's
+        dropEvent). A sibling that does not exist (any more) simply falls
+        back to appending.
+        """
         if self._is_cut and not self._cut_still_holds_current_objects():
             # The cut originals are not part of the open scene any more (for
             # example another scene was opened in between): pasting would add
@@ -1098,10 +1107,46 @@ class GameManager(QObject):
             self._is_cut = False
             return
         if self._is_cut:
-            self._paste_for_cut(parent_uuid)
+            self._paste_for_cut(parent_uuid, sibling_uuid, below)
         else:
-            self._paste_for_copy(parent_uuid)
+            self._paste_for_copy(parent_uuid, sibling_uuid, below)
         self._mark_scene_changed()
+
+    def _resolve_insert_pos(self, parent_uuid, sibling_uuid, below=False, removed=()):
+        """Index to insert at so the paste sits next to ``sibling_uuid``.
+
+        ``removed`` are the subtrees about to leave that parent (the objects
+        being cut): their slots are discounted, so the index is the place the
+        user saw in the tree AFTER the move - which also means dropping an
+        object right below/above ITSELF keeps it where it is instead of
+        flinging it to the end of the list.
+
+        Returns -1 (= append at the end) when no sibling was asked for, it is
+        not a child of that parent, or the sibling IS the parent (the canvas
+        is a row of its own).
+        """
+        if not sibling_uuid or sibling_uuid == parent_uuid:
+            return -1
+
+        parent_struct = self._get_object_tree_struct(parent_uuid)
+        if not parent_struct:
+            return -1
+
+        children = list(parent_struct.values())[0]['children']
+        target = None
+        for index, child_struct in enumerate(children):
+            if list(child_struct.keys())[0] == sibling_uuid:
+                target = index
+                break
+        if target is None:
+            return -1
+
+        if below:
+            target += 1
+        removed_uuids = {list(struct.keys())[0] for struct in removed}
+        leaving = sum(1 for index, child_struct in enumerate(children)
+                      if index < target and list(child_struct.keys())[0] in removed_uuids)
+        return target - leaving
 
     def _cut_still_holds_current_objects(self):
         """True while every cut object still exists in the open scene."""
@@ -1110,7 +1155,7 @@ class GameManager(QObject):
             for struct in self._clipboard_content
         )
 
-    def _paste_for_cut(self, parent_uuid):
+    def _paste_for_cut(self, parent_uuid, sibling_uuid='', below=False):
         # Don't paste to the cut object or its children.
         for object_tree_struct in self._clipboard_content:
             if self._get_object_tree_struct(parent_uuid, object_tree_struct):
@@ -1122,7 +1167,12 @@ class GameManager(QObject):
         for object_tree_struct in self._clipboard_content:
             new_object_tree_struct = self._deep_copy_object_tree_struct(object_tree_struct, False)
             deep_copy_clipboard_content.append(new_object_tree_struct)
-        
+
+        # Resolved while the objects are STILL in the tree, with the moving
+        # ones discounted: the result is the row the user saw in the panel.
+        insert_pos = self._resolve_insert_pos(parent_uuid, sibling_uuid, below,
+                                              self._clipboard_content)
+
         self._undo_stack.beginMacro('Cut')
         for object_tree_struct in self._clipboard_content:
             object_uuid = list(object_tree_struct.keys())[0]
@@ -1130,15 +1180,16 @@ class GameManager(QObject):
             original_parent_uuid = self._get_parent_uuid(object_uuid)
             inserted_pos = self._get_inserted_pos(object_uuid)
             self._undo_stack.push(DeleteObjectCommand(self, original_parent_uuid, object_tree_struct, inserted_pos))
-        
-        for new_object_tree_struct in deep_copy_clipboard_content:
-            self._undo_stack.push(AddObjectCommand(self, parent_uuid, new_object_tree_struct, -1))
+
+        for offset, new_object_tree_struct in enumerate(deep_copy_clipboard_content):
+            position = insert_pos + offset if insert_pos >= 0 else -1
+            self._undo_stack.push(AddObjectCommand(self, parent_uuid, new_object_tree_struct, position))
         self._undo_stack.endMacro()
 
         self._clipboard_content.clear()
         self._is_cut = False
 
-    def _paste_for_copy(self, parent_uuid):
+    def _paste_for_copy(self, parent_uuid, sibling_uuid='', below=False):
         # The clipboard holds data snapshots: every paste builds FRESH objects
         # (new uuids) from the same source data, so pasting twice - or pasting
         # after opening another scene - behaves the same way and never clones
@@ -1146,9 +1197,11 @@ class GameManager(QObject):
         rebuilt = [self._rebuild_snapshot_tree_struct(snapshot)
                    for snapshot in self._clipboard_content]
 
+        insert_pos = self._resolve_insert_pos(parent_uuid, sibling_uuid, below)
         self._undo_stack.beginMacro('Copy')
-        for new_object_tree_struct in rebuilt:
-            self._undo_stack.push(AddObjectCommand(self, parent_uuid, new_object_tree_struct, -1))
+        for offset, new_object_tree_struct in enumerate(rebuilt):
+            position = insert_pos + offset if insert_pos >= 0 else -1
+            self._undo_stack.push(AddObjectCommand(self, parent_uuid, new_object_tree_struct, position))
 
         self._undo_stack.endMacro()
 

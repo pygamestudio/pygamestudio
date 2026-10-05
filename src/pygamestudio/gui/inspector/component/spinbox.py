@@ -279,10 +279,10 @@ class KeyframeSpinBox(SuffixSpinBox):
             # editor's speed box, and the game plays at it too.
             self.setRange(0.1, 8.0)
         else:
-            # Hundredths of a second, at least one: the duration is stored
-            # that way (see ObjectKeyframe.clamp_duration), matching the
-            # animation editor.
-            self.setRange(1.0, 999999.0)
+            # Hundredths of a second, never below one ruler division (0.1 s):
+            # the duration is stored that way (see ObjectKeyframe.clamp_duration
+            # and MIN_DURATION), matching the animation editor.
+            self.setRange(0.1, 999999.0)
         self.setSingleStep(0.1)
         self.setDecimals(2)
         self.setValue(value)

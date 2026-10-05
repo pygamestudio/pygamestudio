@@ -171,11 +171,12 @@ class AnimationEditorWindow(QWidget):
 
         # The duration box uses the inspector's spin style: the unit is
         # pinned to the right edge and the arrows only appear while hovered.
-        # Hundredths of a second, at least one; the stored value is rounded
-        # to hundredths and raised to the last keyframe (see ObjectKeyframe
-        # .clamp_duration), so typing 0.005 comes back as 1.
+        # Hundredths of a second are taken and FRACTIONS are the point (a
+        # 4-frame drop at 0.1 s is 0.4 s), so the minimum is one ruler
+        # division; the stored value is raised to the last keyframe (see
+        # ObjectKeyframe.clamp_duration).
         self._duration_spin.setObjectName('animationDurationSpin')
-        self._duration_spin.setRange(1.0, 9999.0)
+        self._duration_spin.setRange(0.1, 9999.0)
         self._duration_spin.setDecimals(2)
         self._duration_spin.setSingleStep(0.1)
         self._duration_spin.set_suffix('S')

@@ -389,7 +389,7 @@ def push_property(manager_, obj, attr, value):
         # through the same commands the inspector's rows use.
         return push_geometry_component(manager_, obj, attr, new_value)
     if attr == 'duration' and hasattr(obj, 'clamp_duration'):
-        # The duration is stored as whole seconds, never below the last
+        # The duration keeps hundredths and never goes below the last
         # keyframe (see ObjectKeyframe.clamp_duration): clamp before
         # comparing, so the answer reports the value that is really stored.
         new_value = obj.clamp_duration(new_value)

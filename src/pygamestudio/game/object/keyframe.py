@@ -39,6 +39,11 @@ KEYFRAME_CHANNELS = ('x', 'y', 'scale_x', 'scale_y', 'angle', 'color', 'image_pa
 EASING_CURVES = ('linear', 'ease_in', 'ease_out', 'ease_in_out')
 DEFAULT_EASING = 'linear'
 
+#: Shortest timeline a Keyframe object accepts. Sub-second durations are the
+#: point (a two-frame flip book at 0.1 s per frame is 0.2 s long), so the
+#: floor is ONE ruler division instead of a whole second.
+MIN_DURATION = 0.1
+
 
 def ease_progress(kind, t):
     """Map linear progress 0..1 through the named easing curve."""
@@ -258,7 +263,7 @@ class ObjectKeyframe(ObjectBase):
         return self.duration
 
     def set_duration(self, duration):
-        """Set the timeline length in seconds (hundredths, never below 1)."""
+        """Set the timeline length in seconds (hundredths, never below 0.1)."""
         self.duration = duration
 
     def get_playback_speed(self):
@@ -270,17 +275,18 @@ class ObjectKeyframe(ObjectBase):
         self.playback_speed = playback_speed
 
     def clamp_duration(self, duration):
-        """A duration in hundredths of a second, at least 1 and at least the
-        last keyframe.
+        """A duration in hundredths of a second, never below MIN_DURATION and
+        never below the last keyframe.
 
-        The duration boxes take hundredths (1.2 s for a 13-frame sequence at
-        0.1 s per frame) and the keyframes always play (the timeline is as
-        long as the LATER of the duration and the last keyframe - see
-        get_timeline_length), so every write is rounded to hundredths and
-        raised to the last keyframe's time: the stored value, what the spin
-        boxes show and the ruler all agree, and 0.005 still comes back as 1.
+        FRACTIONS are welcome - a four-image flip book at 0.1 s per frame is
+        0.4 s long - so the floor is 0.1 s (one ruler division), not a whole
+        second. The keyframes always play (the timeline is as long as the
+        LATER of the duration and the last keyframe - see get_timeline_length),
+        so every write is rounded to hundredths and raised to the last
+        keyframe's time rounded up to the next hundredth: the stored value,
+        what the spin boxes show and the ruler all agree.
         """
-        value = max(1.0, round(_number(duration, 2.0), 2))
+        value = max(MIN_DURATION, round(_number(duration, 2.0), 2))
         if self.keyframes:
             last = round(float(self.keyframes[-1]['time']) * 100.0, 6)
             value = max(value, math.ceil(last) / 100.0)
