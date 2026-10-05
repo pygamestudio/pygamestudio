@@ -186,6 +186,7 @@
             "set_frame": "跳到第几帧",
             "restart_animation": "重启动画",
             "set_time": "跳到时间（秒）",
+            "set_animation_speed": "设置动画速度",
             "emit_particles": "发射粒子（数量）",
             "set_slider_value": "设置滑块值",
             "set_progress": "设置进度"

@@ -186,6 +186,7 @@
             "set_frame": "Go to frame (index)",
             "restart_animation": "Restart animation",
             "set_time": "Go to time (s)",
+            "set_animation_speed": "Set animation speed",
             "emit_particles": "Emit particles (count)",
             "set_slider_value": "Set slider value",
             "set_progress": "Set progress"

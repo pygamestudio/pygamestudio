@@ -351,6 +351,10 @@ _add('action_set_frame', 'action', 'block.act.set_frame', 'Go to frame (index)',
 _add('action_set_time', 'action', 'block.act.set_time', 'Go to time (s)',
      fields=(('time', 'number'),),
      code='self.obj.set_time({time})', objects=('keyframe',))
+_add('action_set_animation_speed', 'action', 'block.act.set_animation_speed',
+     'Set animation speed',
+     fields=(('speed', 'number', 1),),
+     code='self.obj.set_playback_speed({speed})', objects=('keyframe',))
 _add('action_restart_animation', 'action', 'block.act.restart_animation', 'Restart animation',
      code='self.obj.restart()', objects=('frame_sequence', 'keyframe'))
 _add('action_emit_particles', 'action', 'block.act.emit_particles', 'Emit particles',
