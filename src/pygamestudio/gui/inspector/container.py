@@ -669,6 +669,13 @@ class Container(QFrame):
                 widget.setChecked(bool(getattr(obj, attr)))
                 widget.blockSignals(False)
 
+        folder_edit = self._find_widget(self._container_layout, 'frame_folder')
+        if folder_edit:
+            # The picker stores the folder project-relative on the object:
+            # the row shows exactly what is stored (it used to keep the old
+            # text until the object was re-selected).
+            folder_edit.set_frame_folder(getattr(obj, 'frame_folder', ''))
+
     def _on_object_keyframe_parameter_changed(self, object_uuid):
         """Keep the keyframe editors in sync with an undone/redone parameter
         change (keyframes list, duration, auto_play or loop)."""
@@ -688,14 +695,6 @@ class Container(QFrame):
                 widget.blockSignals(True)
                 widget.setChecked(bool(getattr(obj, attr)))
                 widget.blockSignals(False)
-
-        folder_edit = self._find_widget(self._container_layout, 'frame_folder')
-        if folder_edit:
-            folder_edit.blockSignals(True)
-            frame_folder = getattr(obj, 'frame_folder', '')
-            folder_edit.setText(Path(frame_folder).name if frame_folder else '')
-            folder_edit.setToolTip(Path(frame_folder).as_posix() if frame_folder else '')
-            folder_edit.blockSignals(False)
 
     def _on_object_tile_map_parameter_changed(self, object_uuid):
         """Keep the tile-map editors in sync with an undone/redone parameter

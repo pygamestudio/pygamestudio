@@ -470,10 +470,27 @@ class FrameFolderLineEdit(_PathLineEditDropMixin, QLineEdit):
         path = Path(folder_path)
         if path.is_file():
             path = path.parent
-        self._frame_folder = path
-        self.setToolTip(self._frame_folder.as_posix())
+        self.set_frame_folder(path)
         self._notify_container()
-        self.setStyleSheet('')
+
+    def set_frame_folder(self, folder):
+        """Show ``folder`` on the row WITHOUT notifying the inspector.
+
+        Used by the widget itself when the user picks a folder, and by the
+        inspector to mirror a change that came from elsewhere (undo/redo):
+        the row shows the folder NAME, the full path lives in the tooltip.
+        A folder that is not on disk (any more) reads red, exactly like
+        after a rebuild.
+        """
+        self._frame_folder = Path(folder) if folder else Path('')
+        shown = str(self._frame_folder) not in ('', '.')
+        self.blockSignals(True)
+        self.setText(self._frame_folder.name if shown else '')
+        self.setToolTip(self._frame_folder.as_posix() if shown else '')
+        self.blockSignals(False)
+        project_path = Path(get_project_path())
+        missing = shown and not (project_path / self._frame_folder).is_dir()
+        self.setStyleSheet('color: rgb(255, 0, 0);' if missing else '')
 
     def _choose_folder(self):
         folder = QFileDialog.getExistingDirectory(
@@ -485,11 +502,8 @@ class FrameFolderLineEdit(_PathLineEditDropMixin, QLineEdit):
         self._set_path_from_file(folder)
 
     def _delete_folder(self):
-        self._frame_folder = Path('')
-        self.setToolTip('')
+        self.set_frame_folder('')
         self._notify_container()
-
-        self.setStyleSheet('')
 
     def enterEvent(self, event):
         if str(self._frame_folder) not in ('', '.'):
