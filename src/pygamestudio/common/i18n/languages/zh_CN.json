@@ -372,6 +372,7 @@
         "failed_to_save_before_run": "运行前保存场景失败：{}",
         "failed_to_run_project": "项目{}运行失败：{}",
         "run_project_finished": "项目{}已退出，退出码：{}",
+        "run_project_stopped": "项目{}已停止",
         "run_cancelled": "已取消运行：场景尚未保存为 .scene 文件。",
         "run": "运行",
         "refresh": "刷新"

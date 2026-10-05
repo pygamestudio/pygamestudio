@@ -1466,17 +1466,39 @@ class GameManager(QObject):
         remaining = getattr(process, '_game_output_buffer', '').strip()
         if remaining:
             Logger.info(remaining)
-        Logger.info(T.tr('scene.run_project_finished', 'Project {} exited with code {}').format(Path(self._project_path).name, exit_code))
+        if getattr(process, '_stopped_by_editor', False):
+            # The editor stopped the game on purpose: Qt reports that as a
+            # crash with a termination code, which must not read like one.
+            self._report_game_stopped(process)
+        else:
+            Logger.info(T.tr('scene.run_project_finished', 'Project {} exited with code {}').format(Path(self._project_path).name, exit_code))
         if process in self._game_processes:
             self._game_processes.remove(process)
         process.deleteLater()
 
     def _on_game_error(self, process, error):
         """Log when the game process fails to start or crashes."""
-        Logger.error(T.tr('scene.failed_to_run_project', 'Failed to Run Project {}: {}').format(Path(self._project_path).name, error))
+        if getattr(process, '_stopped_by_editor', False):
+            # A killed process raises ProcessError.Crashed: that is the
+            # expected result of stopping it, not an error (MCP debugging
+            # runs are stopped all the time - a red line would mislead).
+            self._report_game_stopped(process)
+        else:
+            Logger.error(T.tr('scene.failed_to_run_project', 'Failed to Run Project {}: {}').format(Path(self._project_path).name, error))
         if process in self._game_processes:
             self._game_processes.remove(process)
         process.deleteLater()
+
+    def _report_game_stopped(self, process):
+        """One neutral console line for an intentional stop (never red).
+
+        Both the Crashed error and the finished signal arrive for a kill:
+        the first one reports it, whichever that is.
+        """
+        if getattr(process, '_stop_reported', False):
+            return
+        process._stop_reported = True
+        Logger.info(T.tr('scene.run_project_stopped', 'Project {} stopped').format(Path(self._project_path).name))
 
     def get_running_processes(self) -> list:
         """The game processes started from the editor that are still alive."""
@@ -1503,6 +1525,9 @@ class GameManager(QObject):
             try:
                 if process.state() == QProcess.ProcessState.NotRunning:
                     continue
+                # Remember that WE killed it: Qt reports the kill as a
+                # Crashed error, which must not be logged as a real crash.
+                process._stopped_by_editor = True
                 process.kill()
                 process.waitForFinished(2000)
                 stopped += 1

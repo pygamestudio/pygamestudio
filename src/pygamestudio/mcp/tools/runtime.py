@@ -11,15 +11,21 @@ _LEVEL_NAMES = {'INFO': 'info', 'ERROR': 'error', 'WARNING': 'warning'}
 @tool(
     'run_project',
     'Run the game (same as the editor Run button): the current scene is saved '
-    'and main.py is started in its own process. The scene needs a .scene file '
-    'first (save it with save_scene, e.g. {"path": "./scene/main.scene"}) - '
-    'without one the game would start with an empty screen. The game output '
-    'appears in the editor console - read it with get_console_logs.',
+    'and main.py is started in its own process. A game started by an earlier '
+    'run is stopped first, so a debugging session never stacks game windows '
+    '("stop_running": false starts an additional instance, e.g. for '
+    'multi-player tests). The scene needs a .scene file first (save it with '
+    'save_scene, e.g. {"path": "./scene/main.scene"}) - without one the '
+    'game would start with an empty screen. The game output appears in the '
+    'editor console - read it with get_console_logs.',
     {
         'type': 'object',
         'properties': {
             'clear_console': {'type': 'boolean', 'default': True,
                               'description': 'Clear the console before starting (easier to read the new output).'},
+            'stop_running': {'type': 'boolean', 'default': True,
+                             'description': 'Stop the game processes of earlier runs before starting '
+                                            '(false = start an additional instance).'},
         },
         'additionalProperties': False,
     },
@@ -31,6 +37,11 @@ def run_project(args):
         raise ToolError(
             'The scene has no .scene file yet: save it first with save_scene '
             '(for example {"path": "./scene/main.scene"}).')
+    stopped_previous = 0
+    if args.get('stop_running', True):
+        # Run -> look -> run again is the debugging loop: an older game left
+        # open must not become a second window next to the new one.
+        stopped_previous = manager_.stop_project()
     if args.get('clear_console', True):
         browser = _console_browser(required=False)
         if browser is not None:
@@ -39,6 +50,7 @@ def run_project(args):
     return {
         'started': True,
         'project': manager_.get_project_path(),
+        'stopped_previous': stopped_previous,
         'note': 'Use get_console_logs to read the game output, stop_project to stop it.',
     }
 

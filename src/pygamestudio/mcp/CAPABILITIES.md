@@ -51,7 +51,9 @@ not exposed (with the reason). Tool names are the MCP tool names.
 | Find objects | Hierarchy search | `find_objects` (name/type/script/visibility) |
 | Which properties exist per type | Inspector layout | `object_types` |
 | Edit properties (move, resize, scale, rotate, color, text, font, image, collision, particle, slider, progress bar, frame sequence, keyframe, ...) | Inspector widgets | `update_object`, `apply_scene_patch` |
-| Keyframe animation (snapshot timeline: keyframes with easing, duration, loop, auto play; each keyframe stores x/y/scale/angle/color/image) | Animation Editor panel | `update_object` on a KEYFRAME object: `keyframes` (normalized + sorted), `duration`, `auto_play`, `loop`, `image_path` - all undoable |
+| Keyframe animation (snapshot timeline: keyframes with easing, duration, loop, auto play; each keyframe stores x/y/scale/angle/color/image) | Animation Editor panel | `update_object` on a KEYFRAME object: `keyframes` (normalized + sorted), `duration` (whole seconds, at least 1 and at least the last keyframe - a lower value is raised), `auto_play`, `loop`, `image_path` - all undoable |
+| Animation Editor panel: bind a Keyframe object, read the timeline, preview playback (play / pause / stop, 0.1-8x speed), scrub the playhead (the scene shows that pose, so `capture_scene_view` / `analyze_image` show the animation; without a selected keyframe the nearest frame on the LEFT is held, with one selected the values are interpolated), step a keyframe (the value row edits it) or clear the selection | Animation Editor tab | `animation_editor_open`, `animation_editor_state`, `animation_editor_control`; the panel itself is reachable with `open_panel` (`animation`) and `list_editor_panels` |
+| Cut a sprite sheet PNG into single-frame files (cell size, offset, spacing; re-slicing a sheet replaces its earlier frames; the files feed keyframe images or a frame-sequence folder) | Animation Editor toolbar > scissors | `slice_sprite_sheet` |
 | Fit a text box to its text (a TEXT label is clipped to its width/height otherwise) | Inspector > Size (by hand) | `fit_object_size`; `create_object` / `update_object` accept `"auto_size": true` |
 | Rename | Hierarchy > Rename | `update_object` (`name`) |
 | Show / hide | Inspector > Visibility | `update_object` (`visible`) |
@@ -81,7 +83,7 @@ not exposed (with the reason). Tool names are the MCP tool names.
 
 | Capability | Editor entry point | MCP |
 | --- | --- | --- |
-| Run the project (saves the scene — a scene with no file must be saved first — starts `main.py`) | Project > Run | `run_project` |
+| Run the project (saves the scene — a scene with no file must be saved first — starts `main.py`; the game of an earlier run is stopped first, `stop_running: false` starts an additional instance) | Project > Run | `run_project` |
 | Stop running game processes | (editor keeps them alive until exit) | `stop_project` |
 | Runtime status (pids, console length) | Console | `get_runtime_status` |
 | Read the console (info/error/warning, search) | Console panel | `get_console_logs` |

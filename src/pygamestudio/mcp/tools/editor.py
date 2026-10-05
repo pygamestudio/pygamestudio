@@ -518,10 +518,12 @@ def list_editor_panels(args):
             ('_image_editor_window', 'Image Editor'),
             ('_tile_map_editor_window', 'Tile Map Editor'),
             ('_console_window', 'Console'),
+            ('_animation_editor_window', 'Animation Editor'),
             ('_audio_editor_window', 'Audio Editor'),
             ('_hierarchy_window', 'Hierarchy'),
             ('_asset_window', 'Asset'),
             ('_inspector_window', 'Inspector'),
+            ('_agent_window', 'AI Agent'),
             ('_build_window', 'Build')):
         widget = getattr(body, attr, None)
         if widget is None:

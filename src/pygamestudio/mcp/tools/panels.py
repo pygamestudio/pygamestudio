@@ -1,5 +1,6 @@
 """MCP tools for the editing panels: block editor, image editor, tile map
-editor and audio editor - plus ``open_panel`` to bring any panel into view.
+editor, audio editor and animation editor - plus ``open_panel`` to bring any
+panel into view.
 
 These tools drive the SAME widgets the user works in, so every change shows
 up immediately in the editor:
@@ -10,7 +11,10 @@ up immediately in the editor:
 * the tile map tools paint cells and manage layers through the
   ``GameManager``, so they are undoable with the editor's Ctrl+Z;
 * the audio editor tools open a file, play it and edit the open buffer
-  (the same operations the toolbar buttons run, each one undo step).
+  (the same operations the toolbar buttons run, each one undo step);
+* the animation editor tools bind a Keyframe object, read its timeline,
+  drive the preview (play / pause / stop, scrub, keyframe selection, speed)
+  and cut sprite sheets into frame files.
 
 Nothing here opens a modal dialog: paths and sizes are arguments, and an
 unsaved image is saved (or reported) instead of prompting.
@@ -33,6 +37,7 @@ _PANELS = {
     'image': ('_image_editor_window', 'Image Editor', None),
     'tile_map': ('_tile_map_editor_window', 'Tile Map Editor', None),
     'console': ('_console_window', 'Console', None),
+    'animation': ('_animation_editor_window', 'Animation Editor', None),
     'audio': ('_audio_editor_window', 'Audio Editor', None),
     'hierarchy': ('_hierarchy_window', 'Hierarchy', None),
     'assets': ('_asset_window', 'Asset', None),
@@ -98,8 +103,8 @@ def _focus(widget):
     'Bring one of the editor panels into view: selects its tab (or raises the '
     'floating window when the user detached it) and re-shows a tab hidden '
     'from the Window menu. Does not change any project data. Panels: scene, '
-    'code, block, image, tile_map, console, audio, hierarchy, assets, '
-    'inspector, agent, build, project_settings, editor_settings.',
+    'code, block, image, tile_map, console, animation, audio, hierarchy, '
+    'assets, inspector, agent, build, project_settings, editor_settings.',
     {
         'type': 'object',
         'properties': {
@@ -1757,3 +1762,259 @@ def audio_editor_save(args):
     state = _audio_state(window)
     state['frames'] = window._buffer.frames
     return state
+
+
+# ========================================================= animation editor
+def _animation_window():
+    return _require_panel('_animation_editor_window', 'Animation Editor')
+
+
+def _animation_object(window):
+    """The Keyframe object the animation editor edits right now (or None)."""
+    uuid = getattr(window, '_object_uuid', None)
+    if not uuid:
+        return None
+    return manager().get_object(uuid)
+
+
+def _animation_state(window, obj):
+    """What the Animation Editor shows: object, timeline and preview state.
+
+    ``editing`` mirrors the panel's own claim: True while the object counts
+    as being edited (the panel is the surface in view), which is also what
+    locks its properties in the Inspector.
+    """
+    keyframes = obj.get_keyframes()
+    selected = int(getattr(window, '_selected_index', -1))
+    view = window._timeline.view()
+    return {
+        'open': True,
+        'object': {'uuid': obj.uuid, 'name': obj.name},
+        'duration': float(obj.duration),
+        'timeline_length': float(obj.get_timeline_length()),
+        'loop': bool(obj.loop),
+        'auto_play': bool(obj.auto_play),
+        'keyframe_count': len(keyframes),
+        'keyframes': [{'index': index, 'time': float(frame['time']),
+                       'easing': frame.get('easing', 'linear')}
+                      for index, frame in enumerate(keyframes)],
+        'selected_keyframe': selected if 0 <= selected < len(keyframes) else None,
+        'playhead': round(float(window._preview_time), 3),
+        'playing': bool(window._playing),
+        'speed': float(window._playback_speed),
+        'previewing': bool(window._dirty_preview),
+        'editing': bool(window.editing_object()),
+        'view': [round(float(view[0]), 3), round(float(view[1]), 3)],
+    }
+
+
+@tool(
+    'animation_editor_open',
+    'Bind the Animation Editor to a Keyframe object of the scene (uuid, '
+    'hierarchy path or unique name; without an argument the object selected '
+    'in the editor is used) and bring the panel into view. Its timeline can '
+    'then be read with animation_editor_state and driven with '
+    'animation_editor_control.',
+    {
+        'type': 'object',
+        'properties': {
+            'object': {'type': 'string',
+                       'description': 'Keyframe object: uuid, "Canvas/Hero" or name (optional: selection).'},
+        },
+        'additionalProperties': False,
+    },
+    annotations={'title': 'Open a keyframe object in the animation editor'},
+)
+def animation_editor_open(args):
+    from pygamestudio.game.object.type import OBJECT_KEYFRAME
+
+    window = _animation_window()
+    obj = resolve_object(args.get('object'))
+    if getattr(obj, 'type', '') != OBJECT_KEYFRAME:
+        raise ToolError(
+            '"{}" is a {} object, not a KEYFRAME. Create one with '
+            'create_object(type="KEYFRAME") or pick an existing keyframe '
+            'object.'.format(getattr(obj, 'name', '?'), getattr(obj, 'type', '?')))
+    window.set_object(obj.uuid)
+    _focus(window)
+    return _animation_state(window, obj)
+
+
+@tool(
+    'animation_editor_state',
+    'What the Animation Editor shows: the bound Keyframe object, duration, '
+    'loop / auto play, every keyframe (time + easing), the selected keyframe, '
+    'the playhead, whether the preview plays and its speed, and whether the '
+    'object counts as being edited (the Inspector locks it then).',
+    {
+        'type': 'object',
+        'properties': {},
+        'additionalProperties': False,
+    },
+    annotations={'readOnlyHint': True, 'title': 'Animation editor state'},
+)
+def animation_editor_state(args):
+    window = _animation_window()
+    obj = _animation_object(window)
+    if obj is None:
+        return {'open': False,
+                'hint': 'Use animation_editor_open with a KEYFRAME object first.'}
+    return _animation_state(window, obj)
+
+
+@tool(
+    'animation_editor_control',
+    'Drive the Animation Editor preview: toggle / play / pause / stop the '
+    'playback, seek to a time in seconds (moves the playhead and shows that '
+    'pose in the scene, so capture_scene_view shows the animation), select a '
+    'keyframe by index (-1 clears the selection; the scene then holds the '
+    'nearest frame on the LEFT of the playhead) and set the preview playback '
+    'speed. With a keyframe selected, seek interpolates between keyframes.',
+    {
+        'type': 'object',
+        'properties': {
+            'action': {'type': 'string',
+                       'enum': ['toggle', 'play', 'pause', 'stop', 'seek',
+                                'select_keyframe', 'set_speed']},
+            'time': {'type': 'number', 'minimum': 0,
+                     'description': 'Target time in seconds for "seek".'},
+            'index': {'type': 'integer', 'minimum': -1,
+                      'description': 'Keyframe index for "select_keyframe" (-1 clears it).'},
+            'speed': {'type': 'number', 'minimum': 0.1, 'maximum': 8.0,
+                      'description': 'Preview speed for "set_speed" (1 = real time).'},
+        },
+        'required': ['action'],
+        'additionalProperties': False,
+    },
+    annotations={'title': 'Control the animation preview'},
+)
+def animation_editor_control(args):
+    window = _animation_window()
+    obj = _animation_object(window)
+    if obj is None:
+        raise ToolError('The animation editor has no object - open one with '
+                        'animation_editor_open first.')
+    action = args['action']
+
+    if action == 'toggle':
+        window.toggle_play()
+    elif action == 'play':
+        if not window._playing:
+            window.toggle_play()
+    elif action == 'pause':
+        if window._playing:
+            window.toggle_play()
+    elif action == 'stop':
+        window.stop_preview()
+    elif action == 'seek':
+        time = args.get('time')
+        if time is None:
+            raise ToolError('"time" (seconds) is required for seek.')
+        moment = max(0.0, min(float(time), float(obj.get_timeline_length())))
+        window._on_scrubbed(moment)
+    elif action == 'select_keyframe':
+        index = args.get('index')
+        if index is None:
+            raise ToolError('"index" is required for select_keyframe '
+                            '(-1 clears the selection).')
+        index = int(index)
+        count = len(obj.get_keyframes())
+        if index != -1 and not (0 <= index < count):
+            raise ToolError('Keyframe {} does not exist ({} keyframe(s)). Use '
+                            '-1 to clear the selection.'.format(index, count))
+        window._on_keyframe_selected(index)
+    elif action == 'set_speed':
+        speed = args.get('speed')
+        if speed is None:
+            raise ToolError('"speed" is required for set_speed.')
+        window._speed_spin.setValue(float(speed))
+    else:  # pragma: no cover - the schema enum already rejects this
+        raise ToolError('Unknown action "{}".'.format(action))
+
+    return _animation_state(window, obj)
+
+
+# ------------------------------------------------------ sprite sheet slicer
+def _refresh_asset_tree():
+    """Show files a tool just wrote in the Asset panel (the UI refreshes the
+    same tree after its own writes)."""
+    body = bridge.editor_body_or_none()
+    if body is None:
+        return
+    tree = getattr(getattr(body, '_asset_window', None), '_asset_tree_view', None)
+    refresh = getattr(tree, 'refresh', None)
+    if callable(refresh):
+        refresh()
+
+
+@tool(
+    'slice_sprite_sheet',
+    'Cut a sprite sheet image into single-frame PNG files with the Animation '
+    "Editor's slicer (the same cutter as its scissors button): the frames are "
+    'written as "<sheet>_000.png", "<sheet>_001.png", ... and can be used as '
+    'keyframe images or as a frame-sequence folder. "output_folder" defaults '
+    'to "<sheet>_frames" next to the sheet; an earlier slice of the same '
+    'sheet there is replaced (files are not part of the undo stack).',
+    {
+        'type': 'object',
+        'properties': {
+            'sheet': {'type': 'string',
+                      'description': 'Sheet image, project relative (e.g. "image/player_sheet.png").'},
+            'cell_width': {'type': 'integer', 'minimum': 1,
+                           'description': 'Width of one frame in pixels.'},
+            'cell_height': {'type': 'integer', 'minimum': 1,
+                            'description': 'Height of one frame in pixels.'},
+            'offset_x': {'type': 'integer', 'minimum': 0, 'default': 0,
+                         'description': 'Pixels skipped at the left edge.'},
+            'offset_y': {'type': 'integer', 'minimum': 0, 'default': 0,
+                         'description': 'Pixels skipped at the top edge.'},
+            'spacing_x': {'type': 'integer', 'minimum': 0, 'default': 0,
+                          'description': 'Empty pixels between two cells (horizontal).'},
+            'spacing_y': {'type': 'integer', 'minimum': 0, 'default': 0,
+                          'description': 'Empty pixels between two cells (vertical).'},
+            'output_folder': {'type': 'string',
+                              'description': 'Folder for the frames, project relative (default: next to the sheet).'},
+        },
+        'required': ['sheet', 'cell_width', 'cell_height'],
+        'additionalProperties': False,
+    },
+    annotations={'title': 'Slice a sprite sheet into frames'},
+)
+def slice_sprite_sheet(args):
+    from pygamestudio.gui.animation_editor.slicer import slice_done_text
+    from pygamestudio.gui.animation_editor.slicer import \
+        slice_sprite_sheet as cut_sheet
+    from pygamestudio.gui.console.logger import Logger
+
+    sheet = safe_project_path(args['sheet'], must_exist=True)
+    if not sheet.is_file():
+        raise ToolError('"{}" is not a file in the project.'.format(args['sheet']))
+    output_folder = args.get('output_folder')
+    folder = safe_project_path(output_folder) if output_folder else None
+
+    try:
+        written = cut_sheet(sheet, args['cell_width'], args['cell_height'],
+                            args.get('offset_x', 0), args.get('offset_y', 0),
+                            args.get('spacing_x', 0), args.get('spacing_y', 0),
+                            output_folder=str(folder) if folder else None)
+    except ValueError as error:
+        if str(error) == 'the sheet could not be loaded':
+            raise ToolError('"{}" could not be read as an image.'.format(args['sheet']))
+        from PySide6.QtGui import QImage
+
+        size = QImage(str(sheet))
+        raise ToolError(
+            '{}x{} px cells with this offset/spacing do not fit "{}" '
+            '({}x{} px).'.format(args['cell_width'], args['cell_height'],
+                                 args['sheet'], size.width(), size.height()))
+    except OSError as error:
+        raise ToolError('The frames could not be written: {}'.format(error))
+
+    folder_text = project_relative(written[0].parent)
+    Logger.info(slice_done_text(len(written), folder_text))
+    _refresh_asset_tree()
+    return {
+        'folder': folder_text,
+        'count': len(written),
+        'frames': [project_relative(path) for path in written],
+    }

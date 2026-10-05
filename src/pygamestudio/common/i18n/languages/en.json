@@ -372,6 +372,7 @@
         "failed_to_save_before_run": "Failed to save scene before running: {}",
         "failed_to_run_project": "Failed to Run Project {}: {}",
         "run_project_finished": "Project {} exited with code {}",
+        "run_project_stopped": "Project {} stopped",
         "run_cancelled": "Run cancelled: the scene was not saved to a .scene file yet.",
         "run": "Run",
         "refresh": "Refresh"
