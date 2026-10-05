@@ -150,8 +150,7 @@ class ObjectImage(ObjectBase):
         with rounded corners, rotated, alpha-applied and tinted by the color."""
         surface = self._load_image()
 
-        scaled_size = (int(surface.get_width() * self.scale_x), int(surface.get_height() * self.scale_y))
-        scaled_surface = pygame.transform.scale(surface, scaled_size)
+        scaled_surface = self._apply_scale(surface)
         rounded_surface = self._apply_border_radius(scaled_surface)
         rotated_surface = pygame.transform.rotate(rounded_surface, self.angle)
         self._render_cache = self._apply_alpha(rotated_surface)

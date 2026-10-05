@@ -106,8 +106,7 @@ class ObjectRect(ObjectBase):
                          border_radius=-1, border_top_left_radius=self.border_top_left_radius, border_top_right_radius=self.border_top_right_radius,
                          border_bottom_left_radius=self.border_bottom_left_radius, border_bottom_right_radius=self.border_bottom_right_radius)
 
-        scaled_size = (surface.width * self.scale_x, surface.height * self.scale_y)
-        scaled_surface = pygame.transform.scale(surface, scaled_size)
+        scaled_surface = self._apply_scale(surface)
         rotated_surface = pygame.transform.rotate(scaled_surface, self.angle)
         self._render_cache = self._apply_alpha(rotated_surface)
 

@@ -25,6 +25,7 @@ from pygamestudio.game.object.frame_sequence import *
 from pygamestudio.game.object.keyframe import *
 from pygamestudio.game.object.tile_map import *
 from pygamestudio.game.object.node import *
+from pygamestudio.game.object.transform import IDENTITY as TRANSFORM_IDENTITY
 from pygamestudio.api.config.project import get_project_config
 from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.common.utils import assets
@@ -294,20 +295,54 @@ class SceneLoader:
         # bodies ended up in, and can push them for the next frame.
         self._update_physics()
 
-        def _update(object_tree_struct, parent_surface):
+        def _update(object_tree_struct, surface, parent_transform, parent_ops):
+            """Draw one subtree onto ``surface``.
+
+            ``parent_transform`` maps the subtree's PARENT content space onto
+            that surface and ``parent_ops`` are the ancestors' scale / angle
+            steps (see ObjectBase._get_parent_context); while both are the
+            identity / empty the classic "draw at the object's own (x, y)"
+            placement applies. The children of a flat parent are drawn on the
+            same surface under the COMPOSED transform and ops - that is what
+            makes them follow the parent's position, scale, rotation and
+            mirror - while a clipping parent keeps them inside its own
+            surface (drawn as one transformed layer).
+            """
             value = list(object_tree_struct.values())[0]
             obj = value['object']
             obj._update_surface()
             self._update_script(obj)
-            
-            if obj.visible:
-                for child_object_tree_struct in value['children']:
-                    _update(child_object_tree_struct, obj._get_surface())
 
-                obj._draw(parent_surface)
+            if not obj.visible:
+                return
+
+            world_transform = parent_transform.compose(obj._local_transform())
+            child_ops = parent_ops
+            if obj.angle or obj.scale_x != 1 or obj.scale_y != 1:
+                child_ops = parent_ops + ((float(obj.scale_x), float(obj.scale_y),
+                                           float(obj.angle)),)
+
+            if obj.clip_children:
+                # One layer inside its own box: the children are clipped to it
+                # (a viewport / mask container).
+                child_surface = obj._get_surface()
+                for child_object_tree_struct in value['children']:
+                    _update(child_object_tree_struct, child_surface,
+                            TRANSFORM_IDENTITY, ())
+                obj._draw_in_transform(surface, parent_transform, parent_ops)
+                return
+
+            # Flat drawing: the object AND every descendant go onto the same
+            # surface, so a child that leaves its parent's box is still drawn
+            # in full - only the screen itself clips what is outside it.
+            obj._draw_in_transform(surface, parent_transform, parent_ops)
+            for child_object_tree_struct in value['children']:
+                _update(child_object_tree_struct, surface, world_transform,
+                        child_ops)
 
         if self._all_object_tree_struct:
-            _update(self._all_object_tree_struct, screen_surface)
+            _update(self._all_object_tree_struct, screen_surface,
+                    TRANSFORM_IDENTITY, ())
         self._update_collision_events()
         if self._pending_destroy:
             self._flush_destroyed()

@@ -528,9 +528,7 @@ class ObjectKeyframe(ObjectBase):
         (size, color, image, scale, angle). The channel values are expected
         to be applied already."""
         self._rebuild_base_surface()
-        scaled_size = (max(1, int(self.surface.get_width() * self.scale_x)),
-                       max(1, int(self.surface.get_height() * self.scale_y)))
-        scaled = pygame.transform.scale(self.surface, scaled_size)
+        scaled = self._apply_scale(self.surface)
         rotated = pygame.transform.rotate(scaled, self.angle)
         self.surface = self._apply_alpha(rotated)
         super()._update_surface()

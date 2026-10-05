@@ -98,8 +98,7 @@ class ObjectPolygon(ObjectBase):
             normalized_points = [(point[0] - min_x, point[1] - min_y) for point in self.points]
             pygame.draw.polygon(self.surface, self.color[0:3], normalized_points)
 
-        scaled_size = (self.surface.width * self.scale_x, self.surface.height * self.scale_y)
-        scaled_surface = pygame.transform.scale(self.surface, scaled_size)
+        scaled_surface = self._apply_scale(self.surface)
         rotated_surface = pygame.transform.rotate(scaled_surface, self.angle)
         self.surface = self._apply_alpha(rotated_surface)
 

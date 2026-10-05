@@ -165,6 +165,8 @@ class UpdateAttrValueCommand(QUndoCommand):
         elif attr in ('tileset_path', 'tile_width', 'tile_height',
                       'columns', 'rows'):
             self._game_manager.object_tile_map_parameter_changed.emit(self._obj.uuid)
+        elif attr in ('pivot', 'pivot_x', 'pivot_y'):
+            self._game_manager.object_pivot_changed.emit(self._obj.uuid)
 
 
 class TileMapGridCommand(QUndoCommand):

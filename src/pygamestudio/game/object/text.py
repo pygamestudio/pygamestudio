@@ -202,8 +202,7 @@ class ObjectText(ObjectBase):
         surface = pygame.Surface(self.size, pygame.SRCALPHA)
         surface.blit(text_surface, self._text_pos(text_surface, surface))
 
-        scaled_size = (surface.width * self.scale_x, surface.height * self.scale_y)
-        scaled_surface = pygame.transform.scale(surface, scaled_size)
+        scaled_surface = self._apply_scale(surface)
         rotated_surface = pygame.transform.rotate(scaled_surface, self.angle)
         self._render_cache = self._apply_alpha(rotated_surface)
 

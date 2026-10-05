@@ -488,9 +488,7 @@ class ObjectTileMap(ObjectBase):
         if (self.scale_x, self.scale_y) == (1, 1) and not (self.angle % 360):
             base = content.copy()
         else:
-            scaled_size = (max(1, int(content.get_width() * self.scale_x)),
-                           max(1, int(content.get_height() * self.scale_y)))
-            scaled = pygame.transform.scale(content, scaled_size)
+            scaled = self._apply_scale(content)
             base = pygame.transform.rotate(scaled, self.angle)
 
         self.surface = self._apply_alpha(base)

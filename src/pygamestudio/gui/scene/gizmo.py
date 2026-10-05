@@ -153,11 +153,16 @@ class MoveGizmo(QWidget):
     
     def _move_selected_objects(self, dx, dy):
         """Move every selected object (respecting parent-selection pruning) by
-        the given pixel delta through the manager's undoable move()."""
+        the given pixel delta through the manager's undoable move().
+
+        The delta is measured on screen and mapped back through the parent's
+        transform, so dragging inside a rotated / scaled / mirrored parent
+        still follows the mouse."""
         selected_objects = self._game_manager.get_objects_to_move()
         for obj in selected_objects:
-            new_x = obj.x + dx
-            new_y = obj.y + dy
+            local_dx, local_dy = obj._world_delta_to_local(dx, dy)
+            new_x = obj.x + local_dx
+            new_y = obj.y + local_dy
             self._game_manager.move(obj.uuid, (new_x, new_y))
 
     def mousePressEvent(self, event):

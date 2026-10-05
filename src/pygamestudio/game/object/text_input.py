@@ -641,9 +641,7 @@ class ObjectTextInput(ObjectBase):
                                  (margin, int(text_y + text_h)), width=2)
 
         # Scale / rotate like the other objects (content is unscaled).
-        scaled_size = (max(1, int(surface.get_width() * self.scale_x)),
-                       max(1, int(surface.get_height() * self.scale_y)))
-        scaled_surface = pygame.transform.scale(surface, scaled_size)
+        scaled_surface = self._apply_scale(surface)
         rotated_surface = pygame.transform.rotate(scaled_surface, self.angle)
         self.surface = rotated_surface
 

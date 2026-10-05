@@ -3,6 +3,8 @@ from PySide6.QtGui import *
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
 from pygamestudio.game.object.type import *
+from pygamestudio.game.object.transform import (
+    IDENTITY as TRANSFORM_IDENTITY, Transform)
 from pygamestudio.game.core.collision import shape_to_polygon
 from pygamestudio.gui.scene.gizmo import MoveGizmo
 from pygamestudio.gui.scene.guide import resolve_drag, union_rect
@@ -38,6 +40,7 @@ class PygameScreen(QWidget):
         self._workspace_margin = self._WORKSPACE_MARGIN
         self._consuming_press = False
         self._object_images = {}   # object uuid -> QImage (baked surface)
+        self._object_offsets = {}  # object uuid -> (dx, dy) of its image inside the bake
         self._move_gizmo = MoveGizmo(self, game_manager)
 
         self._mouse_x = None
@@ -103,6 +106,7 @@ class PygameScreen(QWidget):
         self._game_manager.object_progress_bar_parameter_changed.connect(self._update_scene)
         self._game_manager.object_slider_parameter_changed.connect(self._update_scene)
         self._game_manager.object_collision_parameter_changed.connect(self._update_scene)
+        self._game_manager.object_pivot_changed.connect(self._update_scene)
 
     def get_ready_for_project(self):
         self._screen_width = get_project_config()['screen_width']
@@ -218,25 +222,110 @@ class PygameScreen(QWidget):
     def _root_value(self):
         return list(self._game_manager.all_object_tree_struct.values())[0]
 
-    def _bake_subtree(self, node):
-        """Update every surface in ``node`` and composite the children into
-        their parent's surface (children clip to their parent, like always).
-        Returns the top object of the subtree."""
+    def _subtree_bounds(self, node, parent_transform, parent_ops):
+        """World bounding box of a visible subtree, or None when it is hidden.
+
+        ``parent_transform`` / ``parent_ops`` describe this node's parent
+        content space (see ObjectBase._get_parent_context). A clipping node
+        bounds itself - its children live inside its own box, so they cannot
+        make the box grow. The box is what the baked image is sized to: a
+        child that sticks out of its parent (and every child of a scaled,
+        rotated or mirrored parent) is inside it.
+        """
+        value = list(node.values())[0]
+        obj = value['object']
+        if not obj.visible:
+            return None
+
+        rect = obj._drawn_bitmap_in(parent_transform, parent_ops)[1]
+        if obj.clip_children:
+            return rect
+
+        world_transform = parent_transform.compose(obj._local_transform())
+        child_ops = parent_ops
+        if obj.angle or obj.scale_x != 1 or obj.scale_y != 1:
+            child_ops = parent_ops + ((float(obj.scale_x), float(obj.scale_y),
+                                       float(obj.angle)),)
+        for child_node in value['children']:
+            child_bounds = self._subtree_bounds(child_node, world_transform,
+                                                child_ops)
+            if child_bounds is not None:
+                rect = rect.union(child_bounds)
+        return rect
+
+    def _bake_node(self, node, surface, parent_transform, parent_ops):
+        """Blit one subtree onto ``surface`` (mirrors the runtime walk).
+
+        ``parent_transform`` / ``parent_ops`` map this node's parent content
+        space onto that surface; a flat node hands its own world transform
+        down to its children, a clipping one starts them over inside its own
+        surface (which is then drawn as one transformed layer).
+        """
         value = list(node.values())[0]
         obj = value['object']
         obj._update_surface()
-        if obj.visible:
+        if not obj.visible:
+            return
+
+        world_transform = parent_transform.compose(obj._local_transform())
+        child_ops = parent_ops
+        if obj.angle or obj.scale_x != 1 or obj.scale_y != 1:
+            child_ops = parent_ops + ((float(obj.scale_x), float(obj.scale_y),
+                                       float(obj.angle)),)
+
+        if obj.clip_children:
+            child_surface = obj._get_surface()
             for child_node in value['children']:
-                self._bake_subtree(child_node)
-                child_obj = list(child_node.values())[0]['object']
-                if child_obj.visible:
-                    child_obj._draw(obj._get_surface())
+                self._bake_node(child_node, child_surface,
+                                TRANSFORM_IDENTITY, ())
+            obj._draw_in_transform(surface, parent_transform, parent_ops)
+            return
+
+        obj._draw_in_transform(surface, parent_transform, parent_ops)
+        for child_node in value['children']:
+            self._bake_node(child_node, surface, world_transform, child_ops)
+
+    def _bake_subtree(self, node):
+        """Update every surface in ``node``, bake the whole subtree into one
+        QImage and remember where that image sits relative to the object.
+
+        The image is as big as the subtree's world bounding box, so children
+        that leave their parent's box are drawn in full (a parent only clips
+        when ``clip_children`` says so). Returns the top object, or None when
+        it is hidden.
+        """
+        value = list(node.values())[0]
+        obj = value['object']
+        if not obj.visible:
+            return None
+
+        world = obj._get_world_rect()
+        parent_transform, parent_ops = obj._get_parent_context()
+        bounds = self._subtree_bounds(node, parent_transform, parent_ops)
+        surface = pygame.Surface((max(1, bounds.width), max(1, bounds.height)),
+                                 pygame.SRCALPHA)
+        self._bake_node(node, surface,
+                        Transform.translation(-bounds.x, -bounds.y).compose(
+                            parent_transform),
+                        parent_ops)
+        if obj.selected:
+            # ObjectBase._draw already outlined the object, but its children
+            # were blitted on top of it: paint the outline last so a selected
+            # object always reads as selected.
+            pygame.draw.rect(surface, (0, 122, 204),
+                             pygame.Rect(world.x - bounds.x, world.y - bounds.y,
+                                         obj.surface.get_width(),
+                                         obj.surface.get_height()), width=2)
+
+        self._object_images[obj.uuid] = self._surface_to_qimage(surface)
+        self._object_offsets[obj.uuid] = (bounds.x - world.x, bounds.y - world.y)
         return obj
 
     def _update_scene(self):
-        """Rebuild the cached QImages (canvas + each visible top-level object,
-        children baked in) and schedule a repaint."""
+        """Rebuild the cached QImages (canvas + each visible top-level object
+        with its whole subtree baked in) and schedule a repaint."""
         self._object_images = {}
+        self._object_offsets = {}
         if self._game_manager.is_empty():
             self.update()
             return
@@ -247,16 +336,7 @@ class PygameScreen(QWidget):
         self._object_images[canvas.uuid] = self._surface_to_qimage(canvas._get_surface())
 
         for child_node in root_value['children']:
-            obj = self._bake_subtree(child_node)
-            if obj.visible:
-                if obj.selected:
-                    # The generic selection outline lives in ObjectBase._draw
-                    # (drawn when blitting onto a parent), but top-level objects
-                    # are painted straight from their own surface here, so bake
-                    # the outline in explicitly.
-                    pygame.draw.rect(obj._get_surface(), (0, 122, 204),
-                                     obj._get_surface().get_rect(), width=2)
-                self._object_images[obj.uuid] = self._surface_to_qimage(obj._get_surface())
+            self._bake_subtree(child_node)
 
         # Stale guides must never linger: they only exist during a gizmo drag.
         if not self._move_gizmo.is_dragging and self._alignment_guides:
@@ -300,8 +380,9 @@ class PygameScreen(QWidget):
             if img is None:
                 continue
             rect = obj._get_world_rect()
-            painter.drawImage(QRectF(rect.x + ox, rect.y + oy,
-                                     rect.width, rect.height), img)
+            dx, dy = self._object_offsets.get(obj.uuid, (0, 0))
+            painter.drawImage(QRectF(rect.x + dx + ox, rect.y + dy + oy,
+                                     img.width(), img.height()), img)
 
         self._draw_collision_overlay(painter)
 
@@ -531,8 +612,10 @@ class PygameScreen(QWidget):
         self._game_manager.undo_stack.beginMacro('Move')
         selected_objects = self._game_manager.get_objects_to_move()
         for obj in selected_objects:
-            new_x = obj.x + pos.x() - self._mouse_x
-            new_y = obj.y + pos.y() - self._mouse_y
+            local_dx, local_dy = obj._world_delta_to_local(
+                pos.x() - self._mouse_x, pos.y() - self._mouse_y)
+            new_x = obj.x + local_dx
+            new_y = obj.y + local_dy
             self._game_manager.move(obj.uuid, (new_x, new_y))
 
         self._game_manager.undo_stack.endMacro()

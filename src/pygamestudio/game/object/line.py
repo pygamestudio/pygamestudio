@@ -116,8 +116,7 @@ class ObjectLine(ObjectBase):
         self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
         pygame.draw.line(self.surface, self.color[0:3], (0, 0), (self.surface.width-self.thickness, self.surface.height-self.thickness), width=self.thickness)
         
-        scaled_size = (self.surface.width * self.scale_x, self.surface.height * self.scale_y)
-        scaled_surface = pygame.transform.scale(self.surface, scaled_size)
+        scaled_surface = self._apply_scale(self.surface)
         rotated_surface = pygame.transform.rotate(scaled_surface, self.angle)
         self.surface = self._apply_alpha(rotated_surface)
 

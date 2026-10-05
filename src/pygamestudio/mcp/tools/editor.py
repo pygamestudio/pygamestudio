@@ -141,7 +141,8 @@ def object_types(args):
     wanted = (args.get('type') or '').upper()
     properties = type_properties()
     common = ['name', 'x', 'y', 'width', 'height', 'angle', 'visible', 'color',
-              'script_path', 'scale_x', 'scale_y', 'collision_enabled',
+              'script_path', 'scale_x', 'scale_y', 'pivot', 'pivot_x', 'pivot_y',
+              'collision_enabled',
               'collision_type', 'collision_offset_x', 'collision_offset_y',
               'collision_width', 'collision_height', 'collision_points',
               'physics_enabled', 'physics_type', 'physics_mass',

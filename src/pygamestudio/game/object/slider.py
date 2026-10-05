@@ -224,9 +224,7 @@ class ObjectSlider(ObjectBase):
     def _update_surface(self):
         content = self._build_content_surface()
 
-        scaled_size = (max(1, int(content.get_width() * self.scale_x)),
-                       max(1, int(content.get_height() * self.scale_y)))
-        scaled_surface = pygame.transform.scale(content, scaled_size)
+        scaled_surface = self._apply_scale(content)
         rotated_surface = pygame.transform.rotate(scaled_surface, self.angle)
         self.surface = self._apply_alpha(rotated_surface)
 

@@ -61,6 +61,7 @@ ENGINE_OBJECT_API = (
     'set_x', 'set_y', 'get_width', 'get_height', 'set_width', 'set_height',
     'get_size', 'set_size', 'get_scale_x', 'set_scale_x', 'get_scale_y', 'set_scale_y',
     'get_scale', 'set_scale', 'get_angle', 'set_angle', 'move',
+    'get_pivot', 'set_pivot', 'get_pivot_point', 'set_pivot_point',
     'get_center', 'set_center', 'get_rect', 'get_world_rect', 'get_world_pos',
     'set_world_pos',
     # visibility / background / border
@@ -144,6 +145,7 @@ ENGINE_OBJECT_API = (
 ENGINE_OBJECT_ATTRIBUTES = (
     'name', 'uuid', 'type', 'x', 'y', 'pos', 'width', 'height', 'size',
     'scale_x', 'scale_y', 'scale', 'angle', 'color', 'visible', 'script_path',
+    'pivot', 'pivot_x', 'pivot_y',
     # specialised object fields
     'text', 'font_size', 'font_path', 'image_path', 'points',
     'start_point', 'end_point', 'thickness', 'frame_folder',

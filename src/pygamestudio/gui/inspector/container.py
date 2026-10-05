@@ -25,6 +25,7 @@ from pygamestudio.gui.inspector.layout.progress_bar import INSPECTOR_LAYOUT_PROG
 from pygamestudio.gui.inspector.layout.slider import INSPECTOR_LAYOUT_SLIDER
 from pygamestudio.gui.inspector.layout.collision import build_collision_layout
 from pygamestudio.gui.inspector.layout.physics import build_physics_layout
+from pygamestudio.gui.inspector.layout.pivot import build_pivot_layout
 
 
 class Container(QFrame):
@@ -95,6 +96,7 @@ class Container(QFrame):
         self._game_manager.object_slider_parameter_changed.connect(self._on_object_slider_parameter_changed)
         self._game_manager.object_collision_parameter_changed.connect(self._on_object_collision_parameter_changed)
         self._game_manager.object_physics_parameter_changed.connect(self._on_object_physics_parameter_changed)
+        self._game_manager.object_pivot_changed.connect(self._on_object_pivot_changed)
 
     def _set_layout(self):
         self._container_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
@@ -411,6 +413,46 @@ class Container(QFrame):
                 path = getattr(obj, attr, '') or ''
                 widget.setText(Path(path).name if path else '')
                 widget.setToolTip(Path(path).as_posix() if path else '')
+                widget.blockSignals(False)
+
+    def set_object_pivot(self, pivot_mode):
+        """Change the anchor rotation/scaling happen around.'"""
+        self._game_manager.set_pivot_parameter(self._object_uuid_in_inspection,
+                                               'pivot', pivot_mode)
+
+    def set_object_pivot_point(self):
+        """Apply the free pivot point from the two coordinate boxes."""
+        spin_x = self._find_widget(self._container_layout, 'pivot_x')
+        spin_y = self._find_widget(self._container_layout, 'pivot_y')
+        if spin_x is None or spin_y is None:
+            return
+        self._game_manager.set_pivot_point(self._object_uuid_in_inspection,
+                                           (spin_x.value(), spin_y.value()))
+
+    def _on_object_pivot_changed(self, object_uuid):
+        """Keep the anchor rows in sync with an undone/redone change - and
+        rebuild them when the mode switches to or from 'custom' (the free
+        coordinates only exist then)."""
+        if object_uuid != self._object_uuid_in_inspection:
+            return
+        obj = self._game_manager.get_object(object_uuid)
+        if obj is None:
+            return
+
+        combo = self._find_widget(self._container_layout, 'pivot')
+        if combo is not None:
+            mode = getattr(obj, 'pivot', 'center')
+            combo.set_pivot(mode)
+            shown = self._find_widget(self._container_layout, 'pivot_x') is not None
+            if (mode == 'custom') != shown:
+                self._inspect_object(self._object_uuid_in_inspection)
+                return
+
+        for attr in ('pivot_x', 'pivot_y'):
+            widget = self._find_widget(self._container_layout, attr)
+            if widget:
+                widget.blockSignals(True)
+                widget.setValue(float(getattr(obj, attr, 0.0)))
                 widget.blockSignals(False)
 
     def set_object_collision_parameter(self, attr, new_value):
@@ -1014,37 +1056,37 @@ class Container(QFrame):
         self._clear_layout(self._container_layout)
 
         if obj.type == OBJECT_CANVAS:
-            self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_CANVAS)
+            self._add_object_type_layout(obj, INSPECTOR_LAYOUT_CANVAS)
         elif obj.type == OBJECT_RECT:
-            self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_RECT)
+            self._add_object_type_layout(obj, INSPECTOR_LAYOUT_RECT)
         elif obj.type == OBJECT_ELLIPSE:
-            self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_ELLIPSE)
+            self._add_object_type_layout(obj, INSPECTOR_LAYOUT_ELLIPSE)
         elif obj.type == OBJECT_POLYGON:
-            self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_POLYGON)
+            self._add_object_type_layout(obj, INSPECTOR_LAYOUT_POLYGON)
         elif obj.type == OBJECT_LINE:
-            self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_LINE)
+            self._add_object_type_layout(obj, INSPECTOR_LAYOUT_LINE)
         elif obj.type == OBJECT_TEXT:
-            self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_TEXT)
+            self._add_object_type_layout(obj, INSPECTOR_LAYOUT_TEXT)
         elif obj.type == OBJECT_IMAGE:
-            self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_IMAGE)
+            self._add_object_type_layout(obj, INSPECTOR_LAYOUT_IMAGE)
         elif obj.type == OBJECT_BUTTON:
-            self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_BUTTON)
+            self._add_object_type_layout(obj, INSPECTOR_LAYOUT_BUTTON)
         elif obj.type == OBJECT_PARTICLE:
-            self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_PARTICLE)
+            self._add_object_type_layout(obj, INSPECTOR_LAYOUT_PARTICLE)
         elif obj.type == OBJECT_TEXT_INPUT:
-            self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_TEXT_INPUT)
+            self._add_object_type_layout(obj, INSPECTOR_LAYOUT_TEXT_INPUT)
         elif obj.type == OBJECT_PROGRESS_BAR:
-            self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_PROGRESS_BAR)
+            self._add_object_type_layout(obj, INSPECTOR_LAYOUT_PROGRESS_BAR)
         elif obj.type == OBJECT_SLIDER:
-            self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_SLIDER)
+            self._add_object_type_layout(obj, INSPECTOR_LAYOUT_SLIDER)
         elif obj.type == OBJECT_FRAME_SEQUENCE:
-            self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_FRAME_SEQUENCE)
+            self._add_object_type_layout(obj, INSPECTOR_LAYOUT_FRAME_SEQUENCE)
         elif obj.type == OBJECT_KEYFRAME:
-            self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_KEYFRAME)
+            self._add_object_type_layout(obj, INSPECTOR_LAYOUT_KEYFRAME)
         elif obj.type == OBJECT_TILE_MAP:
-            self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_TILE_MAP)
+            self._add_object_type_layout(obj, INSPECTOR_LAYOUT_TILE_MAP)
         elif obj.type == OBJECT_NODE:
-            self._add_layout_for_specific_object(obj, INSPECTOR_LAYOUT_NODE)
+            self._add_object_type_layout(obj, INSPECTOR_LAYOUT_NODE)
 
         # Every object (except the canvas root) can carry a collision body and
         # a rigid body. The physics section comes first and has its own shape
@@ -1085,8 +1127,16 @@ class Container(QFrame):
             elif item.spacerItem():
                 layout.removeItem(item)
 
-    def _add_layout_for_specific_object(self, obj, layout_data):
-        for property_detail in layout_data.values():
+    def _add_layout_for_specific_object(self, obj, layout_data, extra_layout=None,
+                                        extra_after=''):
+        """Add every row of ``layout_data`` to the inspector grid.
+
+        ``extra_layout`` (another dict of rows) is spliced in right after the
+        row named ``extra_after`` - the shared pivot rows go directly below
+        the NAME row, next to the rest of the transform block, instead of
+        ending up at the very bottom of the panel.
+        """
+        for row_name, property_detail in layout_data.items():
             text = T.tr(property_detail['i18n']['key'], property_detail['i18n']['default'])
             attribute_list = property_detail['component']['attribute']
             widget_list = property_detail['component']['widget']
@@ -1112,6 +1162,22 @@ class Container(QFrame):
                 self._container_layout.addWidget(w, self._container_row+row, column, 1, column_stretch)
 
             self._container_row += row+1
+
+            if extra_layout is not None and row_name == extra_after:
+                self._add_layout_for_specific_object(obj, extra_layout)
+
+    def _add_object_type_layout(self, obj, layout_data):
+        """Add one object type's rows, with the shared pivot rows spliced in
+        directly below the name row.
+
+        The anchor is a transform property, so it belongs next to pos / size /
+        scale / angle - not below the script path, where the shared sections
+        used to be appended. The canvas (the screen itself) gets no anchor.
+        """
+        pivot_layout = None
+        if obj.type != OBJECT_CANVAS:
+            pivot_layout = build_pivot_layout(getattr(obj, 'pivot', 'center'))
+        self._add_layout_for_specific_object(obj, layout_data, pivot_layout, 'name')
 
     def _clear_selection_history(self):
         self._current_selected_object_uuid_index = -1

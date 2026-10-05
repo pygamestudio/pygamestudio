@@ -614,6 +614,7 @@ def type_properties():
         _PHYSICS_SHAPE_OFFSET, _PHYSICS_SHAPE_POINTS, _PHYSICS_SHAPE_SIZE,
         _PHYSICS_TYPE,
     )
+    from pygamestudio.gui.inspector.layout.pivot import _PIVOT, _PIVOT_POINT
 
     layouts = {
         OBJECT_RECT: INSPECTOR_LAYOUT_RECT,
@@ -636,6 +637,8 @@ def type_properties():
     # The shared sections are stored as individual row details (their layout
     # builders wrap them with a row name), so name them here the same way.
     shared = {
+        'pivot': _PIVOT,
+        'pivot_point': _PIVOT_POINT,
         'collision_enabled': _COLLISION_ENABLED,
         'collision_type': _COLLISION_TYPE,
         'collision_offset': _COLLISION_OFFSET,

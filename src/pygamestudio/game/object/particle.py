@@ -271,9 +271,7 @@ class ObjectParticle(ObjectBase):
             s.set_alpha(alpha)
             base.blit(s, (int(particle['x']) - size // 2, int(particle['y']) - size // 2))
 
-        scaled_size = (max(1, int(base.get_width() * self.scale_x)),
-                       max(1, int(base.get_height() * self.scale_y)))
-        scaled = pygame.transform.scale(base, scaled_size)
+        scaled = self._apply_scale(base)
         rotated = pygame.transform.rotate(scaled, self.angle)
         self.surface = self._apply_alpha(rotated)
 

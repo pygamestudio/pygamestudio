@@ -85,6 +85,7 @@ class GameManager(QObject):
     object_slider_parameter_changed = Signal(str)
     object_collision_parameter_changed = Signal(str)
     object_physics_parameter_changed = Signal(str)
+    object_pivot_changed = Signal(str)
 
     # Emitted whenever the "current scene has unsaved changes" flag flips
     # (True = saved, False = unsaved), so the UI can show unsaved indicators.
@@ -242,9 +243,14 @@ class GameManager(QObject):
 
             if not self._is_loading_scene:
                 # A button spawns with a default child text label so the user
-                # can immediately see (and edit) its caption.
+                # can immediately see (and edit) its caption. The label fills
+                # the button, so it stays inside it whatever the size is (the
+                # fixed 60x40 at (20, 0) was only centred for the default
+                # 100x40 button - and a parent no longer clips its children,
+                # so a differently sized button showed the label outside).
                 child_text_object, child_text_object_tree_struct = self._new_object(OBJECT_TEXT, {})
-                child_text_object.pos = (20, 0)
+                child_text_object.pos = (0, 0)
+                child_text_object.size = (obj.width, obj.height)
                 child_text_object.color = (0, 0, 0, 255)
                 self._add_object_tree_struct(obj.uuid, child_text_object_tree_struct)
                 self.deselect_all()
@@ -823,6 +829,32 @@ class GameManager(QObject):
             return
 
         self._undo_stack.push(UpdateAttrValueCommand(self, obj, attr, old_value, new_value))
+
+    def set_pivot_parameter(self, object_uuid, attr, new_value):
+        """Change one pivot parameter ('pivot', 'pivot_x', 'pivot_y') - the
+        point rotation and scaling (a negative scale) happen around."""
+        obj = self._get_object(object_uuid)
+        old_value = getattr(obj, attr)
+
+        if old_value == new_value:
+            return
+
+        self._undo_stack.push(UpdateAttrValueCommand(self, obj, attr, old_value, new_value))
+
+    def set_pivot_point(self, object_uuid, point):
+        """Set both coordinates of a free pivot point (ONE undo step)."""
+        obj = self._get_object(object_uuid)
+        old_x, old_y = float(obj.pivot_x), float(obj.pivot_y)
+        new_x, new_y = float(point[0]), float(point[1])
+        if (old_x, old_y) == (new_x, new_y):
+            return
+
+        self._undo_stack.beginMacro('Pivot Point')
+        try:
+            self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'pivot_x', old_x, new_x))
+            self._undo_stack.push(UpdateAttrValueCommand(self, obj, 'pivot_y', old_y, new_y))
+        finally:
+            self._undo_stack.endMacro()
 
     def _get_object_tree_struct(self, object_uuid, parent_object_tree_struct=None):
         """Depth-first search for a subtree by uuid. Returns the one-node

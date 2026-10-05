@@ -5,6 +5,8 @@ import time
 import pygame
 from pathlib import Path
 from pygamestudio.game.object.type import *
+from pygamestudio.game.object.transform import (
+    IDENTITY as TRANSFORM_IDENTITY, Transform, PIVOT_MODES, resolve_pivot)
 from pygamestudio.game.core.collision import collide, collide_point, rect_shape
 from pygamestudio.common.utils.system import get_system_lang
 from pygamestudio.common.utils.path import get_project_path
@@ -24,6 +26,23 @@ def _file_state_phase(key):
     the same frame (that lands as a periodic hitch while a game runs).
     """
     return (abs(hash(key)) % 1000) / 1000.0
+
+
+def _scaled_surface(surface, scale_x, scale_y):
+    """Scale a surface by EXPLICIT factors, mirroring negative ones.
+
+    pygame cannot scale to a negative size, so a negative factor flips that
+    axis first - which is exactly a mirror. Always returns a NEW surface: the
+    callers keep writing into it (rounded corners, alpha, tint).
+    """
+    if scale_x < 0 or scale_y < 0:
+        surface = pygame.transform.flip(surface, scale_x < 0, scale_y < 0)
+    elif scale_x == 1 and scale_y == 1:
+        return surface.copy()
+
+    size = (max(1, int(surface.get_width() * abs(scale_x))),
+            max(1, int(surface.get_height() * abs(scale_y))))
+    return pygame.transform.scale(surface, size)
 
 
 class ObjectBase:
@@ -69,6 +88,29 @@ class ObjectBase:
         # no script is attached. It is serialized into the .scene file and used
         # by the runtime to attach a behavior script to the object.
         self.script_path = object_data.get('script_path', '')
+
+        # ------------------------------------------------------------------
+        # Child clipping. A parent does NOT clip its children by default: the
+        # whole tree is drawn flat onto the screen at world coordinates, so a
+        # child that leaves its parent's box stays fully visible (only the
+        # game window itself clips). Set clip_children to True to get the
+        # classic "one layer inside the box" rendering instead - a real
+        # viewport / mask container (the editor bakes it the same way).
+        # ------------------------------------------------------------------
+        self.clip_children = bool(object_data.get('clip_children', False))
+
+        # ------------------------------------------------------------------
+        # Transform pivot ("anchor"): the point of the object's own pixel
+        # grid that rotation and scaling happen around. It defaults to the
+        # CENTRE, so a negative scale mirrors the object IN PLACE and a
+        # rotated parent swings its children around its centre instead of
+        # its top-left corner. 'top_left' restores the classic behaviour,
+        # 'custom' uses pivot_x / pivot_y (content pixels, resolved against
+        # the CURRENT size for the named anchors - see resolve_pivot).
+        # ------------------------------------------------------------------
+        self.pivot = object_data.get('pivot', 'center')
+        self.pivot_x = float(object_data.get('pivot_x', 0.0))
+        self.pivot_y = float(object_data.get('pivot_y', 0.0))
 
         # ------------------------------------------------------------------
         # Collision configuration (default: disabled).
@@ -309,51 +351,77 @@ class ObjectBase:
 
     # ---------------------------------------------------- collision internals
     def _get_local_origin_world(self):
-        """World coordinates of the object's local content origin (its top-left
-        before scaling/rotation): own (x, y) shifted up the parent chain."""
-        ox, oy = self.x, self.y
+        """World coordinates of the object's local content origin (the
+        (0, 0) corner of its own pixel grid, before scaling/rotation)."""
+        return self._get_world_transform().map_point(0.0, 0.0)
+
+    def _local_transform(self):
+        """This object's own transform: content -> parent content space."""
+        return Transform.from_object(self)
+
+    def _get_parent_context(self):
+        """(transform, ops) of the whole ancestor chain.
+
+        ``transform`` maps the parent content space into the scene. ``ops``
+        are the (scale_x, scale_y, angle) of every ancestor that really is
+        scaled or rotated, INNERMOST FIRST - the exact sequence the drawing
+        applies to a bitmap (each step is an axis-aligned scale or a rotation,
+        so a child never shears). Both stay identity / empty for an untouched
+        scene, which is the fast path of the walks.
+        """
+        chain = []
         parent_object = self._game_manager.get_parent_object(self.uuid)
-        while parent_object:
-            ox += parent_object.x
-            oy += parent_object.y
+        while parent_object is not None:
+            chain.append(parent_object)
             parent_object = self._game_manager.get_parent_object(parent_object.uuid)
-        return ox, oy
+
+        transform = TRANSFORM_IDENTITY
+        for ancestor in reversed(chain):
+            transform = transform.compose(ancestor._local_transform())
+
+        ops = []
+        for ancestor in chain:
+            if ancestor.angle or ancestor.scale_x != 1 or ancestor.scale_y != 1:
+                ops.append((float(ancestor.scale_x), float(ancestor.scale_y),
+                            float(ancestor.angle)))
+        return transform, tuple(ops)
+
+    def _get_parent_transform(self):
+        """Composed transform of every ancestor, outermost first (the canvas
+        included). IDENTITY while nothing above the object is moved at all."""
+        return self._get_parent_context()[0]
+
+    def _get_parent_ops(self):
+        """The (scale, angle) ops of every transformed ancestor, innermost
+        first (see _get_parent_context)."""
+        return self._get_parent_context()[1]
+
+    def _get_world_transform(self):
+        """The whole chain: content -> scene coordinates."""
+        return self._get_parent_transform().compose(self._local_transform())
+
+    def _world_delta_to_local(self, dx, dy):
+        """Convert a scene-space delta into this object's parent space.
+
+        Dragging measures the mouse delta on SCREEN, but (x, y) live in the
+        parent's space: inside a rotated, scaled or mirrored parent the delta
+        has to be mapped back through the inverse transform, otherwise the
+        object would drift away from the cursor.
+        """
+        inverse = self._get_parent_transform().inverted()
+        if inverse is None:
+            return (dx, dy)
+        return inverse.map_vector(dx, dy)
 
     def _points_to_world(self, local_points):
-        """Map local content points to world coordinates replicating EXACTLY
-        how the object is rendered: scale about the content origin, then a
-        pygame-style rotation about the scaled content centre whose result is
-        blitted so its bounding-box top-left lands on the object's (x, y)."""
-        sx, sy = self.scale_x, self.scale_y
-        ox, oy = self._get_local_origin_world()
-        angle = float(self.angle) % 360.0
-        if not angle:
-            return [(ox + px * sx, oy + py * sy) for (px, py) in local_points]
+        """Map points of the object's own pixel grid into scene coordinates.
 
-        rad = math.radians(angle)
-        cos_a, sin_a = math.cos(rad), math.sin(rad)
-        # Scaled content size/centre.
-        sw = self.width * sx
-        sh = self.height * sy
-        cx, cy = sw / 2.0, sh / 2.0
-        # Bounding box of the rotated (scaled) content - identical to the size
-        # pygame.transform.rotate returns.
-        rw = abs(sw * cos_a) + abs(sh * sin_a)
-        rh = abs(sw * sin_a) + abs(sh * cos_a)
-        # pygame.rotate keeps the input centre at the centre of the rotated
-        # surface, whose top-left is blitted at (x, y) (+parents).
-        wcx = ox + rw / 2.0
-        wcy = oy + rh / 2.0
-
-        world = []
-        for (px, py) in local_points:
-            dx = px * sx - cx
-            dy = py * sy - cy
-            # pygame.transform.rotate uses a POSITIVE angle for a clockwise
-            # rotation on screen (y grows downwards), hence the -/+ signs.
-            world.append((wcx + dx * cos_a + dy * sin_a,
-                          wcy - dx * sin_a + dy * cos_a))
-        return world
+        The very same transform the drawing uses - position, scale, mirror,
+        rotation and pivot of every ancestor included - so collision and
+        rigid-body shapes stay exactly on the drawn pixels.
+        """
+        transform = self._get_world_transform()
+        return [transform.map_point(px, py) for (px, py) in local_points]
 
     def _point_to_world(self, x, y):
         """Map one local content point to world coordinates."""
@@ -711,7 +779,17 @@ class ObjectBase:
     
     def get_scale(self) -> tuple:
         return self.scale
-    
+
+    def get_pivot(self) -> str:
+        """The anchor rotation/scaling happen around ('center', 'top_left',
+        'custom', ...)."""
+        return self.pivot
+
+    def get_pivot_point(self) -> tuple:
+        """The pivot resolved to content pixels (see resolve_pivot)."""
+        return resolve_pivot(self.pivot, self.pivot_x, self.pivot_y,
+                             self.width, self.height)
+
     def get_visible_state(self) -> bool:
         return self.visible
     
@@ -748,6 +826,17 @@ class ObjectBase:
 
     def set_scale(self, scale_x:float, scale_y:float):
         self.scale = (scale_x, scale_y)
+
+    def set_pivot(self, pivot:str):
+        """Choose the anchor: 'center' (default), 'top_left', 'top_center',
+        ..., or 'custom' (see set_pivot_point)."""
+        self.pivot = pivot
+
+    def set_pivot_point(self, x:float, y:float):
+        """Rotate/scale around a free point of the object's own pixel grid."""
+        self.pivot_x = x
+        self.pivot_y = y
+        self.pivot = 'custom'
 
     def get_angle(self) -> float:
         return self.angle
@@ -917,14 +1006,92 @@ class ObjectBase:
         if callable(emit):
             emit(self, event_name, *args)
 
-    def _draw(self, parent_surface):
-        """Blit this object onto its parent surface at its local position.
+    def _blit(self, parent_surface, rect, surface=None):
+        """Blit ``surface`` (the object's own by default) at ``rect`` (editor
+        mode adds the blue selection outline around exactly that rect)."""
+        parent_surface.blit(self.surface if surface is None else surface, rect)
+        if not self._is_for_api and self.selected:
+            pygame.draw.rect(parent_surface, (0, 122, 204), rect, width=2)
+
+    def _draw(self, parent_surface, position=None):
+        """Blit this object onto a surface.
+
+        ``position`` is where the object's top-left corner goes on that
+        surface; the default draws it at its own local position (inside its
+        parent's surface). The transformed walks use _draw_in_transform.
 
         In editor mode a blue selection outline is drawn around the object.
         """
-        parent_surface.blit(self.surface, self._get_rect())
-        if not self._is_for_api and self.selected:
-            pygame.draw.rect(parent_surface, (0, 122, 204), self._get_rect(), width=2)
+        rect = self._get_rect()
+        if position is not None:
+            rect = pygame.Rect(int(position[0]), int(position[1]),
+                               rect.width, rect.height)
+        self._blit(parent_surface, rect)
+
+    def _parent_render(self, surface, parent_ops):
+        """``surface`` with the ancestors' scale / rotation applied.
+
+        Applying the ancestors' ops (innermost first: scale by theirs, rotate
+        by theirs) to the object's own surface reproduces the composed linear
+        map of the whole chain exactly - a child inside a scaled, rotated or
+        mirrored parent is drawn scaled, rotated and mirrored itself. The
+        result is cached, so an unchanged scene pays for it once.
+        """
+        if not parent_ops:
+            return surface
+
+        cache = self.__dict__.get('_parent_render_cache')
+        if (cache is not None and cache[0][0] is surface
+                and cache[0][1] == parent_ops):
+            return cache[1]
+
+        result = surface
+        for (scale_x, scale_y, angle) in parent_ops:
+            result = _scaled_surface(result, scale_x, scale_y)
+            if angle % 360:
+                result = pygame.transform.rotate(result, angle)
+        self._parent_render_cache = ((surface, parent_ops), result)
+        return result
+
+    def _bitmap_origin_in(self, parent_transform, parent_ops, surface):
+        """FLOAT top-left of the object's bitmap under ``parent_transform``.
+
+        Without a transformed ancestor and with no rotation / scaling of its
+        own, the classic "blit the surface at the object's (x, y)" placement
+        applies - the fast path of every untouched scene. Otherwise the
+        bitmap (the own surface with the ancestors' ops applied) is placed so
+        its CENTRE, the image of the content centre, sits where the transform
+        maps it - which is what makes the pivot hold for the whole chain.
+        """
+        if (not parent_ops and not self.angle
+                and self.scale_x == 1 and self.scale_y == 1):
+            return parent_transform.map_point(self.x, self.y)
+
+        world = parent_transform.compose(self._local_transform())
+        centre_x, centre_y = world.map_point(self.width / 2.0,
+                                             self.height / 2.0)
+        return (centre_x - surface.get_width() / 2.0,
+                centre_y - surface.get_height() / 2.0)
+
+    def _drawn_bitmap_in(self, parent_transform, parent_ops):
+        """(surface, rect) of what this object draws, in the coordinates
+        ``parent_transform`` maps the parent content space into."""
+        surface = self._parent_render(self.surface, parent_ops)
+        x, y = self._bitmap_origin_in(parent_transform, parent_ops, surface)
+        return surface, pygame.Rect(int(round(x)), int(round(y)),
+                                    surface.get_width(), surface.get_height())
+
+    def _drawn_bitmap(self):
+        """(surface, rect) of what this object draws, in SCENE
+        coordinates."""
+        parent_transform, parent_ops = self._get_parent_context()
+        return self._drawn_bitmap_in(parent_transform, parent_ops)
+
+    def _draw_in_transform(self, target_surface, transform, parent_ops=()):
+        """Draw this object where ``transform`` puts it (the transformed
+        runtime walk and the editor bake use this instead of _draw)."""
+        surface, rect = self._drawn_bitmap_in(transform, parent_ops)
+        self._blit(target_surface, rect, surface)
 
     def _get_surface(self):
         return self.surface
@@ -940,32 +1107,33 @@ class ObjectBase:
         return pygame.Rect(self.x, self.y, self.surface.width, self.surface.height)
 
     def _get_world_rect(self):
-        """Rect in scene coordinates: local rect shifted up the parent chain
-        until the canvas root, so nested objects report absolute positions."""
-        world_rect = self._get_rect()
-        parent_object = self._game_manager.get_parent_object(self.uuid)
-
-        while parent_object:
-            parent_rect = parent_object._get_rect()
-            world_rect.move_ip(parent_rect.x, parent_rect.y)
-            parent_object = self._game_manager.get_parent_object(parent_object.uuid)
-
-        return world_rect
+        """Bounding rect of the object's own drawing in scene coordinates
+        (the axis-aligned box around its drawn bitmap, so a rotated, scaled or
+        mirrored object - inside a transformed parent too - reports where it
+        really is)."""
+        return self._drawn_bitmap()[1]
     
     def _set_world_rect(self, world_x, world_y):
-        """Inverse of _get_world_rect: convert a scene (world) position back
-        into the object's local position by subtracting parent offsets."""
-        px, py = 0, 0
-        parent_object = self._game_manager.get_parent_object(self.uuid)
+        """Move the object so its world bounding rect lands at (world_x,
+        world_y) - the inverse of _get_world_rect.
 
-        while parent_object:
-            parent_rect = parent_object._get_rect()
-            px += parent_rect.x
-            py += parent_rect.y
-            parent_object = self._game_manager.get_parent_object(parent_object.uuid)
+        The delta is measured against the EXACT (unrounded) bitmap position
+        and converted through the parent's transform, so repeated syncs (the
+        physics step writes every body back on every frame) are idempotent
+        and dragging inside a rotated or mirrored parent still follows the
+        mouse exactly.
+        """
+        parent_transform, parent_ops = self._get_parent_context()
+        surface = self._parent_render(self.surface, parent_ops)
+        current_x, current_y = self._bitmap_origin_in(parent_transform,
+                                                      parent_ops, surface)
+        delta_x = world_x - current_x
+        delta_y = world_y - current_y
+        if not delta_x and not delta_y:
+            return
 
-        self.x = world_x - px
-        self.y = world_y - py
+        local_delta_x, local_delta_y = self._world_delta_to_local(delta_x, delta_y)
+        self.pos = (self.x + local_delta_x, self.y + local_delta_y)
 
     def _get_data(self):
         """Return the object's full attribute dict (used to clone objects)."""
@@ -973,14 +1141,21 @@ class ObjectBase:
 
     def _check_click_collision(self, click_pos):
         """Pixel-perfect hit test: first a cheap world-rect test, then a
-        per-pixel alpha mask so transparent pixels don't count as a hit."""
-        if not self._get_world_rect().collidepoint(click_pos):
+        per-pixel alpha mask so transparent pixels don't count as a hit.
+
+        The mask is sampled in the DRAWN surface's own pixels (the rect the
+        surface is blitted at), which stays exact for rotated, scaled and
+        mirrored objects.
+        """
+        rect = self._get_world_rect()
+        if not rect.collidepoint(click_pos):
             return False
 
-        rotated_mask = pygame.mask.from_surface(self.surface)
-        local_x = click_pos[0] - self._get_world_pos()[0]
-        local_y = click_pos[1] - self._get_world_pos()[1]
-        return rotated_mask.get_at((local_x, local_y))
+        surface, rect = self._drawn_bitmap()
+        mask = pygame.mask.from_surface(surface)
+        local_x = click_pos[0] - rect.x
+        local_y = click_pos[1] - rect.y
+        return mask.get_at((local_x, local_y))
     
     def _check_rect_collision(self, rect):
         return self._get_world_rect().colliderect(rect)
@@ -999,11 +1174,20 @@ class ObjectBase:
             '_physics_shape_configured',
             '_font_cache', '_font_cache_key', '_image_cache', '_image_cache_key',
             '_render_cache', '_render_state', '_file_state_cache',
+            '_parent_render_cache',
         ]
-        return {
+        data = {
             key: value for key, value in self.__dict__.items() 
             if key not in exclude_fields
         }
+        # Derived tuples are normalized: the component fields are what the
+        # inspector and scripts write, so a stale tuple copy must never win
+        # when the object is loaded again or compared against the disk state.
+        data['scale'] = (self.scale_x, self.scale_y)
+        data['pos'] = (self.x, self.y)
+        if data.get('pivot') not in PIVOT_MODES:
+            data['pivot'] = 'center'
+        return data
 
     @staticmethod
     def _file_state(file_path):
@@ -1058,6 +1242,16 @@ class ObjectBase:
             
         surface.set_alpha(alpha)
         return surface
+
+    def _apply_scale(self, surface):
+        """Scale the object's content by scale_x / scale_y.
+
+        A NEGATIVE factor mirrors that axis (see _scaled_surface): -1 means
+        "flip", and because the drawing places the bitmap around the pivot, a
+        mirrored object stays exactly where it was (with the default centre
+        pivot).
+        """
+        return _scaled_surface(surface, float(self.scale_x), float(self.scale_y))
     
     def __setattr__(self, name, value):
         """Intercept attribute writes to keep derived fields in sync.
@@ -1096,6 +1290,21 @@ class ObjectBase:
             super().__setattr__('scale_x', value[0])
             super().__setattr__('scale_y', value[1])
             super().__setattr__('scale', value)
+
+        elif name in ('scale_x', 'scale_y'):
+            # Writing ONE component keeps the scale tuple in sync: the tuple
+            # is what the scene saves (and what __init__ applies last), so a
+            # stale copy would silently win on the next load - and an undo
+            # would restore the old factor instead.
+            super().__setattr__(name, value)
+            super().__setattr__('scale', (self.scale_x, self.scale_y))
+
+        elif name == 'pivot':
+            mode = str(value).strip().lower()
+            super().__setattr__('pivot', mode if mode in PIVOT_MODES else 'center')
+
+        elif name in ('pivot_x', 'pivot_y'):
+            super().__setattr__(name, float(value))
 
         elif name == 'script_path':
             # Store the script path relative to the project (e.g. './script/x.py').

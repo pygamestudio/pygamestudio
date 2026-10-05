@@ -311,9 +311,7 @@ class ObjectFrameSequence(ObjectBase):
                 base, (max(1, self.width), max(1, self.height))).copy()
             scaled.fill(self.color[:3], special_flags=pygame.BLEND_RGBA_MULT)
 
-            scaled_size = (max(1, int(scaled.get_width() * self.scale_x)),
-                           max(1, int(scaled.get_height() * self.scale_y)))
-            scaled_surface = pygame.transform.scale(scaled, scaled_size)
+            scaled_surface = self._apply_scale(scaled)
             rotated_surface = pygame.transform.rotate(scaled_surface, self.angle)
             self.surface = self._apply_alpha(rotated_surface)
 

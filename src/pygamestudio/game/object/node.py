@@ -70,8 +70,7 @@ class ObjectNode(ObjectBase):
             pygame.draw.rect(self.surface, self.EDITOR_FILL, self.surface.get_rect())
             pygame.draw.rect(self.surface, self.EDITOR_LINE, self.surface.get_rect(), width=1)
 
-        scaled_size = (self.surface.width * self.scale_x, self.surface.height * self.scale_y)
-        scaled_surface = pygame.transform.scale(self.surface, scaled_size)
+        scaled_surface = self._apply_scale(self.surface)
         rotated_surface = pygame.transform.rotate(scaled_surface, self.angle)
         self.surface = self._apply_alpha(rotated_surface)
 
@@ -95,7 +94,11 @@ class ObjectNode(ObjectBase):
         if not self._get_world_rect().collidepoint(click_pos):
             return False
 
-        mask = pygame.mask.from_surface(self.surface, 0)
-        local_x = click_pos[0] - self._get_world_pos()[0]
-        local_y = click_pos[1] - self._get_world_pos()[1]
+        # Sample the mask in the pixels the scene really draws (the bitmap
+        # under the parent transforms), so the hit area follows a scaled,
+        # rotated or mirrored parent exactly like every other object.
+        surface, rect = self._drawn_bitmap()
+        mask = pygame.mask.from_surface(surface, 0)
+        local_x = click_pos[0] - rect.x
+        local_y = click_pos[1] - rect.y
         return bool(mask.get_at((local_x, local_y)))

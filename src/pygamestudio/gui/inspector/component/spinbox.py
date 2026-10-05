@@ -91,7 +91,10 @@ class ScaleSpinBox(SuffixSpinBox):
     def __init__(self, inspector_container, value, attr=''):
         super().__init__()
         self._inspector_container = inspector_container
-        self.setRange(0, 999999)
+        # Negative factors MIRROR that axis: -1 flips the object horizontally
+        # / vertically (around its pivot, the centre by default, so it does
+        # not move).
+        self.setRange(-999999, 999999)
         self.setSingleStep(0.01)
         self.setValue(value)
         self.setDecimals(2)
@@ -102,6 +105,25 @@ class ScaleSpinBox(SuffixSpinBox):
             self.set_suffix('Y')
 
         self.valueChanged.connect(self._inspector_container.scale_object)
+
+
+class PivotSpinBox(SuffixSpinBox):
+    """One coordinate of the free pivot point (content pixels)."""
+
+    def __init__(self, inspector_container, value, attr=''):
+        super().__init__()
+        self._inspector_container = inspector_container
+        self.setRange(-999999, 999999)
+        self.setSingleStep(1)
+        self.setDecimals(0)
+        self.setValue(value)
+
+        if attr == 'pivot_x':
+            self.set_suffix('X')
+        elif attr == 'pivot_y':
+            self.set_suffix('Y')
+
+        self.valueChanged.connect(self._inspector_container.set_object_pivot_point)
 
 
 class AngleSpinBox(QDoubleSpinBox):
