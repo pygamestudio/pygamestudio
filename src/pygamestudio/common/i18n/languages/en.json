@@ -389,7 +389,14 @@
         "save_failed": "Save failed",
         "reloaded": "Reloaded",
         "zoom_in": "Zoom In",
-        "zoom_out": "Zoom Out"
+        "zoom_out": "Zoom Out",
+        "search": "Find (Ctrl+F)",
+        "search_placeholder": "Find",
+        "search_next": "Next Match (Enter)",
+        "search_previous": "Previous Match (Shift+Enter)",
+        "search_case": "Match Case",
+        "search_close": "Close (Esc)",
+        "search_no_results": "No results"
     },
 
     "image": {

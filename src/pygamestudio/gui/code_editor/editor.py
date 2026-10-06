@@ -1,12 +1,14 @@
 from pathlib import Path
 
 from PySide6.QtCore import QRect, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QTextCharFormat, QTextFormat, QTextCursor
+from PySide6.QtGui import (QColor, QFont, QFontMetrics, QPainter, QTextCharFormat,
+                           QTextCursor, QTextDocument, QTextFormat)
 from PySide6.QtWidgets import QPlainTextEdit, QTextEdit, QWidget
 
 from pygamestudio.gui.code_editor.highlighter import CodeHighlighter
 from pygamestudio.gui.code_editor.completion import CodeCompleter
 from pygamestudio.gui.code_editor.menu import CodeEditorMenu
+from pygamestudio.gui.code_editor.search import CodeSearchBar
 from pygamestudio.common.utils.config import get_editor_config, update_editor_config
 from pygamestudio.common.i18n.translator import Translator as T
 
@@ -40,6 +42,10 @@ class CodeEditor(QPlainTextEdit):
     MAX_FONT_SIZE = 26
     INDENT_WIDTH = 4
 
+    # A search highlights at most this many matches (the counter always
+    # shows the true total; huge documents must not build endless selections).
+    MAX_SEARCH_HIGHLIGHTS = 2000
+
     # Characters that auto-complete a closing counterpart while typing.
     _AUTO_PAIRS = {
         '(': ')',
@@ -55,6 +61,16 @@ class CodeEditor(QPlainTextEdit):
         self._font_size = self._load_font_size_from_config()
         self._current_line_color = QColor('#282828')
         self._error_start = None
+
+        # Find bar state (see open_search / find_next / close_search).
+        self._search_text = ''
+        self._search_matches = []
+        self._search_index = -1
+        self._search_case = False
+        self._match_color = QColor(255, 200, 0, 60)
+        self._current_match_color = QColor(255, 160, 0, 150)
+        self._search_bar = CodeSearchBar(self)
+        self._search_bar.hide()
 
         self._highlighter = CodeHighlighter(self.document())
         self._completer = CodeCompleter(self)
@@ -79,6 +95,11 @@ class CodeEditor(QPlainTextEdit):
         self.cursorPositionChanged.connect(self._update_current_line)
         self.blockCountChanged.connect(self._update_line_number_area_width)
         self.updateRequest.connect(self._on_update_request)
+        self._search_bar.text_changed.connect(self._on_search_text_changed)
+        self._search_bar.case_toggled.connect(self._on_search_case_changed)
+        self._search_bar.next_requested.connect(self.find_next)
+        self._search_bar.previous_requested.connect(self.find_previous)
+        self._search_bar.close_requested.connect(self.close_search)
 
         self._update_line_number_area_width()
 
@@ -194,6 +215,7 @@ class CodeEditor(QPlainTextEdit):
         self._auto_save_timer.stop()
         self._syntax_check_timer.stop()
         self._file_path = None
+        self._reset_search()
         self._is_loading = True
         self.clear()
         self._is_loading = False
@@ -213,6 +235,10 @@ class CodeEditor(QPlainTextEdit):
         self._highlighter.apply_theme(is_dark)
         self._is_loading = False
         self._current_line_color = QColor('#282828' if is_dark else '#f2f2f2')
+        # Search highlights: a soft amber for the other matches and a stronger
+        # one for the current match, readable on both editor backgrounds.
+        self._match_color = QColor(255, 200, 0, 60 if is_dark else 90)
+        self._current_match_color = QColor(255, 160, 0, 150 if is_dark else 170)
         self._update_current_line()
 
     # ------------------------------------------------------------------ font size
@@ -494,12 +520,20 @@ class CodeEditor(QPlainTextEdit):
     # ------------------------------------------------------------------ events
     def _on_text_changed(self):
         if self._is_loading:
+            # Loading a file (or re-highlighting) also has to refresh an OPEN
+            # find bar - but without touching the text cursor.
+            if self._search_bar.isVisible():
+                self._recompute_search_matches(select=False)
             return
         self._set_modified(True)
         self._update_status(T.tr('code.unsaved', 'Unsaved'))
         self._completer.update_words()
         self._auto_save_timer.start()
         self._syntax_check_timer.start()
+        if self._search_bar.isVisible():
+            # Live refresh while editing; never re-select a match here or the
+            # caret would jump away from what the user is typing.
+            self._recompute_search_matches(select=False)
 
     def keyPressEvent(self, event):
         if self._completer.popup().isVisible():
@@ -530,9 +564,20 @@ class CodeEditor(QPlainTextEdit):
                 # shortcut does not also fire).
                 self.save()
                 return
+            if event.key() == Qt.Key.Key_F:
+                # Ctrl+F: the find bar at the top-right of the code area.
+                self.open_search()
+                return
             # Ctrl+R is deliberately not handled here: it is an editor-global
             # shortcut (Editor.keyPressEvent) that saves this file first when
             # the code editor is the active panel.
+
+        if event.key() == Qt.Key.Key_F3:
+            if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+                self.find_previous()
+            else:
+                self.find_next()
+            return
 
         # Indentation: Tab indents with spaces (never a literal tab), Shift+Tab
         # / Ctrl+Shift+Tab unindents a whole level, Enter keeps the current
@@ -603,6 +648,153 @@ class CodeEditor(QPlainTextEdit):
         menu.exec(event.globalPos())
         menu.deleteLater()
 
+    # ------------------------------------------------------------------ search
+    def open_search(self):
+        """Ctrl+F: show the find bar at the top-right of the code area.
+
+        Like VS Code, a single-line selection in the editor prefills the
+        query, and opening the bar again simply focuses (and selects) the
+        field.
+        """
+        selected = self.textCursor().selectedText()
+        if selected and '\u2029' not in selected:
+            self._search_bar.set_search_text(selected)
+        self._search_bar.show()
+        self._search_bar.raise_()
+        self._position_search_bar()
+        self._search_bar.focus_input()
+        self._refresh_search()
+
+    def close_search(self):
+        """Escape / the close button: hide the bar and drop the highlights.
+
+        The query survives (exactly like VS Code), so F3 keeps jumping
+        through the matches after the bar was closed.
+        """
+        self._search_bar.hide()
+        self._search_text = self._search_bar.search_text()
+        self._update_current_line()
+        self.setFocus()
+
+    def search_bar(self):
+        """The floating find bar (kept accessible for tests)."""
+        return self._search_bar
+
+    def is_searching(self):
+        """True while the find bar is open."""
+        return self._search_bar.isVisible()
+
+    def _on_search_text_changed(self, text):
+        self._search_text = text
+        self._recompute_search_matches(reset=True)
+
+    def _on_search_case_changed(self, case_sensitive):
+        self._search_case = case_sensitive
+        self._recompute_search_matches(reset=True)
+
+    def _search_flags(self):
+        if self._search_case:
+            return QTextDocument.FindFlag.FindCaseSensitively
+        return QTextDocument.FindFlag(0)
+
+    def _recompute_search_matches(self, reset=False, select=True):
+        """Collect every occurrence of the query in the document.
+
+        ``reset`` re-anchors the current match on the text cursor (typing in
+        the field starts the search where the caret is, like VS Code) and
+        ``select`` moves the editor cursor onto the current match - edits made
+        while the bar is open pass False, so the caret never jumps away.
+        """
+        self._search_matches = []
+        if self._search_text:
+            flags = self._search_flags()
+            cursor = QTextCursor(self.document())
+            while True:
+                cursor = self.document().find(self._search_text, cursor, flags)
+                if cursor.isNull():
+                    break
+                start = cursor.selectionStart()
+                self._search_matches.append((start, cursor.selectionEnd() - start))
+        if reset or self._search_index >= len(self._search_matches):
+            self._search_index = -1
+        if self._search_index < 0:
+            self._search_index = self._match_index_from_cursor()
+        self._refresh_search(select=select)
+
+    def _match_index_from_cursor(self):
+        """Index of the first match at / after the text cursor (0 = wrap)."""
+        if not self._search_matches:
+            return -1
+        position = self.textCursor().selectionStart()
+        for index, (start, _length) in enumerate(self._search_matches):
+            if start >= position:
+                return index
+        return 0
+
+    def _refresh_search(self, select=True):
+        """Update the counter, the highlights and the current match."""
+        if self._search_bar.isVisible():
+            self._search_bar.set_match_info(self._search_index + 1,
+                                            len(self._search_matches))
+            self._position_search_bar()
+        # F3 keeps jumping through the matches after the bar was closed, so
+        # the selection is NOT tied to the bar being open (only the counter
+        # and the highlights are).
+        if select and self._search_index >= 0:
+            self._select_search_match(self._search_index)
+        self._update_current_line()
+
+    def _select_search_match(self, index):
+        start, length = self._search_matches[index]
+        cursor = QTextCursor(self.document())
+        cursor.setPosition(start)
+        cursor.setPosition(start + length, QTextCursor.MoveMode.KeepAnchor)
+        self.setTextCursor(cursor)
+        self.ensureCursorVisible()
+
+    def find_next(self):
+        """Enter / F3 / the down arrow: next match - wraps around."""
+        self._navigate_search(1)
+
+    def find_previous(self):
+        """Shift+Enter / Shift+F3 / the up arrow: previous match - wraps."""
+        self._navigate_search(-1)
+
+    def _navigate_search(self, step):
+        if not self._search_bar.isVisible():
+            # F3 with the bar closed: refresh first, the document may have
+            # changed since the last search.
+            self._search_text = self._search_bar.search_text()
+            self._recompute_search_matches()
+        if not self._search_matches:
+            return
+        if self._search_index < 0:
+            self._search_index = self._match_index_from_cursor()
+        else:
+            self._search_index = (self._search_index + step) % len(self._search_matches)
+        self._refresh_search()
+
+    def _reset_search(self):
+        """Forget the whole search session (the shown file was cleared)."""
+        self._search_bar.set_search_text('')
+        self._search_bar.hide()
+        self._search_text = ''
+        self._search_matches = []
+        self._search_index = -1
+        self._update_current_line()
+
+    def _position_search_bar(self):
+        """Keep the find bar in the top-right corner of the code area."""
+        if not self._search_bar.isVisible():
+            return
+        self._search_bar.adjustSize()
+        margin = 8
+        area = self.contentsRect()
+        size = self._search_bar.size()
+        self._search_bar.move(
+            max(area.left(), area.right() - size.width() - margin),
+            area.top() + margin)
+
     # ------------------------------------------------------------------ status
     def _set_modified(self, modified):
         if modified != self._is_modified:
@@ -647,6 +839,25 @@ class CodeEditor(QPlainTextEdit):
                     QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor)
                 selections.append(error_selection)
 
+        # Find-bar matches: all of them in a soft amber, the current one
+        # stronger (only while the bar is open - the query itself survives
+        # closing it, so F3 keeps working).
+        if self._search_bar.isVisible() and self._search_text and self._search_matches:
+            match_format = QTextCharFormat()
+            match_format.setBackground(self._match_color)
+            current_format = QTextCharFormat()
+            current_format.setBackground(self._current_match_color)
+            for index, (start, length) in enumerate(
+                    self._search_matches[:self.MAX_SEARCH_HIGHLIGHTS]):
+                selection = QTextEdit.ExtraSelection()
+                selection.format = (current_format if index == self._search_index
+                                    else match_format)
+                selection.cursor = QTextCursor(self.document())
+                selection.cursor.setPosition(start)
+                selection.cursor.setPosition(start + length,
+                                             QTextCursor.MoveMode.KeepAnchor)
+                selections.append(selection)
+
         self.setExtraSelections(selections)
 
     def jump_to_line(self, line):
@@ -679,6 +890,7 @@ class CodeEditor(QPlainTextEdit):
         super().resizeEvent(event)
         cr = self.contentsRect()
         self._line_number_area.setGeometry(QRect(cr.left(), cr.top(), self.line_number_area_width(), cr.height()))
+        self._position_search_bar()
 
     def paint_line_number_area(self, event):
         painter = QPainter(self._line_number_area)

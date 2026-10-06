@@ -666,18 +666,53 @@ QPushButton#codeEditorDetachBtn:pressed {
     background-color: #28292a;
 }
 
-QPushButton#codeEditorZoomInBtn, QPushButton#codeEditorZoomOutBtn {
+QPushButton#codeEditorSearchBtn, QPushButton#codeEditorZoomInBtn, QPushButton#codeEditorZoomOutBtn {
     background-color: transparent;
     border: none;
     border-radius: 4px;
 }
 
-QPushButton#codeEditorZoomInBtn:hover, QPushButton#codeEditorZoomOutBtn:hover {
+QPushButton#codeEditorSearchBtn:hover, QPushButton#codeEditorZoomInBtn:hover, QPushButton#codeEditorZoomOutBtn:hover {
     background-color: #404142;
 }
 
-QPushButton#codeEditorZoomInBtn:pressed, QPushButton#codeEditorZoomOutBtn:pressed {
+QPushButton#codeEditorSearchBtn:pressed, QPushButton#codeEditorZoomInBtn:pressed, QPushButton#codeEditorZoomOutBtn:pressed {
     background-color: #28292a;
+}
+
+QFrame#codeSearchBar {
+    background-color: #252526;
+    border: 1px solid #3c3c3c;
+    border-radius: 6px;
+}
+
+QLineEdit#codeSearchLineEdit {
+    padding-left: 21px;
+}
+
+QLabel#codeSearchCountLabel {
+    color: #9d9d9d;
+    background-color: transparent;
+}
+
+QPushButton#codeSearchBtn {
+    background-color: transparent;
+    border: none;
+    border-radius: 4px;
+    color: #d4d4d4;
+}
+
+QPushButton#codeSearchBtn:hover {
+    background-color: #404142;
+}
+
+QPushButton#codeSearchBtn:pressed {
+    background-color: #28292a;
+}
+
+QPushButton#codeSearchBtn[selected="true"] {
+    background-color: #0e639c;
+    color: #ffffff;
 }
 
 QPushButton#editorSwitchBtn {

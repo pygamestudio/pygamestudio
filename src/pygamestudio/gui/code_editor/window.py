@@ -38,6 +38,7 @@ class CodeEditorWindow(QWidget):
         self._block_btn = QPushButton()
         self._zoom_in_btn = QPushButton()
         self._zoom_out_btn = QPushButton()
+        self._search_btn = QPushButton()
 
         self._set_up()
 
@@ -72,6 +73,13 @@ class CodeEditorWindow(QWidget):
         self._zoom_out_btn.setToolTip(T.tr('code.zoom_out', 'Zoom Out'))
         self._update_zoom_buttons(self._editor.font_size())
 
+        self._search_btn.setObjectName('codeEditorSearchBtn')
+        self._search_btn.setIcon(QIcon(':/images/search.png'))
+        self._search_btn.setIconSize(QSize(16, 16))
+        self._search_btn.setFixedSize(26, 26)
+        self._search_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._search_btn.setToolTip(T.tr('code.search', 'Find (Ctrl+F)'))
+
     def _set_signal(self):
         self._run_project_btn.clicked.connect(self._run_project)
         self._detach_btn.clicked.connect(self.toggle_detached)
@@ -80,6 +88,7 @@ class CodeEditorWindow(QWidget):
         self._editor.modified_changed.connect(lambda modified: self._update_titles())
         self._zoom_in_btn.clicked.connect(self._editor.zoom_in)
         self._zoom_out_btn.clicked.connect(self._editor.zoom_out)
+        self._search_btn.clicked.connect(self._editor.open_search)
         self._editor.font_size_changed.connect(self._update_zoom_buttons)
 
     def _request_switch_to_block(self):
@@ -96,6 +105,7 @@ class CodeEditorWindow(QWidget):
         toolbar_layout.addWidget(self._file_label)
         toolbar_layout.addWidget(self._zoom_out_btn)
         toolbar_layout.addWidget(self._zoom_in_btn)
+        toolbar_layout.addWidget(self._search_btn)
         toolbar_layout.addStretch(1)
         toolbar_layout.addWidget(self._block_btn)
         toolbar_layout.addWidget(self._run_project_btn)

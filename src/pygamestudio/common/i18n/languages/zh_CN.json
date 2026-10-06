@@ -389,7 +389,14 @@
         "save_failed": "保存失败",
         "reloaded": "已重新加载",
         "zoom_in": "放大字体",
-        "zoom_out": "缩小字体"
+        "zoom_out": "缩小字体",
+        "search": "查找（Ctrl+F）",
+        "search_placeholder": "查找",
+        "search_next": "下一个匹配项（Enter）",
+        "search_previous": "上一个匹配项（Shift+Enter）",
+        "search_case": "区分大小写",
+        "search_close": "关闭（Esc）",
+        "search_no_results": "无结果"
     },
 
     "image": {
