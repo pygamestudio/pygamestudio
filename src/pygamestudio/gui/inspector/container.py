@@ -839,8 +839,13 @@ class Container(QFrame):
             spinbox_height.blockSignals(False)
 
     def _on_object_renamed(self, object_uuid):
+        if object_uuid != self._object_uuid_in_inspection:
+            return
+
         obj = self._game_manager.get_object(object_uuid)
         name_lineedit = self._find_widget(self._container_layout, 'name')
+        if name_lineedit is None:
+            return
         name_lineedit.blockSignals(True)
         name_lineedit.setText(obj.name)
         name_lineedit.blockSignals(False)
@@ -888,9 +893,14 @@ class Container(QFrame):
                 points_widget.blockSignals(False)
 
     def _on_object_scaled(self, object_uuid):
+        if object_uuid != self._object_uuid_in_inspection:
+            return
+
         obj = self._game_manager.get_object(object_uuid)
         spinbox_scale_x = self._find_widget(self._container_layout, 'scale_x')
         spinbox_scale_y = self._find_widget(self._container_layout, 'scale_y')
+        if spinbox_scale_x is None or spinbox_scale_y is None:
+            return
         spinbox_scale_x.blockSignals(True)
         spinbox_scale_y.blockSignals(True)
         spinbox_scale_x.setValue(obj.scale_x)
@@ -899,8 +909,13 @@ class Container(QFrame):
         spinbox_scale_y.blockSignals(False)
 
     def _on_object_rotated(self, object_uuid):
+        if object_uuid != self._object_uuid_in_inspection:
+            return
+
         obj = self._game_manager.get_object(object_uuid)
         spinbox_angle = self._find_widget(self._container_layout, 'angle')
+        if spinbox_angle is None:
+            return
         spinbox_angle.blockSignals(True)
         spinbox_angle.setValue(obj.angle)
         spinbox_angle.blockSignals(False)
@@ -910,6 +925,8 @@ class Container(QFrame):
             return
         
         checkbox = self._find_widget(self._container_layout, 'visible')
+        if checkbox is None:
+            return
         checkbox.setChecked(True)
 
     def _on_object_hidden(self, object_uuid):
@@ -917,6 +934,8 @@ class Container(QFrame):
             return
         
         checkbox = self._find_widget(self._container_layout, 'visible')
+        if checkbox is None:
+            return
         checkbox.setChecked(False)
 
     def _on_object_color_changed(self, object_uuid):
@@ -925,6 +944,8 @@ class Container(QFrame):
         
         obj = self._game_manager.get_object(object_uuid)
         color_picker = self._find_widget(self._container_layout, 'color')
+        if color_picker is None:
+            return
         color_picker.set_color(obj.color)
 
     def _on_object_rect_border_radius_changed(self, object_uuid, attr):
@@ -933,6 +954,8 @@ class Container(QFrame):
         
         obj = self._game_manager.get_object(object_uuid)
         spinbox_radius = self._find_widget(self._container_layout, attr)
+        if spinbox_radius is None:
+            return
         spinbox_radius.blockSignals(True)
         spinbox_radius.setValue(getattr(obj, attr))
         spinbox_radius.blockSignals(False)
@@ -943,6 +966,8 @@ class Container(QFrame):
         
         obj = self._game_manager.get_object(object_uuid)
         spinbox_thickness = self._find_widget(self._container_layout, 'thickness')
+        if spinbox_thickness is None:
+            return
         spinbox_thickness.blockSignals(True)
         spinbox_thickness.setValue(obj.thickness)
         spinbox_thickness.blockSignals(False)
@@ -954,6 +979,8 @@ class Container(QFrame):
         obj = self._game_manager.get_object(object_uuid)
         spinbox_start_point_x = self._find_widget(self._container_layout, 'start_x')
         spinbox_start_point_y = self._find_widget(self._container_layout, 'start_y')
+        if spinbox_start_point_x is None or spinbox_start_point_y is None:
+            return
         spinbox_start_point_x.blockSignals(True)
         spinbox_start_point_y.blockSignals(True)
         spinbox_start_point_x.setValue(getattr(obj, 'start_x'))
@@ -973,6 +1000,8 @@ class Container(QFrame):
         obj = self._game_manager.get_object(object_uuid)
         spinbox_end_point_x = self._find_widget(self._container_layout, 'end_x')
         spinbox_end_point_y = self._find_widget(self._container_layout, 'end_y')
+        if spinbox_end_point_x is None or spinbox_end_point_y is None:
+            return
         spinbox_end_point_x.blockSignals(True)
         spinbox_end_point_y.blockSignals(True)
         spinbox_end_point_x.setValue(getattr(obj, 'end_x'))
@@ -986,24 +1015,39 @@ class Container(QFrame):
         self._on_object_moved(object_uuid)
 
     def _on_object_image_path_changed(self, object_uuid):
+        if object_uuid != self._object_uuid_in_inspection:
+            return
+
         obj = self._game_manager.get_object(object_uuid)
         image_path_lineedit = self._find_widget(self._container_layout, 'image_path')
+        if image_path_lineedit is None:
+            return
         image_path_lineedit.blockSignals(True)
         image_path_lineedit.setText(Path(obj.image_path).name)
         image_path_lineedit.setToolTip(Path(obj.image_path).as_posix() if obj.image_path else '')
         image_path_lineedit.blockSignals(False)
 
     def _on_object_font_path_changed(self, object_uuid):
+        if object_uuid != self._object_uuid_in_inspection:
+            return
+
         obj = self._game_manager.get_object(object_uuid)
         font_path_lineedit = self._find_widget(self._container_layout, 'font_path')
+        if font_path_lineedit is None:
+            return
         font_path_lineedit.blockSignals(True)
         font_path_lineedit.setText(Path(obj.font_path).name)
         font_path_lineedit.setToolTip(Path(obj.font_path).as_posix() if obj.font_path else '')
         font_path_lineedit.blockSignals(False)
 
     def _on_object_script_path_changed(self, object_uuid):
+        if object_uuid != self._object_uuid_in_inspection:
+            return
+
         obj = self._game_manager.get_object(object_uuid)
         script_path_lineedit = self._find_widget(self._container_layout, 'script_path')
+        if script_path_lineedit is None:
+            return
         script_path_lineedit.blockSignals(True)
         script_path_lineedit.setText(Path(obj.script_path).name)
         script_path_lineedit.setToolTip(Path(obj.script_path).as_posix() if obj.script_path else '')

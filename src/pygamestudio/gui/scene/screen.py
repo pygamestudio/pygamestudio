@@ -107,6 +107,8 @@ class PygameScreen(QWidget):
         self._game_manager.object_slider_parameter_changed.connect(self._update_scene)
         self._game_manager.object_collision_parameter_changed.connect(self._update_scene)
         self._game_manager.object_pivot_changed.connect(self._update_scene)
+        self._game_manager.object_physics_parameter_changed.connect(
+            self._on_object_physics_parameter_changed)
 
     def get_ready_for_project(self):
         self._screen_width = get_project_config()['screen_width']
@@ -194,6 +196,12 @@ class PygameScreen(QWidget):
 
         self._update_scene()
 
+    def _on_object_physics_parameter_changed(self, object_uuid):
+        """The rigid body is an OVERLAY: the purple shape is painted from the
+        live geometry on every paint, so a parameter change (shape type, size,
+        offset, ...) only needs a repaint - the baked images do not change."""
+        self.update()
+
     # ------------------------------------------------------------- render
     @staticmethod
     def _surface_to_qimage(surface):
@@ -237,6 +245,12 @@ class PygameScreen(QWidget):
         if not obj.visible:
             return None
 
+        # The rect is measured on the object's SURFACE, so the surface has to
+        # be up to date BEFORE measuring: a signal that arrives right after a
+        # property edit (size, angle, text, image, pivot, ...) would otherwise
+        # size the bake with the previous render and clip the new one - the
+        # edit only showed up after the next selection change.
+        obj._update_surface()
         rect = obj._drawn_bitmap_in(parent_transform, parent_ops)[1]
         if obj.clip_children:
             return rect
@@ -299,6 +313,9 @@ class PygameScreen(QWidget):
         if not obj.visible:
             return None
 
+        # The world rect must be measured on the CURRENT surface too (see the
+        # note in _subtree_bounds: the signals arrive before any repaint).
+        obj._update_surface()
         world = obj._get_world_rect()
         parent_transform, parent_ops = obj._get_parent_context()
         bounds = self._subtree_bounds(node, parent_transform, parent_ops)

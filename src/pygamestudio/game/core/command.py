@@ -74,8 +74,11 @@ class UpdateAttrValueCommand(QUndoCommand):
         if attr == 'name':
             self._game_manager.object_renamed.emit(self._obj.uuid)
         elif attr == 'visible':
-            if self._new_value == True:
-                self._game_manager.object_showed.emit(self._obj.uuid)  
+            # Dispatch on the value being APPLIED, not on _new_value: an undo
+            # restores the old value and must announce THAT one, otherwise
+            # undoing a hide leaves every 'visible' checkbox unchecked.
+            if value:
+                self._game_manager.object_showed.emit(self._obj.uuid)
             else:
                 self._game_manager.object_hidden.emit(self._obj.uuid)
         elif attr == 'pos':

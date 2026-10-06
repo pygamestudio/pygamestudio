@@ -124,7 +124,15 @@ class ObjectButton(ObjectBase):
         if self.image_path == '' or not image_absolute_path.exists():
             surface = pygame.Surface(self.size, pygame.SRCALPHA)
         else:
-            surface = pygame.image.load(assets.open_stream(image_absolute_path)).convert_alpha()
+            surface = pygame.image.load(assets.open_stream(image_absolute_path))
+            try:
+                surface = surface.convert_alpha()
+            except pygame.error:
+                # convert_alpha() only works while a pygame display surface
+                # exists - the editor bakes the scene with Qt and never sets
+                # one. The loaded surface already carries its own alpha
+                # channel, so it is usable as it is.
+                pass
 
         self._image_cache = pygame.transform.scale(surface, self.size)
         self._image_cache_key = state
