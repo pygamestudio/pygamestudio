@@ -107,11 +107,14 @@ not exposed (with the reason). Tool names are the MCP tool names.
 
 The Build window has two tabs: **Desktop App** (PyInstaller executable for the
 current operating system) and **Web App** (a folder with `index.html` +
-`game.zip` that plays the game in a browser through Pyodide and pygame-ce - a
-project that uses physics also gets pymunk's Pyodide wheel next to the page, so
-nothing is fetched from PyPI at runtime; the project code/assets are protected
-like in the desktop build, the result lands in `<output dir>/build/Web` and the
-installed engine is never modified).
+`game.zip` that plays the game in a browser through Pyodide and pygame-ce - the
+browser itself plays all audio (any format it supports: MP3/OGG/WAV/...), the
+loop is paced by the display's animation frame (smooth scrolling; a hidden tab
+pauses the game) and sound begins with the first click/tap/key because of the
+browser autoplay rule. A project that uses physics also gets pymunk's Pyodide
+wheel next to the page, so nothing is fetched from PyPI at runtime; the
+project code/assets are protected like in the desktop build, the result lands
+in `<output dir>/build/Web` and the installed engine is never modified).
 
 | Capability | Editor entry point | MCP |
 | --- | --- | --- |
