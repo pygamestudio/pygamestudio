@@ -100,14 +100,15 @@ _GAME_PATCHES = (
         "        \"\"\"Web build: the async game loop awaited by the page entry point.\n"
         "\n"
         "        Same event dispatch as run(), but a frame never blocks the tab:\n"
-        "        the loop awaits asyncio.sleep() instead of Clock.tick() and\n"
-        "        returns when the run ends instead of exiting the interpreter.\n"
+        "        the loop waits for the display's next animation frame instead\n"
+        "        of Clock.tick() and returns when the run ends instead of\n"
+        "        exiting the interpreter.\n"
         "        \"\"\"\n"
     ),
     (
         "            delta_time = self._clock.tick(self._fps) / 1000\n",
         "            delta_time = self._web_frame_delta()\n"
-        "            await asyncio.sleep(max(0.0, (1.0 / self._fps) - delta_time))\n"
+        "            await self._web_wait_frame()\n"
     ),
     (
         "        pygame.quit()\n"
@@ -146,7 +147,7 @@ def _web_frame_delta(self):
 
     A browser tab must stay responsive, so the web loop cannot use
     Clock.tick() (it blocks the main thread): it measures the frame itself and
-    run_async() awaits the rest of the frame budget.
+    run_async() waits for the next display frame (see _web_wait_frame).
     """
     now = time.monotonic()
     last = getattr(self, '_web_last_frame_time', None)
@@ -157,6 +158,79 @@ def _web_frame_delta(self):
 
 
 Game._web_frame_delta = _web_frame_delta
+
+
+#: animation-frame timestamps sampled to learn the display's refresh rate
+_WEB_TICK_SAMPLES = 16
+
+
+async def _web_next_frame():
+    """Await the browser's next animation frame; returns its timestamp.
+
+    Animation frames fire on the display's vertical sync, so waiting for one
+    is what keeps the update cadence locked to the monitor.
+    """
+    import js
+    from pyodide.ffi import create_once_callable
+
+    loop = asyncio.get_running_loop()
+    future = loop.create_future()
+
+    def _ready(timestamp=None):
+        if not future.done():
+            future.set_result(timestamp)
+
+    js.requestAnimationFrame(create_once_callable(_ready))
+    return await future
+
+
+def _web_track_display(self, timestamp):
+    """Learn the display frame period (seconds) from frame timestamps."""
+    if timestamp is None or getattr(self, '_web_display_period', None) is not None:
+        return
+    ticks = getattr(self, '_web_ticks', None)
+    if ticks is None:
+        ticks = self._web_ticks = []
+    if ticks and timestamp <= ticks[-1]:
+        return
+    ticks.append(timestamp)
+    if len(ticks) > _WEB_TICK_SAMPLES:
+        del ticks[0]
+    if len(ticks) >= 5:
+        deltas = sorted(second - first for first, second in zip(ticks, ticks[1:]))
+        middle = deltas[len(deltas) // 2] / 1000.0
+        if 0.002 <= middle <= 0.1:
+            self._web_display_period = middle
+
+
+Game._web_track_display = _web_track_display
+
+
+async def _web_wait_frame(self):
+    """Wait for the display: every update lands on the vsync grid.
+
+    Waiting a whole number of animation frames keeps the update cadence
+    locked to the monitor instead of drifting against it - the old
+    time-budget sleep made frames land at random phases, and the picture
+    juddered even at 60+ fps. The game's ``_fps`` target is honored by
+    waiting more frames per update on a faster display (60 fps on a 120 Hz
+    screen = two animation frames per update). A hidden tab stops firing
+    animation frames, which pauses the game - standard for web games.
+    """
+    fps = getattr(self, '_fps', None) or 60.0
+    target = 1.0 / float(fps)
+    period = getattr(self, '_web_display_period', None)
+    ticks = 1 if period is None else max(1, int(round(target / period)))
+    for _ in range(ticks):
+        try:
+            timestamp = await _web_next_frame()
+        except Exception:
+            await asyncio.sleep(target)         # no animation frames here
+            return
+        self._web_track_display(timestamp)
+
+
+Game._web_wait_frame = _web_wait_frame
 
 
 def _web_run(self):

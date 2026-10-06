@@ -876,6 +876,7 @@
         "script_destroy_error": "脚本{}的on_destroy错误：{}",
         "script_event_error": "脚本{}的{}错误：{}",
         "fail_to_init_mixer": "音频混音器初始化失败：{}",
+        "fail_to_use_web_audio": "浏览器音频不可用，改用 SDL 混音器：{}",
         "no_sound_path": "音频路径{}不存在。",
         "fail_to_load_sound": "音频{}加载失败：{}",
         "fail_to_play_sound": "音频{}播放失败：{}",

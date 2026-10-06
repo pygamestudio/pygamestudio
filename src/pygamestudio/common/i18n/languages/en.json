@@ -880,6 +880,7 @@
         "script_destroy_error": "Script on_destroy error for {}: {}",
         "script_event_error": "Script {} error for {}: {}",
         "fail_to_init_mixer": "Failed to initialize audio mixer: {}",
+        "fail_to_use_web_audio": "Browser audio is not available, using the SDL mixer: {}",
         "no_sound_path": "The sound path {} does not exist.",
         "fail_to_load_sound": "Failed to load sound {}: {}",
         "fail_to_play_sound": "Failed to play sound {}: {}",
