@@ -347,6 +347,29 @@ class AgentSession(QObject):
         self._step = 0
         self._awaiting_continue = False
 
+    def messages(self) -> list:
+        """The whole conversation in the model format (a copy, safe to store)."""
+        return json.loads(json.dumps(self._messages, ensure_ascii=False))
+
+    def restore(self, messages):
+        """Adopt a stored conversation and carry on where it left off.
+
+        Only the chat itself is restored: the stored system prompt is dropped
+        and a FRESH one is built, because it carries the current editor state
+        and the tool reference - both may have changed since the conversation
+        was saved. The session comes back idle (nothing running, no pending
+        confirmation).
+        """
+        self.cancel()
+        restored = [dict(message) for message in (messages or [])
+                    if isinstance(message, dict) and message.get('role') != 'system']
+        if restored:
+            restored.insert(0, {'role': 'system', 'content': system_prompt()})
+        self._messages = restored
+        self._step = 0
+        self._awaiting_continue = False
+        self._cancel = False
+
     def send(self, text):
         """Start a turn with a new user message."""
         text = (text or '').strip()

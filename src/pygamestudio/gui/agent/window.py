@@ -19,12 +19,16 @@ Layout::
     +-------------------------------------------------+
 """
 
+import time
+
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import *
 
 from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.common.utils.config import get_editor_config
+from pygamestudio.gui.agent import store
+from pygamestudio.gui.agent.history import AgentHistoryDialog
 from pygamestudio.gui.agent.session import AgentSession
 from pygamestudio.gui.agent.settings import AgentSettingsDialog
 from pygamestudio.gui.agent.view import (AgentComposer, AgentComposerFrame, AgentConfirmBar,
@@ -41,6 +45,7 @@ class AgentWindow(DetachablePanel, QWidget):
         self._session = AgentSession(self)
 
         self._settings_button = QPushButton()
+        self._history_button = QPushButton()
         self._clear_button = QPushButton()
         self._transcript = AgentTranscript()
         self._confirm_bar = AgentConfirmBar()
@@ -49,6 +54,13 @@ class AgentWindow(DetachablePanel, QWidget):
         self._composer_frame = AgentComposerFrame(self._composer)
         self._send_button = QPushButton()
         self._status_label = QLabel()
+
+        # Conversation history: the id of the running conversation and the
+        # project it belongs to (remembered so a project switch can still save
+        # the conversation that was running before it).
+        self._current_session_id = ''
+        self._session_created_at = 0.0
+        self._project_path = ''
 
         self._setup()
         self._set_signal()
@@ -65,6 +77,7 @@ class AgentWindow(DetachablePanel, QWidget):
         # the other panels - the QSS (QPushButton#agentIconBtn) does the rest.
         for button, icon, key, default in (
                 (self._settings_button, ':/images/settings.png', 'agent.settings', 'Settings'),
+                (self._history_button, ':/images/history.png', 'agent.history', 'History'),
                 (self._clear_button, ':/images/clear.png', 'agent.clear', 'Clear')):
             button.setObjectName('agentIconBtn')
             button.setIcon(QIcon(icon))
@@ -85,6 +98,7 @@ class AgentWindow(DetachablePanel, QWidget):
         top_row.setContentsMargins(2, 2, 2, 0)
         top_row.setSpacing(4)
         top_row.addWidget(self._settings_button)
+        top_row.addWidget(self._history_button)
         top_row.addWidget(self._clear_button)
         top_row.addStretch(1)
         top_row.addWidget(self.detach_button())
@@ -117,6 +131,7 @@ class AgentWindow(DetachablePanel, QWidget):
 
     def _set_signal(self):
         self._settings_button.clicked.connect(self.show_settings)
+        self._history_button.clicked.connect(self.show_history)
         self._clear_button.clicked.connect(self._on_clear_clicked)
         self._send_button.clicked.connect(self._on_send_clicked)
         self._composer.submitted.connect(self._on_submitted)
@@ -152,11 +167,50 @@ class AgentWindow(DetachablePanel, QWidget):
         self._session.send(text)
 
     def clear_conversation(self):
-        self._session.reset()
-        self._transcript.clear()
-        self._confirm_bar.clear()
-        self._continue_bar.clear()
-        self._on_status_changed('', False)
+        """Throw the running conversation away (Clear button) and start empty.
+
+        The stored copy is deleted too - use the history dialog's "New chat"
+        to start over while KEEPING the old conversation.
+        """
+        project_path = self._session_project_path()
+        if project_path and self._current_session_id:
+            store.delete_session(project_path, self._current_session_id)
+        self._reset_panel()
+        self._start_new_session()
+
+    def show_history(self):
+        """The history button: reopen, delete or start a conversation."""
+        project_path = self._session_project_path()
+        if not project_path:
+            return
+        self._save_current_session()
+        dialog = AgentHistoryDialog(store.list_sessions(project_path),
+                                    self._current_session_id, self)
+        dialog.deleted.connect(self._on_session_deleted)
+        accepted = dialog.exec() == QDialog.DialogCode.Accepted
+        new_chat = dialog.wants_new_chat()
+        chosen_id = dialog.chosen_session_id()
+        dialog.deleteLater()
+        if not accepted:
+            return
+        if new_chat:
+            self._reset_panel()
+            self._start_new_session()
+            return
+        record = store.get_session(project_path, chosen_id)
+        if record is not None:
+            self._reset_panel()
+            self._load_record(record)
+
+    def _on_session_deleted(self, session_id):
+        """A conversation was deleted in the history dialog."""
+        project_path = self._session_project_path()
+        if not project_path:
+            return
+        store.delete_session(project_path, session_id)
+        if session_id == self._current_session_id:
+            self._reset_panel()
+            self._start_new_session()
 
     def _on_clear_clicked(self):
         """The Clear button asks first - the conversation is thrown away."""
@@ -173,10 +227,12 @@ class AgentWindow(DetachablePanel, QWidget):
     def show_settings(self):
         dialog = AgentSettingsDialog(self._session.settings(), self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
+            # The old conversation is written to the history first, then a new
+            # model starts a fresh one.
+            self._save_current_session()
             self._session.set_settings(dialog.result_settings())
-            self._session.reset()
-            self._continue_bar.clear()
-            self._update_input_state()
+            self._reset_panel()
+            self._start_new_session()
             self._transcript.add_note(T.tr('agent.settings_saved',
                                            'Settings saved. The conversation was reset.'))
 
@@ -187,6 +243,7 @@ class AgentWindow(DetachablePanel, QWidget):
 
     def retranslate(self):
         self._settings_button.setToolTip(T.tr('agent.settings', 'Settings'))
+        self._history_button.setToolTip(T.tr('agent.history', 'History'))
         self._clear_button.setToolTip(T.tr('agent.clear', 'Clear'))
         self._confirm_bar.retranslate()
         self._continue_bar.retranslate()
@@ -196,13 +253,90 @@ class AgentWindow(DetachablePanel, QWidget):
         self.update_window_titles()
 
     def get_ready_for_project(self):
-        """A new project starts with a fresh conversation."""
-        self.clear_conversation()
+        """A project opens: the conversation used last comes back.
+
+        The conversation of the project being left is written first (the
+        manager already points at the NEW project here, so the remembered path
+        is what keeps the old one safe).
+        """
+        self._save_current_session()
+        self._project_path = self._manager_project_path()
+        self._reset_panel()
+        record = store.latest_session(self._project_path) if self._project_path else None
+        if record is not None:
+            self._load_record(record)
+        else:
+            self._start_new_session()
 
     def clean_up(self):
+        """The editor closes: keep the conversation for the next start."""
         self.redock()
         self._session.cancel()
-        self.clear_conversation()
+        self._save_current_session()
+        self._reset_panel()
+
+    # ---------------------------------------------------------- persistence
+    def _manager_project_path(self) -> str:
+        """The project path the panel belongs to (from the game manager)."""
+        try:
+            return str(self._game_manager.get_project_path() or '') if self._game_manager else ''
+        except Exception:  # noqa: BLE001 - never break the panel over this
+            return ''
+
+    def _session_project_path(self) -> str:
+        """Where the running conversation is stored.
+
+        The path remembered when the project was opened; the manager is the
+        fallback for panels built without the project hook (tests, tools).
+        """
+        return self._project_path or self._manager_project_path()
+
+    def current_session_id(self) -> str:
+        """Id of the running conversation ('' before the first one)."""
+        return self._current_session_id
+
+    def _start_new_session(self):
+        """Give the (empty) panel a fresh conversation id."""
+        self._current_session_id = store.new_session_id()
+        self._session_created_at = time.time()
+
+    def _reset_panel(self):
+        """Empty the chat widgets and the session (nothing is stored here)."""
+        self._session.reset()
+        self._transcript.clear()
+        self._confirm_bar.clear()
+        self._continue_bar.clear()
+        self._on_status_changed('', False)
+
+    def _save_current_session(self):
+        """Write the running conversation into the project's history."""
+        project_path = self._session_project_path()
+        if not project_path or not self._current_session_id:
+            return
+        messages = self._session.messages()
+        if not any(message.get('role') == 'user' for message in messages):
+            return                      # nothing was asked yet: nothing to keep
+        settings = self._session.settings()
+        store.save_session(project_path, {
+            'id': self._current_session_id,
+            'created_at': self._session_created_at or time.time(),
+            'updated_at': time.time(),
+            'title': store.title_from_messages(messages),
+            'model': {'provider': settings.get('provider', ''),
+                      'model': settings.get('model', '')},
+            'messages': messages,
+            'transcript': self._transcript.entries(),
+        })
+
+    def _load_record(self, record):
+        """Show a stored conversation again - chatting continues where it stopped."""
+        self._current_session_id = str(record.get('id') or store.new_session_id())
+        self._session_created_at = record.get('created_at') or time.time()
+        self._session.restore(record.get('messages') or [])
+        self._transcript.restore(record.get('transcript') or [])
+        self._confirm_bar.clear()
+        self._continue_bar.clear()
+        self._on_status_changed('', False)
 
     # ------------------------------------------------------------------ slots
     def _on_submitted(self, text):
@@ -278,6 +412,9 @@ class AgentWindow(DetachablePanel, QWidget):
         if error_text:
             self._transcript.add_error(error_text)
         self._confirm_bar.clear()
+        # The turn is over: the conversation is safe in the project history.
+        self._save_current_session()
+
     def _update_send_button(self, text):
         self._send_button.setText(text)
 

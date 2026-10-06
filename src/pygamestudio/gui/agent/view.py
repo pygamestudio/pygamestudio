@@ -7,6 +7,7 @@ amounts of text. Tool calls are shown as compact cards so the user can see what
 the agent did, and every result can be traced back to the tool that produced it.
 """
 
+import copy
 import html
 import json
 
@@ -70,6 +71,18 @@ class AgentTranscript(QTextBrowser):
         """Empty the transcript, log included."""
         self._entries.clear()
         super().clear()
+
+    def entries(self) -> list:
+        """The transcript log (a copy) - the panel is rebuilt from this."""
+        return copy.deepcopy(self._entries)
+
+    def restore(self, entries):
+        """Show a stored conversation again and jump to its end."""
+        self._entries = [tuple(entry) for entry in (entries or [])
+                         if isinstance(entry, (list, tuple)) and entry]
+        self._rebuild()
+        self.moveCursor(QTextCursor.MoveOperation.End)
+        self._scroll_to_end()
 
     def _rebuild(self):
         """Render the logged entries again with the current colors."""

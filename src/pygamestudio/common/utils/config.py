@@ -13,8 +13,13 @@ from PySide6.QtWidgets import *
 EDITOR_CONFIG_VERSION = 2
 
 
+def get_editor_data_dir() -> Path:
+    """Machine-local data folder of the editor (``editor.pygs`` and friends)."""
+    return Path(user_config_dir()) / 'PygameStudio'
+
+
 def _editor_config_file_path() -> Path:
-    return Path(user_config_dir()) / 'PygameStudio' / 'editor.pygs'
+    return get_editor_data_dir() / 'editor.pygs'
 
 
 def _write_editor_config(editor_config: dict) -> None:
