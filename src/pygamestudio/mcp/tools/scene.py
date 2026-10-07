@@ -107,8 +107,10 @@ def load_scene(args):
 
 @tool(
     'save_scene',
-    'Save the open scene. Without a path it is written to its current file '
-    '(pass a path to save a new scene to that file, e.g. "./scene/level2.scene").',
+    'Save the open scene. Without a path it is written to its current file; '
+    'a scene that has no file yet (a brand-new project, or right after '
+    'new_scene) needs a path - for example {"path": "./scene/main.scene"} - '
+    'and is then written there and becomes the current scene.',
     {
         'type': 'object',
         'properties': {

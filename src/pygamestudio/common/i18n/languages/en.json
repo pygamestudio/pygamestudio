@@ -369,6 +369,7 @@
     "scene": {
         "scene": "Scene",
         "scene_saved": "Scene saved",
+        "missing_canvas_root": "The scene file has no canvas root: a new canvas was created and its objects were placed under it",
         "run_project": "Run Project {}",
         "failed_to_save_before_run": "Failed to save scene before running: {}",
         "failed_to_run_project": "Failed to Run Project {}: {}",

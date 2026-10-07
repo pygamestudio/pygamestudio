@@ -369,6 +369,7 @@
     "scene": {
         "scene": "场景编辑器",
         "scene_saved": "场景已保存",
+        "missing_canvas_root": "场景文件缺少画布根对象：已创建新的画布，并将其中的对象放到画布下",
         "run_project": "运行项目{}",
         "failed_to_save_before_run": "运行前保存场景失败：{}",
         "failed_to_run_project": "项目{}运行失败：{}",

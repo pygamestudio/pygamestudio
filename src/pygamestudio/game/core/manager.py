@@ -1354,7 +1354,20 @@ class GameManager(QObject):
         self.scene_saved_signal.emit()
         Logger.info(T.tr('scene.scene_saved', 'Scene saved'))
 
-    def save_scene(self):
+    def save_scene(self, path=''):
+        """Save the scene; without a path it goes to its current file.
+
+        Passing a path writes the scene to that file instead and makes it the
+        current scene - no dialog. Non-interactive callers (the MCP tools) use
+        it to save a scene that has no file yet; the interactive Save As
+        dialog stays behind save_as().
+        """
+        if path:
+            self._current_scene_file_path = str(path)
+            Path(self._current_scene_file_path).parent.mkdir(parents=True, exist_ok=True)
+            self._save()
+            return True
+
         return self._save_scene()
     
     def _save_scene(self):
@@ -1428,6 +1441,16 @@ class GameManager(QObject):
             value = list(object_tree_struct.values())[0]
 
             object_data = value['object']
+            if not parent_uuid and object_data.get('type') != OBJECT_CANVAS:
+                # A .scene file written by hand (or by a tool that did not
+                # know the format) can have a root that is not the canvas.
+                # The editor needs the canvas, so a default one is created
+                # and the foreign root is placed under it - the repaired
+                # tree is written back on the next save.
+                Logger.warning(T.tr('scene.missing_canvas_root', 'The scene file has no canvas root: a new canvas was created and its objects were placed under it'))
+                self._add('', OBJECT_CANVAS)
+                parent_uuid = self._current_canvas_object_uuid
+
             self._add(parent_uuid, value['object']['type'], object_data)
             children = value['children']
             for child_object_tree_struct in children:

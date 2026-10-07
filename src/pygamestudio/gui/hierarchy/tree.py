@@ -181,6 +181,11 @@ class HierarchyTreeView(QTreeView):
         # No selection at start.
         self.selectionModel().clearSelection()
 
+        if self._canvas_item is None:
+            # A project without a canvas (an empty or malformed scene the
+            # manager could not repair): there is nothing to restore.
+            return
+
         # Restore the expanded / collapsed status from last time.
         self.blockSignals(True)
         self.expandAll()
@@ -228,6 +233,12 @@ class HierarchyTreeView(QTreeView):
         parent_item = self._get_matched_item(parent_uuid)
         if not parent_item:
             parent_item = self._canvas_item
+
+        if parent_item is None:
+            # No canvas in the tree (a malformed scene that even the repair
+            # could not anchor): show nothing instead of crashing the load.
+            Logger.warning('Hierarchy: no canvas to place "{}" under'.format(obj.name))
+            return
 
         item = QStandardItem()
         item.setText(obj.name)
@@ -368,6 +379,9 @@ class HierarchyTreeView(QTreeView):
         Logger.info(name)
 
     def _restore_collapsed_items(self):
+        if self._canvas_item is None:
+            return
+
         def _restore(parent_item):
             item_uuid = parent_item.data(Qt.ItemDataRole.UserRole+1)
             obj = self._game_manager.get_object(item_uuid)
@@ -461,6 +475,9 @@ class HierarchyTreeView(QTreeView):
     def _get_matched_items(self, item_uuid_list):
         def _get(item_uuid_list, parent_item):
             match_items = []
+            if parent_item is None:
+                return match_items
+
             if parent_item.data(Qt.ItemDataRole.UserRole+1) in item_uuid_list:
                 match_items.append(parent_item)
             
@@ -474,6 +491,9 @@ class HierarchyTreeView(QTreeView):
     
     def _get_matched_item(self, item_uuid):
         def _get(item_uuid, parent_item):
+            if parent_item is None:
+                return None
+
             if parent_item.data(Qt.ItemDataRole.UserRole+1) == item_uuid:
                 return parent_item
             

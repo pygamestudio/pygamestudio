@@ -37,7 +37,7 @@ not exposed (with the reason). Tool names are the MCP tool names.
 | --- | --- | --- |
 | New scene (empty canvas) | File > New Scene | `new_scene` |
 | Open / switch scene | double click a `.scene`, or Run | `load_scene` |
-| Save scene / Save As | File > Save Scene / Save As | `save_scene` (with optional path) |
+| Save scene / Save As | File > Save Scene / Save As | `save_scene` (with optional path; required when the scene has no file yet) |
 | List scenes, mark the loaded/start scene | Asset panel | `list_scenes` |
 | Unsaved-changes state | window title `*unsaved` | `editor_status`, `get_current_scene` |
 | Scene content overview | Scene panel / Hierarchy | `get_scene_tree` |
