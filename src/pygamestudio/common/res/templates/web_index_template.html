@@ -46,10 +46,12 @@ __PYGS_FAVICON_LINK__
 </div>
 
 <script type="module">
-import { loadPyodide } from "__PYGS_PYODIDE_URL__pyodide.mjs";
+import { loadPyodide } from "__PYGS_PYODIDE_URL____PYGS_PYODIDE_ENTRY__";
 
-// The Pyodide distribution to run (a folder URL that contains pyodide.mjs).
-const PYODIDE_URL = "__PYGS_PYODIDE_URL__";
+// The Pyodide distribution to run (a folder URL with the Pyodide loader).
+// The bundled runtime uses a relative path, so it resolves against this
+// page's own folder; an absolute URL (CDN) passes through unchanged.
+const PYODIDE_URL = new URL("__PYGS_PYODIDE_URL__", window.location.href).href;
 
 const loaderElement = document.getElementById("loader");
 const loaderBar = document.getElementById("loader-bar");

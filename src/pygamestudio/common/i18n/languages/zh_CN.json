@@ -803,6 +803,8 @@
         "web_template_missing": "缺少网页版打包模板：{}",
         "web_physics_bundled": "项目中使用了物理：pymunk 已随网页发布，浏览器可正常进行物理模拟",
         "web_physics_pypi_fallback": "项目中使用了物理，但引擎资源中缺少 pymunk 安装包（{}）：页面将改为从 PyPI 下载",
+        "web_runtime_bundled": "浏览器运行时（Pyodide 与游戏依赖）已随网页发布：进入游戏无需再从网络下载",
+        "web_runtime_cdn_fallback": "引擎资源中缺少随包携带的浏览器运行时（{}）：页面将改为从 CDN 加载 Pyodide",
         "web_build_summary": "已打包 {} 个项目文件、{} 个引擎文件",
         "web_build_output": "网页版输出：{}",
         "web_serve_hint": "请通过 HTTP 访问输出目录来运行游戏，例如：python -m http.server 8000 --directory \"{}\"",

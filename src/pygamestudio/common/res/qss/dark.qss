@@ -601,6 +601,10 @@ QWidget#inspectorContainer QSpinBox:disabled, QWidget#inspectorContainer QDouble
     color: gray;
 }
 
+QWidget#inspectorContainer QComboBox:disabled {
+    color: gray;
+}
+
 /* The "being edited in the animation editor" hint: only its text colour
    stands out - no background of its own, the panel shows through. */
 QWidget#animationEditingHint, QLabel#animationEditingHintLabel {

@@ -44,10 +44,18 @@ from pygamestudio.common.utils import assets
 from pygamestudio.common.utils.config import get_project_config, update_project_config
 from pygamestudio.common.utils.path import RES_PATH
 
-#: Pyodide runtime loaded by the generated page. It is not shown in the
-#: window on purpose: change it here (or pass ``pyodide_url`` in the build
-#: config) to self-host a copy instead of using the CDN.
+#: Pyodide runtime the generated page falls back to when the engine's bundled
+#: copy is missing (it normally ships in ``common/res/pyodide`` and is loaded
+#: from the page's own folder). Pass ``pyodide_url`` in the build config to
+#: point the page at another copy (the CDN, or your own server).
 DEFAULT_PYODIDE_URL = 'https://cdn.jsdelivr.net/pyodide/v314.0.7/full/'
+#: Folder in ``common/res`` with the self-hosted Pyodide runtime: the core
+#: files plus the wheels the page loads (pygame-ce; cffi and pycparser when
+#: the project uses physics). Must belong to the DEFAULT_PYODIDE_URL version -
+#: update both together. The build copies it next to the page.
+PYODIDE_DIR_NAME = 'pyodide'
+#: ``pyodide_url`` written into the page when the bundled runtime is used.
+LOCAL_PYODIDE_URL = './{}/'.format(PYODIDE_DIR_NAME)
 #: Where a web build lands inside the output dir.
 BUNDLE_SUBDIR = ('build', 'Web')
 #: Staging folder of the protection step, inside the bundle dir (removed again
@@ -67,8 +75,9 @@ _ENGINE_DIRS = ('api', 'game', 'common')
 #: Editor files the runtime imports (the logger is plain Python, no Qt in it).
 _ENGINE_EXTRA_FILES = ('gui/__init__.py', 'gui/console/__init__.py', 'gui/console/logger.py')
 #: ``common/res`` data only the editor uses (fonts are per project). The
-#: physics wheels ship NEXT TO the bundle, never inside the archive.
-_ENGINE_RES_SKIP = ('fonts', 'qss', 'templates', 'audios', 'wheels')
+#: physics wheels and the self-hosted Pyodide runtime ship NEXT TO the
+#: bundle, never inside the archive.
+_ENGINE_RES_SKIP = ('fonts', 'qss', 'templates', 'audios', 'wheels', 'pyodide')
 #: Folder in ``common/res`` holding the Pyodide wheels of the engine.
 WHEELS_DIR_NAME = 'wheels'
 #: Boot template placeholder holding the pymunk install source ('' = none).
@@ -665,8 +674,24 @@ class WebAppBuilder:
         self._app_icon = (build_config.get('app_icon') or '').strip()
         output_dir = (build_config.get('output_dir') or '').strip()
         self._output_dir = Path(output_dir) if output_dir else None
-        pyodide_url = (build_config.get('pyodide_url') or '').strip() or DEFAULT_PYODIDE_URL
-        self._pyodide_url = pyodide_url if pyodide_url.endswith('/') else pyodide_url + '/'
+        # The runtime the page loads: an explicit pyodide_url wins (nothing is
+        # copied); otherwise the copy shipped in common/res/pyodide is bundled
+        # next to the page so the game starts without downloading anything;
+        # without that folder the page falls back to the CDN.
+        pyodide_url = (build_config.get('pyodide_url') or '').strip()
+        self._bundle_pyodide = False
+        #: Loader file the page imports; the bundled copy ships as .js (see
+        #: _rename_runtime_modules) so every static server serves it with a
+        #: JavaScript MIME type.
+        self._pyodide_entry = 'pyodide.mjs'
+        if pyodide_url:
+            self._pyodide_url = pyodide_url if pyodide_url.endswith('/') else pyodide_url + '/'
+        elif (self._bundled_pyodide_dir() / 'pyodide.mjs').is_file():
+            self._pyodide_url = LOCAL_PYODIDE_URL
+            self._bundle_pyodide = True
+        else:
+            self._pyodide_url = DEFAULT_PYODIDE_URL
+            Logger.warning(T.tr('build.web_runtime_cdn_fallback', 'The engine resources are missing the bundled browser runtime ({}): the page will load Pyodide from the CDN instead').format(self._bundled_pyodide_dir().as_posix()))
         self._progress_callback = progress
         self._stop_check = stop_check
 
@@ -702,6 +727,7 @@ class WebAppBuilder:
         self._check_stopped()
 
         favicon_links = self._write_favicon(bundle_dir)
+        self._prepare_runtime(bundle_dir)
         self._progress(90)
 
         canvas_size = self._read_canvas_size()
@@ -880,7 +906,8 @@ class WebAppBuilder:
                 .replace('__PYGS_FAVICON_LINK__', favicon_links)
                 .replace('__PYGS_CANVAS_WIDTH__', str(canvas_size[0]))
                 .replace('__PYGS_CANVAS_HEIGHT__', str(canvas_size[1]))
-                .replace('__PYGS_PYODIDE_URL__', self._pyodide_url))
+                .replace('__PYGS_PYODIDE_URL__', self._pyodide_url)
+                .replace('__PYGS_PYODIDE_ENTRY__', self._pyodide_entry))
 
     def _read_template(self, name):
         path = RES_PATH / 'templates' / name
@@ -918,6 +945,60 @@ class WebAppBuilder:
         shutil.copyfile(wheel_path, bundle_dir / wheel_path.name)
         Logger.info(T.tr('build.web_physics_bundled', 'The project uses physics: pymunk ships next to the page and the browser runs the simulation'))
         return wheel_path.name
+
+    def _bundled_pyodide_dir(self):
+        """Folder with the self-hosted Pyodide runtime shipped with the engine."""
+        return RES_PATH / PYODIDE_DIR_NAME
+
+    def _prepare_runtime(self, bundle_dir):
+        """Copy the shipped Pyodide runtime next to the page.
+
+        The page then starts Python and loads the game packages from its own
+        folder, so the game startup downloads nothing. No-op when the build
+        points at an explicit ``pyodide_url`` or the engine copy is missing
+        (the page falls back to the CDN in that case).
+        """
+        if not self._bundle_pyodide:
+            return
+
+        target_dir = bundle_dir / PYODIDE_DIR_NAME
+        target_dir.mkdir(parents=True, exist_ok=True)
+        for path in sorted(self._bundled_pyodide_dir().iterdir()):
+            if path.is_file():
+                shutil.copyfile(path, target_dir / path.name)
+
+        self._rename_runtime_modules(target_dir)
+
+        Logger.info(T.tr('build.web_runtime_bundled', 'The browser runtime (Pyodide and pygame-ce) ships next to the page: the game loads everything locally'))
+
+    def _rename_runtime_modules(self, target_dir):
+        """Ship the two Pyodide module files as .js with their reference patched.
+
+        Simple static servers (Python's own ``http.server`` included, on older
+        Python versions) serve ``.mjs`` as ``text/plain`` and the browser then
+        refuses the module script. The files are plain ES modules, so the
+        bundle carries them as ``.js`` - a name every server maps to a
+        JavaScript MIME type - and the loader's internal reference to
+        ``pyodide.asm.mjs`` is rewritten to match. Keeps the original names
+        when a future distribution changes that reference.
+        """
+        entry = target_dir / 'pyodide.mjs'
+        glue = target_dir / 'pyodide.asm.mjs'
+        if not (entry.is_file() and glue.is_file()):
+            return
+
+        entry_source = entry.read_text(encoding=_SOURCE_ENCODING)
+        if entry_source.count('pyodide.asm.mjs') != 1:
+            return
+
+        (target_dir / 'pyodide.js').write_text(
+            entry_source.replace('pyodide.asm.mjs', 'pyodide.asm.js'), encoding=_SOURCE_ENCODING)
+        glue_source = glue.read_text(encoding=_SOURCE_ENCODING)
+        (target_dir / 'pyodide.asm.js').write_text(
+            glue_source.replace('pyodide.asm.mjs', 'pyodide.asm.js'), encoding=_SOURCE_ENCODING)
+        entry.unlink()
+        glue.unlink()
+        self._pyodide_entry = 'pyodide.js'
 
     def _wheels_dir(self):
         """Folder with the Pyodide wheels shipped with the engine."""

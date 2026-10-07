@@ -805,6 +805,8 @@
         "web_template_missing": "The web build template is missing: {}",
         "web_physics_bundled": "The project uses physics: pymunk ships next to the page and the browser runs the simulation",
         "web_physics_pypi_fallback": "The project uses physics but the shipped pymunk wheel is missing from the engine resources ({}): the page will download pymunk from PyPI instead",
+        "web_runtime_bundled": "The browser runtime (Pyodide and the game packages) ships next to the page: the game loads without downloading anything",
+        "web_runtime_cdn_fallback": "The engine resources are missing the bundled browser runtime ({}): the page will load Pyodide from the CDN instead",
         "web_build_summary": "Bundled {} project file(s) and {} engine file(s)",
         "web_build_output": "Web build output: {}",
         "web_serve_hint": "Serve the folder over HTTP to play it, for example: python -m http.server 8000 --directory \"{}\"",
