@@ -1,5 +1,6 @@
 from .config.project import *
 from .core.game import *
+from .core.debug import *
 from .core.scene import *
 from .core.physics import *
 from .core.audio import *

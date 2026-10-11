@@ -5,6 +5,7 @@ import inspect
 from pathlib import Path
 from pygamestudio.api.core.scene import scene_loader
 from pygamestudio.api.config.project import get_project_config
+from pygamestudio.api.core.debug import _draw_debug_info
 
 
 class Game:
@@ -239,6 +240,9 @@ class Game:
             self._frame_count += 1
             # --- 2. Fixed/step logic: user update + draw, then present. ---
             self.on_update(delta_time)
+            # Debug info (studio.show_debug_info()): drawn on top of the
+            # frame on_update produced, right before it is presented.
+            _draw_debug_info(self._screen, self._delta_time)
             pygame.display.flip()
 
         # Let every attached behavior script run its on_destroy() cleanup hook

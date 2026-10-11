@@ -13,6 +13,10 @@ class Game(studio.Game):
         Game startup lifecycle callback.
         Executes exactly once after the game initialization and before the main loop starts.
         """
+
+        # 运行游戏时窗口左下角显示帧率等调试信息。
+        # Show the FPS debug info in the bottom-left corner.
+        # studio.show_debug_info()
         pass
 
     def on_update(self, dt:float):

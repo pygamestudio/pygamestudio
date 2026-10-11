@@ -175,6 +175,8 @@ ENGINE_RUNTIME_API = (
     'get_delta_time', 'get_elapsed_time', 'get_frame_count',
     'get_pressed_keys', 'get_pressed_buttons', 'is_key_pressed',
     'get_mouse_position', 'is_mouse_button_pressed',
+    # debug info overlay
+    'show_debug_info', 'hide_debug_info', 'is_debug_info_enabled',
     # audio
     'load_sound', 'play_sound', 'stop_sound', 'stop_all_sounds', 'is_sound_playing',
     'set_sound_volume', 'get_sound_volume',
