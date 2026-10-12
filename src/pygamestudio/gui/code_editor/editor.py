@@ -749,8 +749,21 @@ class CodeEditor(QPlainTextEdit):
         cursor = QTextCursor(self.document())
         cursor.setPosition(start)
         cursor.setPosition(start + length, QTextCursor.MoveMode.KeepAnchor)
+        # Is the match already on screen? Measure BEFORE setTextCursor: it
+        # scrolls the caret into view on its own (minimally - right to the
+        # viewport edge), so checking afterwards would always read "visible"
+        # and the match would stay half-hidden at the very edge.
+        was_visible = self.viewport().rect().contains(self.cursorRect(cursor))
         self.setTextCursor(cursor)
+        if was_visible:
+            # Stepping through matches inside one screen must not make the
+            # view jump around (VS Code behaviour).
+            return
+        # Off-screen match: centre it vertically so it never lands at the
+        # very top or bottom edge of the viewport (ensureCursorVisible()
+        # covers the horizontal axis as well - the lines do not wrap).
         self.ensureCursorVisible()
+        self.centerCursor()
 
     def find_next(self):
         """Enter / F3 / the down arrow: next match - wraps around."""
