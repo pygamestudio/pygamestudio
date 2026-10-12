@@ -68,7 +68,8 @@ READ_ONLY_TOOLS = {
     'editor_status', 'get_scene_tree', 'get_object', 'find_objects', 'object_types',
     'get_current_scene', 'list_scenes', 'list_files', 'read_file', 'get_project_info',
     'get_project_config', 'get_editor_settings', 'get_build_settings', 'get_console_logs',
-    'get_runtime_status', 'list_editor_panels', 'capture_scene_view', 'analyze_image',
+    'get_runtime_status', 'list_editor_panels', 'capture_scene_view',
+    'capture_game_window', 'analyze_image',
     'undo', 'redo',
     'open_panel', 'block_editor_list_types', 'block_editor_get_blocks',
     'image_editor_state', 'image_editor_capture', 'image_editor_set_grid',
@@ -172,10 +173,12 @@ def system_prompt() -> str:
         '- After writing a script, run_project and then get_console_logs to check it '
         'works; temporary print() lines (player x/y, event counts, collisions) are a '
         'good probe - remove them afterwards.\n'
-        '- You cannot see pictures: analyze_image turns the scene view (or any project '
-        'image) into text - background, content position, colours. Use it to verify a '
-        'scene really shows what it should instead of guessing; capture_scene_view only '
-        'shows the screenshot to the user.\n'
+        '- You cannot see pictures: analyze_image turns the scene view, the running '
+        'game window ("source": "game") or any project image into text - background, '
+        'content position, colours. Use it to verify what the user sees instead of '
+        'guessing - after run_project, analyze_image with "source": "game" shows the '
+        'live game; capture_scene_view / capture_game_window only show the screenshot '
+        'to the user.\n'
         '- Answer in the language the user writes in, and keep answers short.\n'
         '\nTool reference:\n' + INSTRUCTIONS + '\n\nEditor state:\n' + '\n'.join(context)
     )

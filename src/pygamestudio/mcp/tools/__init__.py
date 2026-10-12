@@ -2,7 +2,7 @@
 
 Each module groups the tools of one area of the editor:
 
-``editor``   status, undo/redo, console output, scene screenshots, panels
+``editor``   status, undo/redo, console output, screenshots (scene view + running game), panels
 ``project``  project info/config, files, assets, scripts
 ``scene``    scene files, the object tree, searching objects
 ``objects``  creating/updating/deleting/duplicating/moving/selecting objects

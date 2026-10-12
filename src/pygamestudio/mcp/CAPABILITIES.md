@@ -89,6 +89,7 @@ not exposed (with the reason). Tool names are the MCP tool names.
 | Run the project (saves the scene — a scene with no file must be saved first — starts `main.py`; the game of an earlier run is stopped first, `stop_running: false` starts an additional instance) | Project > Run | `run_project` |
 | Stop running game processes | (editor keeps them alive until exit) | `stop_project` |
 | Runtime status (pids, console length) | Console | `get_runtime_status` |
+| Look at the running game window (the live view with script movement, physics and animations; Windows only - falls back to the editor scene view when the window cannot be captured: game not running, window minimized, macOS/Linux) | game window | `capture_game_window` (PNG), `analyze_image` with `"source": "game"` (text) |
 | Read the console (info/error/warning, search) | Console panel | `get_console_logs` |
 | Clear the console | Console > Clear | `clear_console_logs` |
 | Write to the console (progress notes for the user) | - | `log_to_console` |
@@ -98,7 +99,7 @@ not exposed (with the reason). Tool names are the MCP tool names.
 | Capability | Editor entry point | MCP |
 | --- | --- | --- |
 | Look at the scene as the user sees it | Scene panel | `capture_scene_view` (PNG, whole canvas or a region, scalable) |
-| Understand a picture without seeing it (for text-only models): background colour + share, content position/margins, main colours with boxes, brightness, a coarse colour grid | - | `analyze_image` (fresh scene-view capture by default, or `path` for any project image, e.g. a screenshot a script saved) |
+| Understand a picture without seeing it (for text-only models): background colour + share (exact mean, per-channel variation and shade count, so subtle shading is not read as a flat fill), content position/margins, main colours with boxes, brightness, a coarse colour grid | - | `analyze_image` (fresh scene-view capture by default, `"source": "game"` for the running game window, or `path` for any project image, e.g. a screenshot a script saved) |
 | Which panels exist and are visible | tab bars | `list_editor_panels` |
 | Show a panel (select its tab, raise a detached window, re-show one hidden from the Window menu) | tab bars / Window menu | `open_panel` |
 | Pan/zoom/grid, gizmos, alignment guides | Scene panel + mouse | **no** - interactive only |
