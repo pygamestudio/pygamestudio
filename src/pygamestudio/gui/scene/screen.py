@@ -43,6 +43,19 @@ class PygameScreen(QWidget):
         self._object_offsets = {}  # object uuid -> (dx, dy) of its image inside the bake
         self._move_gizmo = MoveGizmo(self, game_manager)
 
+        # Deferred cache rebuilds: batches (paste/undo, deleting many nodes)
+        # emit one signal PER NODE, and rebuilding the affected branch (or the
+        # whole scene) for each of them made big operations crawl. Collecting
+        # the work and flushing once per event-loop turn bakes each branch
+        # exactly one time; paintEvent flushes defensively so a stale frame
+        # is never presented.
+        self._pending_full_rebuild = False
+        self._pending_branches = set()
+        self._scene_flush_timer = QTimer(self)
+        self._scene_flush_timer.setSingleShot(True)
+        self._scene_flush_timer.setInterval(0)
+        self._scene_flush_timer.timeout.connect(self._flush_scene_updates)
+
         self._mouse_x = None
         self._mouse_y = None
         self._is_ctrl_pressed = False
@@ -73,7 +86,10 @@ class PygameScreen(QWidget):
 
     def _set_signal(self):
         # Content-affecting changes rebuild the rendered images.
-        self._game_manager.object_added.connect(self._update_scene)
+        self._game_manager.object_added.connect(self._on_object_added)
+        # One rebuild after a scene load (during the load every node would
+        # rebuild everything - that is what made big scenes unresponsive).
+        self._game_manager.scene_loaded_signal.connect(self._update_scene)
         self._game_manager.object_deleted.connect(self._on_object_deleted)
         self._game_manager.object_selected.connect(self._on_object_selected)
         self._game_manager.object_deselected.connect(self._on_object_deselected)
@@ -118,6 +134,9 @@ class PygameScreen(QWidget):
         self._update_scene()
 
     def clean_up(self):
+        self._scene_flush_timer.stop()
+        self._pending_full_rebuild = False
+        self._pending_branches = set()
         self._final_selected_object = None
         self._mouse_x = None
         self._mouse_y = None
@@ -136,19 +155,28 @@ class PygameScreen(QWidget):
         self._game_manager.delete(selected_uuids)
 
     def _on_object_deleted(self, object_uuid):
-        move_gizmo_object = self._move_gizmo.get_object()
-        if not move_gizmo_object or not self._game_manager.get_object(move_gizmo_object.uuid):
-            self._move_gizmo.remove_object()
-            self._move_gizmo.hide()
+        try:
+            move_gizmo_object = self._move_gizmo.get_object()
+            if not move_gizmo_object or not self._game_manager.get_object(move_gizmo_object.uuid):
+                self._move_gizmo.remove_object()
+                self._move_gizmo.hide()
 
-        # A deleted object must never linger: clear the collision-overlay
-        # reference when the selected object is gone (directly or because a
-        # parent it lived under was removed), so its green outline disappears.
-        if (self._final_selected_object is not None
-                and not self._game_manager.get_object(self._final_selected_object.uuid)):
-            self._final_selected_object = None
+            # A deleted object must never linger: clear the collision-overlay
+            # reference when the selected object is gone (directly or because
+            # a parent it lived under was removed), so its green outline
+            # disappears.
+            if (self._final_selected_object is not None
+                    and not self._game_manager.get_object(self._final_selected_object.uuid)):
+                self._final_selected_object = None
 
-        self._update_scene()
+            # Deferred: deleting N roots emits N signals - one rebuild for all.
+            self._pending_full_rebuild = True
+            self._scene_flush_timer.start()
+        except Exception:
+            # This runs inside the undo stack's push (a C++ call chain): an
+            # escaping exception must never be able to corrupt the run.
+            import traceback
+            traceback.print_exc()
 
     def _on_object_selected(self, object_uuid):
         if object_uuid == self._game_manager.canvas_object_uuid:
@@ -158,7 +186,7 @@ class PygameScreen(QWidget):
             self._final_selected_object = obj
             self._move_gizmo.set_object(obj)
 
-        self._update_scene()
+        self._rebake_object_branch(object_uuid)
 
     def _on_object_deselected(self, object_uuid):
         if self._move_gizmo.get_object() and self._move_gizmo.get_object().uuid == object_uuid:
@@ -172,7 +200,7 @@ class PygameScreen(QWidget):
         if (self._final_selected_object is not None
                 and self._final_selected_object.uuid == object_uuid):
             self._final_selected_object = None
-        self._update_scene()
+        self._rebake_object_branch(object_uuid)
 
     def _on_object_moved(self, object_uuid):
         """A pure move only changes where the object sits, not its pixels, so
@@ -181,8 +209,9 @@ class PygameScreen(QWidget):
         parent = self._game_manager.get_parent_object(object_uuid) if obj is not None else None
         if parent is not None and parent.type != OBJECT_CANVAS:
             # A nested object moved inside its parent: that parent's baked
-            # image (which contains the child) is now stale.
-            self._update_scene()
+            # image (which contains the child) is now stale - rebuild only
+            # that top-level branch (a gizmo drag emits this per step).
+            self._rebake_object_branch(object_uuid)
             return
         self.update()
 
@@ -338,9 +367,13 @@ class PygameScreen(QWidget):
         self._object_offsets[obj.uuid] = (bounds.x - world.x, bounds.y - world.y)
         return obj
 
-    def _update_scene(self):
+    def _update_scene(self, *args):
         """Rebuild the cached QImages (canvas + each visible top-level object
         with its whole subtree baked in) and schedule a repaint."""
+        if self._game_manager.is_loading_scene():
+            # A load emits object_added for every node - one rebuild runs when
+            # the load finishes (scene_loaded_signal), not one per node.
+            return
         self._object_images = {}
         self._object_offsets = {}
         if self._game_manager.is_empty():
@@ -361,7 +394,102 @@ class PygameScreen(QWidget):
         self.update()
         self._move_gizmo.update_pos()
 
+    def _on_object_added(self, parent_uuid, object_uuid, inserted_pos):
+        """A new node changes its own top-level branch only."""
+        self._rebake_object_branch(object_uuid)
+
+    def _rebake_object_branch(self, object_uuid):
+        """Schedule a re-bake of ONLY the top-level branch containing the
+        object (the selection outline and a moved child live inside its baked
+        image). The bake itself runs once per event-loop turn: a paste/undo
+        emits one add per node, and baking the growing branch for every node
+        was O(n²) work (see __init__).
+        """
+        if self._game_manager.is_loading_scene() or self._game_manager.is_empty():
+            return
+        self._pending_branches.add(object_uuid)
+        self._scene_flush_timer.start()
+
+    def _flush_scene_updates(self):
+        """Apply every rebuild the signals scheduled in this turn.
+
+        Never lets an exception escape: it also runs from paintEvent, where
+        an escaping exception corrupts the Qt state (PySide6 segfaults later).
+        """
+        try:
+            self._flush_scene_updates_unsafe()
+        except Exception:
+            import traceback
+            traceback.print_exc()
+
+    def _flush_scene_updates_unsafe(self):
+        if self._pending_full_rebuild:
+            self._pending_full_rebuild = False
+            self._pending_branches.clear()
+            self._update_scene()
+            return
+        if not self._pending_branches:
+            return
+        branches = self._pending_branches
+        self._pending_branches = set()
+        for object_uuid in branches:
+            self._rebake_object_branch_now(object_uuid)
+
+    def _rebake_object_branch_now(self, object_uuid):
+        """Re-bake ONLY the top-level branch that contains the object.
+
+        A selection change (or a move) only alters the object's own baked
+        image - the blue outline lives inside it. Rebuilding every branch on
+        every click made the editor crawl once a scene had a few dozen
+        objects. The canvas image carries no selection outline, so an
+        empty-space click (which selects the canvas) only needs a repaint.
+        """
+        if self._game_manager.is_loading_scene() or self._game_manager.is_empty():
+            return
+        root_value = self._root_value()
+        if root_value is None:
+            self._update_scene()
+            return
+        if object_uuid == root_value['object'].uuid:
+            self.update()
+            self._move_gizmo.update_pos()
+            return
+        for child_node in root_value['children']:
+            if self._node_contains(child_node, object_uuid):
+                top_object = list(child_node.values())[0]['object']
+                if top_object.visible:
+                    self._bake_subtree(child_node)
+                else:
+                    self._object_images.pop(top_object.uuid, None)
+                    self._object_offsets.pop(top_object.uuid, None)
+                self.update()
+                self._move_gizmo.update_pos()
+                return
+        # The object is gone (a delete/undo in flight): full rebuild.
+        self._update_scene()
+
+    def _node_contains(self, node, object_uuid):
+        """True when the subtree of ``node`` contains ``object_uuid``."""
+        value = list(node.values())[0]
+        if value['object'].uuid == object_uuid:
+            return True
+        for child_node in value['children']:
+            if self._node_contains(child_node, object_uuid):
+                return True
+        return False
+
     def paintEvent(self, event):
+        if self._pending_full_rebuild or self._pending_branches:
+            # Never paint a stale frame - the next timer tick would be too
+            # late for THIS paint (and keeps grab()/render() deterministic).
+            # An exception escaping a paintEvent corrupts the Qt/C++ state
+            # (PySide6 segfaults later in unrelated code), so it must never
+            # propagate - report it instead.
+            try:
+                self._flush_scene_updates()
+            except Exception:
+                import traceback
+                traceback.print_exc()
         painter = QPainter(self)
         painter.setRenderHints(QPainter.RenderHint.Antialiasing
                                | QPainter.RenderHint.SmoothPixmapTransform)

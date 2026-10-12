@@ -1022,6 +1022,11 @@ class GameManager(QObject):
     
     def is_cut(self):
         return self._is_cut
+
+    def is_loading_scene(self):
+        """True while a .scene file is being (re)built. Panels use it to skip
+        per-node work that only matters once the whole scene exists."""
+        return self._is_loading_scene
     
     def get_clipboard_content(self):
         return self._clipboard_content
@@ -1297,6 +1302,10 @@ class GameManager(QObject):
                 continue
 
             object_tree_struct = self._get_object_tree_struct(object_uuid)
+            if not object_tree_struct:
+                # Stale selection: the object is not in the tree any more
+                # (deleted elsewhere). Never push a command for it.
+                continue
             object_tree_struct_list_to_delete.append(object_tree_struct)
             object_uuid_list_to_delete.append(object_uuid)
 
@@ -1461,9 +1470,10 @@ class GameManager(QObject):
         # Remember the freshly loaded tree as the clean snapshot.
         self._saved_object_tree_struct = self._serialize_tree(self._all_object_tree_struct)
         self._is_current_scene_saved = True
-        self.scene_loaded_signal.emit()
-
+        # Clear the flag BEFORE the signal: handlers rebuild their caches from
+        # it (the scene view bakes ONCE here instead of once per added node).
         self._is_loading_scene = False
+        self.scene_loaded_signal.emit()
 
     def is_empty(self):
         return self._all_object_tree_struct == {}

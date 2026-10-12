@@ -7,6 +7,10 @@ from pygamestudio.gui.hierarchy.menu import ContextMenu
 from pygamestudio.gui.hierarchy.delegate import HierarchyTreeViewDelegate
 from pygamestudio.common.i18n.translator import Translator as T
 
+#: Item role caching the object's visibility. The delegate reads it while
+#: painting every row; looking the object up per row ran a full tree search.
+_ITEM_VISIBLE_ROLE = Qt.ItemDataRole.UserRole + 2
+
 
 class HierarchyTreeView(QTreeView):
     # Emitted when a TILE_MAP object is double-clicked (the editor opens its
@@ -28,6 +32,30 @@ class HierarchyTreeView(QTreeView):
         self._is_cut = False
         self._clipboard_items = []
         self._items_to_delete_by_cut = []
+
+        # uuid -> QStandardItem index of the whole tree: every lookup used to
+        # be a recursive walk (O(n) per object, O(n²) while loading a scene).
+        self._items_by_uuid = {}
+
+        # Making a new node current is deferred to the end of the event-loop
+        # turn: a paste/undo adds dozens of nodes and setting each one current
+        # fired a full selection cascade (inspector + scene rebuild) per node.
+        # Only the LAST new node ends up current - the same end state as the
+        # immediate version produced, just once instead of once per node.
+        # The pending target is kept as a UUID (never as the item wrapper:
+        # items are owned by the C++ model and a removed item leaves a
+        # dangling Python wrapper behind - a deferred access could segfault).
+        self._pending_current_uuid = None
+        self._current_item_timer = QTimer(self)
+        self._current_item_timer.setSingleShot(True)
+        self._current_item_timer.setInterval(0)
+        self._current_item_timer.timeout.connect(self._apply_pending_current_item)
+
+        # Rows taken out of the model are kept alive until later in the turn:
+        # freeing QStandardItems while the same signal emission still unwinds
+        # through Qt internals is the kind of state corruption that crashes
+        # later, in unrelated code.
+        self._removed_rows = []
 
         self._canvas_item = None
         self._context_menu = ContextMenu('', self)
@@ -197,6 +225,10 @@ class HierarchyTreeView(QTreeView):
         self._clipboard_items = []
         self._items_to_delete_by_cut = []
         self._canvas_item = None
+        self._items_by_uuid = {}
+        self._current_item_timer.stop()
+        self._pending_current_uuid = None
+        self._removed_rows = []
         
         self.selectionModel().blockSignals(True)
         self._standard_model.clear()
@@ -222,12 +254,25 @@ class HierarchyTreeView(QTreeView):
             self._on_regular_object_added(parent_uuid, obj, inserted_pos)
         
     def _on_canvas_object_added(self, obj):
-        self._canvas_item = QStandardItem()
-        self._canvas_item.setText(obj.name)
-        self._canvas_item.setIcon(QIcon(obj.icon))
-        self._canvas_item.setData(obj.uuid, Qt.ItemDataRole.UserRole+1)
+        self._canvas_item = self._make_item(obj)
         self._canvas_item.setFlags(self._canvas_item.flags() & ~Qt.ItemFlag.ItemIsDragEnabled)
+        self._items_by_uuid[obj.uuid] = self._canvas_item
         self._standard_model.appendRow(self._canvas_item)
+
+    def _make_item(self, obj):
+        """Build the tree item for an object.
+
+        Everything is set BEFORE the item is attached, so the model's
+        itemChanged signal never fires for a half-built item (it renames the
+        object - one wasted tree lookup per node on every add).
+        """
+        item = QStandardItem()
+        item.setText(obj.name)
+        item.setIcon(QIcon(obj.icon))
+        item.setData(obj.visible, _ITEM_VISIBLE_ROLE)
+        item.setData(obj.uuid, Qt.ItemDataRole.UserRole+1)
+        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+        return item
 
     def _on_regular_object_added(self, parent_uuid, obj, inserted_pos):
         parent_item = self._get_matched_item(parent_uuid)
@@ -240,11 +285,8 @@ class HierarchyTreeView(QTreeView):
             Logger.warning('Hierarchy: no canvas to place "{}" under'.format(obj.name))
             return
 
-        item = QStandardItem()
-        item.setText(obj.name)
-        item.setIcon(QIcon(obj.icon))
-        item.setData(obj.uuid, Qt.ItemDataRole.UserRole+1)
-        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+        item = self._make_item(obj)
+        self._items_by_uuid[obj.uuid] = item
     
         if inserted_pos == -1:
             parent_item.appendRow(item)
@@ -253,10 +295,33 @@ class HierarchyTreeView(QTreeView):
             parent_item.insertRow(inserted_pos, QStandardItem())
             parent_item.setChild(inserted_pos, item)
 
-        index = self._proxy_model.mapFromSource(self._standard_model.indexFromItem(item))
+        if self._game_manager.is_loading_scene():
+            # Loading a scene adds every node one by one; making each node
+            # current would select it (and rebuild the scene view) for
+            # nothing - the load ends with nothing selected anyway.
+            return
 
-        # Ensure that the selected property of objects is not changed while loading the scene file.
-        # if self._game_manager.is_project_ready:
+        # Deferred (see __init__): a batch add collapses to ONE selection.
+        self._pending_current_uuid = obj.uuid
+        self._current_item_timer.start()
+
+    def _apply_pending_current_item(self):
+        """Make the last added node the current one (see __init__).
+
+        Looks the item up by uuid at the last possible moment: a node deleted
+        in the meantime is simply not there any more (a kept item reference
+        would have gone dangling instead).
+        """
+        object_uuid = self._pending_current_uuid
+        self._pending_current_uuid = None
+        if not object_uuid:
+            return
+        item = self._items_by_uuid.get(object_uuid)
+        if item is None:
+            return
+        index = self._proxy_model.mapFromSource(self._standard_model.indexFromItem(item))
+        if not index.isValid():
+            return
         self.setCurrentIndex(index)
         self.scrollTo(index)
 
@@ -334,21 +399,58 @@ class HierarchyTreeView(QTreeView):
         self._game_manager.delete(item_uuid_list)
     
     def _on_object_deleted(self, object_uuid):
-        matched_item = self._get_matched_item(object_uuid)
-        if matched_item == self._canvas_item:
-            self.selectionModel().blockSignals(True)
-            self._standard_model.clear()
-            self.selectionModel().blockSignals(False)
-        else:
-            matched_item.parent().takeRow(matched_item.row())
+        try:
+            matched_item = self._get_matched_item(object_uuid)
+            if matched_item is None:
+                return
+            if matched_item == self._canvas_item:
+                self._pending_current_uuid = None
+                self.selectionModel().blockSignals(True)
+                self._standard_model.clear()
+                self.selectionModel().blockSignals(False)
+                self._items_by_uuid = {}
+            else:
+                self._forget_items(matched_item)
+                parent_item = matched_item.parent()
+                if parent_item is None:
+                    # Already detached (removed with an ancestor earlier in
+                    # the same batch): nothing left to do.
+                    return
+                removed = parent_item.takeRow(matched_item.row())
+                if removed:
+                    # Keep the wrappers alive for the rest of the turn (see
+                    # __init__), then let the oldest ones go.
+                    self._removed_rows.append(removed)
+                    del self._removed_rows[:-64]
+        except Exception:
+            # An exception escaping a slot called from C++ (the undo stack
+            # pushes right through this) must never corrupt the run - and
+            # must be visible when it happens.
+            import traceback
+            traceback.print_exc()
+
+    def _forget_items(self, item):
+        """Drop an item and its whole subtree from the uuid index."""
+        self._items_by_uuid.pop(item.data(Qt.ItemDataRole.UserRole+1), None)
+        for i in range(item.rowCount()):
+            self._forget_items(item.child(i))
     
     def _rename(self):
         self.edit(self.currentIndex())
 
-    def _on_object_showed(self):
-        self.viewport().update()
+    def _on_object_showed(self, object_uuid):
+        self._set_item_visible(object_uuid, True)
 
-    def _on_object_hidden(self):
+    def _on_object_hidden(self, object_uuid):
+        self._set_item_visible(object_uuid, False)
+
+    def _set_item_visible(self, object_uuid, visible):
+        """Sync the cached visibility flag the delegate paints from."""
+        item = self._get_matched_item(object_uuid)
+        if item is not None:
+            self._standard_model.blockSignals(True)
+            item.setData(visible, _ITEM_VISIBLE_ROLE)
+            self._standard_model.blockSignals(False)
         self.viewport().update()
 
     def _copy_uuid(self):
@@ -418,9 +520,14 @@ class HierarchyTreeView(QTreeView):
         return self._is_item_visible(item)
 
     def _is_item_visible(self, item):
-        item_uuid = item.data(Qt.ItemDataRole.UserRole+1)
-        obj = self._game_manager.get_object(item_uuid)
-        return obj.visible
+        # Read the cached flag: the delegate calls this for every row on every
+        # repaint, and a manager lookup walks the whole object tree each time.
+        visible = item.data(_ITEM_VISIBLE_ROLE)
+        if visible is None:
+            item_uuid = item.data(Qt.ItemDataRole.UserRole+1)
+            obj = self._game_manager.get_object(item_uuid)
+            return bool(obj.visible) if obj is not None else True
+        return bool(visible)
     
     def is_ancestor_item_visible(self, item):
         current = item.parent()
@@ -490,6 +597,11 @@ class HierarchyTreeView(QTreeView):
         return _get(item_uuid_list, self._canvas_item)
     
     def _get_matched_item(self, item_uuid):
+        matched_item = self._items_by_uuid.get(item_uuid)
+        if matched_item is not None:
+            return matched_item
+
+        # Fallback walk: the index can miss while a scene is being torn down.
         def _get(item_uuid, parent_item):
             if parent_item is None:
                 return None

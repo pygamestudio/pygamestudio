@@ -84,7 +84,10 @@ class HierarchyTreeViewDelegate(QStyledItemDelegate):
             # If mouse hovers on a different index, then repaint.
             if old_hovered_index != self._hovered_index:
                 self._tree_view.viewport().update()
-            return True
+            # Returning True here would make the view treat the move as
+            # "handled by the delegate" and skip its own logic - including
+            # STARTING A DRAG (dragging a node only worked after many tries).
+            return False
         
         # Prevent the expand and collapse event when toggling item's visibility.
         elif event.type() == QMouseEvent.Type.MouseButtonDblClick and event.button() == Qt.MouseButton.LeftButton and self._is_click_on_eye_pixmap(event.pos(), option.rect):
