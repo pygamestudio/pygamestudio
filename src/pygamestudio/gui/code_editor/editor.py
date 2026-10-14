@@ -608,11 +608,12 @@ class CodeEditor(QPlainTextEdit):
                                               | Qt.KeyboardModifier.AltModifier
                                               | Qt.KeyboardModifier.MetaModifier)
         if text and not modifiers_down \
-                and not (text.isalnum() or text == '_') \
+                and not (text.isalnum() or text == '_') and text != '.' \
                 and event.key() not in (Qt.Key.Key_Backspace, Qt.Key.Key_Delete):
             # Anything that cannot continue an identifier ends the completion
             # session (so Enter after a space or bracket is a newline, never
-            # an accidental insertion).
+            # an accidental insertion). The dot is the exception: it starts a
+            # member completion instead (studio.sdk. -> taptap, ...).
             self._completer.popup().hide()
         if text and not modifiers_down \
                 and (text in self._AUTO_PAIRS or text == ')'):
@@ -627,6 +628,11 @@ class CodeEditor(QPlainTextEdit):
                                               | Qt.KeyboardModifier.AltModifier
                                               | Qt.KeyboardModifier.MetaModifier)) \
                 and (text.isalnum() or text == '_'):
+            self._completer.update_words()
+            self._completer.complete_prefix()
+        elif text == '.' and not modifiers_down:
+            # A dot opens the member completion of the expression in front of
+            # it (studio.sdk.taptap.pc. -> init(), run_callbacks(), ...).
             self._completer.update_words()
             self._completer.complete_prefix()
         elif event.key() in (Qt.Key.Key_Backspace, Qt.Key.Key_Delete) \

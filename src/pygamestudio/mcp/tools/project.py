@@ -82,7 +82,8 @@ def get_project_config_tool(args):
 @tool(
     'update_project_config',
     'Change project settings in project.pygs. Keys may be dotted, e.g. '
-    '"screen_width", "caption", "build.app_name", "asset.current_scene". '
+    '"screen_width", "caption", "build.app_name", "build.platform" '
+    '("" = 无平台, "taptap" = TapTap), "asset.current_scene". '
     'Changes are saved immediately (and are NOT part of the undo stack).',
     {
         'type': 'object',

@@ -50,7 +50,7 @@ class BuildWindow(WindowBase):
         self._set_object_name()
 
     def _set_widget(self):
-        self.resize(500, 260)
+        self.resize(600, 260)
         self.set_window_body(self._build_window_body)
         self.window_title.set_title_name(T.tr('build.build', 'Build'))
     

@@ -71,13 +71,16 @@ ENGINE_PACKAGE = 'pygamestudio'
 _IGNORED_DIR_NAMES = {'__pycache__', '.git', '.github', '.vscode', '.idea',
                       'venv', '.venv', 'env', 'node_modules', 'dist', 'build'}
 #: Engine package folders the game runtime needs (the editor is left out).
-_ENGINE_DIRS = ('api', 'game', 'common')
+#: ``sdk`` holds the platform bridges: copied so ``import`` never
+#: breaks in the browser, where every call reports "Windows only".
+_ENGINE_DIRS = ('api', 'game', 'common', 'sdk')
 #: Editor files the runtime imports (the logger is plain Python, no Qt in it).
 _ENGINE_EXTRA_FILES = ('gui/__init__.py', 'gui/console/__init__.py', 'gui/console/logger.py')
-#: ``common/res`` data only the editor uses (fonts are per project). The
-#: physics wheels and the self-hosted Pyodide runtime ship NEXT TO the
-#: bundle, never inside the archive.
-_ENGINE_RES_SKIP = ('fonts', 'qss', 'templates', 'audios', 'wheels', 'pyodide')
+#: ``common/res`` data only the desktop/editor side uses (fonts are per
+#: project; the TapTap SDK binaries are Windows desktop data). The physics
+#: wheels and the self-hosted Pyodide runtime ship NEXT TO the bundle, never
+#: inside the archive.
+_ENGINE_RES_SKIP = ('fonts', 'qss', 'templates', 'audios', 'wheels', 'pyodide', 'sdk')
 #: Folder in ``common/res`` holding the Pyodide wheels of the engine.
 WHEELS_DIR_NAME = 'wheels'
 #: Boot template placeholder holding the pymunk install source ('' = none).

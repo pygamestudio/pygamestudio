@@ -54,10 +54,13 @@ def _open_folder(folder):
 @tool(
     'get_build_settings',
     'The build settings of the project: the desktop-app values (app name, '
-    'icon, output dir, clean cache) and the web-app values (build.web: output '
-    'dir; name and icon are shared with the desktop build). Also reports '
-    'whether a build is running in either tab, its progress and the folder of '
-    'the last web build.',
+    'icon, output dir, publishing platform) and the web-app values (build.web: '
+    'output dir; name and icon are shared with the desktop build). The '
+    'publishing platform is stored as build.platform: "" = 无平台 (no '
+    'platform), "taptap" = TapTap (older projects may still carry the legacy '
+    'build.taptap flag - the desktop tab migrates it). Also reports whether a '
+    'build is running in either tab, its progress and the folder of the last '
+    'web build.',
     {
         'type': 'object',
         'properties': {},
@@ -93,13 +96,20 @@ def get_build_settings(args):
     'as the Build button in the desktop-app tab of the Build window; the '
     'PyInstaller cache is always cleared first). This takes a while: the build '
     'runs in the background, poll get_build_settings and read get_console_logs '
-    'for the log, open_output_dir points at the result.',
+    'for the log, open_output_dir points at the result. Use platform to set '
+    'where the build is published: "" = 无平台 (no platform), "taptap" = '
+    'TapTap - only then the TapTap PC SDK is included in the package (config '
+    'key build.platform).',
     {
         'type': 'object',
         'properties': {
             'app_name': {'type': 'string', 'description': 'Name of the executable (e.g. "MyGame").'},
             'app_icon': {'type': 'string', 'description': 'Absolute path of a .png/.ico/.icns icon (optional).'},
             'output_dir': {'type': 'string', 'description': 'Absolute path of an existing output folder.'},
+            'platform': {'type': 'string', 'enum': ['', 'taptap'],
+                         'description': 'Publishing platform: "" = 无平台 (no platform), "taptap" = '
+                                        'TapTap (the package includes the TapTap PC SDK). Defaults to '
+                                        'the saved pick (build.platform).'},
         },
         'required': ['output_dir'],
         'additionalProperties': False,
@@ -107,6 +117,10 @@ def get_build_settings(args):
     annotations={'title': 'Build a desktop app'},
 )
 def start_build(args):
+    platform_id = args.get('platform')
+    if platform_id is not None and platform_id not in ('', 'taptap'):
+        raise ToolError('Unknown platform "{}" - use "" (无平台) or "taptap".'.format(platform_id))
+
     body = _build_body()
     if getattr(body, '_is_building', False):
         raise ToolError('A build is already running (use stop_build to stop it).')
@@ -142,12 +156,15 @@ def start_build(args):
         build_config['app_name'] = args['app_name']
     build_config['app_icon'] = app_icon
     build_config['output_dir'] = str(output_dir)
+    if platform_id is not None:
+        build_config['platform'] = platform_id
     save_project_config(config)
 
     # Mirror the values into the build window widgets, then start its thread.
     body._app_name_lineedit.setText(str(build_config.get('app_name', '')))
     body._app_icon_lineedit.setText(build_config['app_icon'])
     body._output_dir_lineedit.setText(build_config['output_dir'])
+    body.set_platform_selected(build_config.get('platform', ''))
 
     body._progress_bar.setValue(0)
     body._progress_bar.show()

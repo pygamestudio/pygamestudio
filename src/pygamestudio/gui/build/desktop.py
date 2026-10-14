@@ -34,6 +34,11 @@ class DesktopAppBuildWindow(QScrollArea):
         self._build_button = QPushButton()
         self._run_button = QPushButton()
         self._open_output_dir_button = QPushButton()
+        #: Publishing-platform picker (bottom-right corner): the pick decides
+        #: what extra bits the package gets (TapTap -> the TapTap PC SDK;
+        #: more platforms - Steam - plug in here later).
+        self._platform_label = QLabel()
+        self._platform_combobox = QComboBox()
 
         self._build_thread = BuildThread(self._game_manager)
         self._is_building = False
@@ -64,6 +69,9 @@ class DesktopAppBuildWindow(QScrollArea):
         self._run_button.setText(T.tr('build.run_game', 'Run Game'))
         self._run_button.setEnabled(False)
         self._open_output_dir_button.setText(T.tr('build.open_output_dir', 'Open Output Dir'))
+        self._platform_label.setText(T.tr('build.platform_label', 'Publishing Platform:'))
+        self._set_platform_combobox_texts()
+        self._set_platform_tooltip()
         self._update_button_widths()
         
     def _set_signal(self):
@@ -72,6 +80,7 @@ class DesktopAppBuildWindow(QScrollArea):
         self._build_button.clicked.connect(self._build)
         self._run_button.clicked.connect(self._run_game)
         self._open_output_dir_button.clicked.connect(self._open_output_dir)
+        self._platform_combobox.activated.connect(self._on_platform_activated)
 
         self._build_thread.stopped_signal.connect(self._on_build_stopped)
         self._build_thread.finished_signal.connect(self._on_build_finished)
@@ -98,6 +107,9 @@ class DesktopAppBuildWindow(QScrollArea):
         button_layout.addSpacing(5)
         button_layout.addWidget(self._open_output_dir_button)
         button_layout.addStretch()
+        # Bottom-right corner: label + platform picker of the build.
+        button_layout.addWidget(self._platform_label)
+        button_layout.addWidget(self._platform_combobox)
 
         main_g_layout = QGridLayout(self._central_widget)
         main_g_layout.setHorizontalSpacing(10)
@@ -115,6 +127,25 @@ class DesktopAppBuildWindow(QScrollArea):
         
     def _set_object_name(self):
         self._build_button.setObjectName('desktopAppBuildBtn')
+
+    def _set_platform_tooltip(self):
+        self._platform_combobox.setToolTip(T.tr(
+            'build.platform_tooltip',
+            'Choose the platform to publish on: picking TapTap includes the '
+            'TapTap PC SDK in the package'))
+
+    def _set_platform_combobox_texts(self):
+        """(Re)fill the dropdown: "无" (with its ban icon) and the platforms,
+        each entry carrying its own icon; "无" stays the default pick."""
+        selected = self._platform_combobox.currentData()
+        self._platform_combobox.blockSignals(True)
+        self._platform_combobox.clear()
+        self._platform_combobox.addItem(QIcon(':/images/ban.png'),
+                                        T.tr('build.no_platform', 'None'), '')
+        self._platform_combobox.addItem(QIcon(':/images/taptap_logo.png'), 'TapTap', 'taptap')
+        index = self._platform_combobox.findData(selected)
+        self._platform_combobox.setCurrentIndex(index if index >= 0 else 0)
+        self._platform_combobox.blockSignals(False)
 
     def _update_button_widths(self):
         """Give the buttons one width, wide enough for the longer label."""
@@ -142,6 +173,13 @@ class DesktopAppBuildWindow(QScrollArea):
         except Exception as e:
             self._output_dir_lineedit.clear()
 
+        build_config = project_config.get('build') or {}
+        platform_id = str(build_config.get('platform') or '')
+        if not platform_id and build_config.get('taptap'):
+            # Settings written before the picker existed only knew TapTap.
+            platform_id = 'taptap'
+        self.set_platform_selected(platform_id)
+
     def _browse_app_icon(self):
         icon_path, _ = QFileDialog.getOpenFileName(self, T.tr('build.select_app_icon', 'Select App Icon'), self._game_manager.get_project_path(), 'Format (*png *.ico *.icns)')
         if icon_path:
@@ -151,6 +189,23 @@ class DesktopAppBuildWindow(QScrollArea):
         output_dir = QFileDialog.getExistingDirectory(self, T.tr('build.select_output_dir', 'Select Output Dir'))
         if output_dir:
             self._output_dir_lineedit.setText(output_dir)
+
+    def _on_platform_activated(self, index):
+        """Remember the pick right away (build.platform in project.pygs)."""
+        update_project_config('build.platform', self.get_platform())
+
+    def get_platform(self):
+        """The chosen platform id ('' while "无" is picked)."""
+        return str(self._platform_combobox.currentData() or '')
+
+    def set_platform_selected(self, platform_id):
+        """Set the picker from outside without re-saving the config."""
+        self._platform_combobox.blockSignals(True)
+        index = self._platform_combobox.findData(str(platform_id or ''))
+        # An unknown id (a platform this build does not know yet) falls back
+        # to "无": nothing extra gets packaged.
+        self._platform_combobox.setCurrentIndex(index if index >= 0 else 0)
+        self._platform_combobox.blockSignals(False)
 
     def _check_before_build(self):
         if not (Path(self._game_manager.get_project_path()) / 'main.py').exists():
@@ -283,8 +338,12 @@ class DesktopAppBuildWindow(QScrollArea):
             "app_name": app_name,
             "app_icon": app_icon,
             "output_dir": output_dir,
+            "platform": self.get_platform(),
         }
-        update_project_config('build', build_config)
+        # One dotted write per key: replacing the whole "build" section would
+        # wipe the settings of the other tabs (build.web of the web build).
+        for key, value in build_config.items():
+            update_project_config('build.' + key, value)
 
         return build_config
 
@@ -298,6 +357,9 @@ class DesktopAppBuildWindow(QScrollArea):
         self._build_button.setText(T.tr('build.build', 'Build'))
         self._run_button.setText(T.tr('build.run_game', 'Run Game'))
         self._open_output_dir_button.setText(T.tr('build.open_output_dir', 'Open Output Dir'))
+        self._platform_label.setText(T.tr('build.platform_label', 'Publishing Platform:'))
+        self._set_platform_combobox_texts()
+        self._set_platform_tooltip()
         self._update_button_widths()
 
 
@@ -476,6 +538,10 @@ class BuildThread(QThread):
         # only collects the .py files of the engine on its own.
         cmd.append(self._get_add_data_param(RES_PATH / 'images', 'pygamestudio/common/res/images', sep))
         cmd.append(self._get_add_data_param(LANG_PATH, 'pygamestudio/common/i18n/languages', sep))
+        # The TapTap PC SDK binaries ship only when TapTap is the chosen
+        # publishing platform (the picker of the build window, build.platform).
+        if build_config.get('platform') == 'taptap':
+            cmd.append(self._get_add_data_param(RES_PATH / 'sdk', 'pygamestudio/common/res/sdk', sep))
 
         cmd.append((build_project_path / 'main.py').as_posix())
         return [part for part in cmd if part]

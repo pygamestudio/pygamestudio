@@ -196,6 +196,8 @@ ENGINE_RUNTIME_API = (
     'set_allow_screensaver', 'is_allow_screensaver',
     # project
     'get_project_config', 'get_project_path',
+    # TapTap platform bridge (studio.sdk.taptap.pc - Windows x64 desktop only)
+    'sdk', 'taptap',
     # keyframe animation helpers (game/object/keyframe.py)
     'normalize_keyframes', 'snapshot_from_object', 'ease_progress',
     'DEFAULT_EASING', 'EASING_CURVES', 'KEYFRAME_CHANNELS',
@@ -246,11 +248,106 @@ def api_names() -> tuple:
     return _API_NAMES
 
 
+#: Cache of resolved member names per expression (see member_names()).
+_MEMBER_CACHE = {}
+#: Cache of the scene-object member names.
+_OBJECT_MEMBERS = None
+
+
+def engine_object_members():
+    """Every public member a scene object offers (methods + fields).
+
+    Read from the engine itself - the dir() of every ObjectBase subclass -
+    and completed with the curated field lists, because dir() cannot see the
+    instance fields (physics_mass, collision_width, ...).
+    """
+    global _OBJECT_MEMBERS
+    if _OBJECT_MEMBERS is not None:
+        return _OBJECT_MEMBERS
+
+    names = set(ENGINE_OBJECT_API)
+    names.update(ENGINE_OBJECT_ATTRIBUTES)
+    try:
+        from pygamestudio.game import object as object_models
+        from pygamestudio.game.object.base import ObjectBase
+        classes = [ObjectBase]
+        classes += [member for member in vars(object_models).values()
+                    if isinstance(member, type) and issubclass(member, ObjectBase)]
+        for object_class in classes:
+            names.update(name for name in dir(object_class)
+                         if not name.startswith('_'))
+    except Exception:  # noqa: BLE001 - hints must never break the editor
+        pass
+
+    _OBJECT_MEMBERS = tuple(sorted(names))
+    return _OBJECT_MEMBERS
+
+
+def _resolve_expression(expr):
+    """The object an expression like ``studio.sdk.taptap.pc`` refers to.
+
+    Only names that are already imported are walked - a hint never imports a
+    module as a side effect. None when the expression cannot be resolved.
+    """
+    parts = expr.split('.')
+    if parts[0] not in ('studio', 'pygamestudio'):
+        return None
+    try:
+        import pygamestudio
+    except Exception:  # noqa: BLE001 - hints must never break the editor
+        return None
+    target = pygamestudio
+    for part in parts[1:]:
+        target = getattr(target, part, None)
+        if target is None:
+            return None
+    return target
+
+
+def member_names(expr, text=''):
+    """The names that may follow ``expr`` + a dot; None when unknown.
+
+    ``studio.*`` / ``pygamestudio.*`` chains are resolved against the real
+    engine modules, so the popup picks up new API automatically (e.g.
+    ``studio.sdk.taptap.pc.`` offers the whole TapTap PC bridge). The
+    conventional script attribute ``self.obj`` (and the raw ``obj`` of the
+    template) offers the scene-object API, and ``self`` offers what the
+    document assigned to itself.
+    """
+    if expr in ('self.obj', 'obj', 'self.object'):
+        # The game object an ObjectScript receives (script template).
+        return engine_object_members()
+
+    if expr == 'self':
+        names = set(re.findall(r'self\.([A-Za-z_]\w*)', text))
+        names.update(re.findall(r'def\s+([A-Za-z_]\w*)\s*\(\s*self\b', text))
+        return tuple(sorted(name for name in names
+                            if not (name.startswith('__') and name.endswith('__'))))
+
+    members = _MEMBER_CACHE.get(expr, False)
+    if members is False:
+        members = None
+        if re.fullmatch(r'[A-Za-z_][\w.]*', expr):
+            target = _resolve_expression(expr)
+            if target is not None:
+                members = tuple(sorted(name for name in dir(target)
+                                       if not name.startswith('_')))
+                if expr.strip() in ('studio', 'pygamestudio'):
+                    # The studio root re-exports everything a script uses -
+                    # including the event constants (K_SPACE, ...); keep the
+                    # live API names in the list on top of dir().
+                    members = tuple(sorted(set(members) | set(api_names())))
+        _MEMBER_CACHE[expr] = members
+    return members
+
+
 class CodeCompleter(QCompleter):
     """Popup autocompletion for the code editor.
 
     Offers Python keywords/builtins plus every identifier already present in
-    the document, so completion adapts to the user's own code.
+    the document, so completion adapts to the user's own code. Right after a
+    dot it offers the members of the expression in front of it (engine
+    modules, the scene-object API, the script's own self.* names).
     """
 
     def __init__(self, editor):
@@ -285,12 +382,31 @@ class CodeCompleter(QCompleter):
         self._model.setStringList(self._all_words)
 
     def complete_prefix(self):
-        """Show the popup under the cursor for the identifier being typed."""
+        """Show the popup under the cursor for the identifier being typed.
+
+        Right after a dot the members of the expression in front of it are
+        offered (studio.sdk. -> taptap, studio.sdk.taptap.pc. -> init(),
+        self.obj. -> the scene-object API); while a plain identifier is
+        typed the usual word list is offered.
+        """
         cursor = self._editor.textCursor()
         # Only look at the current line up to the cursor, so a word on a
         # previous line can never act as the completion prefix (e.g. right
         # after deleting a word on an empty line).
         line_prefix = cursor.block().text()[:cursor.positionInBlock()]
+
+        member_match = re.search(r'([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)\.(\w*)$',
+                                 line_prefix)
+        if member_match:
+            members = member_names(member_match.group(1),
+                                   self._editor.toPlainText())
+            if members:
+                partial = member_match.group(2)
+                self.setCompletionPrefix(partial)
+                self._model.setStringList(self._ranked(members, partial))
+                self._show_popup_at_cursor()
+                return True
+
         match = re.search(r'[A-Za-z_]\w*$', line_prefix)
         if not match:
             self.popup().hide()
@@ -298,14 +414,20 @@ class CodeCompleter(QCompleter):
 
         prefix = match.group()
         self.setCompletionPrefix(prefix)
-        # Rank candidates:
-        #   1. words that START with the prefix (before words that only contain
-        #      it), and
-        #   2. within each group respect the case the user is typing - words
-        #      whose spelling matches the typed prefix exactly come first, then
-        #      words starting with the same case (uppercase input prefers
-        #      uppercase starts, lowercase input prefers lowercase starts).
-        #      Without this a lowercase input could put "Text" before "text".
+        words = [word for word in self._all_words
+                 if not self._is_document_echo(word, prefix)]
+        self._model.setStringList(self._ranked(words, prefix))
+        self._show_popup_at_cursor()
+        return True
+
+    @staticmethod
+    def _ranked(words, prefix):
+        """Rank candidates: words that START with the prefix come first, then
+        words that only contain it. Within each group the case of what the
+        user is typing decides (uppercase input prefers uppercase starts), so
+        a lowercase input can never put "Text" before "text"."""
+        if not prefix:
+            return sorted(words, key=lambda word: (word.lower(), word))
         prefix_lower = prefix.lower()
         prefix_is_upper = prefix[0].isupper()
 
@@ -314,15 +436,10 @@ class CodeCompleter(QCompleter):
             same_case = 0 if (word[0].isupper() == prefix_is_upper) else 1
             return (exact, same_case, word.lower(), word)
 
-        starts = [w for w in self._all_words
-                  if not self._is_document_echo(w, prefix)
-                  and w.lower().startswith(prefix_lower)]
-        contains = [w for w in self._all_words
-                    if not self._is_document_echo(w, prefix)
-                    and prefix_lower in w.lower() and w not in starts]
-        self._model.setStringList(sorted(starts, key=rank) + sorted(contains, key=rank))
-        self._show_popup_at_cursor()
-        return True
+        starts = [word for word in words if word.lower().startswith(prefix_lower)]
+        contains = [word for word in words
+                    if prefix_lower in word.lower() and word not in starts]
+        return sorted(starts, key=rank) + sorted(contains, key=rank)
 
     def _is_document_echo(self, word, prefix):
         """True when a candidate would just repeat what is being typed.
@@ -353,16 +470,22 @@ class CodeCompleter(QCompleter):
         return True
 
     def _insert_completion(self, completion):
-        """Replace the word under the cursor with the chosen completion."""
+        """Replace the identifier under the cursor with the chosen completion.
+
+        Right after a dot the identifier is empty, so the member lands where
+        it stands - the expression before the dot is never overwritten.
+        """
         cursor = self._editor.textCursor()
-        cursor.movePosition(QTextCursor.MoveOperation.Left, QTextCursor.MoveMode.KeepAnchor)
-        # Expand the selection to the whole identifier being completed.
+        position = cursor.position()
         text = self._editor.toPlainText()
-        start = cursor.selectionStart()
+        start = position
         while start > 0 and (text[start - 1].isalnum() or text[start - 1] == '_'):
             start -= 1
+        end = position
+        while end < len(text) and (text[end].isalnum() or text[end] == '_'):
+            end += 1
         cursor.setPosition(start, QTextCursor.MoveMode.MoveAnchor)
-        cursor.movePosition(QTextCursor.MoveOperation.EndOfWord, QTextCursor.MoveMode.KeepAnchor)
+        cursor.setPosition(end, QTextCursor.MoveMode.KeepAnchor)
         cursor.insertText(completion)
         self._editor.setTextCursor(cursor)
 
