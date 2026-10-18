@@ -59,9 +59,8 @@ def _open_folder(folder):
     'publishing platform is stored as build.platform: "" = 无平台 (no '
     'platform), "taptap" = TapTap (older projects may still carry the legacy '
     'build.taptap flag - the desktop tab migrates it). Also reports whether a '
-    'build is running in either tab, its progress, the folder of the last '
-    'web build and whether the TapTap keys (taptap.client_id / '
-    'taptap.public_key) are filled in.',
+    'build is running in either tab, its progress and the folder of the last '
+    'web build.',
     {
         'type': 'object',
         'properties': {},
@@ -72,14 +71,10 @@ def _open_folder(folder):
 def get_build_settings(args):
     from pygamestudio.common.utils.config import get_project_config
     project_config = get_project_config()
-    taptap_keys = project_config.get('taptap') or {}
     data = {
         'config': project_config.get('build'),
         'project_path': str(project_path()),
         'has_main_py': (project_path() / 'main.py').exists(),
-        # A TapTap build needs both keys (studio.sdk.taptap.pc reads them).
-        'taptap_keys_set': bool(str(taptap_keys.get('client_id') or '').strip()
-                                and str(taptap_keys.get('public_key') or '').strip()),
     }
     body = _build_body(required=False)
     if body is not None:
@@ -96,27 +91,6 @@ def get_build_settings(args):
     return data
 
 
-def _taptap_key_warnings(config, platform_id):
-    """Warnings for a build whose chosen platform needs the TapTap keys.
-
-    The game reads ``taptap.client_id`` / ``taptap.public_key`` from
-    project.pygs at run time, so a TapTap build with empty keys would only
-    fail when the game initializes the SDK. Reporting it here lets the agent
-    fill the keys in before the (slow) build starts.
-    """
-    if (platform_id or '') != 'taptap':
-        return []
-    section = config.get('taptap') if isinstance(config, dict) else None
-    section = section if isinstance(section, dict) else {}
-    missing = [key for key in ('client_id', 'public_key')
-               if not str(section.get(key) or '').strip()]
-    if not missing:
-        return []
-    return ['build.platform is "taptap" but taptap.{} is empty in project.pygs - '
-            'the built game cannot initialize the TapTap SDK until it is filled '
-            'in (update_project_config).'.format(' / taptap.'.join(missing))]
-
-
 @tool(
     'start_build',
     'Package the project into a standalone desktop app with PyInstaller (same '
@@ -126,9 +100,9 @@ def _taptap_key_warnings(config, platform_id):
     'for the log, open_output_dir points at the result. Use platform to set '
     'where the build is published: "" = 无平台 (no platform), "taptap" = '
     'TapTap - only then the TapTap PC SDK is included in the package (config '
-    'key build.platform); a TapTap build also needs taptap.client_id / '
-    'taptap.public_key in project.pygs (the result warns when they are '
-    'empty). The shipped code stays protected: comments and docstrings are '
+    'key build.platform; the game passes its TapTap client id / public key to '
+    'studio.sdk.taptap.pc.init() in its own code). The shipped code stays '
+    'protected: comments and docstrings are '
     'stripped and the project modules and assets are encrypted, main.py stays '
     'readable and importing the project modules from it keeps working. Names '
     'are never renamed, so third party SDKs keep working.',
@@ -191,7 +165,6 @@ def start_build(args):
     if platform_id is not None:
         build_config['platform'] = platform_id
     save_project_config(config)
-    warnings = _taptap_key_warnings(config, build_config.get('platform', ''))
 
     # Mirror the values into the build window widgets, then start its thread.
     body._app_name_lineedit.setText(str(build_config.get('app_name', '')))
@@ -209,7 +182,6 @@ def start_build(args):
     return {
         'started': True,
         'config': build_config,
-        'warnings': warnings,
         'note': 'Poll get_build_settings for progress; the log appears in the console.',
     }
 

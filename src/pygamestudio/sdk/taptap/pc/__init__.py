@@ -9,10 +9,14 @@ Typical game integration::
 
     import pygamestudio as studio
 
+    # keys from the TapTap developer center; keep them in the game's own code
+    CLIENT_ID = '...'
+    PUB_KEY = '...'
+
     pc = studio.sdk.taptap.pc
-    pc.restart_app_if_necessary()   # before Game().run()
+    pc.restart_app_if_necessary(CLIENT_ID)   # before Game().run()
     # -> True: TapTap relaunches the game, exit the process
-    pc.init()
+    pc.init(CLIENT_ID, PUB_KEY)
 
     # in the game loop (on_update):
     pc.run_callbacks()
@@ -22,13 +26,15 @@ Typical game integration::
     request = pc.achievement.unlock('first_win')
     # request.done / request.ok / request.data once run_callbacks() delivered it
 
-``client_id`` / ``public_key`` may live in project.pygs::
-
-    {"taptap": {"client_id": "...", "public_key": "..."}}
-
 Where the SDK is not available (web build, non-Windows, DLL missing)
 ``available()`` is False and every call raises ``TapSDKNotAvailable`` with a
 readable reason instead of failing randomly.
+
+``client_id`` / ``public_key`` are optional arguments. A game that prefers to
+keep them in its project settings may add the section itself (the editor never
+writes it) and let the defaults read it::
+
+    {"taptap": {"client_id": "...", "public_key": "..."}}
 """
 
 from . import _achievement as achievement

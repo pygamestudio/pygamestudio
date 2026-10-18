@@ -2,15 +2,19 @@
 
 The lifecycle mirrors the SDK exactly::
 
-    pc.restart_app_if_necessary()   # before Game().run(); True -> sys.exit()
-    pc.init()                       # from the TapTap developer center key
-    ...                             # game loop: pc.run_callbacks() every frame
-    pc.shutdown()                   # optional, when the game quits
+    pc.restart_app_if_necessary(client_id)   # before Game().run(); True -> sys.exit()
+    pc.init(client_id, pub_key)              # keys from the TapTap developer center
+    ...                                      # game loop: pc.run_callbacks() every frame
+    pc.shutdown()                            # optional, when the game quits
 
-``client_id`` / ``public_key`` default to the optional ``taptap`` section of
-``project.pygs``::
+The client id and the game public key are the game's own settings: pass them
+to ``init()`` / ``restart_app_if_necessary()``, or keep them in an optional
+``taptap`` section of ``project.pygs`` that the developer adds himself (the
+editor never writes it) and let the defaults read it::
 
     {"taptap": {"client_id": "...", "public_key": "..."}}
+
+Explicit arguments always win over that section.
 """
 
 import ctypes
@@ -90,7 +94,13 @@ def require_initialized():
 
 
 def _project_taptap_config():
-    """The optional ``taptap`` section of project.pygs ({} when unavailable)."""
+    """The optional ``taptap`` section of project.pygs ({} when unavailable).
+
+    The editor never writes this section - the game decides whether to keep its
+    keys in project.pygs or in its own code. When it exists, ``init()`` and
+    ``restart_app_if_necessary()`` use it for values the caller left out;
+    explicit arguments always win.
+    """
     config = {}
     try:
         from pygamestudio.api.config.project import get_project_config
@@ -119,15 +129,16 @@ def restart_app_if_necessary(client_id=None):
     """检查游戏是否需要通过 TapTap 重启；在 main.py 最顶部、创建窗口前调用。
 
     返回 True 表示 TapTap 正在重新启动游戏，当前进程应立即退出（sys.exit()）。
-    client_id 缺省时读取 project.pygs 的 taptap.client_id。
+    client_id 可以传参；缺省时读取 project.pygs 中若存在的 taptap.client_id
+    （该字段由开发者自行添加，编辑器不会写入）。
     True when the game must restart through TapTap - quit the current process.
     """
-    config = _project_taptap_config()
-    client_id = client_id or config.get('client_id')
+    client_id = client_id or _project_taptap_config().get('client_id')
     if not client_id:
         raise _ffi.TapSDKError(
             'restart_app_if_necessary needs the client id: pass client_id=... (from the '
-            'TapTap developer center) or add {"taptap": {"client_id": "..."}} to project.pygs')
+            'TapTap developer center), or add a "taptap" section with "client_id" to '
+            'project.pygs yourself and read it in your game')
     library = _ffi.load()
     return bool(library.TapSDK_RestartAppIfNecessary(_ffi.encode(client_id)))
 
@@ -135,8 +146,9 @@ def restart_app_if_necessary(client_id=None):
 def init(client_id=None, pub_key=None):
     """初始化 TapSDK；成功返回 InitResult.OK，失败抛出 TapSDKInitError。
 
-    公钥（pub_key）来自 TapTap 开发者中心；缺省时读取 project.pygs 的
-    taptap.client_id / taptap.public_key。
+    client_id / pub_key 可以直接传参（推荐，key 属于游戏自己的代码）；缺省时
+    读取 project.pygs 中若存在的 taptap.client_id / taptap.public_key —— 该
+    字段由开发者自行添加，编辑器不会写入。传参优先于配置。
     Initialize the SDK. Returns InitResult.OK, raises TapSDKInitError otherwise.
     """
     if _state.initialized:
@@ -148,7 +160,8 @@ def init(client_id=None, pub_key=None):
     if not pub_key:
         raise _ffi.TapSDKError(
             'the TapSDK needs the game public key: pass pub_key=... (from the TapTap '
-            'developer center) or add {"taptap": {"public_key": "..."}} to project.pygs')
+            'developer center), or add a "taptap" section with "public_key" to '
+            'project.pygs yourself and read it in your game')
 
     error_buffer = ctypes.create_string_buffer(1024)
     result = int(library.TapSDK_Init(error_buffer, _ffi.encode(pub_key)))

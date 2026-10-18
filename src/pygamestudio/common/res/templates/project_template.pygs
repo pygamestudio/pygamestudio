@@ -11,9 +11,5 @@
         "app_name": "",
         "app_icon": "",
         "output_dir": ""
-    },
-    "taptap": {
-        "client_id": "",
-        "public_key": ""
     }
 }
