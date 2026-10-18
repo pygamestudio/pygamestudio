@@ -324,6 +324,11 @@ class _WebPreviewServer:
 
 
 class WebAppBuildWindow(QScrollArea):
+    #: The app icon and name are one setting shared with the desktop build tab
+    #: (build.app_icon / build.app_name); the build window saves them and
+    #: mirrors them.
+    app_icon_changed_signal = Signal(str)
+    app_name_changed_signal = Signal(str)
     def __init__(self, game_manager):
         super().__init__()
         self._game_manager = game_manager
@@ -375,7 +380,9 @@ class WebAppBuildWindow(QScrollArea):
         self._update_button_widths()
 
     def _set_signal(self):
+        self._app_name_lineedit.editingFinished.connect(self._on_app_name_edited)
         self._app_icon_browse_button.clicked.connect(self._browse_app_icon)
+        self._app_icon_lineedit.editingFinished.connect(self._on_app_icon_edited)
         self._output_dir_browse_button.clicked.connect(self._browse_output_dir)
         self._build_button.clicked.connect(self._build)
         self._run_button.clicked.connect(self._run_in_browser)
@@ -465,6 +472,33 @@ class WebAppBuildWindow(QScrollArea):
         icon_path, _ = QFileDialog.getOpenFileName(self, T.tr('build.select_app_icon', 'Select App Icon'), self._game_manager.get_project_path(), 'Format (*png *.ico *.jpg *.jpeg *.bmp *.gif)')
         if icon_path:
             self._app_icon_lineedit.setText(icon_path)
+            self._on_app_icon_edited()
+
+    def _on_app_icon_edited(self):
+        """Report the pick right away so it is saved even without a build.
+
+        ``build.app_icon`` is shared with the desktop build tab, so the build
+        window stores the path at once and shows it in both tabs. Otherwise a
+        pick was lost as soon as the app was closed without building (or the
+        other tab built with its still empty field).
+        """
+        self.app_icon_changed_signal.emit(self._app_icon_lineedit.text().strip())
+
+    def set_app_icon(self, icon_path):
+        """Show an app icon chosen in the other build tab (no new pick)."""
+        icon_path = str(icon_path or '')
+        if self._app_icon_lineedit.text() != icon_path:
+            self._app_icon_lineedit.setText(icon_path)
+
+    def _on_app_name_edited(self):
+        """Report the name right away: build.app_name is shared by both tabs."""
+        self.app_name_changed_signal.emit(self._app_name_lineedit.text().strip())
+
+    def set_app_name(self, app_name):
+        """Show an app name chosen in the other build tab (no new edit)."""
+        app_name = str(app_name or '')
+        if self._app_name_lineedit.text() != app_name:
+            self._app_name_lineedit.setText(app_name)
 
     def _browse_output_dir(self):
         output_dir = QFileDialog.getExistingDirectory(self, T.tr('build.select_output_dir', 'Select Output Dir'))

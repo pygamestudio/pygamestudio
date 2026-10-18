@@ -5,6 +5,7 @@ from pygamestudio.gui.base.window import WindowBase
 from pygamestudio.gui.build.desktop import DesktopAppBuildWindow
 from pygamestudio.gui.build.web import WebAppBuildWindow
 from pygamestudio.common.i18n.translator import Translator as T
+from pygamestudio.common.utils.config import update_project_config
 
 
 class BuildWindowBody(QTabWidget):
@@ -24,6 +25,26 @@ class BuildWindowBody(QTabWidget):
     
     def _set_signal(self):
         T.add_observer(self)
+        # The app name and icon are one setting for both targets
+        # (build.app_name / build.app_icon): an edit in either tab is saved at
+        # once and mirrored to the other tab, so it survives closing the editor
+        # and a build started from the other tab.
+        self._desktop_app_build_window.app_icon_changed_signal.connect(self._on_app_icon_changed)
+        self._web_app_build_window.app_icon_changed_signal.connect(self._on_app_icon_changed)
+        self._desktop_app_build_window.app_name_changed_signal.connect(self._on_app_name_changed)
+        self._web_app_build_window.app_name_changed_signal.connect(self._on_app_name_changed)
+
+    def _on_app_icon_changed(self, icon_path):
+        """Store the pick in project.pygs and show it in both tabs."""
+        update_project_config('build.app_icon', icon_path)
+        for build_window in (self._desktop_app_build_window, self._web_app_build_window):
+            build_window.set_app_icon(icon_path)
+
+    def _on_app_name_changed(self, app_name):
+        """Store the name in project.pygs and show it in both tabs."""
+        update_project_config('build.app_name', app_name)
+        for build_window in (self._desktop_app_build_window, self._web_app_build_window):
+            build_window.set_app_name(app_name)
 
     def retranslate(self):
         self.setTabText(0, T.tr('build.desktop_app', 'Desktop App'))
