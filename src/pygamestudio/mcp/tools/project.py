@@ -66,7 +66,8 @@ def get_project_info(args):
 @tool(
     'get_project_config',
     'Read project.pygs (the project settings: caption, screen size, start '
-    'scene, app name/icon/output dir).',
+    'scene, app name/icon/output dir, publishing platform and the taptap '
+    'client_id / public_key).',
     {
         'type': 'object',
         'properties': {},
@@ -83,7 +84,9 @@ def get_project_config_tool(args):
     'update_project_config',
     'Change project settings in project.pygs. Keys may be dotted, e.g. '
     '"screen_width", "caption", "build.app_name", "build.platform" '
-    '("" = 无平台, "taptap" = TapTap), "asset.current_scene". '
+    '("" = 无平台, "taptap" = TapTap), "taptap.client_id" / '
+    '"taptap.public_key" (the TapTap developer-center keys that '
+    'studio.sdk.taptap.pc reads) and "asset.current_scene". '
     'Changes are saved immediately (and are NOT part of the undo stack).',
     {
         'type': 'object',

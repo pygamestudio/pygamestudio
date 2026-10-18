@@ -76,8 +76,44 @@ class _ProtectedModuleLoader(importlib.abc.Loader):
         exec(_compile(filename, read_source(self._path)), module.__dict__)
 
 
+def _is_inside(path, root) -> bool:
+    """True when ``path`` lives inside ``root`` (both made absolute)."""
+    try:
+        return Path(path).resolve().is_relative_to(Path(root).resolve())
+    except (OSError, ValueError):
+        return False
+
+
 class _ProjectModuleFinder(importlib.abc.MetaPathFinder):
-    """Resolve protected project modules before the normal file finder."""
+    """Resolve protected project modules before the normal file finder.
+
+    A protected build encrypts the project's modules, so the standard finder
+    would read the container as source (``ValueError: source code string
+    cannot contain null bytes``). This finder looks for the module in
+
+    * the project root (``import script.taptap_login``),
+    * every sys.path entry inside the project - a game may add e.g. its
+      ``script`` folder to sys.path and then ``import taptap_login``, and
+    * the package folder of a sub-import, like the standard ``PathFinder``.
+
+    Files that are not protected are left to the normal finder, so plain
+    projects behave exactly as before.
+    """
+
+    @staticmethod
+    def _spec_for(base, fullname):
+        """Spec for ``base.py`` / ``base/__init__.py`` when it is protected."""
+        module_file = Path(str(base) + '.py')
+        if module_file.is_file() and assets.is_encrypted(module_file):
+            return importlib.util.spec_from_loader(fullname, _ProtectedModuleLoader(module_file))
+        package_file = Path(base) / '__init__.py'
+        if package_file.is_file() and assets.is_encrypted(package_file):
+            spec = importlib.util.spec_from_loader(fullname, _ProtectedModuleLoader(package_file, True),
+                                                   is_package=True)
+            if spec is not None:
+                spec.submodule_search_locations = [str(package_file.parent)]
+            return spec
+        return None
 
     def find_spec(self, fullname, path=None, target=None):
         root = (get_project_path() or '').strip()
@@ -87,17 +123,21 @@ class _ProjectModuleFinder(importlib.abc.MetaPathFinder):
         if not parts or any(not part.isidentifier() for part in parts):
             return None
 
-        module_file = Path(root).joinpath(*parts).with_suffix('.py')
-        if module_file.is_file() and assets.is_encrypted(module_file):
-            return importlib.util.spec_from_loader(fullname, _ProtectedModuleLoader(module_file))
-
-        package_file = Path(root).joinpath(*parts) / '__init__.py'
-        if package_file.is_file() and assets.is_encrypted(package_file):
-            spec = importlib.util.spec_from_loader(fullname, _ProtectedModuleLoader(package_file, True),
-                                                   is_package=True)
+        # Names relative to the project root and to project sys.path entries.
+        bases = [Path(root)]
+        bases += [Path(entry) for entry in sys.path
+                  if entry and _is_inside(entry, root)]
+        for base in bases:
+            spec = self._spec_for(base.joinpath(*parts), fullname)
             if spec is not None:
-                spec.submodule_search_locations = [str(package_file.parent)]
-            return spec
+                return spec
+
+        # Names relative to the package folder of a sub-import.
+        for entry in path or ():
+            if entry:
+                spec = self._spec_for(Path(entry).joinpath(parts[-1]), fullname)
+                if spec is not None:
+                    return spec
         return None
 
 

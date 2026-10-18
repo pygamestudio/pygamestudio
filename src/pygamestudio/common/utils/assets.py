@@ -18,9 +18,9 @@ even a multi-megabyte soundtrack is decrypted in a few milliseconds.
 
 The build key itself is not shipped as a separate "key" file: it is hidden
 inside ``resources.cache``, a small binary blob that looks like a resource
-index (see ``encode_key_blob``). That is obfuscation, not security - the key
-ships with the game and can be recovered - so it is only ever a speed bump on
-top of the obfuscated code.
+index (see ``encode_key_blob``). That is only a speed bump - the key ships
+with the game and can be recovered - so it protects against casual copying,
+not against a determined attacker.
 """
 import hashlib
 import io

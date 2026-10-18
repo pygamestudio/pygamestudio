@@ -12,6 +12,14 @@ from PySide6.QtWidgets import *
 #: version has to be adjusted once (see _migrate_editor_config).
 EDITOR_CONFIG_VERSION = 2
 
+#: Settings every project.pygs should carry. An older project gets the missing
+#: ones added once when the editor opens it; values already present are kept.
+PROJECT_CONFIG_DEFAULTS = {
+    # TapTap PC SDK keys (empty = not configured; fill them in from the TapTap
+    # developer center). studio.sdk.taptap.pc reads them from here.
+    'taptap': {'client_id': '', 'public_key': ''},
+}
+
 
 def get_editor_data_dir() -> Path:
     """Machine-local data folder of the editor (``editor.pygs`` and friends)."""
@@ -95,10 +103,39 @@ def get_project_config() -> dict:
         with open(project_config_json_path, 'w', encoding='utf-8') as f:
             f.write(project_config_template_content)
 
-        return json.loads(project_config_template_content)
+        return _migrate_project_config(json.loads(project_config_template_content),
+                                       project_config_json_path)
     
     with open(project_config_json_path, 'r', encoding='utf-8') as f:
-        return json.loads(f.read())
+        project_config = json.loads(f.read())
+    return _migrate_project_config(project_config, project_config_json_path)
+
+
+def _migrate_project_config(project_config: dict, path: Path) -> dict:
+    """Add the project settings an older project.pygs does not have yet.
+
+    Only missing keys are added (a value the user already set is never
+    touched), and the file is rewritten once so the new settings are visible
+    in project.pygs right away.
+    """
+    changed = False
+    for key, default in PROJECT_CONFIG_DEFAULTS.items():
+        if not isinstance(project_config.get(key), dict):
+            project_config[key] = dict(default)
+            changed = True
+            continue
+        section = project_config[key]
+        for field, value in default.items():
+            if field not in section:
+                section[field] = value
+                changed = True
+    if changed:
+        try:
+            path.write_text(json.dumps(project_config, indent=4, ensure_ascii=False),
+                            encoding='utf-8')
+        except OSError as error:
+            Logger.error(f'Failed to update project config: {error}')
+    return project_config
     
 
 def save_project_config(config:dict) -> None:

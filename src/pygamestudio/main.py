@@ -24,6 +24,7 @@ SOFTWARE.
 
 import os
 import sys
+from PySide6.QtCore import qInstallMessageHandler
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 from pygamestudio.gui.main import PygameStudio
@@ -31,6 +32,26 @@ from pygamestudio.gui.main import PygameStudio
 
 if sys.platform == 'linux':
     os.environ['QT_QPA_PLATFORM'] = 'xcb'
+
+
+def install_qt_message_filter():
+    """Drop one known-benign Qt warning from the console.
+
+    On Windows, DirectWrite logs a ``CreateFontFaceFromHDC()`` failure for the
+    legacy bitmap font "Fixedsys" whenever Windows' own font fallback or the
+    legacy IME touches it. Nothing in Pygame Studio asks for that family (the
+    code editor, the console and the agent panel all use explicit families);
+    Qt falls back to a scalable font and draws the text fine, so the line is
+    pure noise. Every other Qt message is printed like the default handler.
+    """
+    def handler(mode, context, message):
+        if 'CreateFontFaceFromHDC' in message:
+            return
+        category = getattr(context, 'category', '') or ''
+        prefix = '{}: '.format(category) if category not in ('', 'default') else ''
+        sys.stderr.write(prefix + message + '\n')
+
+    qInstallMessageHandler(handler)
 
 
 def set_application_icon(app):
@@ -48,6 +69,7 @@ def set_application_icon(app):
 
 
 def main():
+    install_qt_message_filter()
     app = QApplication([])
     set_application_icon(app)
     pygame_studio = PygameStudio()

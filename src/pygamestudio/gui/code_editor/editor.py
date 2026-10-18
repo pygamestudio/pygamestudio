@@ -669,7 +669,12 @@ class CodeEditor(QPlainTextEdit):
         self._search_bar.raise_()
         self._position_search_bar()
         self._search_bar.focus_input()
-        self._refresh_search()
+        # The query survives closing the bar, so the stored matches may have
+        # been collected from a previous (longer) document - refresh them for
+        # the CURRENT text before the highlights / the jump below touch stale
+        # offsets (QTextCursor::setPosition out-of-range warnings).
+        self._search_text = self._search_bar.search_text()
+        self._recompute_search_matches()
 
     def close_search(self):
         """Escape / the close button: hide the bar and drop the highlights.
@@ -752,6 +757,13 @@ class CodeEditor(QPlainTextEdit):
 
     def _select_search_match(self, index):
         start, length = self._search_matches[index]
+        document_length = self.document().characterCount() - 1
+        if start > document_length:
+            # A stale match from before the document was replaced: selecting
+            # it would only log QTextCursor::setPosition out-of-range warnings
+            # (and land nowhere useful).
+            return
+        length = min(length, document_length - start)
         cursor = QTextCursor(self.document())
         cursor.setPosition(start)
         cursor.setPosition(start + length, QTextCursor.MoveMode.KeepAnchor)
@@ -845,7 +857,9 @@ class CodeEditor(QPlainTextEdit):
 
         # Red wave underline on the syntax-error token (not the whole line).
         if self._error_start is not None:
-            block = self.document().findBlock(self._error_start)
+            error_position = min(self._error_start,
+                                 self.document().characterCount() - 1)
+            block = self.document().findBlock(error_position)
             if block.isValid():
                 error_selection = QTextEdit.ExtraSelection()
                 error_format = QTextCharFormat()
@@ -853,7 +867,7 @@ class CodeEditor(QPlainTextEdit):
                 error_format.setUnderlineColor(QColor('#f14c4c'))
                 error_selection.format = error_format
                 error_selection.cursor = QTextCursor(block)
-                error_selection.cursor.setPosition(self._error_start)
+                error_selection.cursor.setPosition(error_position)
                 error_selection.cursor.movePosition(
                     QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor)
                 selections.append(error_selection)
@@ -866,8 +880,12 @@ class CodeEditor(QPlainTextEdit):
             match_format.setBackground(self._match_color)
             current_format = QTextCharFormat()
             current_format.setBackground(self._current_match_color)
+            document_length = self.document().characterCount() - 1
             for index, (start, length) in enumerate(
                     self._search_matches[:self.MAX_SEARCH_HIGHLIGHTS]):
+                if start > document_length:
+                    continue
+                length = min(length, document_length - start)
                 selection = QTextEdit.ExtraSelection()
                 selection.format = (current_format if index == self._search_index
                                     else match_format)

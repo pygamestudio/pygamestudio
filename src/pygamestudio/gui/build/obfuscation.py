@@ -220,6 +220,26 @@ def _module_level_names(root) -> set:
     return names
 
 
+def _collect_global_names(project_dir) -> set:
+    """Names used in a ``global`` statement of any project module.
+
+    pyobfus renames the module-level variable but leaves the identifier inside
+    ``global`` untouched, so a function would silently create a new local that
+    shadows it (a logging handle stored that way stays None). Keeping those
+    names unchanged is the simple, safe fix.
+    """
+    names = set()
+    for script in sorted(Path(project_dir).rglob('*.py')):
+        try:
+            tree = ast.parse(script.read_text(encoding='utf-8', errors='replace'))
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Global):
+                names.update(node.names)
+    return names
+
+
 def _collect_module_attribute_names(project_dir) -> set:
     """Names other files of the project read as ``<module>.<name>``.
 
@@ -230,6 +250,11 @@ def _collect_module_attribute_names(project_dir) -> set:
     modules = _project_module_names(project_dir)
     if len(modules) < 2:
         return set()
+    # ``import taptap_login`` (with the script folder on sys.path) binds the
+    # bare module name, so map those names to their project module as well.
+    basenames = {}
+    for module_name in modules:
+        basenames.setdefault(module_name.split('.')[-1], module_name)
     reserved = set()
     for script in sorted(Path(project_dir).rglob('*.py')):
         try:
@@ -240,8 +265,9 @@ def _collect_module_attribute_names(project_dir) -> set:
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for alias in node.names:
-                    if alias.name in modules:
-                        aliases[alias.asname or alias.name] = alias.name
+                    target = alias.name if alias.name in modules else basenames.get(alias.name)
+                    if target:
+                        aliases[alias.asname or alias.name.split('.')[0]] = target
             elif isinstance(node, ast.ImportFrom):
                 base = node.module or ''
                 for alias in node.names:
@@ -310,6 +336,9 @@ def obfuscate(project_dir, work_dir) -> dict:
     # ``module.name`` accesses are not rewritten by the obfuscator, so those
     # names have to keep their name (see _collect_module_attribute_names).
     attribute_names = _collect_module_attribute_names(project_dir)
+    # pyobfus misses the identifier of a ``global`` statement - keep those
+    # names, too (see _collect_global_names).
+    global_names = _collect_global_names(project_dir)
     defined_before = _module_level_names(project_dir)
 
     code_dir = work_dir / 'code'
@@ -324,7 +353,7 @@ def obfuscate(project_dir, work_dir) -> dict:
         shutil.copy2(script, target)
 
     config_path = work_dir / 'pyobfus.yaml'
-    excluded = list(RESERVED_NAMES) + sorted(attribute_names)
+    excluded = list(RESERVED_NAMES) + sorted(attribute_names | global_names)
     exclude_lines = '\n'.join(f'    - "{name}"' for name in excluded)
     config_path.write_text(_CONFIG_TEMPLATE.format(exclude_names=exclude_lines), encoding='utf-8')
 
@@ -371,13 +400,15 @@ def obfuscate(project_dir, work_dir) -> dict:
     missing = sorted(callbacks - staged_callbacks)
     if missing:
         raise ObfuscationError(f'callbacks were renamed by the obfuscator: {", ".join(missing)}')
-    # names read as module attributes elsewhere must survive as well
+    # names read as module attributes elsewhere must survive as well, and so
+    # must the variables a ``global`` statement refers to
     defined_after = _module_level_names(project_dir)
-    lost = sorted(attribute_names & defined_before - defined_after)
+    lost = sorted(((attribute_names & defined_before) | global_names) - defined_after)
     if lost:
         raise ObfuscationError(f'names used as module attributes were renamed: {", ".join(lost)}')
 
-    return {'files': len(python_files), 'callbacks': len(callbacks), 'reserved': len(attribute_names)}
+    return {'files': len(python_files), 'callbacks': len(callbacks),
+            'reserved': len(attribute_names), 'globals': len(global_names)}
 
 
 def prepare(project_path, output_dir) -> dict:

@@ -5,8 +5,9 @@ The bundle is a plain folder with a few files:
 * ``index.html`` - loads Pyodide (Python compiled to WebAssembly), unpacks
   ``game.zip`` into its file system and starts the game loop;
 * ``game.zip`` - the PROTECTED project (assets and scripts encrypted, code
-  stripped/obfuscated, the build key in ``resources.cache`` - exactly like the
-  desktop build), plus a COPY of the engine and a generated ``web_boot.py``;
+  stripped of comments/docstrings, the build key in ``resources.cache`` -
+  exactly like the desktop build), plus a COPY of the engine and a generated
+  ``web_boot.py``;
 * one favicon file for the browser tab;
 * ``pymunk-*.whl`` - only when the project uses physics: the Pyodide wheel of
   pymunk (shipped with the engine), installed by the page from its own folder
@@ -37,7 +38,7 @@ from PySide6.QtCore import *
 from PySide6.QtWidgets import *
 import pygamestudio
 from pygamestudio.gui.console.logger import Logger
-from pygamestudio.gui.build import obfuscation
+from pygamestudio.gui.build import protection
 from pygamestudio.gui.build import assets as asset_build
 from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.common.utils import assets
@@ -747,7 +748,7 @@ class WebAppBuilder:
     # ---------- Build steps ----------
 
     def _prepare_protected_project(self, bundle_dir):
-        """Stage, strip, obfuscate and encrypt the project (like the desktop build).
+        """Stage, strip and encrypt the project (like the desktop build).
 
         The project folder itself is never touched: the protection works on the
         staging copy inside the bundle folder, and that copy is what gets
@@ -758,18 +759,15 @@ class WebAppBuilder:
         Logger.info(T.tr('build.protection_running', 'Preparing the project code and assets ...'))
         self._progress(8)
         try:
-            prepared = obfuscation.prepare(self._project_path, bundle_dir)
+            prepared = protection.prepare(self._project_path, bundle_dir)
         except asset_build.AssetBuildError as e:
             raise WebBuildError(T.tr('build.assets_failed', 'Encrypting the project assets failed, the build is stopped: {}').format(e))
-        except obfuscation.ObfuscationError as e:
-            raise WebBuildError(T.tr('build.obfuscation_failed', 'Code obfuscation failed, the build is stopped: {}').format(e))
-        except obfuscation.ProtectionError as e:
+        except protection.StripError as e:
+            raise WebBuildError(T.tr('build.code_strip_failed', 'Preparing the project code failed, the build is stopped: {}').format(e))
+        except protection.ProtectionError as e:
             raise WebBuildError(T.tr('build.staging_failed', 'The project could not be prepared for the build, the build is stopped: {}').format(e))
 
-        if prepared['obfuscation_summary'] is None:
-            Logger.warning(T.tr('build.obfuscation_unavailable', 'pyobfus was not found: the code is stripped but not name-obfuscated'))
-        else:
-            Logger.info(T.tr('build.obfuscation_enabled', 'Obfuscated {} python file(s), no comment or docstring left').format(prepared['obfuscation_summary']['files']))
+        Logger.info(T.tr('build.code_prepared', 'Prepared {} python file(s), comments and docstrings removed').format(prepared['strip_summary']['files']))
         summary = prepared['asset_summary']['summary']
         Logger.info(T.tr('build.assets_encrypted', 'Encrypted {} file(s) ({} KB), project scripts included').format(summary['files'], round(summary['bytes'] / 1024)))
         self._progress(20)

@@ -1,11 +1,11 @@
 """File protection for game builds.
 
-The build packages a staging copy of the project (see ``obfuscation.py``). This
+The build packages a staging copy of the project (see ``protection.py``). This
 module protects the files of that copy - images, audio, fonts, scene files,
-``project.pygs`` and the project's python modules (already stripped and
-obfuscated by the time they get here) - so the packaged game ships neither a
-plain resource nor readable code in the clear. The project itself is never
-touched: only the staging copy is rewritten.
+``project.pygs`` and the project's python modules (already stripped of
+comments and docstrings by the time they get here) - so the packaged game
+ships neither a plain resource nor readable code in the clear. The project
+itself is never touched: only the staging copy is rewritten.
 
 The per-build key is hidden inside ``resources.cache``, a small binary blob in
 the staging root that looks like a resource index; the runtime

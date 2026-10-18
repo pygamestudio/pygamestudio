@@ -10,7 +10,7 @@ from PySide6.QtGui import *
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
 from pygamestudio.gui.console.logger import Logger
-from pygamestudio.gui.build import obfuscation
+from pygamestudio.gui.build import protection
 from pygamestudio.gui.build import assets as asset_build
 from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.common.utils.config import get_project_config, update_project_config
@@ -528,8 +528,8 @@ class BuildThread(QThread):
         cmd.extend(['--specpath', output_dir.as_posix()])
 
         # The build packages a staging copy of the project: the code of that
-        # copy loses every comment/docstring (and is obfuscated when pyobfus is
-        # available) and its assets are encrypted. The project stays untouched.
+        # copy loses every comment/docstring and its assets and modules are
+        # encrypted. The project stays untouched.
         build_project_path = self._prepare_build_project(project_path, output_dir)
 
         sep = ';' if platform.system() == 'Windows' else ':'
@@ -553,23 +553,18 @@ class BuildThread(QThread):
         """
         Logger.info(T.tr('build.protection_running', 'Preparing the project code and assets ...'))
         try:
-            result = obfuscation.prepare(project_path, output_dir)
+            result = protection.prepare(project_path, output_dir)
         except asset_build.AssetBuildError as e:
             Logger.error(T.tr('build.assets_failed', 'Encrypting the project assets failed, the build is stopped: {}').format(e))
             raise
-        except obfuscation.ObfuscationError as e:
-            # Never ship readable code silently when obfuscation was expected -
-            # the user would not notice the difference.
-            Logger.error(T.tr('build.obfuscation_failed', 'Code obfuscation failed, the build is stopped: {}').format(e))
+        except protection.StripError as e:
+            Logger.error(T.tr('build.code_strip_failed', 'Preparing the project code failed, the build is stopped: {}').format(e))
             raise
-        except obfuscation.ProtectionError as e:
+        except protection.ProtectionError as e:
             Logger.error(T.tr('build.staging_failed', 'The project could not be prepared for the build, the build is stopped: {}').format(e))
             raise
 
-        if result['obfuscation_summary'] is None:
-            Logger.warning(T.tr('build.obfuscation_unavailable', 'pyobfus was not found: the code is stripped but not name-obfuscated'))
-        else:
-            Logger.info(T.tr('build.obfuscation_enabled', 'Obfuscated {} python file(s), no comment or docstring left').format(result['obfuscation_summary']['files']))
+        Logger.info(T.tr('build.code_prepared', 'Prepared {} python file(s), comments and docstrings removed').format(result['strip_summary']['files']))
         summary = result['asset_summary']['summary']
         Logger.info(T.tr('build.assets_encrypted', 'Encrypted {} asset file(s) ({} KB)').format(summary['files'], round(summary['bytes'] / 1024)))
         return result['project_dir']

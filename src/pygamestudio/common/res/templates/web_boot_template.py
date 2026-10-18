@@ -52,11 +52,12 @@ the browser) is involved.
 
 
 def _find_game_class(project_main):
-    """The project's Game class, whatever the protection did to its name.
+    """The project's Game class (``Game``, or any subclass if it was renamed).
 
-    The build obfuscates the project code like the desktop build does and that
-    can rename the class, so the boot does not rely on the name ``Game``: the
-    first subclass of the engine's Game inside main.py wins.
+    The build keeps the names of the project intact, but a game may import its
+    game class from a module or name it differently, so the boot does not rely
+    on the name ``Game`` alone: the first subclass of the engine's Game inside
+    main.py wins.
     """
     import pygamestudio as studio
 
