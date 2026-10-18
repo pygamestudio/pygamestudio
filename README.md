@@ -55,7 +55,6 @@ If the Pygame Studio editor launches successfully, the installation is complete.
 | pyinstaller | >=6.18.0 |
 | soundfile | >=0.13.1 |
 | pymunk | >=7.3.0 |
-| pyobfus | >=0.5.26 |
 
 <br>
 
