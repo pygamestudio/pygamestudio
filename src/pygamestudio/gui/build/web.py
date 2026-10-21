@@ -49,10 +49,12 @@ from pygamestudio.gui.build import protection
 from pygamestudio.gui.build import assets as asset_build
 from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.common.utils import assets
+from pygamestudio.common.utils import qr
 from pygamestudio.common.utils.config import (get_project_config,
                                               save_project_config,
                                               update_project_config)
 from pygamestudio.common.utils.path import RES_PATH
+from pygamestudio.common.utils.system import get_lan_ip
 
 #: Pyodide runtime the generated page falls back to when the engine's bundled
 #: copy is missing (it normally ships in ``common/res/pyodide`` and is loaded
@@ -373,7 +375,10 @@ class _WebPreviewServer:
 
     The page must be served over HTTP (a ``file://`` page cannot fetch
     game.zip), so Run starts this server for the bundle folder and opens the
-    browser on it. The thread is a daemon: closing the editor stops it.
+    browser on it. It listens on every interface (``0.0.0.0``) so a phone on
+    the same network can open the page too - that is the address the QR button
+    hands out - while the desktop browser keeps using the loopback one. The
+    thread is a daemon: closing the editor stops it.
     """
 
     def __init__(self):
@@ -381,22 +386,39 @@ class _WebPreviewServer:
         self._thread = None
         self._directory = None
         self._url = ''
+        self._lan_url = ''
 
     def url_for(self, directory) -> str:
         """Start (or reuse) the server for this folder and return its URL."""
+        self._start(directory)
+        return self._url
+
+    def lan_url_for(self, directory) -> str:
+        """The same page as a phone on the same network opens it.
+
+        Falls back to the loopback address when no LAN address can be found
+        (no network, firewall-only setups).
+        """
+        self._start(directory)
+        return self._lan_url or self._url
+
+    def _start(self, directory):
         directory = Path(directory).resolve()
         if self._server is not None and self._directory == directory:
-            return self._url
+            return
 
         self.stop()
         handler = partial(_WebPreviewRequestHandler, directory=directory.as_posix())
-        self._server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), handler)
+        # 0.0.0.0 = every interface: the loopback as well as the LAN address a
+        # phone uses.
+        self._server = http.server.ThreadingHTTPServer(('0.0.0.0', 0), handler)
         self._server.daemon_threads = True
         self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
         self._thread.start()
         self._directory = directory
-        self._url = 'http://127.0.0.1:{}/index.html'.format(self._server.server_address[1])
-        return self._url
+        port = self._server.server_address[1]
+        self._url = 'http://127.0.0.1:{}/index.html'.format(port)
+        self._lan_url = 'http://{}:{}/index.html'.format(get_lan_ip() or '127.0.0.1', port)
 
     def stop(self):
         if self._server is not None:
@@ -406,6 +428,54 @@ class _WebPreviewServer:
         self._thread = None
         self._directory = None
         self._url = ''
+        self._lan_url = ''
+
+
+class _QrPopup(QWidget):
+    """Floating panel with the QR code of the phone preview address.
+
+    It is a tooltip-type window: it never takes focus or activates the editor,
+    so hovering the QR button does not disturb whatever the user is typing.
+    """
+
+    def __init__(self):
+        super().__init__(None, Qt.WindowType.ToolTip | Qt.WindowType.FramelessWindowHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
+        self._title_label = QLabel()
+        self._image_label = QLabel()
+        self._url_label = QLabel()
+        self._url_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self._url_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self._url_label.setWordWrap(True)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 10, 12, 10)
+        layout.addWidget(self._title_label)
+        layout.addWidget(self._image_label, 0, Qt.AlignmentFlag.AlignHCenter)
+        layout.addWidget(self._url_label)
+        self.setStyleSheet(
+            'QWidget { background: #ffffff; color: #202020; '
+            'border: 1px solid #9aa0a6; } '
+            'QLabel { border: none; }')
+        self._title_label.setStyleSheet('font-weight: 600;')
+
+    def set_title(self, text):
+        self._title_label.setText(text)
+        self._title_label.setVisible(bool(text))
+
+    def set_content(self, image, text):
+        """Show ``image`` (None = no code) above ``text``."""
+        if image is None or image.isNull():
+            self._image_label.clear()
+            self._image_label.hide()
+        else:
+            pixmap = QPixmap.fromImage(image)
+            self._image_label.setPixmap(pixmap)
+            self._image_label.show()
+        self._url_label.setText(text)
+        self._url_label.setVisible(bool(text))
+        self.adjustSize()
 
 
 class WebAppBuildWindow(QScrollArea):
@@ -430,6 +500,12 @@ class WebAppBuildWindow(QScrollArea):
         self._build_button = QPushButton()
         self._run_button = QPushButton()
         self._open_output_dir_button = QPushButton()
+        #: Hovering this icon shows the QR code a phone scans to open the same
+        #: preview page (the server listens on every interface for it).
+        self._qr_button = QPushButton()
+        self._qr_popup = None
+        #: Last printed phone address, so hovering does not flood the console.
+        self._qr_logged_url = None
         #: Publishing-platform picker (bottom-right, like the desktop tab):
         #: the pick decides how the bundle is packaged (Bilibili Toy renames
         #: the containers to whitelisted suffixes and loads the Toy SDK).
@@ -467,6 +543,13 @@ class WebAppBuildWindow(QScrollArea):
         self._run_button.setText(T.tr('build.web_run', 'Run in Browser'))
         self._run_button.setEnabled(False)
         self._open_output_dir_button.setText(T.tr('build.open_output_dir', 'Open Output Dir'))
+        self._qr_button.setIcon(QIcon(':/images/qr_code.png'))
+        self._qr_button.setIconSize(QSize(18, 18))
+        self._qr_button.setFixedSize(QSize(26, 26))
+        self._qr_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._qr_button.setToolTip(T.tr(
+            'build.web_qr_tooltip',
+            'Hover to show a QR code - scan it with your phone to try the game'))
         self._platform_label.setText(T.tr('build.platform_label', 'Publishing Platform:'))
         self._set_platform_combobox_texts()
         self._set_platform_tooltip()
@@ -480,6 +563,9 @@ class WebAppBuildWindow(QScrollArea):
         self._build_button.clicked.connect(self._build)
         self._run_button.clicked.connect(self._run_in_browser)
         self._open_output_dir_button.clicked.connect(self._open_output_dir)
+        # The QR code appears while the pointer rests on the icon, so it is a
+        # hover (event filter) rather than a click.
+        self._qr_button.installEventFilter(self)
         self._platform_combobox.activated.connect(self._on_platform_activated)
 
         self._build_thread.stopped_signal.connect(self._on_build_stopped)
@@ -501,10 +587,12 @@ class WebAppBuildWindow(QScrollArea):
 
         button_layout = QHBoxLayout()
         button_layout.addWidget(self._build_button)
-        button_layout.addSpacing(5)
+        button_layout.addSpacing(1)
         button_layout.addWidget(self._run_button)
-        button_layout.addSpacing(5)
+        button_layout.addSpacing(1)
         button_layout.addWidget(self._open_output_dir_button)
+        button_layout.addSpacing(1)
+        button_layout.addWidget(self._qr_button)
         button_layout.addStretch()
         # Bottom-right corner: label + publishing-platform picker.
         button_layout.addWidget(self._platform_label)
@@ -722,6 +810,90 @@ class WebAppBuildWindow(QScrollArea):
         else:
             QMessageBox.information(QApplication.activeWindow(), T.tr('message_box.information_title', 'Info'), T.tr('message_box.information_os_content', 'Unsupported Operating System'))
 
+    # ------------------------------------------------------------ phone QR code
+    def eventFilter(self, watched, event):
+        """Show the phone QR code while the pointer rests on its button."""
+        if watched is self._qr_button:
+            if event.type() == QEvent.Type.Enter:
+                self._show_qr_popup()
+            elif event.type() in (QEvent.Type.Leave, QEvent.Type.Hide):
+                self._hide_qr_popup()
+        return super().eventFilter(watched, event)
+
+    def _current_bundle_dir(self):
+        """The built bundle folder: the last build, else <output>/build/Web."""
+        bundle_dir = self._build_thread.bundle_dir
+        if bundle_dir is not None and Path(bundle_dir).exists():
+            return Path(bundle_dir)
+        output_dir = self._output_dir_lineedit.text().strip()
+        if output_dir:
+            candidate = Path(output_dir).joinpath(*BUNDLE_SUBDIR)
+            if candidate.exists():
+                return candidate
+        return None
+
+    def _ensure_qr_popup(self):
+        if self._qr_popup is None:
+            self._qr_popup = _QrPopup()
+        return self._qr_popup
+
+    def _show_qr_popup(self):
+        """Show the QR code of the address a phone on this network opens."""
+        popup = self._ensure_qr_popup()
+        popup.set_title(T.tr('build.web_qr_title', 'Scan with your phone to play'))
+
+        bundle_dir = self._current_bundle_dir()
+        if bundle_dir is None:
+            popup.set_content(None, T.tr(
+                'build.web_qr_no_build',
+                'Build the web app first - the QR code links to the preview server'))
+            self._place_qr_popup(popup)
+            popup.show()
+            return
+
+        try:
+            url = self._preview_server.lan_url_for(bundle_dir)
+            image = qr.to_qimage(url, scale=5)
+        except Exception as error:
+            popup.set_content(None, T.tr(
+                'build.web_qr_failed',
+                'Could not start the phone preview server: {}').format(error))
+            self._place_qr_popup(popup)
+            popup.show()
+            return
+
+        if self._qr_logged_url != url:
+            Logger.info(T.tr('build.web_preview_lan', 'Phone preview (same network): {}').format(url))
+            self._qr_logged_url = url
+        popup.set_content(image, url)
+        self._place_qr_popup(popup)
+        popup.show()
+
+    def _place_qr_popup(self, popup):
+        """Sit the panel above the button, kept inside the screen."""
+        anchor = self._qr_button.mapToGlobal(self._qr_button.rect().topRight())
+        size = popup.sizeHint()
+        x = anchor.x() - size.width()
+        y = anchor.y() - size.height() - 8
+        screen = self._qr_button.screen()
+        if screen is not None:
+            available = screen.availableGeometry()
+            x = max(available.left() + 4, min(x, available.right() - size.width() - 4))
+            y = max(available.top() + 4, min(y, available.bottom() - size.height() - 4))
+        popup.move(int(x), int(y))
+
+    def _hide_qr_popup(self):
+        if self._qr_popup is not None:
+            self._qr_popup.hide()
+
+    def closeEvent(self, event):
+        """Drop the floating QR panel together with the window."""
+        if self._qr_popup is not None:
+            self._qr_popup.hide()
+            self._qr_popup.deleteLater()
+            self._qr_popup = None
+        super().closeEvent(event)
+
     def _run_in_browser(self):
         """Serve the built folder over HTTP and open it in the browser."""
         bundle_dir = self._build_thread.bundle_dir
@@ -793,6 +965,9 @@ class WebAppBuildWindow(QScrollArea):
         self._build_button.setText(T.tr('build.build', 'Build'))
         self._run_button.setText(T.tr('build.web_run', 'Run in Browser'))
         self._open_output_dir_button.setText(T.tr('build.open_output_dir', 'Open Output Dir'))
+        self._qr_button.setToolTip(T.tr(
+            'build.web_qr_tooltip',
+            'Hover to show a QR code - scan it with your phone to try the game'))
         self._platform_label.setText(T.tr('build.platform_label', 'Publishing Platform:'))
         self._set_platform_combobox_texts()
         self._set_platform_tooltip()

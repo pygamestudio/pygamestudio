@@ -64,6 +64,38 @@ def get_system_lang():
     return 'en'
 
 
+def get_lan_ip() -> str:
+    """The LAN address of this machine ('' when it cannot be found).
+
+    Used to build the address a phone on the same Wi-Fi opens. A UDP socket
+    "connects" to a documentation address (no packet is sent) so the OS picks
+    the interface a real connection would use - that is the address other
+    devices on the network can reach. Falls back to the host name lookup and
+    finally to '' (the caller then keeps the loopback address).
+    """
+    import socket
+
+    candidates = []
+    try:
+        probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            probe.connect(('192.0.2.1', 9))       # TEST-NET-1, nothing is sent
+            candidates.append(probe.getsockname()[0])
+        finally:
+            probe.close()
+    except OSError:
+        pass
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            candidates.append(info[4][0])
+    except OSError:
+        pass
+    for address in candidates:
+        if address and not address.startswith('127.') and address != '0.0.0.0':
+            return address
+    return ''
+
+
 def send_to_trash(path):
     """Move a file or folder to the system trash / recycle bin.
 

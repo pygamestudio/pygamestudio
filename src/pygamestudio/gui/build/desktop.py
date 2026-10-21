@@ -110,9 +110,9 @@ class DesktopAppBuildWindow(QScrollArea):
 
         button_layout = QHBoxLayout()
         button_layout.addWidget(self._build_button)
-        button_layout.addSpacing(5)
+        button_layout.addSpacing(1)
         button_layout.addWidget(self._run_button)
-        button_layout.addSpacing(5)
+        button_layout.addSpacing(1)
         button_layout.addWidget(self._open_output_dir_button)
         button_layout.addStretch()
         # Bottom-right corner: label + platform picker of the build.
