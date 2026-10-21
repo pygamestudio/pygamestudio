@@ -31,11 +31,6 @@ from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.common.utils import assets
 from pygamestudio.common.utils import project_modules
 
-#: A touch that stays down longer than this is a press, not a tap.
-TOUCH_TAP_MAX_MS = 400
-#: How far (pixels) a finger may travel and still count as a tap.
-TOUCH_TAP_SLOP = 12
-
 
 class SceneLoader:
     """Runtime mirror of the editor's scene tree.
@@ -58,6 +53,11 @@ class SceneLoader:
     # without touch hooks keep receiving the mouse events (touch first, mouse
     # as the fallback).
     _TOUCH_EVENTS = ('on_touch_down', 'on_touch_move', 'on_touch_up', 'on_tap')
+
+    #: A touch that stays down longer than this is a press, not a tap.
+    TOUCH_TAP_MAX_MS = 400
+    #: How far (pixels) a finger may travel and still count as a tap.
+    TOUCH_TAP_SLOP = 12
 
     def __init__(self):
         self._current_scene_path = ''
@@ -1234,7 +1234,7 @@ class SceneLoader:
         if press is not None and not press['moved']:
             dx = pos[0] - press['pos'][0]
             dy = pos[1] - press['pos'][1]
-            if dx * dx + dy * dy > TOUCH_TAP_SLOP * TOUCH_TAP_SLOP:
+            if dx * dx + dy * dy > self.TOUCH_TAP_SLOP * self.TOUCH_TAP_SLOP:
                 press['moved'] = True
         self._emit_object_event(target, 'on_touch_move', finger_id, pos)
         return True
@@ -1252,7 +1252,7 @@ class SceneLoader:
         self._emit_object_event(target, 'on_touch_up', finger_id, pos)
         if press is not None and not press['moved']:
             elapsed = pygame.time.get_ticks() - press['ms']
-            if elapsed <= TOUCH_TAP_MAX_MS:
+            if elapsed <= self.TOUCH_TAP_MAX_MS:
                 if self._event_target(pos, self._TOUCH_EVENTS) is target:
                     self._emit_object_event(target, 'on_tap', finger_id, pos)
         return True

@@ -199,8 +199,8 @@ ENGINE_RUNTIME_API = (
     'set_allow_screensaver', 'is_allow_screensaver',
     # project
     'get_project_config', 'get_project_path',
-    # TapTap platform bridge (studio.sdk.taptap.pc - Windows x64 desktop only)
-    'sdk', 'taptap',
+    # platform bridges (studio.sdk.*): TapTap PC (desktop) and Bilibili Toy
+    'sdk', 'taptap', 'toy',
     # keyframe animation helpers (game/object/keyframe.py)
     'normalize_keyframes', 'snapshot_from_object', 'ease_progress',
     'DEFAULT_EASING', 'EASING_CURVES', 'KEYFRAME_CHANNELS',
@@ -286,21 +286,62 @@ def engine_object_members():
     return _OBJECT_MEMBERS
 
 
+def _engine_packages():
+    """Engine packages a bare module name may come from (`toy`, `taptap`).
+
+    A game script usually writes ``from pygamestudio.sdk import toy`` and then
+    ``toy.get_user_profile()``, so the name in front of the dot is not
+    ``studio.``-prefixed. Only packages that are already imported are
+    inspected - a hint never imports a module as a side effect.
+    """
+    packages = []
+    try:
+        import pygamestudio
+    except Exception:  # noqa: BLE001 - hints must never break the editor
+        return packages
+    packages.append(pygamestudio)
+    sdk = getattr(pygamestudio, 'sdk', None)
+    for module in (sdk, getattr(pygamestudio, 'api', None),
+                   getattr(pygamestudio, 'game', None)):
+        if isinstance(module, ModuleType):
+            packages.append(module)
+    if isinstance(sdk, ModuleType):
+        for name in ('toy', 'taptap'):
+            module = getattr(sdk, name, None)
+            if isinstance(module, ModuleType):
+                packages.append(module)
+    return packages
+
+
 def _resolve_expression(expr):
-    """The object an expression like ``studio.sdk.taptap.pc`` refers to.
+    """The object an expression like ``studio.sdk.toy`` or ``toy`` refers to.
 
     Only names that are already imported are walked - a hint never imports a
     module as a side effect. None when the expression cannot be resolved.
     """
     parts = expr.split('.')
-    if parts[0] not in ('studio', 'pygamestudio'):
-        return None
     try:
         import pygamestudio
     except Exception:  # noqa: BLE001 - hints must never break the editor
         return None
-    target = pygamestudio
-    for part in parts[1:]:
+    if parts[0] in ('studio', 'pygamestudio'):
+        target = pygamestudio
+        rest = parts[1:]
+    else:
+        # A name the script imported itself (``toy`` after
+        # ``from pygamestudio.sdk import toy``): look for that module in the
+        # engine packages that are already loaded.
+        target = None
+        rest = parts
+        for package in _engine_packages():
+            candidate = getattr(package, parts[0], None)
+            if isinstance(candidate, ModuleType):
+                target = candidate
+                rest = parts[1:]
+                break
+        if target is None:
+            return None
+    for part in rest:
         target = getattr(target, part, None)
         if target is None:
             return None
