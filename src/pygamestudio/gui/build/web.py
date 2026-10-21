@@ -19,6 +19,13 @@ async ``Game.run_async()`` loop, and ``run()`` is kept as a wrapper for
 synchronous callers. **The installed engine is never modified** - every change
 lives in the archive, and the project keeps running from the editor/desktop
 exactly as before.
+
+The publishing platform decides the packaging (see the dropdown in the build
+window). "None" produces the bundle described above; **Bilibili Toy** only
+accepts whitelisted file suffixes, so there the containers are renamed to
+``.data`` (``game.data``, ``python_stdlib.data``, the wheels), the runtime's
+loader and lock file are patched to match, and the page also loads the Toy JS
+SDK - the Python side of it lives in ``pygamestudio/sdk/toy``.
 """
 
 import html
@@ -42,7 +49,9 @@ from pygamestudio.gui.build import protection
 from pygamestudio.gui.build import assets as asset_build
 from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.common.utils import assets
-from pygamestudio.common.utils.config import get_project_config, update_project_config
+from pygamestudio.common.utils.config import (get_project_config,
+                                              save_project_config,
+                                              update_project_config)
 from pygamestudio.common.utils.path import RES_PATH
 
 #: Pyodide runtime the generated page falls back to when the engine's bundled
@@ -59,6 +68,9 @@ PYODIDE_DIR_NAME = 'pyodide'
 LOCAL_PYODIDE_URL = './{}/'.format(PYODIDE_DIR_NAME)
 #: Where a web build lands inside the output dir.
 BUNDLE_SUBDIR = ('build', 'Web')
+#: Suffix of the folder the package is assembled in before it replaces the
+#: previous bundle (a failed build never leaves a half-written package).
+BUNDLE_STAGING_SUFFIX = '.building'
 #: Staging folder of the protection step, inside the bundle dir (removed again
 #: once the archive is written); same name the desktop build uses.
 PROTECTED_WORK_DIR_NAME = '_protected'
@@ -75,6 +87,26 @@ _IGNORED_DIR_NAMES = {'__pycache__', '.git', '.github', '.vscode', '.idea',
 #: ``sdk`` holds the platform bridges: copied so ``import`` never
 #: breaks in the browser, where every call reports "Windows only".
 _ENGINE_DIRS = ('api', 'game', 'common', 'sdk')
+#: Bridges that never belong in a web bundle: the TapTap PC SDK is a Windows
+#: desktop library (ctypes + a DLL) and the browser has no use for it. The
+#: page only keeps the bridges that work there (Bilibili Toy).
+_ENGINE_WEB_SKIP_DIRS = (('sdk', 'taptap'),)
+#: Single engine files the page never shows (the TapTap pick only exists in the
+#: desktop tab of the build window).
+_ENGINE_WEB_SKIP_FILES = ('common/res/images/taptap_logo.png',)
+#: ``sdk/__init__.py`` written into the bundle: the real one imports every
+#: bridge, which would fail when the desktop-only package is left out.
+_WEB_SDK_INIT_SOURCE = '''"""studio.sdk - the platform bridges available to this web build.
+
+The TapTap PC bridge is a Windows desktop library and is not part of a browser
+bundle; ``toy`` talks to the Bilibili Toy JS SDK the page loads when the bundle
+is packaged for that platform (``toy.available()`` is False everywhere else).
+"""
+
+from . import toy
+
+__all__ = ['toy']
+'''
 #: Editor files the runtime imports (the logger is plain Python, no Qt in it).
 _ENGINE_EXTRA_FILES = ('gui/__init__.py', 'gui/console/__init__.py', 'gui/console/logger.py')
 #: ``common/res`` data only the desktop/editor side uses (fonts are per
@@ -88,6 +120,59 @@ WHEELS_DIR_NAME = 'wheels'
 PYMUNK_SOURCE_PLACEHOLDER = '__PYGS_PYMUNK_SOURCE__'
 #: Install source used when the shipped pymunk wheel is missing (PyPI name).
 PYMUNK_PACKAGE_NAME = 'pymunk'
+#: Platform picker value for a plain (no platform) bundle.
+NO_PLATFORM_ID = ''
+#: Platform picker value for a Bilibili Toy bundle.
+TOY_PLATFORM_ID = 'bilibili_toy'
+#: File suffixes the Bilibili Toy platform publishes - everything else is
+#: silently dropped by the upload, so a Toy bundle only contains these.
+TOY_ALLOWED_SUFFIXES = frozenset((
+    # page, script, data
+    '.html', '.htm', '.css', '.js', '.json', '.wasm',
+    '.data', '.md', '.csv', '.tsv',
+    # images, fonts
+    '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.ico',
+    '.woff2', '.woff', '.ttf', '.eot',
+    # audio, video
+    '.mp3', '.wav', '.ogg', '.m4a', '.mp4', '.webm',
+    # engine resources
+    '.atlas', '.ani', '.part', '.nani', '.unityweb',
+))
+#: Containers the platform filters (``.zip``, ``.whl``) ship as ``.data``.
+TOY_GAME_ARCHIVE_NAME = 'game.data'
+TOY_STDLIB_ARCHIVE_NAME = 'python_stdlib.data'
+#: Literal rewrites that keep the runtime able to parse its renamed wheels:
+#: the distribution turns a wheel URL back into package name/version with
+#: ``/^.*?([^\/]*)\.whl$/`` and rebuilds the file name with ``+".whl"``.
+TOY_WHEEL_NAME_PATCHES = (
+    (r'/^.*?([^\/]*)\.whl$/', r'/^.*?([^\/]*)\.(whl|data)$/'),
+    ('r.join("-")+".whl"', 'r.join("-")+"."+e[2]'),
+)
+#: The platform SDK script (provides ``window.toy``); only a Toy page loads it.
+TOY_SDK_SCRIPT = '<script src="//s1.hdslb.com/bfs/seed/toy/app/sdk/toy-sdk.js"></script>'
+#: Patch of ``pyodide/_package_loader.py`` inside the shipped standard library:
+#: the package loader decides the archive format and the wheel handling from
+#: the file extension, which the Toy build had to change to ``.data``. Each
+#: entry must match exactly once, otherwise the build stops.
+_TOY_LOADER_PATCHES = (
+    (
+        "        buffer._into_file(f)\n"
+        "        shutil.unpack_archive(f.name, extract_path, format)\n"
+        "\n"
+        "        suffix = Path(f.name).suffix\n"
+        "        if suffix == \".whl\":\n",
+        "        buffer._into_file(f)\n"
+        "        # Toy build patch: the platform only serves whitelisted suffixes,\n"
+        "        # so the wheels arrive renamed to .data - they are still zips and\n"
+        "        # are installed exactly like a wheel.\n"
+        "        suffix = \".whl\" if filename.endswith(\".data\") else Path(f.name).suffix\n"
+        "        shutil.unpack_archive(f.name, extract_path, format or \"zip\")\n"
+        "\n"
+        "        if suffix == \".whl\":\n",
+    ),
+)
+#: Module of the standard library that carries the package loader patch.
+_TOY_LOADER_MODULE = 'pyodide/_package_loader.py'
 #: File names never copied from the project root.
 _PROJECT_SKIP_SUFFIXES = ('.pyc', '.pyo')
 #: Engine file replaced by its patched copy in the bundle.
@@ -345,6 +430,11 @@ class WebAppBuildWindow(QScrollArea):
         self._build_button = QPushButton()
         self._run_button = QPushButton()
         self._open_output_dir_button = QPushButton()
+        #: Publishing-platform picker (bottom-right, like the desktop tab):
+        #: the pick decides how the bundle is packaged (Bilibili Toy renames
+        #: the containers to whitelisted suffixes and loads the Toy SDK).
+        self._platform_label = QLabel()
+        self._platform_combobox = QComboBox()
 
         self._build_thread = WebBuildThread(self._game_manager)
         self._preview_server = _WebPreviewServer()
@@ -377,6 +467,9 @@ class WebAppBuildWindow(QScrollArea):
         self._run_button.setText(T.tr('build.web_run', 'Run in Browser'))
         self._run_button.setEnabled(False)
         self._open_output_dir_button.setText(T.tr('build.open_output_dir', 'Open Output Dir'))
+        self._platform_label.setText(T.tr('build.platform_label', 'Publishing Platform:'))
+        self._set_platform_combobox_texts()
+        self._set_platform_tooltip()
         self._update_button_widths()
 
     def _set_signal(self):
@@ -387,6 +480,7 @@ class WebAppBuildWindow(QScrollArea):
         self._build_button.clicked.connect(self._build)
         self._run_button.clicked.connect(self._run_in_browser)
         self._open_output_dir_button.clicked.connect(self._open_output_dir)
+        self._platform_combobox.activated.connect(self._on_platform_activated)
 
         self._build_thread.stopped_signal.connect(self._on_build_stopped)
         self._build_thread.finished_signal.connect(self._on_build_finished)
@@ -412,6 +506,9 @@ class WebAppBuildWindow(QScrollArea):
         button_layout.addSpacing(5)
         button_layout.addWidget(self._open_output_dir_button)
         button_layout.addStretch()
+        # Bottom-right corner: label + publishing-platform picker.
+        button_layout.addWidget(self._platform_label)
+        button_layout.addWidget(self._platform_combobox)
 
         main_g_layout = QGridLayout(self._central_widget)
         main_g_layout.setHorizontalSpacing(10)
@@ -438,6 +535,59 @@ class WebAppBuildWindow(QScrollArea):
         self._build_button.setMinimumWidth(button_width)
         self._run_button.setMinimumWidth(button_width)
         self._open_output_dir_button.setMinimumWidth(button_width)
+
+    # ------------------------------------------------------- publishing platform
+    def _set_platform_tooltip(self):
+        """Tooltip of the picker: "Publish to <platform>", none for 无平台."""
+        platform_id = self.get_platform()
+        if platform_id == TOY_PLATFORM_ID:
+            tooltip = T.tr('build.publish_to_toy', 'Publish to Bilibili Toy')
+        else:
+            tooltip = ''
+        self._platform_combobox.setToolTip(tooltip)
+
+    def _set_platform_combobox_texts(self):
+        """(Re)fill the dropdown: 无平台 and Bilibili Toy, each with its icon."""
+        selected = self._platform_combobox.currentData()
+        self._platform_combobox.blockSignals(True)
+        self._platform_combobox.clear()
+        self._platform_combobox.addItem(QIcon(':/images/ban.png'),
+                                        T.tr('build.no_platform', 'None'), '')
+        self._platform_combobox.addItem(QIcon(':/images/bilibili_toy.png'),
+                                        T.tr('build.bilibili_toy', 'Bilibili Toy'),
+                                        'bilibili_toy')
+        index = self._platform_combobox.findData(selected)
+        self._platform_combobox.setCurrentIndex(index if index >= 0 else 0)
+        self._platform_combobox.blockSignals(False)
+        self._set_platform_tooltip()
+
+    def set_platform_selected(self, platform_id):
+        """Set the picker from outside without re-saving the config."""
+        self._platform_combobox.blockSignals(True)
+        index = self._platform_combobox.findData(str(platform_id or ''))
+        # An unknown id falls back to "无平台": the normal web bundle.
+        self._platform_combobox.setCurrentIndex(index if index >= 0 else 0)
+        self._platform_combobox.blockSignals(False)
+        self._set_platform_tooltip()
+
+    def get_platform(self):
+        """The chosen web publishing platform id ('' while "无" is picked)."""
+        return str(self._platform_combobox.currentData() or '')
+
+    def _on_platform_activated(self, index):
+        """Remember the pick right away (build.web.platform in project.pygs)."""
+        self._save_web_config(platform=self.get_platform())
+        self._set_platform_tooltip()
+
+    def _save_web_config(self, output_dir=None, platform=None):
+        """Write the web build settings into build.web, keeping other keys."""
+        project_config = get_project_config()
+        web_config = project_config.setdefault('build', {}).setdefault('web', {})
+        if output_dir is not None:
+            web_config['output_dir'] = output_dir
+        if platform is not None:
+            web_config['platform'] = platform
+        save_project_config(project_config)
 
     def get_ready_for_project(self):
         project_path = Path(self._game_manager.get_project_path())
@@ -467,6 +617,9 @@ class WebAppBuildWindow(QScrollArea):
         except Exception as e:
             output_dir = ''
         self._output_dir_lineedit.setText(output_dir or project_path.as_posix())
+
+        web_config = project_config.get('build', {}).get('web') or {}
+        self.set_platform_selected(str(web_config.get('platform') or ''))
 
     def _browse_app_icon(self):
         icon_path, _ = QFileDialog.getOpenFileName(self, T.tr('build.select_app_icon', 'Select App Icon'), self._game_manager.get_project_path(), 'Format (*png *.ico *.jpg *.jpeg *.bmp *.gif)')
@@ -615,16 +768,19 @@ class WebAppBuildWindow(QScrollArea):
         app_name = self._app_name_lineedit.text().strip() or project_path.name
         app_icon = self._app_icon_lineedit.text().strip()
         output_dir = self._output_dir_lineedit.text().strip() or project_path.as_posix()
+        platform_id = self.get_platform()
 
-        # Stored under build.web so the desktop settings (build.*) survive.
-        update_project_config('build.web', {'output_dir': output_dir})
+        # Stored under build.web so the desktop settings (build.*) survive;
+        # the merge keeps keys this dialog does not know.
+        self._save_web_config(output_dir=output_dir, platform=platform_id)
         # The app name and the icon are the same settings the desktop build
         # uses: one app for every target (a new project already ships
         # image/logo.png).
         update_project_config('build.app_name', app_name)
         update_project_config('build.app_icon', app_icon)
 
-        return {'app_name': app_name, 'app_icon': app_icon, 'output_dir': output_dir}
+        return {'app_name': app_name, 'app_icon': app_icon,
+                'output_dir': output_dir, 'platform': platform_id}
 
     def retranslate(self):
         self._app_name_label.setText(T.tr('build.app_name', 'App Name'))
@@ -637,6 +793,9 @@ class WebAppBuildWindow(QScrollArea):
         self._build_button.setText(T.tr('build.build', 'Build'))
         self._run_button.setText(T.tr('build.web_run', 'Run in Browser'))
         self._open_output_dir_button.setText(T.tr('build.open_output_dir', 'Open Output Dir'))
+        self._platform_label.setText(T.tr('build.platform_label', 'Publishing Platform:'))
+        self._set_platform_combobox_texts()
+        self._set_platform_tooltip()
         self._update_button_widths()
 
 
@@ -710,6 +869,9 @@ class WebAppBuilder:
         app_name = (build_config.get('app_name') or build_config.get('page_title') or '').strip()
         self._page_title = app_name or self._project_path.name
         self._app_icon = (build_config.get('app_icon') or '').strip()
+        platform_id = str(build_config.get('platform') or '').strip()
+        self._platform = platform_id if platform_id in ('', TOY_PLATFORM_ID) else ''
+        self._is_toy = self._platform == TOY_PLATFORM_ID
         output_dir = (build_config.get('output_dir') or '').strip()
         self._output_dir = Path(output_dir) if output_dir else None
         # The runtime the page loads: an explicit pyodide_url wins (nothing is
@@ -736,15 +898,36 @@ class WebAppBuilder:
     # ---------- Public API ----------
 
     def build(self) -> Path:
-        """Create the bundle and return its folder."""
+        """Create the bundle and return its folder.
+
+        The package is assembled in a sibling folder and swapped in only when
+        it is complete: the previous bundle is always replaced (a stale wheel,
+        runtime file or asset never survives), and a build that fails or is
+        stopped leaves the last good bundle untouched.
+        """
         if self._output_dir is None:
             raise WebBuildError(T.tr('build.web_no_output_dir', 'The web build needs an output dir'))
 
         self._check_stopped()
         bundle_dir = self._output_dir.joinpath(*BUNDLE_SUBDIR)
-        bundle_dir.mkdir(parents=True, exist_ok=True)
+        staging_dir = bundle_dir.with_name(bundle_dir.name + BUNDLE_STAGING_SUFFIX)
+        # A staging folder left behind by a crash is not part of any build.
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        staging_dir.mkdir(parents=True, exist_ok=True)
         self._progress(2)
 
+        try:
+            self._assemble(staging_dir)
+        except BaseException:
+            shutil.rmtree(staging_dir, ignore_errors=True)
+            raise
+
+        self._replace_bundle(staging_dir, bundle_dir)
+        return bundle_dir
+
+    def _assemble(self, bundle_dir):
+        """Write the whole bundle into ``bundle_dir`` (the staging folder)."""
+        self._check_stopped()
         project_dir = self._prepare_protected_project(bundle_dir)
         self._check_stopped()
 
@@ -759,7 +942,8 @@ class WebAppBuilder:
         patched_source = self._patch_game_source(game_source_path.read_text(encoding=_SOURCE_ENCODING))
         self._progress(30)
 
-        archive_path = bundle_dir / 'game.zip'
+        archive_name = TOY_GAME_ARCHIVE_NAME if self._is_toy else 'game.zip'
+        archive_path = bundle_dir / archive_name
         project_count, engine_count = self._write_archive(archive_path, patched_source, boot_source, project_dir)
         self._progress(85)
         self._check_stopped()
@@ -769,17 +953,44 @@ class WebAppBuilder:
         self._progress(90)
 
         canvas_size = self._read_canvas_size()
-        (bundle_dir / 'index.html').write_text(self._render_index(index_template, favicon_links, canvas_size), encoding=_SOURCE_ENCODING)
+        (bundle_dir / 'index.html').write_text(self._render_index(index_template, favicon_links, canvas_size, archive_name), encoding=_SOURCE_ENCODING)
+        if self._is_toy:
+            self._apply_toy_package(bundle_dir)
         self._progress(95)
 
         # The staging copy has done its job: only the page and the archive stay.
         shutil.rmtree(bundle_dir / PROTECTED_WORK_DIR_NAME, ignore_errors=True)
+
+        if self._is_toy:
+            # Checked last: the staging copy holds the very suffixes the
+            # platform filters, and it is gone by now.
+            self._check_toy_whitelist(bundle_dir)
 
         Logger.info(T.tr('build.web_build_summary', 'Bundled {} project file(s) and {} engine file(s)').format(project_count, engine_count))
         self._check_stopped()
         return bundle_dir
 
     # ---------- Build steps ----------
+
+    def _replace_bundle(self, staging_dir, bundle_dir):
+        """Swap the finished package in, dropping everything that was there.
+
+        A file the page still holds (an open browser tab, a static server) can
+        make the removal fail on Windows; the step then retries what it can and
+        stops the build, because a leftover file would ship next to the new
+        bundle (an old ``pymunk`` wheel, a removed asset, an obsolete runtime).
+        """
+        self._check_stopped()
+        if bundle_dir.exists():
+            try:
+                shutil.rmtree(bundle_dir)
+            except OSError as error:
+                shutil.rmtree(bundle_dir, ignore_errors=True)
+                if bundle_dir.exists():
+                    raise WebBuildError(T.tr('build.web_clear_failed', 'The previous web build could not be removed ({}): {}. Close the page or the server using it and build again').format(bundle_dir.as_posix(), error))
+            Logger.info(T.tr('build.web_previous_removed', 'Replaced the previous web build: {}').format(bundle_dir.as_posix()))
+        bundle_dir.parent.mkdir(parents=True, exist_ok=True)
+        staging_dir.replace(bundle_dir)
 
     def _prepare_protected_project(self, bundle_dir):
         """Stage, strip and encrypt the project (like the desktop build).
@@ -825,6 +1036,8 @@ class WebAppBuilder:
             self._progress(70)
 
             archive.writestr(f'{ENGINE_PACKAGE}/{GAME_SOURCE_RELATIVE_PATH}', patched_source)
+            # The real sdk/__init__.py imports the desktop-only bridges too.
+            archive.writestr(f'{ENGINE_PACKAGE}/sdk/__init__.py', _WEB_SDK_INIT_SOURCE)
             archive.writestr('web_boot.py', boot_source)
 
         return project_count, engine_count
@@ -866,6 +1079,13 @@ class WebAppBuilder:
                     continue
                 # The patched copy is written separately.
                 if relative_path.as_posix() == GAME_SOURCE_RELATIVE_PATH:
+                    continue
+                # Desktop-only platform bridges (written separately as well).
+                if relative_path.parts[:2] in _ENGINE_WEB_SKIP_DIRS:
+                    continue
+                if relative_path.as_posix() in _ENGINE_WEB_SKIP_FILES:
+                    continue
+                if relative_path.as_posix() == 'sdk/__init__.py':
                     continue
 
                 yield path, f'{ENGINE_PACKAGE}/{relative_path.as_posix()}'
@@ -935,12 +1155,14 @@ class WebAppBuilder:
             Logger.warning('Failed to read the screen size from project.pygs: {}'.format(e))
         return DEFAULT_CANVAS_SIZE
 
-    def _render_index(self, template, favicon_links, canvas_size):
+    def _render_index(self, template, favicon_links, canvas_size, archive_name='game.zip'):
         return (template
                 .replace('__PYGS_TITLE__', html.escape(self._page_title))
                 .replace('__PYGS_FAVICON_LINK__', favicon_links)
                 .replace('__PYGS_CANVAS_WIDTH__', str(canvas_size[0]))
                 .replace('__PYGS_CANVAS_HEIGHT__', str(canvas_size[1]))
+                .replace('__PYGS_GAME_ARCHIVE__', archive_name)
+                .replace('__PYGS_TOY_SDK_SCRIPT__', TOY_SDK_SCRIPT if self._is_toy else '')
                 .replace('__PYGS_PYODIDE_URL__', self._pyodide_url)
                 .replace('__PYGS_PYODIDE_ENTRY__', self._pyodide_entry))
 
@@ -972,14 +1194,27 @@ class WebAppBuilder:
         if not self._uses_physics():
             return ''
 
+        if self._is_toy and not self._bundle_pyodide:
+            # The renamed wheel is unpacked by the PATCHED runtime of the
+            # bundle; a remote runtime has the stock loader, so let micropip
+            # fetch the real wheel instead (that page needs the network for
+            # its runtime anyway).
+            Logger.warning(T.tr('build.web_toy_physics_cdn', 'A Bilibili Toy package with physics needs the bundled browser runtime ({}): the page will download pymunk from PyPI instead').format(self._bundled_pyodide_dir().as_posix()))
+            return PYMUNK_PACKAGE_NAME
+
         wheel_path = self._find_pymunk_wheel()
         if wheel_path is None:
             Logger.warning(T.tr('build.web_physics_pypi_fallback', 'The project uses physics but the shipped pymunk wheel is missing from the engine resources ({}): the page will download pymunk from PyPI instead').format(self._wheels_dir().as_posix()))
             return PYMUNK_PACKAGE_NAME
 
-        shutil.copyfile(wheel_path, bundle_dir / wheel_path.name)
+        # A Toy bundle keeps only whitelisted suffixes: .whl is filtered out,
+        # so the same wheel ships as .data (the boot accepts both).
+        target_name = wheel_path.name
+        if self._is_toy:
+            target_name = wheel_path.name[:-4] + '.data'
+        shutil.copyfile(wheel_path, bundle_dir / target_name)
         Logger.info(T.tr('build.web_physics_bundled', 'The project uses physics: pymunk ships next to the page and the browser runs the simulation'))
-        return wheel_path.name
+        return target_name
 
     def _bundled_pyodide_dir(self):
         """Folder with the self-hosted Pyodide runtime shipped with the engine."""
@@ -1034,6 +1269,133 @@ class WebAppBuilder:
         entry.unlink()
         glue.unlink()
         self._pyodide_entry = 'pyodide.js'
+
+    def _apply_toy_package(self, bundle_dir):
+        """Turn the bundle into a Bilibili Toy package.
+
+        The platform silently drops every file whose suffix is outside its
+        whitelist, and ``.zip``/``.whl`` are not part of it. The two containers
+        the page loads at startup - the game archive and the Python standard
+        library - are therefore shipped as ``.data``, the wheels next to the
+        runtime (pygame-ce and its dependencies) as well, and every loader
+        reference is patched to match. A final self-check refuses to publish a
+        bundle that still contains a filtered suffix.
+        """
+        runtime_dir = bundle_dir.joinpath(PYODIDE_DIR_NAME)
+
+        stdlib = runtime_dir / 'python_stdlib.zip'
+        if stdlib.is_file():
+            self._patch_toy_stdlib_loader(stdlib)
+            stdlib.replace(runtime_dir / TOY_STDLIB_ARCHIVE_NAME)
+
+        renamed = {}
+        for folder in (runtime_dir, bundle_dir):
+            if not folder.is_dir():
+                continue
+            for path in sorted(folder.glob('*.whl')):
+                target = path.with_name(path.name[:-len('.whl')] + '.data')
+                path.replace(target)
+                renamed[path.name] = target.name
+
+        if renamed:
+            self._patch_toy_wheel_references(runtime_dir, renamed)
+        self._patch_toy_stdlib_reference(runtime_dir)
+
+        for path in sorted(runtime_dir.glob('*.mjs')):
+            path.unlink()
+
+        Logger.info(T.tr('build.web_toy_packaged', 'Packaged for Bilibili Toy: containers ship as .data and the platform SDK is loaded by the page'))
+
+    def _patch_toy_stdlib_loader(self, stdlib_path):
+        """Teach the packaged standard library that wheels may be ``.data``.
+
+        Pyodide installs a package by unpacking the fetched file and decides
+        the archive format (and the wheel metadata step) from its extension.
+        The Toy build renames the wheels, so the loader is patched too -
+        otherwise every package install fails with "Unknown archive format".
+        The archive is rewritten in place with the same entries and
+        compression; only that one module changes.
+        """
+        with zipfile.ZipFile(stdlib_path) as source:
+            entries = [(info, source.read(info.filename)) for info in source.infolist()]
+
+        patched_module = None
+        for info, data in entries:
+            if info.filename != _TOY_LOADER_MODULE:
+                continue
+            text = data.decode(_SOURCE_ENCODING)
+            for old, new in _TOY_LOADER_PATCHES:
+                if text.count(old) != 1:
+                    raise WebBuildError(T.tr('build.web_toy_loader_patch_failed', 'The packaged browser runtime no longer matches the Bilibili Toy patch ({}): the build was stopped').format(_TOY_LOADER_MODULE))
+                text = text.replace(old, new)
+            patched_module = text.encode(_SOURCE_ENCODING)
+
+        if patched_module is None:
+            raise WebBuildError(T.tr('build.web_toy_loader_patch_failed', 'The packaged browser runtime no longer matches the Bilibili Toy patch ({}): the build was stopped').format(_TOY_LOADER_MODULE))
+
+        temporary = stdlib_path.with_suffix('.tmp')
+        with zipfile.ZipFile(temporary, 'w') as target:
+            for info, data in entries:
+                if info.filename == _TOY_LOADER_MODULE:
+                    data = patched_module
+                target.writestr(info, data)
+        temporary.replace(stdlib_path)
+
+    def _patch_toy_stdlib_reference(self, runtime_dir):
+        """Point the runtime entry at the renamed standard library archive."""
+        for name in ('pyodide.js', 'pyodide.mjs'):
+            path = runtime_dir / name
+            if not path.is_file():
+                continue
+            source = path.read_text(encoding=_SOURCE_ENCODING)
+            if 'python_stdlib.zip' not in source:
+                continue
+            path.write_text(source.replace('python_stdlib.zip', TOY_STDLIB_ARCHIVE_NAME), encoding=_SOURCE_ENCODING)
+            return
+
+    def _patch_toy_wheel_references(self, runtime_dir, renamed):
+        """Teach the runtime that its wheels now end in ``.data``.
+
+        ``pyodide-lock.json`` carries the file name the loader fetches, and the
+        distribution parses that name back into package name and version with a
+        hardcoded ``\\.whl`` pattern - both sides are updated so the renamed
+        files resolve exactly like before.
+        """
+        lock_path = runtime_dir / 'pyodide-lock.json'
+        if lock_path.is_file():
+            source = lock_path.read_text(encoding=_SOURCE_ENCODING)
+            for old, new in renamed.items():
+                source = source.replace(old, new)
+            lock_path.write_text(source, encoding=_SOURCE_ENCODING)
+
+        for name in ('pyodide.asm.js', 'pyodide.asm.mjs'):
+            path = runtime_dir / name
+            if not path.is_file():
+                continue
+            source = path.read_text(encoding=_SOURCE_ENCODING)
+            patched = source
+            for old, new in TOY_WHEEL_NAME_PATCHES:
+                patched = patched.replace(old, new)
+            if patched == source:
+                Logger.warning(T.tr('build.web_toy_wheel_patch_skipped', 'The browser runtime did not expose the wheel name pattern: physics wheels may not load on this platform ({})').format(path.name))
+                continue
+            path.write_text(patched, encoding=_SOURCE_ENCODING)
+            return
+
+    def _check_toy_whitelist(self, bundle_dir):
+        """Fail the build when a file the platform would silently drop is left."""
+        blocked = []
+        for path in sorted(bundle_dir.rglob('*')):
+            if not path.is_file():
+                continue
+            if path.suffix.lower() not in TOY_ALLOWED_SUFFIXES:
+                blocked.append(path.relative_to(bundle_dir).as_posix())
+        if not blocked:
+            return
+        shown = ', '.join(blocked[:5])
+        if len(blocked) > 5:
+            shown += ' ...'
+        raise WebBuildError(T.tr('build.web_toy_blocked_files', 'These files are not supported by Bilibili Toy and would be dropped, the build is stopped: {}').format(shown))
 
     def _wheels_dir(self):
         """Folder with the Pyodide wheels shipped with the engine."""

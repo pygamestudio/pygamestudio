@@ -17,7 +17,10 @@ _LEVEL_NAMES = {'INFO': 'info', 'ERROR': 'error', 'WARNING': 'warning'}
     'multi-player tests). The scene needs a .scene file first (save it with '
     'save_scene, e.g. {"path": "./scene/main.scene"}) - without one the '
     'game would start with an empty screen. The game output appears in the '
-    'editor console - read it with get_console_logs.',
+    'editor console - read it with get_console_logs. A game started here is a '
+    'test run: the editor closes that window again once you stop calling tools '
+    '(about 25 s of idle), while a game the user started himself keeps running. '
+    'Use stop_project to close it earlier.',
     {
         'type': 'object',
         'properties': {
@@ -46,7 +49,9 @@ def run_project(args):
         browser = _console_browser(required=False)
         if browser is not None:
             browser.clear_log()
-    manager_.run_project()
+    # Marked as an agent test run: the editor closes it again as soon as the
+    # agent stops calling tools, and never touches a game the user started.
+    manager_.run_project(started_by_agent=True)
     return {
         'started': True,
         'project': manager_.get_project_path(),

@@ -40,6 +40,7 @@ not exposed (with the reason). Tool names are the MCP tool names.
 | Save scene / Save As | File > Save Scene / Save As | `save_scene` (with optional path; required when the scene has no file yet) |
 | List scenes, mark the loaded/start scene | Asset panel | `list_scenes` |
 | Unsaved-changes state | window title `*unsaved` | `editor_status`, `get_current_scene` |
+| **Autosave of agent edits**: a tool call that changes the scene writes it to its `.scene` file right away (a build and a game run read the files on disk, not the editor's memory); edits the user made himself stay unsaved until he saves. `start_build` / `start_web_build` also flush those before packaging | - | all mutating tools, `start_build`, `start_web_build` |
 | Scene content overview | Scene panel / Hierarchy | `get_scene_tree` |
 
 ## 4. Objects (Hierarchy + Inspector)
@@ -82,13 +83,39 @@ not exposed (with the reason). Tool names are the MCP tool names.
 | Jump to a file (and line) in the editor | Asset / console click | `open_in_code_editor` |
 | Visual (block) scripting | Block Editor | `block_editor_open`, `block_editor_list_types`, `block_editor_get_blocks`, `block_editor_add_block`, `block_editor_set_field`, `block_editor_move_block`, `block_editor_delete_block`, `block_editor_save` (block scripts stay plain `.py` files) |
 
+### Per-object input hooks
+
+An object script (or an object subclass) reacts to input by defining the hook
+it needs - anything not defined is simply skipped, and an object that
+implements an event keeps it when another object on top of it does not (the
+gesture bubbles to its parents, then to the objects below).
+
+| Family | Hooks |
+| --- | --- |
+| Lifecycle | `on_start`, `on_update(dt)`, `on_destroy`, `on_visible_changed(visible)` |
+| Mouse / pointer | `on_pressed`, `on_released`, `on_clicked`, `on_double_clicked`, `on_right_clicked`, `on_mouse_enter`, `on_mouse_leave`, `on_drag_start`, `on_drag(pos)`, `on_drag_end` |
+| Touch | `on_touch_down(finger_id, pos)`, `on_touch_move(finger_id, pos)`, `on_touch_up(finger_id, pos)`, `on_tap(finger_id, pos)` |
+| Widgets | input box: `on_focus`, `on_blur`, `on_text_changed(text)`, `on_submitted(text)`; slider: `on_value_changed(value)`; progress bar: `on_progress_changed`, `on_progress_full` |
+| Collisions / animation | `on_collision_enter(other)`, `on_collision_exit(other)`, `on_animation_start`, `on_frame_changed(frame_index)`, `on_animation_finished`, `on_particles_finished` |
+
+Touch takes priority: an object (or its script) that implements a touch hook
+owns that finger, so the mouse events the platform synthesizes from the same
+finger (a web page and a touch screen both send them) never fire its
+click/drag hooks a second time - a tap fires `on_touch_down` → `on_touch_up` →
+`on_tap` and nothing else on that object. Objects without touch hooks keep
+using the mouse hooks exactly as before, and every finger is tracked on its
+own, so two fingers can press two objects at the same time. `pos` is in the
+same pixel world coordinates the mouse events use; `finger_id` identifies the
+finger. An input box or slider under the finger still handles the press itself
+(typing / dragging the handle).
+
 ## 6. Running and debugging
 
 | Capability | Editor entry point | MCP |
 | --- | --- | --- |
-| Run the project (saves the scene — a scene with no file must be saved first — starts `main.py`; the game of an earlier run is stopped first, `stop_running: false` starts an additional instance) | Project > Run | `run_project` |
-| Stop running game processes | (editor keeps them alive until exit) | `stop_project` |
-| Runtime status (pids, console length) | Console | `get_runtime_status` |
+| Run the project (saves the scene — a scene with no file must be saved first — starts `main.py`; the game of an earlier run is stopped first, `stop_running: false` starts an additional instance). A game started here is a **test run**: the editor closes that window again once the agent stops calling tools (about 25 s of idle), while a game the user started himself keeps running | Project > Run | `run_project` |
+| Stop running game processes (also used to close the agent's test window right away) | (editor keeps them alive until exit) | `stop_project` |
+| Runtime status (pids, whether a process is an agent test run, console length) | Console | `get_runtime_status` |
 | Look at the running game window (the live view with script movement, physics and animations; Windows only - falls back to the editor scene view when the window cannot be captured: game not running, window minimized, macOS/Linux) | game window | `capture_game_window` (PNG), `analyze_image` with `"source": "game"` (text) |
 | Read the console (info/error/warning, search) | Console panel | `get_console_logs` |
 | Clear the console | Console > Clear | `clear_console_logs` |
@@ -117,11 +144,25 @@ wheel next to the page, so nothing is fetched from PyPI at runtime; the
 project code/assets are protected like in the desktop build, the result lands
 in `<output dir>/build/Web` and the installed engine is never modified).
 
+Each tab has its own **publishing platform** pick (dropdown at the bottom
+right). Desktop: `build.platform` - none or TapTap (the TapTap PC SDK is added
+to the package only then). Web: `build.web.platform` - none, or **Bilibili
+Toy**: that platform silently drops every file whose suffix is outside its
+whitelist, so the bundle ships its containers as `.data` (`game.data`,
+`python_stdlib.data`, the wheels - the runtime's loader and lock file are
+patched to match), the page loads the Toy JS SDK and the game calls it through
+`studio.sdk.toy`. TapTap is desktop-only: a web bundle never carries it.
+
+A web build **clears `<output dir>/build/Web` first**, so nothing from a
+previous build (an old wheel, a removed runtime file, an asset deleted from the
+project) can end up in the new package; if a file is still held open the build
+stops with a message instead of shipping a mixed folder.
+
 | Capability | Editor entry point | MCP |
 | --- | --- | --- |
-| Read build settings (desktop values + `build.web`, running state, progress, last web bundle) | Build window | `get_build_settings` |
-| Start a desktop build (PyInstaller executable) | Build window > Desktop App > Build | `start_build` |
-| Start a web build (browser bundle) | Build window > Web App > Build | `start_web_build` |
+| Read build settings (desktop values + `build.web`, publishing platforms, running state, progress, last web bundle) | Build window | `get_build_settings` (`web_platform` = the web pick) |
+| Start a desktop build (PyInstaller executable) | Build window > Desktop App > Build | `start_build` (`platform`: `""` / `"taptap"`) |
+| Start a web build (browser bundle; clears the previous one) | Build window > Web App > Build | `start_web_build` (`platform`: `""` / `"bilibili_toy"`) |
 | Stop a build (whichever tab is building) | Build window > Stop | `stop_build` |
 | Open the desktop output / the web bundle folder | Build window > Open Output Dir | `open_output_dir` (`target`: `"desktop"` / `"web"`) |
 | Run the built app / preview the web build | Run Game / Run in Browser buttons | **no** - buttons only |

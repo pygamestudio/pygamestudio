@@ -137,10 +137,13 @@ class DesktopAppBuildWindow(QScrollArea):
         self._build_button.setObjectName('desktopAppBuildBtn')
 
     def _set_platform_tooltip(self):
-        self._platform_combobox.setToolTip(T.tr(
-            'build.platform_tooltip',
-            'Choose the platform to publish on: picking TapTap includes the '
-            'TapTap PC SDK in the package'))
+        """Tooltip of the picker: "Publish to <platform>", none for 无平台."""
+        platform_id = self.get_platform()
+        if platform_id == 'taptap':
+            tooltip = T.tr('build.publish_to_taptap', 'Publish to TapTap PC')
+        else:
+            tooltip = ''
+        self._platform_combobox.setToolTip(tooltip)
 
     def _set_platform_combobox_texts(self):
         """(Re)fill the dropdown: "无" (with its ban icon) and the platforms,
@@ -150,10 +153,12 @@ class DesktopAppBuildWindow(QScrollArea):
         self._platform_combobox.clear()
         self._platform_combobox.addItem(QIcon(':/images/ban.png'),
                                         T.tr('build.no_platform', 'None'), '')
-        self._platform_combobox.addItem(QIcon(':/images/taptap_logo.png'), 'TapTap', 'taptap')
+        self._platform_combobox.addItem(QIcon(':/images/taptap_logo.png'),
+                                        T.tr('build.taptap_pc', 'TapTap PC'), 'taptap')
         index = self._platform_combobox.findData(selected)
         self._platform_combobox.setCurrentIndex(index if index >= 0 else 0)
         self._platform_combobox.blockSignals(False)
+        self._set_platform_tooltip()
 
     def _update_button_widths(self):
         """Give the buttons one width, wide enough for the longer label."""
@@ -228,6 +233,7 @@ class DesktopAppBuildWindow(QScrollArea):
     def _on_platform_activated(self, index):
         """Remember the pick right away (build.platform in project.pygs)."""
         update_project_config('build.platform', self.get_platform())
+        self._set_platform_tooltip()
 
     def get_platform(self):
         """The chosen platform id ('' while "无" is picked)."""
@@ -241,6 +247,7 @@ class DesktopAppBuildWindow(QScrollArea):
         # to "无": nothing extra gets packaged.
         self._platform_combobox.setCurrentIndex(index if index >= 0 else 0)
         self._platform_combobox.blockSignals(False)
+        self._set_platform_tooltip()
 
     def _check_before_build(self):
         if not (Path(self._game_manager.get_project_path()) / 'main.py').exists():

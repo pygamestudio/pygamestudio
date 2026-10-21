@@ -31,6 +31,11 @@ from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.common.utils import assets
 from pygamestudio.common.utils import project_modules
 
+#: A touch that stays down longer than this is a press, not a tap.
+TOUCH_TAP_MAX_MS = 400
+#: How far (pixels) a finger may travel and still count as a tap.
+TOUCH_TAP_SLOP = 12
+
 
 class SceneLoader:
     """Runtime mirror of the editor's scene tree.
@@ -47,6 +52,12 @@ class SceneLoader:
                        'on_double_clicked', 'on_right_clicked',
                        'on_drag_start', 'on_drag', 'on_drag_end')
     _HOVER_EVENTS = ('on_mouse_enter', 'on_mouse_leave')
+    # Touch family: an object (or its script) that implements one of these owns
+    # the finger, so the mouse events a platform derives from that same finger
+    # (web page, touch screen) do not run its click/drag hooks again. Objects
+    # without touch hooks keep receiving the mouse events (touch first, mouse
+    # as the fallback).
+    _TOUCH_EVENTS = ('on_touch_down', 'on_touch_move', 'on_touch_up', 'on_tap')
 
     def __init__(self):
         self._current_scene_path = ''
@@ -63,6 +74,13 @@ class SceneLoader:
         # all (the common case: a game whose objects only react to clicks, or
         # a background made of hundreds of objects).
         self._hoverable_uuids = set()
+        # Objects whose script implements a touch hook (same idea as the hover
+        # set: without one, a finger never has to walk the scene).
+        self._touchable_uuids = set()
+        # Touch gestures in progress: finger_id -> the object that owns the
+        # finger, plus the press info used to decide whether it was a tap.
+        self._touch_owners = {}
+        self._touch_presses = {}
         # Objects marked by destroy_object(): they leave the scene at the end
         # of the frame, so a script can destroy anything while the tree is
         # being walked without pulling the ground away from the running frame.
@@ -118,6 +136,7 @@ class SceneLoader:
         self._object_by_uuid = {}
         self._parent_by_uuid = {}
         self._hoverable_uuids = set()
+        self._touchable_uuids = set()
         # Nothing is left to destroy: the whole tree is gone already.
         self._pending_destroy = []
         self._current_scene_path = str(scene_path)
@@ -205,6 +224,9 @@ class SceneLoader:
         # Remember the objects that need hover tracking (see _hoverable_uuids).
         if self._implements_event(obj, self._HOVER_EVENTS):
             self._hoverable_uuids.add(obj.uuid)
+        # ... and the ones that take part in touch gestures (see _TOUCH_EVENTS).
+        if self._implements_event(obj, self._TOUCH_EVENTS):
+            self._touchable_uuids.add(obj.uuid)
         return obj
 
     def _load_script(self, obj):
@@ -787,6 +809,11 @@ class SceneLoader:
     def _forget_runtime_state(self, obj):
         """Drop every runtime reference to an object that left the scene."""
         self._hoverable_uuids.discard(obj.uuid)
+        self._touchable_uuids.discard(obj.uuid)
+        for finger_id, owner in list(self._touch_owners.items()):
+            if owner is obj:
+                self._touch_owners.pop(finger_id, None)
+                self._touch_presses.pop(finger_id, None)
         if self._focused_text_input is obj:
             self._clear_text_input_focus(notify=False)
         if self._active_slider is obj:
@@ -1047,6 +1074,10 @@ class SceneLoader:
         generic drag events (on_drag_start / on_drag / on_drag_end) and the
         value update while dragging a slider. Returns True when the event was
         consumed by a slider drag."""
+        if self.is_touch_gesture_active():
+            # The finger owns the gesture: its derived mouse move is not a
+            # hover and must not drag the object a second time.
+            return False
         self._update_hover_target(pos)
         left_pressed = bool((buttons or (0,))[0])
         if self._active_slider is not None and left_pressed:
@@ -1067,6 +1098,10 @@ class SceneLoader:
         object, plus on_clicked / on_double_clicked when the release lands on
         that same object again (right clicks fire on_right_clicked). Returns
         True when the event was consumed by a slider drag."""
+        if self.is_touch_gesture_active():
+            # Touch first: the finger already fired on_touch_up / on_tap for
+            # this press, so its derived mouse release stays silent.
+            return False
         consumed = False
         if self._active_slider is not None:
             if button == 1:
@@ -1151,13 +1186,86 @@ class SceneLoader:
         self._pressed_object = None
         self._drag_object = None
         self._right_pressed_object = None
+        self._touch_owners = {}
+        self._touch_presses = {}
         self._collision_pairs = {}
+
+    # ---------------------------------------- runtime touch gestures
+    def is_touch_gesture_active(self):
+        """True while a finger owns object touch events.
+
+        The mouse events a platform derives from that same finger (a web page
+        and a touch screen both send them) must not run the click/drag hooks a
+        second time - see the _TOUCH_EVENTS comment on the class.
+        """
+        return bool(self._touch_owners)
+
+    def handle_finger_down(self, finger_id, pos):
+        """Deliver a touch press to the object under the finger.
+
+        Returns True when an object (or its script) implements the touch
+        events: it then owns this finger's gesture, and the mouse events the
+        platform derives from it are ignored. Every finger is tracked on its
+        own, so several fingers can press several objects at once.
+        """
+        if not self._touchable_uuids:
+            # Nothing in the scene implements a touch hook: the derived mouse
+            # events stay in charge (and no scene walk is needed here).
+            return False
+        if self._hit_slider(pos) is not None or self._hit_text_input(pos) is not None:
+            # Input boxes and sliders keep working through the pointer path.
+            return False
+        target = self._event_target(pos, self._TOUCH_EVENTS)
+        if target is None or not self._implements_event(target, self._TOUCH_EVENTS):
+            return False
+        self._touch_owners[finger_id] = target
+        self._touch_presses[finger_id] = {'pos': pos,
+                                          'ms': pygame.time.get_ticks(),
+                                          'moved': False}
+        self._emit_object_event(target, 'on_touch_down', finger_id, pos)
+        return True
+
+    def handle_finger_move(self, finger_id, pos):
+        """Deliver a finger move to the object that owns the gesture."""
+        target = self._touch_owners.get(finger_id)
+        if target is None:
+            return False
+        press = self._touch_presses.get(finger_id)
+        if press is not None and not press['moved']:
+            dx = pos[0] - press['pos'][0]
+            dy = pos[1] - press['pos'][1]
+            if dx * dx + dy * dy > TOUCH_TAP_SLOP * TOUCH_TAP_SLOP:
+                press['moved'] = True
+        self._emit_object_event(target, 'on_touch_move', finger_id, pos)
+        return True
+
+    def handle_finger_up(self, finger_id, pos):
+        """Deliver a finger lift to the object that owns the gesture.
+
+        A short press that neither moved far nor left the object also fires
+        on_tap - the touch equivalent of on_clicked.
+        """
+        target = self._touch_owners.pop(finger_id, None)
+        press = self._touch_presses.pop(finger_id, None)
+        if target is None:
+            return False
+        self._emit_object_event(target, 'on_touch_up', finger_id, pos)
+        if press is not None and not press['moved']:
+            elapsed = pygame.time.get_ticks() - press['ms']
+            if elapsed <= TOUCH_TAP_MAX_MS:
+                if self._event_target(pos, self._TOUCH_EVENTS) is target:
+                    self._emit_object_event(target, 'on_tap', finger_id, pos)
+        return True
 
     def handle_pointer_down(self, pos, button=1):
         """Pointer down: start dragging the slider under the cursor, else
         fall back to the input-box focus behaviour, and fire the press event
         (on_pressed) of the pointed object. Returns True when a UI control
         (slider or input box) was hit."""
+        if self.is_touch_gesture_active():
+            # The finger that owns this gesture already delivered the touch
+            # events: its derived mouse press must not press the object again.
+            return False
         if button == 1:
             slider = self._hit_slider(pos)
             if slider is not None:

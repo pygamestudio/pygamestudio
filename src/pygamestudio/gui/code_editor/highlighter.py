@@ -24,7 +24,20 @@ class CodeHighlighter(QSyntaxHighlighter):
         'decorator': ('#af00db', '#d7ba7d'),
         'key': ('#0451a5', '#9cdcfe'),
         'constant': ('#0000ff', '#569cd6'),
+        'escape': ('#b15700', '#d7ba7d'),
     }
+
+    #: Numbers of every Python flavour: 0x1F, 0b1010, 0o17, 1_000, 1.5e-3, 2j.
+    _PY_NUMBER = (r'\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+'
+                  r'|\d[\d_]*(?:\.[\d_]*)?(?:[eE][+-]?\d+)?[jJ]?)\b')
+
+    #: Prefixes that belong to the string literal (f", rb', ...).
+    _STRING_PREFIXES = ('r', 'b', 'u', 'f', 'fr', 'rf', 'br', 'rb')
+
+    #: Escape sequences inside a string literal.
+    _ESCAPE_PATTERN = re.compile(
+        r'\\(?:[\\\'"abfnrtv0]|x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}'
+        r'|U[0-9a-fA-F]{8}|N\{[^}\n]*\}|[0-7]{1,3})')
 
     _PY_KEYWORDS = (
         'and', 'as', 'assert', 'async', 'await', 'break', 'class', 'continue',
@@ -131,14 +144,16 @@ class CodeHighlighter(QSyntaxHighlighter):
 
     def _highlight_python(self, text):
         # Secondary tokens first; string/comment regions override them below.
-        self._apply(text, r'\b\d+(?:\.\d+)?\b', 'number')
-        self._apply(text, r'@\w+', 'decorator')
-        self._apply(text, r'\b(?:def|class)\s+([A-Za-z_]\w*)', 'function')
+        self._apply(text, self._PY_NUMBER, 'number')
+        self._apply_group(text, r'\b(?:def|class)\s+([A-Za-z_]\w*)', 'function', 1)
         self._apply(text, r'\b[A-Za-z_]\w*(?=\s*\()', 'function')
-        self._apply(text, r'\bself\b', 'self')
+        self._apply(text, r'\b(?:self|cls)\b', 'self')
         self._apply(text, r'\b(?:' + '|'.join(self._PY_BUILTINS) + r')\b', 'builtin')
         self._apply(text, r'\b(?:' + '|'.join(self._PY_KEYWORDS) + r')\b', 'keyword')
-        self._apply(text, r'\bclass\s+([A-Za-z_]\w*)', 'class')
+        self._apply_group(text, r'\bclass\s+([A-Za-z_]\w*)', 'class', 1)
+        # Decorators last, so @app.route keeps one color over the whole chain
+        # (the function-call rule above already matched the last part).
+        self._apply(text, r'@[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*', 'decorator')
         # Scan for strings (incl. multi-line triple-quoted) and comments, which
         # must win over everything inside them.
         self._scan_strings_and_comments(text)
@@ -148,7 +163,8 @@ class CodeHighlighter(QSyntaxHighlighter):
 
         Uses the highlighter block state (1 = inside \"\"\", 2 = inside
         '''') so triple-quoted strings keep their color across lines and the
-        closing triple quote is included.
+        closing triple quote is included. A string prefix (f, r, rb, ...) is
+        part of the literal, and escape sequences get their own color.
         """
         string_fmt = self._fmt('string')
         comment_fmt = self._fmt('comment')
@@ -161,9 +177,11 @@ class CodeHighlighter(QSyntaxHighlighter):
             close = text.find(delim)
             if close == -1:
                 self.setFormat(0, n, string_fmt)
+                self._paint_escapes(text, 0, n)
                 self.setCurrentBlockState(state)
                 return
             self.setFormat(0, close + 3, string_fmt)
+            self._paint_escapes(text, 0, close + 3)
             i = close + 3
         else:
             i = 0
@@ -174,15 +192,18 @@ class CodeHighlighter(QSyntaxHighlighter):
                 self.setFormat(i, n - i, comment_fmt)
                 break
             if ch in ('"', "'"):
+                start = self._string_prefix_start(text, i)
                 triple = text[i:i + 3]
                 if triple in ('"""', "'''"):
                     close = text.find(triple, i + 3)
                     if close == -1:
                         # String spans into the next block.
-                        self.setFormat(i, n - i, string_fmt)
+                        self.setFormat(start, n - start, string_fmt)
+                        self._paint_escapes(text, start, n)
                         self.setCurrentBlockState(1 if triple == '"""' else 2)
                         return
-                    self.setFormat(i, close + 3 - i, string_fmt)
+                    self.setFormat(start, close + 3 - start, string_fmt)
+                    self._paint_escapes(text, start, close + 3)
                     i = close + 3
                     continue
                 # Single-line string (handles backslash escapes).
@@ -195,15 +216,33 @@ class CodeHighlighter(QSyntaxHighlighter):
                         j += 1
                         break
                     j += 1
-                self.setFormat(i, min(j, n) - i, string_fmt)
+                self.setFormat(start, min(j, n) - start, string_fmt)
+                self._paint_escapes(text, start, min(j, n))
                 i = min(j, n)
                 continue
             i += 1
 
         self.setCurrentBlockState(0)
 
+    def _string_prefix_start(self, text, quote_index):
+        """Index where a string prefix (f, rb, ...) starts, else the quote."""
+        for length in (2, 1):
+            start = quote_index - length
+            if start < 0:
+                continue
+            if text[start:quote_index].lower() in self._STRING_PREFIXES:
+                if start == 0 or not (text[start - 1].isalnum() or text[start - 1] == '_'):
+                    return start
+        return quote_index
+
+    def _paint_escapes(self, text, start, end):
+        """Color the escape sequences inside a painted string span."""
+        fmt = self._fmt('escape')
+        for match in self._ESCAPE_PATTERN.finditer(text, start, end):
+            self.setFormat(match.start(), match.end() - match.start(), fmt)
+
     def _highlight_json(self, text):
-        self._apply(text, r'\b\d+(?:\.\d+)?\b', 'number')
+        self._apply(text, r'-?\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b', 'number')
         self._apply(text, r'\b(?:' + '|'.join(self._JSON_CONSTANTS) + r')\b', 'constant')
         # String keys (before generic strings so keys win).
         self._apply(text, r'"[^"\n]*"(?=\s*:)', 'key')
@@ -212,7 +251,8 @@ class CodeHighlighter(QSyntaxHighlighter):
     # ---------------------------------------------------------------- JavaScript
     def _highlight_js(self, text):
         # Secondary tokens first; string/comment regions override them below.
-        self._apply(text, r'\b0[xX][0-9a-fA-F]+\b|\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b', 'number')
+        self._apply(text, r'\b0[xX][0-9a-fA-F_]+\b|\b0[bB][01_]+\b'
+                          r'|\b\d[\d_]*(?:\.\d*)?(?:[eE][+-]?\d+)?\b', 'number')
         self._apply_group(text, r'\b(?:function|class)\s+([A-Za-z_$]\w*)', 'function', 1)
         self._apply(text, r'\b[A-Za-z_$]\w*(?=\s*\()', 'function')
         self._apply(text, r'\b(?:' + '|'.join(self._JS_BUILTINS) + r')\b', 'builtin')
@@ -248,9 +288,11 @@ class CodeHighlighter(QSyntaxHighlighter):
             close = self._template_end(text, 0)
             if close == -1:
                 self.setFormat(0, n, string_fmt)
+                self._paint_escapes(text, 0, n)
                 self.setCurrentBlockState(2)
                 return
             self.setFormat(0, close, string_fmt)
+            self._paint_escapes(text, 0, close)
             i = close
 
         while i < n:
@@ -271,9 +313,11 @@ class CodeHighlighter(QSyntaxHighlighter):
                 close = self._template_end(text, i + 1)
                 if close == -1:
                     self.setFormat(i, n - i, string_fmt)
+                    self._paint_escapes(text, i, n)
                     self.setCurrentBlockState(2)
                     return
                 self.setFormat(i, close - i, string_fmt)
+                self._paint_escapes(text, i, close)
                 i = close
                 continue
             if ch in ('"', "'"):
@@ -288,6 +332,7 @@ class CodeHighlighter(QSyntaxHighlighter):
                         break
                     j += 1
                 self.setFormat(i, min(j, n) - i, string_fmt)
+                self._paint_escapes(text, i, min(j, n))
                 i = min(j, n)
                 continue
             i += 1

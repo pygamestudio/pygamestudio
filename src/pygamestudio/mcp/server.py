@@ -303,6 +303,11 @@ def stop_server():
     with _lock:
         if _server is None:
             return False
+        # A test game the agent left open must not survive the server.
+        try:
+            bridge.stop_agent_game()
+        except Exception:  # noqa: BLE001 - shutdown must not fail on cleanup
+            pass
         _server.stop()
         _server = None
         return True

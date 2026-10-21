@@ -269,6 +269,16 @@ EVENT_BLOCKS = (
     ('on_drag_start', 'drag_start', 'When a drag starts', '', ALL_OBJECTS),
     ('on_drag', 'drag', 'While dragging (pos)', 'pos', ALL_OBJECTS),
     ('on_drag_end', 'drag_end', 'When a drag ends', '', ALL_OBJECTS),
+    # Touch: an object that implements one of these owns the finger (see
+    # api/core/scene.py - touch first, mouse as the fallback).
+    ('on_touch_down', 'touch_down', 'When a finger presses (finger_id, pos)',
+     'finger_id, pos', ALL_OBJECTS),
+    ('on_touch_move', 'touch_move', 'While a finger moves (finger_id, pos)',
+     'finger_id, pos', ALL_OBJECTS),
+    ('on_touch_up', 'touch_up', 'When a finger lifts (finger_id, pos)',
+     'finger_id, pos', ALL_OBJECTS),
+    ('on_tap', 'tap', 'When tapped (finger_id, pos)',
+     'finger_id, pos', ALL_OBJECTS),
     ('on_focus', 'focus', 'When an input gains focus', '', ('text_input',)),
     ('on_blur', 'blur', 'When an input loses focus', '', ('text_input',)),
     ('on_text_changed', 'text_changed', 'When the text changes (text)', 'text', ('text_input',)),

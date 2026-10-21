@@ -47,11 +47,5 @@ class Game(studio.Game):
 
 
 if __name__ == '__main__':
-    # TapTap 平台（可选）：在创建窗口前检查是否需要通过 TapTap 重启游戏。
-    # TapTap platform (optional): check the restart BEFORE the window opens.
-    # if studio.sdk.taptap.pc.restart_app_if_necessary():
-    #     import sys
-    #     sys.exit()
-
     game = Game()
     game.run()

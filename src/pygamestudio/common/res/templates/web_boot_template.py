@@ -103,7 +103,7 @@ async def _prepare_physics(install_source):
 
         await pyodide_js.loadPackage('cffi')
 
-        if install_source.endswith('.whl'):
+        if install_source.endswith(('.whl', '.data')):
             if '://' not in install_source:
                 from js import URL, location
                 install_source = URL.new(install_source, location.href).href

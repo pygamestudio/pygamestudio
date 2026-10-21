@@ -1508,7 +1508,7 @@ class GameManager(QObject):
                 Logger.error(T.tr('scene.failed_to_save_before_run', 'Failed to save scene before running: {}').format(e))
         return True
 
-    def run_project(self):
+    def run_project(self, started_by_agent=False):
         """Launch the project's main.py in a separate process and forward its
         stdout/stderr to the editor console (info for stdout, error for stderr).
 
@@ -1516,6 +1516,10 @@ class GameManager(QObject):
         without a .scene file asks for one (Save As) and the run is skipped
         when that dialog is cancelled. Returns True when the game process was
         started.
+
+        ``started_by_agent`` marks a run a debugging agent started: such a game
+        window is closed again as soon as the agent is done, while a game the
+        user started himself keeps running (see ``stop_project``).
         """
         if not self._ensure_scene_saved_before_run():
             return False
@@ -1542,6 +1546,9 @@ class GameManager(QObject):
             process.setEnvironment(process_env)
 
             process.start(sys.executable, [str(Path(self._project_path) / 'main.py')])
+            # Remember who started it: only a test run of the AI agent is
+            # closed automatically when the agent is done.
+            process._started_by_agent = bool(started_by_agent)
             self._game_processes.append(process)
             Logger.info(T.tr('scene.run_project', 'Run Project {}').format(Path(self._project_path).name))
             return True
@@ -1618,30 +1625,44 @@ class GameManager(QObject):
         process._stop_reported = True
         Logger.info(T.tr('scene.run_project_stopped', 'Project {} stopped').format(Path(self._project_path).name))
 
-    def get_running_processes(self) -> list:
-        """The game processes started from the editor that are still alive."""
+    def get_running_processes(self, agent_only=False) -> list:
+        """The game processes started from the editor that are still alive.
+
+        ``agent_only`` keeps just the test runs an AI agent started.
+        """
         running = []
         for process in list(self._game_processes):
             try:
                 if process.state() == QProcess.ProcessState.NotRunning:
                     continue
+                by_agent = bool(getattr(process, '_started_by_agent', False))
+                if agent_only and not by_agent:
+                    continue
                 running.append({
                     'pid': int(process.processId() or 0),
                     'program': process.program(),
                     'state': 'running',
+                    'started_by_agent': by_agent,
                 })
             except RuntimeError:
                 # The underlying C++ object is gone (already deleted).
                 continue
         return running
 
-    def stop_project(self) -> int:
-        """Stop every game process started from the editor; returns how many
-        were still running (the editor's Run/Stop button uses the same list)."""
+    def stop_project(self, agent_only=False) -> int:
+        """Stop the game processes started from the editor; returns how many
+        were still running (the editor's Run/Stop button uses the same list).
+
+        ``agent_only`` stops only the test runs an AI agent started, so a game
+        the user launched himself is never closed by the agent. Stops quit the
+        same way the Stop button does (a neutral console line, no "crash").
+        """
         stopped = 0
         for process in list(self._game_processes):
             try:
                 if process.state() == QProcess.ProcessState.NotRunning:
+                    continue
+                if agent_only and not getattr(process, '_started_by_agent', False):
                     continue
                 # Remember that WE killed it: Qt reports the kill as a
                 # Crashed error, which must not be logged as a real crash.
@@ -1652,5 +1673,9 @@ class GameManager(QObject):
             except RuntimeError:
                 continue
         if stopped:
-            Logger.info('Stopped {} running game process(es).'.format(stopped))
+            if agent_only:
+                Logger.info(T.tr('scene.agent_game_closed',
+                                 'Closed {} test game window(s) opened by the AI agent').format(stopped))
+            else:
+                Logger.info('Stopped {} running game process(es).'.format(stopped))
         return stopped

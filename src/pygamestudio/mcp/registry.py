@@ -73,12 +73,17 @@ INSTRUCTIONS = (
     'editor console and take screenshots of the scene view and of the running '
     'game window. It can also '
     'package the project: `start_build` makes a standalone desktop app '
-    '(PyInstaller) and `start_web_build` a browser bundle (index.html + '
-    'game.zip, played through Pyodide/pygame-ce: the browser plays the audio '
-    'and the loop follows the display refresh; physics projects also ship '
-    'the pymunk wheel next to the page) - both protected like the '
-    'editor\'s Build window; `get_build_settings`, `stop_build` and '
-    '`open_output_dir` (target "desktop" or "web") manage them.\n'
+    '(PyInstaller, `platform` "" or "taptap") and `start_web_build` a browser '
+    'bundle (index.html + game.zip, played through Pyodide/pygame-ce: the '
+    'browser plays the audio and the loop follows the display refresh; physics '
+    'projects also ship the pymunk wheel next to the page). The web build '
+    'clears the previous <output>/build/Web folder first and takes its own '
+    '`platform` pick - "" = 无平台 or "bilibili_toy" = Bilibili Toy (containers '
+    'ship as .data, the page loads the Toy JS SDK and the game calls it '
+    'through studio.sdk.toy); TapTap is desktop-only and never ends up in a '
+    'web bundle. Both are protected like the editor\'s Build window; '
+    '`get_build_settings`, `stop_build` and `open_output_dir` (target '
+    '"desktop" or "web") manage them.\n'
     'The editing panels can be driven as well: `open_panel` brings any panel '
     'into view, `block_editor_*` edits visual block scripts, `image_editor_*` '
     'paints images, `tile_map_editor_*` edits tile maps (painting is undoable '
@@ -101,7 +106,22 @@ INSTRUCTIONS = (
     'project image) as text (background, content position, colours) for models '
     'that cannot see pictures.\n'
     'Games are plain Python: the editor only stores the scene (.scene JSON) and '
-    'attaches scripts from the project folder to objects.'
+    'attaches scripts from the project folder to objects. Scene edits made with '
+    'the tools are saved to their .scene file automatically (a build packages '
+    'the files on disk); a game started with `run_project` is a test run - its '
+    'window is closed again once you stop calling tools (about 25 s of idle), '
+    'while a game the user started himself is left running.\n'
+    'Object scripts can implement per-object input hooks: mouse (on_pressed / '
+    'on_released / on_clicked / on_double_clicked / on_right_clicked / '
+    'on_mouse_enter / on_mouse_leave / on_drag_start / on_drag / on_drag_end) '
+    'and touch (on_touch_down / on_touch_move / on_touch_up / on_tap, each '
+    'getting `finger_id` and a pixel `pos`). Touch takes priority: an object '
+    '(or its script) that implements a touch hook owns that finger, so the '
+    'mouse events the platform synthesizes from it (web page, touch screen) do '
+    'not fire its click/drag hooks again; objects without touch hooks keep '
+    'working through the mouse events as before. So on a touch-capable target '
+    '(web build, Bilibili Toy, a touch screen) the touch hooks are the ones '
+    'that fire, while plain desktop mouse input still drives the mouse hooks.'
 )
 
 
@@ -143,8 +163,44 @@ def clear_registry():
 
 
 # ------------------------------------------------------------------ calling
+def autosave_scene(force=False):
+    """Save scene edits made through the MCP tools.
+
+    The agent edits the in-memory scene, while a build (and a game run) reads
+    the files on disk. Every successful tool call that changed the scene is
+    written back right away, so a later build never packages the old state.
+    Edits the USER made on his own are left alone (unsaved work stays unsaved
+    until he saves it), unless ``force`` is set - the build tools use that to
+    package exactly what the editor shows.
+
+    :return: ``'saved'``, ``'unsaved'`` (the scene has no .scene file yet - the
+             caller should warn instead of opening a Save As dialog) or None.
+    """
+    manager = bridge.game_manager_or_none()
+    if manager is None:
+        return None
+    try:
+        if manager.is_current_scene_saved:
+            return None
+        if not str(manager.current_scene_file_path or ''):
+            return 'unsaved'
+        if not force and not bridge.scene_touched_by_agent:
+            return None
+        manager.save_scene()
+        bridge.clear_scene_touched()
+        return 'saved'
+    except Exception as e:  # noqa: BLE001 - a tool call must not fail on this
+        try:
+            from pygamestudio.gui.console.logger import Logger
+            Logger.warning('Failed to save the scene after a tool call: {}'.format(e))
+        except Exception:
+            pass
+        return None
+
+
 def call_tool(name, arguments):
     """Run a tool and return its MCP result dict."""
+    bridge.note_activity()
     registered = _TOOLS.get(name)
     if registered is None:
         # The spec wants an error response (not a tool result) for a tool that
@@ -158,7 +214,16 @@ def call_tool(name, arguments):
         return error_result(f'Invalid arguments for {name}: {e}')
 
     def _run():
-        return normalize_result(registered.handler(args))
+        manager = bridge.game_manager_or_none()
+        clean_before = manager is None or manager.is_current_scene_saved
+        result = normalize_result(registered.handler(args))
+        if manager is not None:
+            if clean_before and not manager.is_current_scene_saved:
+                # This call is what changed the scene: its edits have to reach
+                # disk, otherwise a build packages the previous state.
+                bridge.mark_scene_touched()
+            autosave_scene()
+        return result
 
     try:
         return bridge.call_in_main_thread(_run)
@@ -174,6 +239,7 @@ def call_tool(name, arguments):
 
 def read_resource(uri):
     """Read one resource and return the MCP ``resources/read`` result."""
+    bridge.note_activity()
     registered = _RESOURCES.get(uri)
     if registered is None:
         raise ToolError(f'Unknown resource: {uri}')

@@ -19,11 +19,19 @@ When no editor is attached (headless use, tests, ``python -m pygamestudio.mcp
 
 import queue
 import threading
+import time
 
 #: How long a tool call may wait for the main thread before giving up. A modal
 #: dialog (file chooser, message box) blocks the timer, which is a real
 #: possibility, so this must not be too short or the editor looks broken.
 CALL_TIMEOUT = 60.0
+
+#: A game window an AI agent started for testing is closed again once the agent
+#: has not called any tool for this long (the agent is done with its run).
+AGENT_GAME_IDLE_SECONDS = 25.0
+
+#: How often the main-thread pump looks for an idle agent test run.
+_WATCH_INTERVAL = 1.0
 
 
 class EditorNotAttached(RuntimeError):
@@ -65,6 +73,12 @@ class EditorBridge:
         self._game_manager = None
         self._project_ready = False
         self._main_thread_id = None
+        self._last_activity = time.monotonic()
+        self._last_watch = 0.0
+        #: True once an MCP call changed the scene (see registry.autosave_scene).
+        self._scene_touched_by_agent = False
+        #: Idle time after which an agent's test run is closed (tests shorten it).
+        self.agent_game_idle_seconds = AGENT_GAME_IDLE_SECONDS
 
     # ------------------------------------------------------------- lifecycle
     def attach(self, editor=None, editor_body=None, game_manager=None, project_ready=True):
@@ -81,6 +95,8 @@ class EditorBridge:
             # in-editor agent will), and such a call must NOT be queued back to
             # the thread that is waiting for it.
             self._main_thread_id = threading.get_ident()
+            self._last_activity = time.monotonic()
+            self._scene_touched_by_agent = False
             if self._timer is None:
                 self._timer = self._create_pump()
 
@@ -99,12 +115,21 @@ class EditorBridge:
 
     def detach(self):
         """Forget the editor and fail every pending call."""
+        # A test run the agent left open must not outlive the editor (the
+        # user's own game window is kept).
+        manager = self.game_manager_or_none()
+        if manager is not None:
+            try:
+                manager.stop_project(agent_only=True)
+            except Exception:  # noqa: BLE001 - closing must never fail
+                pass
         with self._lock:
             self._editor = None
             self._editor_body = None
             self._game_manager = None
             self._project_ready = False
             self._main_thread_id = None
+            self._scene_touched_by_agent = False
             if self._timer is not None:
                 try:
                     self._timer.stop()
@@ -155,6 +180,38 @@ class EditorBridge:
         with self._lock:
             self._project_ready = bool(ready)
 
+    def note_activity(self):
+        """Remember that the MCP client is still working.
+
+        Called for every tool call/resource read: the watchdog closes a game
+        window the agent started once this timestamp goes stale.
+        """
+        self._last_activity = time.monotonic()
+
+    @property
+    def scene_touched_by_agent(self) -> bool:
+        """Whether a tool call (rather than the user) changed the scene."""
+        return self._scene_touched_by_agent
+
+    def mark_scene_touched(self):
+        """Remember that an MCP call modified the scene (autosave is due)."""
+        self._scene_touched_by_agent = True
+
+    def clear_scene_touched(self):
+        """The scene is on disk again (after the autosave)."""
+        self._scene_touched_by_agent = False
+
+    def stop_agent_game(self) -> int:
+        """Close the game windows an AI agent opened for testing.
+
+        Only runs the agent started (``run_project(started_by_agent=True)``)
+        are stopped; a game the user started himself keeps running.
+        """
+        manager = self.game_manager_or_none()
+        if manager is None:
+            return 0
+        return self.call_in_main_thread(lambda: manager.stop_project(agent_only=True))
+
     # ------------------------------------------------------------ execution
     def call_in_main_thread(self, func, *args, **kwargs):
         """Run ``func`` on the editor's main thread and return its result.
@@ -188,8 +245,30 @@ class EditorBridge:
             try:
                 job = self._pending.get_nowait()
             except queue.Empty:
-                return
+                break
             job.run()
+        self._watch_agent_game()
+
+    def _watch_agent_game(self):
+        """Close a test run the AI agent started once the agent is done.
+
+        Runs on the main thread from the pump timer: when no tool call arrived
+        for ``agent_game_idle_seconds``, the game windows the agent opened for
+        debugging are closed. A game the user started is never touched.
+        """
+        now = time.monotonic()
+        if now - self._last_watch < _WATCH_INTERVAL:
+            return
+        self._last_watch = now
+        manager = self._game_manager
+        if manager is None:
+            return
+        if now - self._last_activity < self.agent_game_idle_seconds:
+            return
+        try:
+            manager.stop_project(agent_only=True)
+        except Exception:  # noqa: BLE001 - the watchdog must never break the pump
+            pass
 
 
 #: The one bridge the editor, the server and the tools all share.
@@ -220,3 +299,8 @@ def require_manager():
 def in_main_thread(func):
     """Run ``func`` on the editor's main thread. Tools use this everywhere."""
     return call_in_main_thread(func)
+
+
+def stop_agent_game():
+    """Shortcut for ``bridge.stop_agent_game()`` (agent test windows only)."""
+    return bridge.stop_agent_game()

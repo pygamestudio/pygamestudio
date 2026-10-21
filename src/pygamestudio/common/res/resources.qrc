@@ -13,6 +13,7 @@
         <file>images/button.png</file>
         <file>images/browse.png</file>
         <file>images/ban.png</file>
+        <file>images/bilibili_toy.png</file>
         <file>images/taptap_logo.png</file>
         <file>images/canvas.png</file>
         <file>images/check.png</file>
@@ -24,6 +25,7 @@
         <file>images/flip_vertical.png</file>
         <file>images/pen.png</file>
         <file>images/redo.png</file>
+        <file>images/resize.png</file>
         <file>images/rotate_ccw.png</file>
         <file>images/rotate_cw.png</file>
         <file>images/save.png</file>

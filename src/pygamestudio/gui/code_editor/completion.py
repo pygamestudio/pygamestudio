@@ -48,6 +48,9 @@ ENGINE_EVENTS = (
     'on_mouse_enter', 'on_mouse_leave', 'on_pressed', 'on_released', 'on_clicked',
     'on_focus', 'on_blur', 'on_text_changed', 'on_submitted',
     'on_value_changed', 'on_drag_start', 'on_drag', 'on_drag_end',
+    # touch: an object that implements these owns the finger (the mouse events
+    # the platform derives from it do not fire its click/drag hooks again)
+    'on_touch_down', 'on_touch_move', 'on_touch_up', 'on_tap',
     'on_right_clicked', 'on_double_clicked', 'on_visible_changed',
     'on_collision_enter', 'on_collision_exit',
     'on_animation_start', 'on_frame_changed', 'on_animation_finished',
@@ -304,6 +307,66 @@ def _resolve_expression(expr):
     return target
 
 
+def _scan_cursor_context(text, position):
+    """``'string'``, ``'comment'`` or ``''`` for the caret at ``position``.
+
+    VS Code shows no suggestions inside a string literal or a comment, so the
+    popup is suppressed there as well. This is a plain scan of the text before
+    the caret (not ``tokenize``): the code being typed is usually not valid
+    Python yet, and an unfinished string must still be recognised.
+    """
+    quote = ''
+    triple = False
+    escaped = False
+    in_comment = False
+    index = 0
+    while index < position and index < len(text):
+        char = text[index]
+        if in_comment:
+            if char in ('\n', '\u2029'):
+                in_comment = False
+            index += 1
+            continue
+        if quote:
+            if escaped:
+                escaped = False
+            elif char == '\\':
+                escaped = True
+            elif triple:
+                if text.startswith(quote * 3, index):
+                    index += 3
+                    quote = ''
+                    continue
+            elif char == quote:
+                quote = ''
+            elif char in ('\n', '\u2029'):
+                # An unterminated single-quoted string ends at the line break.
+                quote = ''
+            index += 1
+            continue
+        if char == '#':
+            in_comment = True
+        elif char in ('"', "'"):
+            if text.startswith(char * 3, index):
+                quote = char
+                triple = True
+                index += 3
+                continue
+            quote = char
+            triple = False
+        index += 1
+    if quote:
+        return 'string'
+    if in_comment:
+        return 'comment'
+    return ''
+
+
+def cursor_context(text, position):
+    """Where the caret is: ``'string'``, ``'comment'`` or ``''`` (code)."""
+    return _scan_cursor_context(text, position)
+
+
 def member_names(expr, text=''):
     """The names that may follow ``expr`` + a dot; None when unknown.
 
@@ -366,7 +429,7 @@ class CodeCompleter(QCompleter):
         # exact-cased engine/keyword/builtin names, so the popup can tell a
         # hint from the user's own (document-only) text - see complete_prefix
         self._known_words = set()
-
+        
     def update_words(self):
         """Rebuild the candidate list: keywords + engine API + document words."""
         known = set(PYTHON_KEYWORDS)
@@ -387,9 +450,13 @@ class CodeCompleter(QCompleter):
         Right after a dot the members of the expression in front of it are
         offered (studio.sdk. -> taptap, studio.sdk.taptap.pc. -> init(),
         self.obj. -> the scene-object API); while a plain identifier is
-        typed the usual word list is offered.
+        typed the usual word list is offered. Inside a string literal or a
+        comment nothing is offered, exactly like VS Code.
         """
         cursor = self._editor.textCursor()
+        if cursor_context(self._editor.toPlainText(), cursor.position()):
+            self.popup().hide()
+            return False
         # Only look at the current line up to the cursor, so a word on a
         # previous line can never act as the completion prefix (e.g. right
         # after deleting a word on an empty line).

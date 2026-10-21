@@ -30,6 +30,11 @@ class Game:
         self._elapsed_time = 0.0
         self._frame_count = 0
 
+    def _finger_pos(self, event):
+        """Pixel position of a touch event (SDL reports it normalized 0..1)."""
+        width, height = self._screen.get_size() if self._screen is not None else (0, 0)
+        return int(event.x * width), int(event.y * height)
+
     def _init_game(self):
         """Set up pygame and resolve the project root.
 
@@ -73,7 +78,20 @@ class Game:
 
         while self._running:
             # --- 1. Dispatch all pending pygame events to the on_* hooks. ---
-            for event in pygame.event.get():
+            events = pygame.event.get()
+            # Touch goes first: one physical finger also arrives as synthesized
+            # mouse events (a web page and a touch screen both send them), and
+            # an object that implements the touch events keeps the gesture -
+            # see SceneLoader._TOUCH_EVENTS.
+            for event in events:
+                if event.type == pygame.FINGERDOWN:
+                    scene_loader.handle_finger_down(event.finger_id, self._finger_pos(event))
+                elif event.type == pygame.FINGERMOTION:
+                    scene_loader.handle_finger_move(event.finger_id, self._finger_pos(event))
+                elif event.type == pygame.FINGERUP:
+                    scene_loader.handle_finger_up(event.finger_id, self._finger_pos(event))
+
+            for event in events:
                 # ---------- Quit Event ----------
                 if event.type == pygame.QUIT:
                     self._running = False

@@ -213,6 +213,9 @@ class ImageCanvas(QWidget):
             return
         self._redo_stack.append(self._image.copy())
         self._image = self._undo_stack.pop()
+        # A transform (rotate / resize) changes the dimensions: the widget has
+        # to grow or shrink with the restored image.
+        self._sync_size()
         self.update()
         self.modified_changed.emit(True)
 
@@ -221,6 +224,7 @@ class ImageCanvas(QWidget):
             return
         self._undo_stack.append(self._image.copy())
         self._image = self._redo_stack.pop()
+        self._sync_size()
         self.update()
         self.modified_changed.emit(True)
 
@@ -296,6 +300,26 @@ class ImageCanvas(QWidget):
                                               Qt.TransformationMode.SmoothTransformation)
         self._sync_size()
         self.update()
+
+    def resize(self, width, height):
+        """Scale the image to a new pixel size (undoable).
+
+        The whole picture is resampled instead of cropped, so the artwork is
+        kept when the size changes. Returns True when the size really changed.
+        """
+        if self._image is None:
+            return False
+        width = max(1, int(width))
+        height = max(1, int(height))
+        if (width, height) == self.image_size():
+            return False
+        self._push_undo()
+        self._image = self._image.scaled(
+            width, height, Qt.AspectRatioMode.IgnoreAspectRatio,
+            Qt.TransformationMode.SmoothTransformation)
+        self._sync_size()
+        self.update()
+        return True
 
     def clear(self):
         if self._image is None:

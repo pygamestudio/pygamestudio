@@ -967,6 +967,41 @@ class ObjectBase:
         """User hook: called when a pointer drag on the object ends at runtime."""
         ...
 
+    def on_touch_down(self, finger_id, pos):
+        """User hook: called when a finger goes down on the object at runtime.
+
+        ``finger_id`` identifies the finger (several fingers can press several
+        objects at the same time) and ``pos`` is the touch position in the same
+        world/pixel coordinates the mouse events use.
+
+        An object (or its script) that implements any touch hook owns the
+        gesture: the mouse events the platform derives from that same finger
+        (a web page and a touch screen both send them) do not fire the click /
+        drag hooks on it a second time. Objects without touch hooks keep
+        working through the mouse events exactly as before.
+        """
+        ...
+
+    def on_touch_move(self, finger_id, pos):
+        """User hook: called on every move of a finger pressed on the object.
+
+        The gesture stays with the object it started on, so a finger dragged
+        off the object keeps reporting here (like on_drag does for the mouse).
+        """
+        ...
+
+    def on_touch_up(self, finger_id, pos):
+        """User hook: called when a finger that went down on the object lifts."""
+        ...
+
+    def on_tap(self, finger_id, pos):
+        """User hook: a short touch that was released on the same object.
+
+        Fired after on_touch_up when the finger did not move far and did not
+        stay down long - the touch equivalent of on_clicked.
+        """
+        ...
+
     def on_visible_changed(self, visible):
         """User hook: called when the object is shown or hidden at runtime."""
         ...

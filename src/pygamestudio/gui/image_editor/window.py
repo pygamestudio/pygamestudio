@@ -3,7 +3,7 @@ from pathlib import Path
 from PySide6.QtCore import QEvent, QRectF, QSize, Qt
 from PySide6.QtGui import (QColor, QIcon, QImage, QPainter, QPainterPath,
                            QPen, QPixmap, QCursor)
-from PySide6.QtWidgets import (QApplication, QDialog, QDialogButtonBox,
+from PySide6.QtWidgets import (QApplication, QCheckBox, QDialog, QDialogButtonBox,
                                QFileDialog, QFormLayout, QHBoxLayout, QLabel,
                                QMessageBox, QPushButton, QScrollArea,
                                QToolButton, QVBoxLayout, QWidget)
@@ -34,6 +34,7 @@ TOOLS = (
 ACTION_ICONS = {
     '_save_btn': 'save',
     '_save_as_btn': 'save_as',
+    '_resize_btn': 'resize',
     '_undo_btn': 'undo',
     '_redo_btn': 'redo',
     '_flip_h_btn': 'flip_horizontal',
@@ -90,6 +91,7 @@ class ImageEditorWindow(QWidget):
         self._open_btn = QPushButton()
         self._save_btn = QPushButton()
         self._save_as_btn = QPushButton()
+        self._resize_btn = QPushButton()
         self._undo_btn = QPushButton()
         self._redo_btn = QPushButton()
         self._flip_h_btn = QPushButton()
@@ -177,6 +179,7 @@ class ImageEditorWindow(QWidget):
         for btn_name, key, default, width in (
             ('_save_btn', 'image.save', 'Save (Ctrl+S)', 30),
             ('_save_as_btn', 'image.save_as', 'Save As', 30),
+            ('_resize_btn', 'image.resize', 'Resize Image', 28),
             ('_undo_btn', 'image.undo', 'Undo (Ctrl+Z)', 26),
             ('_redo_btn', 'image.redo', 'Redo (Ctrl+Y)', 26),
             ('_flip_h_btn', 'image.flip_h', 'Flip Horizontal', 28),
@@ -258,6 +261,7 @@ class ImageEditorWindow(QWidget):
         self._open_btn.clicked.connect(self.choose_image)
         self._save_btn.clicked.connect(self.save)
         self._save_as_btn.clicked.connect(self.save_as)
+        self._resize_btn.clicked.connect(self.resize_image)
         self._undo_btn.clicked.connect(self._canvas.undo)
         self._redo_btn.clicked.connect(self._canvas.redo)
         self._flip_h_btn.clicked.connect(self._canvas.flip_h)
@@ -281,9 +285,9 @@ class ImageEditorWindow(QWidget):
         row1 = QHBoxLayout()
         row1.addWidget(self._new_btn)
         row1.addWidget(self._open_btn)
-        for w in (self._save_btn, self._save_as_btn, self._undo_btn, self._redo_btn,
-                  self._flip_h_btn, self._flip_v_btn, self._rotate_ccw_btn,
-                  self._rotate_cw_btn, self._clear_btn):
+        for w in (self._save_btn, self._save_as_btn, self._resize_btn, self._undo_btn,
+                  self._redo_btn, self._flip_h_btn, self._flip_v_btn,
+                  self._rotate_ccw_btn, self._rotate_cw_btn, self._clear_btn):
             row1.addWidget(w)
         row1.addStretch(1)
         row1.addWidget(self._zoom_out_btn)
@@ -450,8 +454,10 @@ class ImageEditorWindow(QWidget):
         self._file_path = Path(file_path)
         self._update_enabled_state()
         self._update_titles()
-        # Show the image at 1:1 by default (zoom controls let the user fit it).
-        self._canvas.actual_size()
+        # Keep the zoom the user works at: opening the next image from the
+        # asset panel must not jump back to 1:1 (the 1:1 / Fit buttons exist
+        # for that). Loading does not touch the zoom, so nothing to do here.
+        self._update_zoom_label()
         return True
 
     def open_image(self, file_path):
@@ -525,6 +531,88 @@ class ImageEditorWindow(QWidget):
 
         if dialog.exec() == QDialog.DialogCode.Accepted:
             return width_spin.value(), height_spin.value()
+        return None
+
+    # ------------------------------------------------------------- resize
+    def resize_image(self):
+        """Ask for a new pixel size and scale the image (undoable)."""
+        if not self._canvas.has_image():
+            return False
+        size = self._ask_resize_size()
+        if size is None:
+            return False
+        if not self._canvas.resize(size[0], size[1]):
+            return False
+        self._update_size_label()
+        Logger.info(T.tr('image.resized', 'Image resized to {} × {} px').format(size[0], size[1]))
+        return True
+
+    def _build_resize_dialog(self):
+        """Build the Resize dialog: width, height and the aspect-ratio lock.
+
+        Kept separate from ``_ask_resize_size`` so the lock logic can be
+        exercised without a modal dialog.
+        """
+        current_width, current_height = self._canvas.image_size()
+        dialog = QDialog(self)
+        dialog.setWindowTitle(T.tr('image.resize_title', 'Resize Image'))
+        form = QFormLayout(dialog)
+
+        # Same SuffixSpinBox look as the brush-size control in the editor.
+        width_spin = SuffixSpinBox()
+        height_spin = SuffixSpinBox()
+        for spin, value in ((width_spin, current_width), (height_spin, current_height)):
+            spin.setRange(1, 16384)
+            spin.setDecimals(0)
+            spin.setSingleStep(1)
+            spin.set_suffix('px')
+            spin.setValue(value if value > 0 else 1)
+
+        lock_checkbox = QCheckBox(T.tr('image.lock_aspect', 'Lock aspect ratio'))
+        lock_checkbox.setChecked(True)
+        state = {'ratio': (current_width / current_height) if current_height else 1.0,
+                 'updating': False}
+
+        def sync_height(width):
+            if state['updating'] or not lock_checkbox.isChecked():
+                return
+            state['updating'] = True
+            height_spin.setValue(max(1, round(width / state['ratio'])))
+            state['updating'] = False
+
+        def sync_width(height):
+            if state['updating'] or not lock_checkbox.isChecked():
+                return
+            state['updating'] = True
+            width_spin.setValue(max(1, round(height * state['ratio'])))
+            state['updating'] = False
+
+        def relock(checked):
+            # Ticking the box links the two fields again using the ratio the
+            # dialog currently shows (a user may have changed both first).
+            if checked and height_spin.value() > 0:
+                state['ratio'] = width_spin.value() / height_spin.value()
+
+        width_spin.valueChanged.connect(sync_height)
+        height_spin.valueChanged.connect(sync_width)
+        lock_checkbox.toggled.connect(relock)
+
+        form.addRow(T.tr('image.width', 'Width'), width_spin)
+        form.addRow(T.tr('image.height', 'Height'), height_spin)
+        form.addRow(lock_checkbox)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
+                                   | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        form.addRow(buttons)
+        return dialog, width_spin, height_spin, lock_checkbox
+
+    def _ask_resize_size(self):
+        """The size picked in the Resize dialog, or None when cancelled."""
+        dialog, width_spin, height_spin, _lock = self._build_resize_dialog()
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            return int(round(width_spin.value())), int(round(height_spin.value()))
         return None
 
     def _update_empty_state(self):
@@ -702,7 +790,7 @@ class ImageEditorWindow(QWidget):
     # ------------------------------------------------------------------ state
     def _update_enabled_state(self):
         has = self._canvas.has_image()
-        for btn in (self._save_btn, self._save_as_btn, self._undo_btn,
+        for btn in (self._save_btn, self._save_as_btn, self._resize_btn, self._undo_btn,
                     self._redo_btn, self._flip_h_btn, self._flip_v_btn,
                     self._rotate_cw_btn, self._rotate_ccw_btn, self._clear_btn,
                     self._zoom_in_btn, self._zoom_out_btn, self._fit_btn,
@@ -764,6 +852,7 @@ class ImageEditorWindow(QWidget):
         for btn, key, default in (
             (self._save_btn, 'image.save', 'Save (Ctrl+S)'),
             (self._save_as_btn, 'image.save_as', 'Save As'),
+            (self._resize_btn, 'image.resize', 'Resize Image'),
             (self._undo_btn, 'image.undo', 'Undo (Ctrl+Z)'),
             (self._redo_btn, 'image.redo', 'Redo (Ctrl+Y)'),
             (self._flip_h_btn, 'image.flip_h', 'Flip Horizontal'),

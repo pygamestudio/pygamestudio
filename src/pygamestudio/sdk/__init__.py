@@ -2,10 +2,13 @@
 
 Each sub-package wraps one vendor SDK, reachable from game code through the
 ``sdk`` name of the ``studio`` namespace, e.g. ``studio.sdk.taptap.pc`` (TapTap
-PC SDK). The wrappers are pure Python + ctypes: no compiler is needed at build
-time and one DLL serves every Python version.
+PC SDK) or ``studio.sdk.toy`` (Bilibili Toy JS SDK). The TapTap wrappers are
+pure Python + ctypes - no compiler needed at build time, one DLL serves every
+Python version - while the Toy bridge talks to the ``window.toy`` object the
+platform injects into a Toy page.
 """
 
 from . import taptap
+from . import toy
 
-__all__ = ['taptap']
+__all__ = ['taptap', 'toy']

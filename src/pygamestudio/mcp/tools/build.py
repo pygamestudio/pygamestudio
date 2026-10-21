@@ -7,8 +7,28 @@ import subprocess
 from pathlib import Path
 
 from pygamestudio.mcp.bridge import bridge
-from pygamestudio.mcp.registry import ToolError, tool
+from pygamestudio.mcp.registry import ToolError, autosave_scene, tool
 from pygamestudio.mcp.tools.context import manager, project_path, project_relative
+
+#: Publishing platforms of the web tab; the values come from
+#: ``gui.build.web`` (none = a plain bundle, bilibili_toy = Toy packaged).
+_WEB_PLATFORMS = ('', 'bilibili_toy')
+
+
+def _scene_build_warnings():
+    """Warn when the latest scene edits cannot be on disk (no .scene file).
+
+    A build stages the files of the project folder, so the scene has to be
+    saved first. Every tool call already autosaves a scene the agent changed;
+    this also flushes edits the user has not saved yet, so the package shows
+    exactly what the editor shows. A scene without a file cannot be saved
+    without asking for a path - that case is reported as a warning.
+    """
+    if autosave_scene(force=True) == 'unsaved':
+        return ['The current scene has no .scene file yet, so the build uses the '
+                'files already on disk - save it with save_scene to include your '
+                'latest changes.']
+    return []
 
 
 def _build_body(required=True):
@@ -55,12 +75,13 @@ def _open_folder(folder):
     'get_build_settings',
     'The build settings of the project: the desktop-app values (app name, '
     'icon, output dir, publishing platform) and the web-app values (build.web: '
-    'output dir; name and icon are shared with the desktop build). The '
-    'publishing platform is stored as build.platform: "" = 无平台 (no '
-    'platform), "taptap" = TapTap (older projects may still carry the legacy '
-    'build.taptap flag - the desktop tab migrates it). Also reports whether a '
-    'build is running in either tab, its progress and the folder of the last '
-    'web build.',
+    'output dir and publishing platform; name and icon are shared with the '
+    'desktop build). Two separate platform picks exist: the desktop one is '
+    'build.platform - "" = 无平台 (no platform), "taptap" = TapTap (older '
+    'projects may still carry the legacy build.taptap flag - the desktop tab '
+    'migrates it); the web one is build.web.platform - "" = 无平台 and '
+    '"bilibili_toy" = Bilibili Toy. Also reports whether a build is running in '
+    'either tab, its progress and the folder of the last web build.',
     {
         'type': 'object',
         'properties': {},
@@ -88,6 +109,7 @@ def get_build_settings(args):
         data['web_progress'] = web_progress_bar.value() if web_progress_bar is not None else None
         bundle_dir = getattr(getattr(web_body, '_build_thread', None), 'bundle_dir', None)
         data['web_bundle_dir'] = Path(bundle_dir).as_posix() if bundle_dir else None
+        data['web_platform'] = ((project_config.get('build') or {}).get('web') or {}).get('platform', '')
     return data
 
 
@@ -172,6 +194,10 @@ def start_build(args):
     body._output_dir_lineedit.setText(build_config['output_dir'])
     body.set_platform_selected(build_config.get('platform', ''))
 
+    # The build stages the project folder: flush scene edits made through the
+    # MCP tools first, otherwise the package carries the old .scene files.
+    warnings = _scene_build_warnings()
+
     body._progress_bar.setValue(0)
     body._progress_bar.show()
     body._build_thread.set_build_config(body.get_build_config())
@@ -182,6 +208,7 @@ def start_build(args):
     return {
         'started': True,
         'config': build_config,
+        'warnings': warnings,
         'note': 'Poll get_build_settings for progress; the log appears in the console.',
     }
 
@@ -196,23 +223,39 @@ def start_build(args):
     'once loaded. The browser plays all audio with its own codecs and the '
     'game loop follows the display\'s animation frame (a hidden tab pauses '
     'the game; sound begins with the first click/tap/key, browser autoplay '
-    'rule). The project code/assets are protected like '
-    'in the desktop build (the installed engine is never modified) and the '
-    'result lands in <output_dir>/build/Web. The build runs in the background: '
-    'poll get_build_settings (web_is_building / web_progress), read '
-    'get_console_logs, then open_output_dir with target="web".',
+    'rule). The previous <output_dir>/build/Web folder is always cleared '
+    'first, so the package never carries a stale file. platform picks how the '
+    'bundle is packaged: "" = 无平台 (plain index.html + game.zip) or '
+    '"bilibili_toy" = Bilibili Toy (that platform drops every file whose '
+    'suffix is not whitelisted, so the containers ship as .data - game.data, '
+    'python_stdlib.data, the wheels - the page also loads the Toy JS SDK and '
+    'the game talks to it through studio.sdk.toy). The TapTap PC SDK is '
+    'desktop-only and is never part of a web bundle. The project code/assets '
+    'are protected like in the desktop build (the installed engine is never '
+    'modified) and the result lands in <output_dir>/build/Web. The build runs '
+    'in the background: poll get_build_settings (web_is_building / '
+    'web_progress), read get_console_logs, then open_output_dir with '
+    'target="web".',
     {
         'type': 'object',
         'properties': {
             'app_name': {'type': 'string', 'description': 'Page title / app name (default: the project folder name).'},
             'app_icon': {'type': 'string', 'description': 'Absolute path of the favicon image (.png/.ico/.jpg/.bmp/.gif; optional).'},
             'output_dir': {'type': 'string', 'description': 'Absolute path of an existing output folder (default: the project folder).'},
+            'platform': {'type': 'string', 'enum': list(_WEB_PLATFORMS),
+                         'description': 'Publishing platform: "" = 无平台 (plain bundle), '
+                                        '"bilibili_toy" = Bilibili Toy (.data containers + Toy JS '
+                                        'SDK). Defaults to the saved pick (build.web.platform).'},
         },
         'additionalProperties': False,
     },
     annotations={'title': 'Build a web app'},
 )
 def start_web_build(args):
+    platform_id = args.get('platform')
+    if platform_id is not None and platform_id not in _WEB_PLATFORMS:
+        raise ToolError('Unknown platform "{}" - use "" (无平台) or "bilibili_toy".'.format(platform_id))
+
     body = _web_build_body()
     if getattr(body, '_is_building', False):
         raise ToolError('A web build is already running (use stop_build to stop it).')
@@ -241,10 +284,13 @@ def start_web_build(args):
         body._app_icon_lineedit.setText(app_icon)
     if output_dir:
         body._output_dir_lineedit.setText(output_dir)
+    if platform_id is not None:
+        body.set_platform_selected(platform_id)
 
     body._progress_bar.setValue(0)
     body._progress_bar.show()
     body._run_button.setEnabled(False)
+    warnings = _scene_build_warnings()
     build_config = body.get_build_config()
     body._build_thread.set_build_config(build_config)
     body._build_thread.start()
@@ -255,7 +301,9 @@ def start_web_build(args):
         'started': True,
         'config': build_config,
         'bundle_dir': (Path(build_config['output_dir']) / 'build' / 'Web').as_posix(),
-        'note': 'Poll get_build_settings (web_is_building / web_progress); the log appears in the console.',
+        'platform': build_config.get('platform', ''),
+        'warnings': warnings,
+        'note': 'The previous bundle was cleared; poll get_build_settings (web_is_building / web_progress); the log appears in the console.',
     }
 
 
