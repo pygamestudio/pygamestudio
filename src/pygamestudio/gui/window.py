@@ -232,10 +232,29 @@ class EditorBody(QMainWindow):
         new_project_action = QAction(T.tr('menu.new_project', 'New Project'), self)
         open_project_action = QAction(T.tr('menu.open_project', 'Open Project'), self)
         new_scene_action = QAction(T.tr('menu.new_scene', 'New Scene'), self)
-        save_scene_action = QAction(T.tr('menu.save_scene', 'Save Scene'), self)
+        # Ctrl+S is shown but NOT registered: the focused panel owns it (the
+        # script / image / tile map editors save their own file) and
+        # Editor.keyPressEvent falls back to the scene. A window-level shortcut
+        # here would steal the key from the code editor before it sees it.
+        save_scene_action = QAction(T.tr('menu.save_scene', 'Save Scene') + '\tCtrl+S', self)
         save_as_action = QAction(T.tr('menu.save_as', 'Save As'), self)
         editor_settings_action = QAction(T.tr('menu.editor_settings', 'Editor Settings'), self)
         quit_editor_action = QAction(T.tr('menu.quit', 'Quit'), self)
+
+        # Real shortcuts: Qt draws them in the menu (natively on macOS) and
+        # they fire whichever panel has the focus. None of them is used
+        # elsewhere - Ctrl+S / Ctrl+R / Ctrl+Z / Ctrl+Y stay with the panels and
+        # with Editor.keyPressEvent, see test_menu_shortcuts.py.
+        #
+        # Editor Settings deliberately does NOT use Ctrl+, (the VS Code key):
+        # input methods / global hotkeys commonly grab Ctrl+, at the OS level,
+        # so the comma key press never reaches any window (verified on a    
+        # Chinese IME setup - Ctrl+comma delivers nothing, Ctrl+E does).
+        new_project_action.setShortcut(QKeySequence('Ctrl+Shift+N'))
+        open_project_action.setShortcut(QKeySequence('Ctrl+Shift+O'))
+        new_scene_action.setShortcut(QKeySequence('Ctrl+N'))
+        save_as_action.setShortcut(QKeySequence('Ctrl+Shift+S'))
+        quit_editor_action.setShortcut(QKeySequence('Ctrl+Q'))
 
         new_project_action.triggered.connect(self.new_project_signal.emit)
         open_project_action.triggered.connect(self.open_project_signal.emit)
@@ -285,8 +304,13 @@ class EditorBody(QMainWindow):
         self._project_menu.clear()
 
         project_settings_action = QAction(T.tr('menu.project_settings', 'Project Settings'), self)
-        run_action = QAction(T.tr('menu.run', 'Run') + '\tCtrl+R', self)
+        # Display only, like the Edit menu: Ctrl+R is handled by the editor
+        # window (and forwarded by every detached panel), so registering it a
+        # second time as an action would run the project twice.
+        run_action = QAction(T.tr('menu.run', 'Run'), self)
         build_action = QAction(T.tr('menu.build', 'Build'), self)
+        run_action.setShortcut(QKeySequence('Ctrl+R'))
+        build_action.setShortcut(QKeySequence('Ctrl+B'))
 
         project_settings_action.triggered.connect(self._show_project_settings_window)
         run_action.triggered.connect(self.run_project)
