@@ -15,7 +15,8 @@ nearest "gap" (every position in every statement list).
 import json
 import re
 
-from PySide6.QtCore import QPoint, QPointF, QRect, QRectF, QSize, QSizeF, Qt, QTimer, Signal
+from PySide6.QtCore import (QEvent, QPoint, QPointF, QRect, QRectF, QSize, QSizeF, Qt, QTimer,
+                            Signal)
 from PySide6.QtGui import (QColor, QCursor, QFont, QFontMetrics, QKeySequence, QPainter,
                            QPainterPath, QPen)
 from PySide6.QtWidgets import (QApplication, QGraphicsItem, QGraphicsItemGroup, QGraphicsScene,
@@ -23,6 +24,7 @@ from PySide6.QtWidgets import (QApplication, QGraphicsItem, QGraphicsItemGroup, 
 
 from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.gui.block_editor import storage
+from pygamestudio.gui.inspector.color import ColorPicker, normalise_rgba
 from pygamestudio.gui.block_editor.model import (VARIABLE_TYPES, block_children, clone_block,
                                                  find_block, find_variable, insert_block,
                                                  new_block, new_stack, new_variable,
@@ -43,6 +45,9 @@ def variable_field_text(value):
     match = _VARIABLE_CODE.match(str(value))
     return match.group(1) if match else str(value)
 
+
+_COLOR_NUMBER = re.compile(r'-?\d+(?:\.\d+)?')
+
 HEADER_HEIGHT = 34
 FIELD_HEIGHT = 22
 FIELD_GAP = 8
@@ -55,6 +60,28 @@ PLACEHOLDER_HEIGHT = 22
 ELSE_BAR_HEIGHT = 30
 LABEL_ARROW_WIDTH = 16
 BLOCK_RADIUS = 7.0
+#: The colour square drawn at the right end of a color field.
+COLOR_SWATCH = 14
+#: A color field without a readable value paints white (and the picker opens on it).
+DEFAULT_COLOR = (255, 255, 255, 255)
+
+
+def color_field_rgba(value, default=DEFAULT_COLOR):
+    """The RGBA tuple of a color field's text, for the swatch and the picker.
+
+    The field stores the code that will be generated (``(255, 0, 0, 255)``), so
+    this is only about showing it: a missing alpha means opaque and anything
+    unreadable falls back to ``default`` (white), exactly like the inspector.
+    """
+    numbers = _COLOR_NUMBER.findall(str(value if value is not None else ''))
+    if len(numbers) not in (3, 4):
+        return default
+    return normalise_rgba([float(number) for number in numbers])
+
+
+def color_field_text(rgba):
+    """The text a color field stores: the tuple the generator inserts."""
+    return '({}, {}, {}, {})'.format(*normalise_rgba(rgba))
 
 SNAP_DISTANCE = 60
 SNAP_PROBE_RATIO = 0.5
@@ -219,6 +246,9 @@ class BlockItem(QGraphicsItem):
             field_text = self._field_text(spec)
             width = max(FIELD_WIDTHS.get(spec['kind'], 80),
                         metrics.horizontalAdvance(field_text) + 26)
+            if spec['kind'] == 'color':
+                # the colour square sits at the right end of the field
+                width += COLOR_SWATCH + 8
             x += FIELD_GAP
             self._field_rects[spec['name']] = QRectF(
                 x, (HEADER_HEIGHT - FIELD_HEIGHT) / 2.0, width, FIELD_HEIGHT)
@@ -329,7 +359,15 @@ class BlockItem(QGraphicsItem):
             painter.drawRoundedRect(rect, 5, 5)
             painter.setPen(QColor('#2b2b2b'))
             text = self._field_text(spec)
-            painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, self._clip_text(text, rect.width() - 10))
+            text_rect = rect
+            if spec['kind'] == 'color':
+                # keep the text clear of the colour square on the right
+                text_rect = QRectF(rect.left(), rect.top(),
+                                   rect.width() - COLOR_SWATCH - 8, rect.height())
+            painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter,
+                             self._clip_text(text, text_rect.width() - 10))
+            if spec['kind'] == 'color':
+                self._paint_color_swatch(painter, rect, color_field_rgba(text))
             if spec['kind'] in ('property', 'operator', 'amount'):
                 self._paint_arrow(painter, rect.right() - 10, rect.center().y())
 
@@ -346,10 +384,31 @@ class BlockItem(QGraphicsItem):
                              self._bar_label(bar['key']))
 
         if self.isSelected():
-            # the highlight follows the block outline (rounded), not a box
-            painter.setPen(QPen(QColor('#ffffff'), 1.6, Qt.PenStyle.DashLine))
-            painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.drawPath(path)
+            self._paint_selection(painter)
+
+    def _paint_selection(self, painter):
+        """The dashed frame of a selected block.
+
+        A hat's body starts EXACTLY at its header's bottom edge (and a plain
+        block is followed by the next one in the stack at that same line), so a
+        frame drawn centred on the silhouette would lose its bottom side: child
+        items always paint after their parent, and a sibling below paints after
+        it too (see BlockCanvas._apply_selection for the z part). Header-only
+        blocks therefore get the frame just INSIDE their outline.
+        """
+        definition = self._definition
+        shape = definition['shape'] if definition else 'stack'
+        painter.setPen(QPen(QColor('#ffffff'), 1.6, Qt.PenStyle.DashLine))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        if shape in ('stack', 'hat'):
+            inset = 2.0
+            painter.drawRoundedRect(
+                QRectF(inset, inset, self._width - 2 * inset, HEADER_HEIGHT - 2 * inset),
+                BLOCK_RADIUS - 1, BLOCK_RADIUS - 1)
+            return
+        # control blocks: the outline runs around the mouth, and nothing of
+        # their own covers it (the body starts BODY_PAD below the header)
+        painter.drawPath(self._outline_path())
 
     def _outline_path(self):
         """The block silhouette used for painting and selection."""
@@ -394,6 +453,26 @@ class BlockItem(QGraphicsItem):
         """A small downward chevron (marks a dropdown)."""
         painter.drawLine(QPointF(x - 3, y - 2), QPointF(x + 1, y + 2))
         painter.drawLine(QPointF(x + 1, y + 2), QPointF(x + 5, y - 2))
+
+    @staticmethod
+    def _paint_color_swatch(painter, rect, rgba):
+        """The colour square at the right end of a color field.
+
+        A checkerboard shows through when the colour is not fully opaque, so
+        the block tells the truth about the alpha channel too.
+        """
+        size = COLOR_SWATCH
+        swatch = QRectF(rect.right() - size - 5, rect.center().y() - size / 2.0, size, size)
+        half = size / 2.0
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor('#ffffff'))
+        painter.drawRect(swatch)
+        painter.setBrush(QColor('#cfcfcf'))
+        painter.drawRect(QRectF(swatch.left(), swatch.top(), half, half))
+        painter.drawRect(QRectF(swatch.left() + half, swatch.top() + half, half, half))
+        painter.setBrush(QColor(*rgba))
+        painter.setPen(QPen(QColor(0, 0, 0, 90), 1.0))
+        painter.drawRect(swatch)
 
     @staticmethod
     def _bar_label(key):
@@ -454,6 +533,10 @@ class BlockCanvas(QGraphicsView):
         self._drop_indicator = DropIndicator()
         self._scene.addItem(self._drop_indicator)
         self._drop_indicator.setVisible(False)
+        # The colour popup of a color field, shared by every block of the canvas
+        # (created on first use, it closes itself on focus-out).
+        self._color_picker = None
+        self._color_handler = None
         self._save_timer = QTimer(self)
         self._save_timer.setSingleShot(True)
         self._save_timer.setInterval(SAVE_DELAY)
@@ -1157,7 +1240,14 @@ class BlockCanvas(QGraphicsView):
         selected = self._selected_ids
 
         def apply(item):
-            item.setSelected(item.block()['id'] in selected)
+            is_selected = item.block()['id'] in selected
+            item.setSelected(is_selected)
+            # Blocks in a stack touch edge to edge, so the next block is
+            # painted OVER the bottom edge of the one above it and would hide
+            # that dashed side of the frame. A selected block is lifted above
+            # its stack neighbours (nothing else changes z, so blocks keep
+            # their document order).
+            item.setZValue(1.0 if is_selected else 0.0)
             for child in item.childItems():
                 if isinstance(child, BlockItem):
                     apply(child)
@@ -1238,6 +1328,9 @@ class BlockCanvas(QGraphicsView):
         spec = field_spec(definition, field_name)
         if spec is None:
             return
+        if spec['kind'] == 'color':
+            self._pick_color(item, spec)
+            return
         value = self._choose_field_value(item, spec)
         if value is None:
             return
@@ -1245,6 +1338,67 @@ class BlockCanvas(QGraphicsView):
         item.block().setdefault('fields', {})[field_name] = value
         self.rebuild()
         self.schedule_save()
+
+    def _pick_color(self, item, spec):
+        """A color field opens the editor's colour picker - no value dialog.
+
+        Every change is written into the block immediately, so the tuple text
+        and its swatch follow the picker while the user drags the sliders. The
+        whole popup session is one undo step and one (debounced) save, and
+        opening the picker without changing anything leaves no undo step.
+        """
+        block = item.block()
+        current = field_value(block, item.definition(), spec['name'])
+        picker = self._color_picker_widget()
+        self._disconnect_color_picker()
+        pushed = []
+
+        def on_color_changed(rgba):
+            if not pushed:
+                self.push_undo()      # snapshot BEFORE the first change
+                pushed.append(True)
+            block.setdefault('fields', {})[spec['name']] = color_field_text(rgba)
+            self.rebuild()
+            self.schedule_save()
+
+        self._color_handler = on_color_changed
+        picker.color_changed.connect(on_color_changed)
+        self._show_color_picker(picker, color_field_rgba(current))
+
+    def _color_picker_widget(self):
+        """The colour popup (the one the inspector and image editor use)."""
+        if self._color_picker is None:
+            self._color_picker = ColorPicker()
+            self._color_picker.installEventFilter(self)
+        return self._color_picker
+
+    def _disconnect_color_picker(self):
+        """Forget the handler of the previous popup session (if any)."""
+        if self._color_picker is not None and self._color_handler is not None:
+            try:
+                self._color_picker.color_changed.disconnect(self._color_handler)
+            except (RuntimeError, TypeError):
+                pass
+        self._color_handler = None
+
+    def eventFilter(self, watched, event):
+        # Closing the popup ends the session: the next opening connects anew.
+        if watched is self._color_picker and event.type() == QEvent.Type.Hide:
+            self._disconnect_color_picker()
+        return super().eventFilter(watched, event)
+
+    def _show_color_picker(self, picker, rgba):
+        """Show the picker next to the cursor, inside the screen."""
+        picker.set_rgba(rgba)
+        picker.adjustSize()      # the clamp below needs the real popup size
+        screen = QApplication.primaryScreen().availableGeometry()
+        position = QCursor.pos()
+        x = min(max(screen.left(), position.x() - 24), screen.right() - picker.width())
+        y = min(max(screen.top(), position.y() + 18), screen.bottom() - picker.height())
+        picker.move(x, y)
+        picker.show()
+        picker.raise_()
+        picker.setFocus(Qt.FocusReason.ActiveWindowFocusReason)
 
     def _choose_field_value(self, item, spec):
         """Ask the user for a new field value (dropdown menu or text dialog)."""

@@ -638,6 +638,8 @@ class ColorPicker(QWidget):
         try:
             self._set_rgba(rgba)
             self._update_all_visuals(*rgba)
+            # the HEX box belongs to the colour shown, not to the previous one
+            self._set_hex(self._rgb2hex(rgba[0], rgba[1], rgba[2], rgba[3]))
         finally:
             self.blockSignals(was_blocked)
 

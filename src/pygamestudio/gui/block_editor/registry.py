@@ -327,7 +327,11 @@ _add('action_hide', 'action', 'block.act.hide', 'Hide',
 _add('action_toggle_visible', 'action', 'block.act.toggle_visible', 'Toggle show / hide',
      code='self.obj.visible = not self.obj.visible')
 _add('action_set_color', 'action', 'block.act.set_color', 'Set color',
-     fields=(('color', 'text', '(255, 255, 255, 255)'),),
+     # ``color``: an RGBA tuple, not text. The generator inserts it as typed
+     # (``set_color((255, 255, 255, 255))``, never a string - pygame would read
+     # a string as a color NAME and raise "ValueError: invalid color name"), and
+     # the canvas opens the colour picker for it (see canvas._pick_color).
+     fields=(('color', 'color', '(255, 255, 255, 255)'),),
      code='self.obj.set_color({color})')
 _add('action_set_image', 'action', 'block.act.set_image', 'Set image',
      fields=(('path', 'text'),),

@@ -261,6 +261,11 @@ def _field_code(definition, name, value, variables=()):
             return _format_number(float(text))
         except (TypeError, ValueError):
             return repr(text)
+    if kind == 'color':
+        # a color field is an RGBA tuple, not text: insert it as typed. Quoting
+        # it would hand pygame a string, which it reads as a color NAME
+        # ("ValueError: invalid color name").
+        return str(value).strip()
     return repr(str(value))
 
 
