@@ -63,6 +63,14 @@ QLineEdit {
     background-color: #ffffff;
 }
 
+/* The inline rename box of a tree row (hierarchy, asset): the row is only one
+   text line tall, so the 3px padding above left no room for the descenders -
+   a trailing "_" was not drawn at all. */
+QLineEdit#treeRenameEditor {
+    border-radius: 3px;
+    padding: 0px 3px;
+}
+
 QLineEdit:hover {
     border: 1px solid #007acc;
 }

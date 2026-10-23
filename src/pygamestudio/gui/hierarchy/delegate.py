@@ -2,6 +2,8 @@ from PySide6.QtGui import *
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
 
+from pygamestudio.gui.base.tree_rename import fit_rename_editor, prepare_rename_editor
+
 
 class HierarchyTreeViewDelegate(QStyledItemDelegate):
     def __init__(self, tree_view=None, proxy_model=None, standard_model=None):
@@ -16,6 +18,15 @@ class HierarchyTreeViewDelegate(QStyledItemDelegate):
         self._eye_closed_pixmap = QPixmap(':/images/eye_closed.png')
 
         self._hovered_index = None
+
+    def createEditor(self, parent, option, index):
+        """The inline rename box (a QLineEdit with the compact style)."""
+        return prepare_rename_editor(super().createEditor(parent, option, index))
+
+    def updateEditorGeometry(self, editor, option, index):
+        # The row is one text line tall: the editor needs the height its own
+        # style asks for, otherwise the bottom of the text ("_") is clipped.
+        fit_rename_editor(editor, option.rect)
 
     def _draw_eye_pixmap(self, painter, cell_rect, is_hovered, is_item_visible, is_ancestor_visible):
         painter.save()

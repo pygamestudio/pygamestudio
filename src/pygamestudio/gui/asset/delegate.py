@@ -3,6 +3,7 @@ from PySide6.QtGui import *
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
 from pygamestudio.common.utils.config import *
+from pygamestudio.gui.base.tree_rename import fit_rename_editor, prepare_rename_editor
 
 
 class AssetTreeWidgetDelegate(QStyledItemDelegate):
@@ -30,6 +31,7 @@ class AssetTreeWidgetDelegate(QStyledItemDelegate):
     def createEditor(self, parent, option, index):
         editor = super().createEditor(parent, option, index)
         if isinstance(editor, QLineEdit):
+            prepare_rename_editor(editor)
             text = index.data(Qt.ItemDataRole.DisplayRole)
             last_dot = text.rfind('.')
             if last_dot > 0:
@@ -37,3 +39,8 @@ class AssetTreeWidgetDelegate(QStyledItemDelegate):
             
             editor.editingFinished.connect(lambda: self._on_rename_completed(index, text))
         return editor
+
+    def updateEditorGeometry(self, editor, option, index):
+        # The row is one text line tall: the editor needs the height its own
+        # style asks for, otherwise the bottom of the text ("_") is clipped.
+        fit_rename_editor(editor, option.rect)
