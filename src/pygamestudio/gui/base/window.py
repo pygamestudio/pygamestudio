@@ -298,6 +298,27 @@ class WindowBase(QWidget):
 
         return stretch_type
 
+    def _stretch_hit(self, event):
+        """The stretch type for a mouse event, or None.
+
+        A mouse event that travelled up from a child widget keeps the CHILD's
+        coordinates, so ``event.position()`` can be a small point inside a
+        panel - a hover over the first text line of the code editor then looked
+        like the window's top resize band and set a resize cursor on the WHOLE
+        window (every child without its own cursor inherited it). The global
+        position is unambiguous: map it into the window and hit-test that.
+        """
+        point = self.mapFromGlobal(event.globalPosition().toPoint())
+        return self._get_stretch_type(point.x(), point.y())
+
+    def leaveEvent(self, event):
+        # Leaving the window ends any hover-resize: the window keeps the cursor
+        # it set for its children, and that would still be a resize arrow when
+        # the pointer comes back over a panel.
+        if not self._is_stretching:
+            self.unsetCursor()
+        return super().leaveEvent(event)
+
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             # Forget any stale state, then hit-test the PRESS position: hover
@@ -305,8 +326,7 @@ class WindowBase(QWidget):
             # window, so a stored stretch type can be stale (a click in the
             # middle of a panel used to look like an edge grab).
             self._end_stretch()
-            self._stretch_type = self._get_stretch_type(event.position().x(),
-                                                        event.position().y())
+            self._stretch_type = self._stretch_hit(event)
             if self._stretch_type:
                 self._is_stretching = True
                 self._start_geometry = self.geometry()
@@ -323,7 +343,7 @@ class WindowBase(QWidget):
             # never let a bare hover drag the border along - stop it first,
             # so the hit-test below starts from a clean state.
             self._end_stretch()
-        stretch_type = self._get_stretch_type(event.position().x(), event.position().y())
+        stretch_type = self._stretch_hit(event)
         self._stretch_type = stretch_type
         if self._is_stretching and stretch_type:
             self._resize_window(event.globalPosition().toPoint())

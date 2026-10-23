@@ -623,7 +623,7 @@ class ColorPicker(QWidget):
         self._g_lineedit.setText(str(g))
         self._b_lineedit.setText(str(b))
         self._a_lineedit.setText(str(a))
-
+        
         for slider in [self._r_slider, self._g_slider, self._b_slider, self._a_slider]:
             slider.blockSignals(False)
         for lineedit in [self._r_lineedit, self._g_lineedit, self._b_lineedit, self._a_lineedit]:
