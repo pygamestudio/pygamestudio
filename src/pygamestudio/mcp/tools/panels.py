@@ -181,6 +181,54 @@ def _find_block(workspace, block_id):
     return block
 
 
+def _color_channels(value):
+    """The (r, g, b, a) of a color argument, or None when it is not one."""
+    if isinstance(value, (list, tuple)):
+        numbers = list(value)
+    else:
+        text = str(value).strip()
+        if not text:
+            return None
+        if text.startswith('#'):
+            digits = text[1:]
+            if len(digits) not in (6, 8) or any(
+                    character not in '0123456789abcdefABCDEF' for character in digits):
+                return None
+            numbers = [int(digits[index:index + 2], 16) for index in range(0, len(digits), 2)]
+        else:
+            parts = [part for part in text.strip('()[]').replace(' ', ',').split(',') if part]
+            try:
+                numbers = [float(part) for part in parts]
+            except ValueError:
+                return None
+
+    if len(numbers) == 3:
+        numbers.append(255)
+    if len(numbers) != 4:
+        return None
+    try:
+        return tuple(max(0, min(255, int(round(float(channel))))) for channel in numbers)
+    except (TypeError, ValueError):
+        return None
+
+
+def _coerce_color_value(spec, value):
+    """A color field: stored as the RGBA tuple the generated code carries.
+
+    The block editor writes a color field into the script VERBATIM (``(255, 0,
+    0, 255)`` - a quoted value would reach pygame as a color name), so the
+    tool accepts the friendly spellings and stores the canonical tuple; a
+    value that is not a color is refused instead of breaking the script.
+    """
+    channels = _color_channels(value)
+    if channels is None:
+        raise ToolError(
+            'Field "{}" needs a color, got "{}". Use [r, g, b], [r, g, b, a], '
+            '"(r, g, b, a)" or "#RRGGBB" / "#RRGGBBAA" (0-255 per channel).'.format(
+                spec['name'], value))
+    return '({}, {}, {}, {})'.format(*channels)
+
+
 def _coerce_block_value(spec, value, variables=()):
     """Turn a JSON value into the value the workspace should store."""
     from pygamestudio.gui.block_editor import registry as block_registry
@@ -188,6 +236,8 @@ def _coerce_block_value(spec, value, variables=()):
     kind = spec['kind']
     if value is None:
         raise ToolError('A value is required for field "{}".'.format(spec['name']))
+    if kind == 'color':
+        return _coerce_color_value(spec, value)
     if kind == 'number':
         if isinstance(value, bool):
             raise ToolError('Field "{}" is a number.'.format(spec['name']))
@@ -449,13 +499,17 @@ def block_editor_add_block(args):
     'block_editor_set_field',
     'Change one field of a block in the block editor (the same edit as '
     'clicking the field). Dropdown fields accept the option code or its '
-    'label; number fields accept numbers. Undoable in the block editor.',
+    'label; number fields accept numbers. A color field ("Set color") accepts '
+    '[r, g, b], [r, g, b, a], "(r, g, b, a)" or "#RRGGBB" / "#RRGGBBAA" and '
+    'is stored as the RGBA tuple the generated code carries. Undoable in the '
+    'block editor.',
     {
         'type': 'object',
         'properties': {
             'block': {'type': 'string', 'description': 'Block id.'},
             'field': {'type': 'string', 'description': 'Field name.'},
-            'value': {'description': 'New value (string, number, boolean).'},
+            'value': {'description': 'New value (string, number, boolean, or a '
+                                     '[r, g, b] / [r, g, b, a] list for a color field).'},
         },
         'required': ['block', 'field'],
         'additionalProperties': False,
@@ -1796,7 +1850,10 @@ def _animation_state(window, obj):
         'auto_play': bool(obj.auto_play),
         'keyframe_count': len(keyframes),
         'keyframes': [{'index': index, 'time': float(frame['time']),
-                       'easing': frame.get('easing', 'linear')}
+                       'easing': frame.get('easing', 'linear'),
+                       # the panel paints a thumbnail of this image under the
+                       # diamond; '' = the frame has no image of its own
+                       'image_path': frame.get('image_path', '') or ''}
                       for index, frame in enumerate(keyframes)],
         'selected_keyframe': selected if 0 <= selected < len(keyframes) else None,
         'playhead': round(float(window._preview_time), 3),
@@ -1843,9 +1900,11 @@ def animation_editor_open(args):
 @tool(
     'animation_editor_state',
     'What the Animation Editor shows: the bound Keyframe object, duration, '
-    'loop / auto play, every keyframe (time + easing), the selected keyframe, '
-    'the playhead, whether the preview plays and its speed, and whether the '
-    'object counts as being edited (the Inspector locks it then).',
+    'loop / auto play, every keyframe (time, easing and the image it uses - '
+    'the panel paints a thumbnail of that image under the diamond), the '
+    'selected keyframe, the playhead, whether the preview plays and its '
+    'speed, and whether the object counts as being edited (the Inspector '
+    'locks it then).',
     {
         'type': 'object',
         'properties': {},

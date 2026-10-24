@@ -35,9 +35,9 @@ not exposed (with the reason). Tool names are the MCP tool names.
 
 | Capability | Editor entry point | MCP |
 | --- | --- | --- |
-| New scene (empty canvas) | File > New Scene | `new_scene` |
+| New scene (empty canvas) | File > New Scene (Ctrl+N) | `new_scene` |
 | Open / switch scene | double click a `.scene`, or Run | `load_scene` |
-| Save scene / Save As | File > Save Scene / Save As | `save_scene` (with optional path; required when the scene has no file yet) |
+| Save scene / Save As | File > Save Scene (Ctrl+S) / Save As (Ctrl+Shift+S) | `save_scene` (with optional path; required when the scene has no file yet) |
 | List scenes, mark the loaded/start scene | Asset panel | `list_scenes` |
 | Unsaved-changes state | window title `*unsaved` | `editor_status`, `get_current_scene` |
 | **Autosave of agent edits**: a tool call that changes the scene writes it to its `.scene` file right away (a build and a game run read the files on disk, not the editor's memory); edits the user made himself stay unsaved until he saves. `start_build` / `start_web_build` also flush those before packaging | - | all mutating tools, `start_build`, `start_web_build` |
@@ -53,7 +53,7 @@ not exposed (with the reason). Tool names are the MCP tool names.
 | Which properties exist per type | Inspector layout | `object_types` |
 | Edit properties (move, resize, scale, rotate, color, text, font, image, collision, particle, slider, progress bar, frame sequence, keyframe, ...) | Inspector widgets | `update_object`, `apply_scene_patch` |
 | Keyframe animation (snapshot timeline: keyframes with easing, duration, loop, auto play, playback speed; each keyframe stores x/y/scale/angle/color/image) | Animation Editor panel | `update_object` on a KEYFRAME object: `keyframes` (normalized + sorted), `duration` (hundredths of a second, fractions welcome - at least 0.1 s and at least the last keyframe - a lower value is raised), `auto_play`, `loop`, `playback_speed` (1 = real time, the game plays at it too), `image_path` - all undoable |
-| Animation Editor panel: bind a Keyframe object, read the timeline, preview playback (play / pause / stop, 0.1-8x speed), scrub the playhead (the scene shows that pose, so `capture_scene_view` / `analyze_image` show the animation; without a selected keyframe the nearest frame on the LEFT is held, with one selected the values are interpolated), step a keyframe (the value row edits it) or clear the selection | Animation Editor tab | `animation_editor_open`, `animation_editor_state`, `animation_editor_control`; the panel itself is reachable with `open_panel` (`animation`) and `list_editor_panels` |
+| Animation Editor panel: bind a Keyframe object, read the timeline, preview playback (play / pause / stop, 0.1-8x speed), scrub the playhead (the scene shows that pose, so `capture_scene_view` / `analyze_image` show the animation; without a selected keyframe the nearest frame on the LEFT is held, with one selected the values are interpolated), step a keyframe (the value row edits it) or clear the selection. The timeline paints a small thumbnail of its own image under every diamond (nothing when the keyframe has no image), so the user sees which sprite each frame plays | Animation Editor tab | `animation_editor_open`, `animation_editor_state` (per keyframe: time, easing, `image_path`), `animation_editor_control`; the panel itself is reachable with `open_panel` (`animation`) and `list_editor_panels` |
 | Cut a sprite sheet PNG into single-frame files (cell size, offset, spacing; re-slicing a sheet replaces its earlier frames; the files feed keyframe images or a frame-sequence folder) | Animation Editor toolbar > scissors | `slice_sprite_sheet` |
 | Fit a text box to its text (a TEXT label is clipped to its width/height otherwise) | Inspector > Size (by hand) | `fit_object_size`; `create_object` / `update_object` accept `"auto_size": true` |
 | Rename | Hierarchy > Rename | `update_object` (`name`) |
@@ -81,7 +81,7 @@ not exposed (with the reason). Tool names are the MCP tool names.
 | Create a script from the ObjectScript template | Asset > Add > Script | `create_script` |
 | Read / write script files | Code Editor | `read_file`, `write_file` |
 | Jump to a file (and line) in the editor | Asset / console click | `open_in_code_editor` |
-| Visual (block) scripting | Block Editor | `block_editor_open`, `block_editor_list_types`, `block_editor_get_blocks`, `block_editor_add_block`, `block_editor_set_field`, `block_editor_move_block`, `block_editor_delete_block`, `block_editor_save` (block scripts stay plain `.py` files) |
+| Visual (block) scripting | Block Editor | `block_editor_open`, `block_editor_list_types`, `block_editor_get_blocks`, `block_editor_add_block`, `block_editor_set_field`, `block_editor_move_block`, `block_editor_delete_block`, `block_editor_save` (block scripts stay plain `.py` files). The "Set color" block's field is an RGBA tuple written into the code as `` (255, 0, 0, 255) ``: `block_editor_set_field` takes `[r, g, b]`, `[r, g, b, a]`, `"(r, g, b, a)"` or `"#RRGGBB"` / `"#RRGGBBAA"` and stores that canonical tuple (a non-color is refused - it would break the script) |
 
 ### Per-object input hooks
 
@@ -113,7 +113,7 @@ finger. An input box or slider under the finger still handles the press itself
 
 | Capability | Editor entry point | MCP |
 | --- | --- | --- |
-| Run the project (saves the scene — a scene with no file must be saved first — starts `main.py`; the game of an earlier run is stopped first, `stop_running: false` starts an additional instance). A game started here is a **test run**: the editor closes that window again once the agent stops calling tools (about 25 s of idle), while a game the user started himself keeps running | Project > Run | `run_project` |
+| Run the project (saves the scene — a scene with no file must be saved first — starts `main.py`; the game of an earlier run is stopped first, `stop_running: false` starts an additional instance). A game started here is a **test run**: the editor closes that window again once the agent stops calling tools (about 25 s of idle), while a game the user started himself keeps running | Project > Run (Ctrl+R) | `run_project` |
 | Stop running game processes (also used to close the agent's test window right away) | (editor keeps them alive until exit) | `stop_project` |
 | Runtime status (pids, whether a process is an agent test run, console length) | Console | `get_runtime_status` |
 | Look at the running game window (the live view with script movement, physics and animations; Windows only - falls back to the editor scene view when the window cannot be captured: game not running, window minimized, macOS/Linux) | game window | `capture_game_window` (PNG), `analyze_image` with `"source": "game"` (text) |
@@ -161,8 +161,8 @@ stops with a message instead of shipping a mixed folder.
 | Capability | Editor entry point | MCP |
 | --- | --- | --- |
 | Read build settings (desktop values + `build.web`, publishing platforms, running state, progress, last web bundle) | Build window | `get_build_settings` (`web_platform` = the web pick) |
-| Start a desktop build (PyInstaller executable) | Build window > Desktop App > Build | `start_build` (`platform`: `""` / `"taptap"`) |
-| Start a web build (browser bundle; clears the previous one) | Build window > Web App > Build | `start_web_build` (`platform`: `""` / `"bilibili_toy"`) |
+| Start a desktop build (PyInstaller executable) | Build window (Ctrl+B) > Desktop App > Build | `start_build` (`platform`: `""` / `"taptap"`) |
+| Start a web build (browser bundle; clears the previous one) | Build window (Ctrl+B) > Web App > Build | `start_web_build` (`platform`: `""` / `"bilibili_toy"`) |
 | Stop a build (whichever tab is building) | Build window > Stop | `stop_build` |
 | Open the desktop output / the web bundle folder | Build window > Open Output Dir | `open_output_dir` (`target`: `"desktop"` / `"web"`) |
 | Run the built app / preview the web build | Run Game / Run in Browser buttons | **no** - buttons only |
