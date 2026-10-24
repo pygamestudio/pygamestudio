@@ -16,7 +16,7 @@ Docked as a center bottom tab between the console and the audio editor.
 from pathlib import Path
 
 from PySide6.QtCore import QElapsedTimer, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QCursor, QIcon
+from PySide6.QtGui import QImage, QCursor, QIcon, QPixmap
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QFrame,
                                QHBoxLayout, QLabel, QMenu, QPushButton,
                                QScrollArea, QVBoxLayout, QWidget)
@@ -46,6 +46,9 @@ TIME_EPSILON = 1e-4
 #: Seconds between the keyframes built from dropped frame images (10 fps):
 #: an image sequence cycles through its frames at this even pace.
 FRAME_DROP_INTERVAL = 0.1
+#: Longest edge of a cached frame thumbnail: the timeline paints it at
+#: THUMB_SIZE, so a big source image is scaled down once, not per frame.
+THUMB_CACHE_SIZE = 64
 
 
 class _ValueRowHost:
@@ -92,6 +95,8 @@ class AnimationEditorWindow(QWidget):
         self._base_values = None
         self._dirty_preview = False
         self._value_edit_pending = False
+        #: path -> (mtime, pixmap) of the frame thumbnails under the diamonds
+        self._thumbnail_cache = {}
 
         self._preview_timer = QTimer(self)
         self._preview_timer.setInterval(PREVIEW_INTERVAL_MS)
@@ -411,6 +416,8 @@ class AnimationEditorWindow(QWidget):
         self._updating = True
         try:
             self._timeline.set_keyframes(keyframes)
+            self._timeline.set_frame_images(
+                [self._frame_thumbnail(frame.get('image_path', '')) for frame in keyframes])
             self._timeline.set_length(obj.get_timeline_length())
             self._timeline.set_time(self._preview_time)
             self._selected_index = self._timeline.selected_index()
@@ -432,6 +439,7 @@ class AnimationEditorWindow(QWidget):
         self._updating = True
         try:
             self._timeline.set_keyframes([])
+            self._timeline.set_frame_images([])
             self._timeline.set_length(1.0)
             self._timeline.set_time(0.0)
             self._timeline.set_selected(-1)
@@ -490,6 +498,39 @@ class AnimationEditorWindow(QWidget):
                 EASING_CURVES.index(curve) if curve in EASING_CURVES else 0)
         self._easing_combo.blockSignals(False)
         self._easing_combo.setEnabled(has_frame)
+
+    def _frame_thumbnail(self, path):
+        """The small picture of a snapshot's image (None when it has none).
+
+        A keyframe whose ``image_path`` is empty shows no thumbnail at all;
+        a missing file (renamed / deleted asset) shows none either instead of
+        an empty box. Results are cached per path and file stamp, and the
+        image is scaled down once, so painting the timeline never re-reads
+        the disk.
+        """
+        path = str(path or '').strip()
+        if not path:
+            return None
+        file_path = Path(get_project_path()) / path
+        try:
+            stamp = file_path.stat().st_mtime_ns
+        except OSError:
+            return None
+
+        cached = self._thumbnail_cache.get(path)
+        if cached is not None and cached[0] == stamp:
+            return cached[1]
+
+        image = QImage(file_path.as_posix())
+        pixmap = None
+        if not image.isNull():
+            if image.width() > THUMB_CACHE_SIZE or image.height() > THUMB_CACHE_SIZE:
+                image = image.scaled(THUMB_CACHE_SIZE, THUMB_CACHE_SIZE,
+                                     Qt.AspectRatioMode.KeepAspectRatio,
+                                     Qt.TransformationMode.SmoothTransformation)
+            pixmap = QPixmap.fromImage(image)
+        self._thumbnail_cache[path] = (stamp, pixmap)
+        return pixmap
 
     def _sync_image_edit(self, frame):
         """The image row is the inspector's path line edit: show the

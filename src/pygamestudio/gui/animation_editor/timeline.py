@@ -14,8 +14,8 @@ the whole timeline again.
 """
 import math
 
-from PySide6.QtCore import QPoint, QPointF, Qt, Signal
-from PySide6.QtGui import QColor, QPainter, QPen, QPolygonF
+from PySide6.QtCore import QPoint, QPointF, QRectF, Qt, Signal
+from PySide6.QtGui import QColor, QPainter, QPen, QPixmap, QPolygonF
 from PySide6.QtWidgets import QWidget
 
 PAD = 12                 # horizontal padding of the track
@@ -25,6 +25,11 @@ TRACK_HEIGHT = 44        # height of the diamond band
 DIAMOND_RADIUS = 6
 HIT_RADIUS = 11
 MIN_LENGTH = 0.001
+#: Row of frame thumbnails under the diamond band: each keyframe shows the
+#: image it uses (nothing when the snapshot has no image of its own).
+THUMB_SIZE = 28
+THUMB_TOP = TRACK_TOP + TRACK_HEIGHT + 4
+THUMB_BOTTOM_PAD = 6
 
 #: The ruler's division: one grid line every 0.1 s.
 TICK_INTERVAL = 0.1
@@ -70,6 +75,19 @@ def _format_length(seconds):
     return '{}s'.format(text)
 
 
+def _fit_rect(box, width, height):
+    """The rect inside ``box`` that shows a ``width`` x ``height`` image
+    without distortion (centred, aspect ratio kept)."""
+    if width <= 0 or height <= 0:
+        return QRectF(box)
+    scale = min(box.width() / width, box.height() / height)
+    target_width = width * scale
+    target_height = height * scale
+    return QRectF(box.center().x() - target_width / 2.0,
+                  box.center().y() - target_height / 2.0,
+                  target_width, target_height)
+
+
 class AnimationTimeline(QWidget):
     """The keyframe track: ruler, diamonds and playhead."""
 
@@ -84,6 +102,7 @@ class AnimationTimeline(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._keyframes = []
+        self._thumbnails = []
         self._length = 1.0
         self._time = 0.0
         self._selected = -1
@@ -95,7 +114,7 @@ class AnimationTimeline(QWidget):
         self._pan_origin = None
         self._pan_view = None
         self._colors = self._theme_colors(True)
-        self.setMinimumHeight(TRACK_TOP + TRACK_HEIGHT + 14)
+        self.setMinimumHeight(THUMB_TOP + THUMB_SIZE + THUMB_BOTTOM_PAD)
         self.setCursor(Qt.CursorShape.ArrowCursor)
         self.setMouseTracking(True)
 
@@ -108,6 +127,15 @@ class AnimationTimeline(QWidget):
 
     def keyframes(self):
         return list(self._keyframes)
+
+    def set_frame_images(self, images):
+        """The picture shown under every diamond (None = none).
+
+        One entry per keyframe, in the same order; a snapshot whose
+        ``image_path`` is empty simply has no thumbnail.
+        """
+        self._thumbnails = list(images)
+        self.update()
 
     def set_length(self, length):
         """Set the timeline length; a fitted view follows it, a zoomed one
@@ -154,6 +182,7 @@ class AnimationTimeline(QWidget):
                 'diamond_edge': QColor('#7a5700'),
                 'selected': QColor('#ffffff'),
                 'playhead': QColor('#4fc1ff'),
+                'thumb_edge': QColor('#5a5a5a'),
             }
         return {
             'ruler': QColor('#e8e8e8'),
@@ -164,6 +193,7 @@ class AnimationTimeline(QWidget):
             'diamond_edge': QColor('#8a5200'),
             'selected': QColor('#1a1a1a'),
             'playhead': QColor('#0078d4'),
+            'thumb_edge': QColor('#b0b0b0'),
         }
 
     # ------------------------------------------------------------- geometry
@@ -225,6 +255,32 @@ class AnimationTimeline(QWidget):
     def _diamond_center(self, index):
         return QPointF(self._time_to_x(self._diamond_time(index)),
                        TRACK_TOP + TRACK_HEIGHT / 2.0)
+
+    def _thumb_rect(self, center_x):
+        """The box of a frame thumbnail, centred under its diamond.
+
+        Near the ends of the track the box is nudged inside the widget, so
+        the first and the last frame stay recognisable.
+        """
+        left = center_x - THUMB_SIZE / 2.0
+        left = min(max(left, 1.0), max(1.0, self.width() - THUMB_SIZE - 1.0))
+        return QRectF(left, float(THUMB_TOP), float(THUMB_SIZE), float(THUMB_SIZE))
+
+    def _hit_thumbnail(self, pos):
+        """The keyframe whose thumbnail is under ``pos`` (else None)."""
+        if not (THUMB_TOP <= pos.y() <= THUMB_TOP + THUMB_SIZE):
+            return None
+        for index, pixmap in enumerate(self._thumbnails):
+            if pixmap is None or pixmap.isNull() or index >= len(self._keyframes):
+                continue
+            if self._thumb_rect(self._diamond_center(index).x()).contains(pos):
+                return index
+        return None
+
+    def _hit_keyframe(self, pos):
+        """The keyframe under ``pos``: its diamond first, then its thumbnail."""
+        index = self._hit_diamond(pos)
+        return index if index is not None else self._hit_thumbnail(pos)
 
     def _hit_diamond(self, pos):
         if not (TRACK_TOP - DIAMOND_RADIUS <= pos.y() <= TRACK_TOP + TRACK_HEIGHT + DIAMOND_RADIUS):
@@ -304,6 +360,20 @@ class AnimationTimeline(QWidget):
             painter.setPen(pen)
             painter.drawPolygon(points)
 
+        # Frame thumbnails: the image this snapshot plays, right under its
+        # diamond. Keyframes without an image of their own show nothing.
+        if self.height() >= THUMB_TOP + THUMB_SIZE:
+            for index, pixmap in enumerate(self._thumbnails):
+                if pixmap is None or pixmap.isNull() or index >= len(self._keyframes):
+                    continue
+                box = self._thumb_rect(self._diamond_center(index).x())
+                painter.setPen(QPen(colors['thumb_edge'], 1.0))
+                painter.setBrush(colors['ruler'])
+                painter.drawRect(box)
+                target = _fit_rect(box.adjusted(1, 1, -1, -1),
+                                   pixmap.width(), pixmap.height())
+                painter.drawPixmap(target, pixmap, QRectF(pixmap.rect()))
+
         # Playhead: a plain vertical line (no arrow head).
         x = self._time_to_x(min(self._time, self._length))
         painter.setPen(QPen(colors['playhead'], 1.6))
@@ -326,7 +396,7 @@ class AnimationTimeline(QWidget):
             self._scrubbing = True
             self._scrub_to(pos.x())
             return
-        index = self._hit_diamond(pos)
+        index = self._hit_keyframe(pos)
         if index is not None:
             self._drag_index = index
             self._drag_time = self._keyframes[index]['time']
@@ -357,9 +427,9 @@ class AnimationTimeline(QWidget):
             self.update()
             self.keyframe_dragged.emit(self._drag_index, self._drag_time)
         else:
-            # Hovering a diamond must read as clickable.
-            over_diamond = self._hit_diamond(pos) is not None
-            self.setCursor(Qt.CursorShape.PointingHandCursor if over_diamond
+            # Hovering a diamond (or its thumbnail) must read as clickable.
+            over_keyframe = self._hit_keyframe(pos) is not None
+            self.setCursor(Qt.CursorShape.PointingHandCursor if over_keyframe
                            else Qt.CursorShape.ArrowCursor)
 
     def contextMenuEvent(self, event):
@@ -368,7 +438,7 @@ class AnimationTimeline(QWidget):
         The pick is reported WITHOUT seeking: the menu's New Keyframe lands
         on the playhead, which must stay where the user left it.
         """
-        index = self._hit_diamond(event.pos())
+        index = self._hit_keyframe(event.pos())
         if index is not None and index != self._selected:
             self._selected = index
             self.update()

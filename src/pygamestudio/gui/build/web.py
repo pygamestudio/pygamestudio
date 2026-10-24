@@ -629,7 +629,7 @@ class WebAppBuildWindow(QScrollArea):
         """Tooltip of the picker: "Publish to <platform>", none for 无平台."""
         platform_id = self.get_platform()
         if platform_id == TOY_PLATFORM_ID:
-            tooltip = T.tr('build.publish_to_toy', 'Publish to Bilibili Toy')
+            tooltip = T.tr('build.publish_to_toy', 'Publish to bilibili Toy')
         else:
             tooltip = ''
         self._platform_combobox.setToolTip(tooltip)
@@ -642,7 +642,7 @@ class WebAppBuildWindow(QScrollArea):
         self._platform_combobox.addItem(QIcon(':/images/ban.png'),
                                         T.tr('build.no_platform', 'None'), '')
         self._platform_combobox.addItem(QIcon(':/images/bilibili_toy.png'),
-                                        T.tr('build.bilibili_toy', 'Bilibili Toy'),
+                                        T.tr('build.bilibili_toy', 'bilibili Toy'),
                                         'bilibili_toy')
         index = self._platform_combobox.findData(selected)
         self._platform_combobox.setCurrentIndex(index if index >= 0 else 0)
