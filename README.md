@@ -14,7 +14,7 @@
 English&nbsp; | &nbsp;[简体中文](https://github.com/pygamestudio/pygamestudio/blob/main/README_zh-CN.md)
 </div>
 
-**Pygame Studio** is a visual editor built with **PyGame-ce** and **PySide6**, designed to help users create Python games visually, making it easier for beginners, students, and hobby developers to get started with game development.
+**Pygame Studio** is a visual game engine built with **PyGame-ce** and **PySide6**, designed to help users create Python games visually, making it easier for beginners, students, and hobby developers to get started with game development.
 
 <br>
 
@@ -86,7 +86,7 @@ Once created, the game project will be displayed in the Dashboard.
 
 **3.** Double-click the created project to open the editing window and start your creation.
 
-<img src="https://i-blog.csdnimg.cn/direct/2821cf105da54539adcd3cfee6270d9e.png" width="800"/>
+<img src="https://i-blog.csdnimg.cn/direct/c80637bb40f147f1b9da084887634171.png" width="800"/>
 
 <br>
 

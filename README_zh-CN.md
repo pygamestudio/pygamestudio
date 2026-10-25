@@ -14,7 +14,7 @@
 [English](https://github.com/pygamestudio/pygamestudio) &nbsp;|&nbsp; 简体中文
 </div>
 
-**Pygame Studio** 是基于 **PyGame-ce** 和 **PySide6** 打造的可视化编辑器，支持以可视化方式制作 Python 游戏，让编程新手、在校学生以及业余开发者都能更轻松地入门游戏开发。
+**Pygame Studio** 是基于 **PyGame-ce** 和 **PySide6** 打造的可视化游戏引擎，支持以可视化方式制作 Python 游戏，让编程新手、在校学生以及业余开发者都能更轻松地入门游戏开发。
 
 <br>
 
@@ -86,7 +86,7 @@ pygs
 
 **3.** 双击已创建的项目，即可打开编辑窗口，开始你的游戏创作。
 
-<img src="https://i-blog.csdnimg.cn/direct/2821cf105da54539adcd3cfee6270d9e.png" width="800"/>
+<img src="https://i-blog.csdnimg.cn/direct/c80637bb40f147f1b9da084887634171.png" width="800"/>
 
 <br>
 
