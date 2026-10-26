@@ -7,6 +7,8 @@
     <img src="https://static.pepy.tech/personalized-badge/pygamestudio?period=total&units=international_system&left_color=grey&right_color=blue&left_text=Downloads" />
     <img src="https://img.shields.io/pypi/v/pygamestudio.svg?maxAge=86400">
     <img src="https://img.shields.io/badge/python-3-red.svg" />
+    <img src="https://img.shields.io/badge/WebApp-supported-turquoise.svg" />
+    <img src="https://img.shields.io/badge/DesktopApp-supported-indigo .svg" />
     <img src="https://img.shields.io/badge/Buy Me a Coffee-KoFi-yellow.svg" />
     <br>
     <br>
