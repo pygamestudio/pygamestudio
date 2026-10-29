@@ -15,10 +15,11 @@ Why the workarounds (each one was a separate CI failure):
 1. ``hostpython_prerequisites`` - the sdist ships ``.pyx`` sources, so
    ``setup.py build_ext`` aborts with "You need cython" unless Cython is
    importable from the interpreter driving the cross build.
-2. ``setup_extra_args = ['--no-build-isolation']`` - the isolated build env is a
-   different Python (3.14 on the buildozer image), which has no wheel for the
-   pinned Cython range; the hostpython env already has everything.
-3. the two patches in ``prebuild_arch`` - see their docstrings.
+2. the two patches in ``prebuild_arch`` - see their docstrings.
+
+Do *not* reach for ``setup_extra_args`` here: p4a appends it to
+``setup.py build_ext`` as well as to ``pip install``, so pip-only flags such as
+``--no-build-isolation`` make setup.py fail with "option not recognized".
 """
 
 import ast
@@ -28,8 +29,10 @@ from pathlib import Path
 from pythonforandroid.recipes.pygame import Pygame2Recipe
 
 #: Replacement for the sdist's PEP 517 metadata, see _use_setuptools_backend().
+#: Cython has to be listed here as well: pip builds the wheel in an isolated
+#: environment (the image's Python 3.14), which therefore needs its own copy.
 _BUILD_SYSTEM = '''[build-system]
-requires = ["setuptools>=61", "wheel"]
+requires = ["setuptools>=61", "wheel", "Cython>=3.1"]
 build-backend = "setuptools.build_meta"
 
 '''
@@ -49,8 +52,6 @@ class PygameCERecipe(Pygame2Recipe):
            'pygame_ce-{version}.tar.gz')
     # Cython 3.1 is what has wheels for the Python 3.14 host interpreter.
     hostpython_prerequisites = ['Cython>=3.0,<3.2']
-    # See the module docstring: build with the hostpython env, not an isolated one.
-    setup_extra_args = ['--no-build-isolation']
 
     def prebuild_arch(self, arch):
         # Writes the legacy ``Setup`` file pygame's setup.py consumes.
