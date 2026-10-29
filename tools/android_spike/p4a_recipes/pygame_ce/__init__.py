@@ -21,6 +21,11 @@ class PygameCERecipe(Pygame2Recipe):
     # PyPI's stable "source" alias - no hash needed, and it survives version bumps.
     url = ('https://files.pythonhosted.org/packages/source/p/pygame-ce/'
            'pygame_ce-{version}.tar.gz')
+    # Unlike pygame 2.1, the pygame-ce sdist ships .pyx sources: its
+    # setup.py build_ext aborts with "You need cython" unless Cython is
+    # importable from the *host* interpreter that p4a uses to drive the
+    # cross build. Pinned below 3.1 for the same reason pyjnius pins <3.2.
+    hostpython_prerequisites = ['Cython<3.1']
 
 
 recipe = PygameCERecipe()

@@ -73,6 +73,7 @@ adb logcat -s python          # p4a 的 Python 输出都带这个 tag
 
 | 现象 | 原因 | 处置 |
 |---|---|---|
+| `You need cython. https://cython.org/` | pygame-ce 的 sdist 是 `.pyx` 源码，hostpython 里没有 Cython | 已在 recipe 里加 `hostpython_prerequisites = ['Cython<3.1']` |
 | `KeyError: 'pygame_ce'` 或 recipe 找不到 | buildozer 没读到 `p4a.local_recipes` | 确认在 `tools/android_spike` 下运行；必要时把 spec 里改成绝对路径 |
 | `buildconfig/Setup.Android.SDL2.in` 不存在 | pygame-ce 新版删了旧构建模板 | 回退 recipe 到 `pygame-ce 2.5.4`，或用 `Pygame2Recipe` 之外自写 `CompiledComponentsPythonRecipe` |
 | pygame 编译报找不到 SDL2 头文件 | 子类没有继承到 p4a 的 env | recipe 里显式加回 `USE_SDL2/PYGAME_ANDROID` 与 include 路径 |
