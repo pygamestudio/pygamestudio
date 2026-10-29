@@ -46,35 +46,30 @@ jobs:
           set -o pipefail
           buildozer -v android debug 2>&1 | tee buildozer.log
 
+      # Never let a failed inspection cost us the APK again: this step may fail,
+      # the artefacts are uploaded unconditionally right after it, and only then
+      # does the payload gate decide whether the job is red.
       - name: Inspect the produced dist
+        continue-on-error: true
         working-directory: tools/android_spike
         run: |
           DIST=$(ls -d .buildozer/android/platform/build-*/dists/*/ | head -n 1)
           DIST="${DIST%/}"
           echo "DIST=$DIST" >> "$GITHUB_ENV"
           python3 inspect_dist.py inspect "$DIST" | tee inspect.log
-          python3 inspect_dist.py roundtrip "$DIST" --out dist_private_rebuilt.tar
-
-      # Spike 1 + 2 acceptance: the payload must carry the four packages the
-      # engine needs, every pygame extension module must be compiled in, and
-      # private.tar must survive a stdlib-only rebuild.
-      - name: Check the payload
-        working-directory: tools/android_spike
-        run: |
-          grep -qE 'required modules missing  : none' inspect.log || {
-            echo "::error::pygame is missing extension modules - see inspect.log"; exit 1; }
-          for package in pygame pymunk cffi _cffi_backend; do
-            grep -qE "^     ${package} +[0-9]+ files.* ok$" inspect.log || {
-              echo "::error::${package} is missing from site-packages"; exit 1; }
-          done
-          echo "payload ok"
+          python3 inspect_dist.py bundle "$DIST" --out libpybundle_rebuilt.so | tee -a inspect.log
 
       - name: Pack the dist
+        if: always()
         working-directory: tools/android_spike
         run: |
+          DIST="${DIST:-$(ls -d .buildozer/android/platform/build-*/dists/*/ | head -n 1)}"
+          DIST="${DIST%/}"
+          echo "packing $DIST"
           tar -czf pygs-dist.tgz -C "$(dirname "${DIST}")" "$(basename "${DIST}")"
 
       - name: Upload spike artefacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: pygs-android-spike
@@ -85,6 +80,23 @@ jobs:
             tools/android_spike/buildozer.log
             tools/android_spike/inspect.log
             tools/android_spike/pygs-dist.tgz
+
+      # Spike 1 + 2 acceptance: the payload must carry the four packages the
+      # engine needs, every pygame extension module must be compiled in, and the
+      # bundle must be rebuildable here with the stdlib only.
+      - name: Check the payload
+        if: always()
+        working-directory: tools/android_spike
+        run: |
+          grep -qE 'required modules missing  : none' inspect.log || {
+            echo "::error::pygame is missing extension modules - see inspect.log"; exit 1; }
+          for package in pygame pymunk cffi _cffi_backend; do
+            grep -qE "^     ${package} +[0-9]+ files.* ok$" inspect.log || {
+              echo "::error::${package} is missing from site-packages"; exit 1; }
+          done
+          grep -qE '^RESULT : bundle rebuilt in the layout the Android side expects' inspect.log || {
+            echo "::error::libpybundle.so could not be rebuilt - see inspect.log"; exit 1; }
+          echo "payload ok"
 
       - name: Show the tail of the log on failure
         if: failure()

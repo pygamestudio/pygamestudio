@@ -46,25 +46,35 @@ docker run --rm -it -v "${PWD}:/home/user/hostcwd" -w /home/user/hostcwd/tools/a
 
 ## spike 2：在 Windows 上检查并重建 payload
 
+> 这版 p4a 的 dist **没有 `private.tar`**：Python 运行时以目录形式躺在
+> `_python_bundle__arm64-v8a/_python_bundle/`（`modules/` + `site-packages/` + `stdlib.zip`），
+> 到打 APK 时才被 `make_tar()` 打成 `libs/<abi>/libpybundle.so`（一个 gzip tar，扩展名却像库），
+> 应用代码则打成 `assets/private.tar`。两者都是普通压缩包，所以 Windows 上可以自己生成。
+
 拿到 `dist`（解压 `pygs-dist.tgz`）后：
 
 ```powershell
 py -3.10 tools/android_spike/inspect_dist.py inspect <dist_dir>
-py -3.10 tools/android_spike/inspect_dist.py roundtrip <dist_dir> --out rebuilt.tar
+py -3.10 tools/android_spike/inspect_dist.py bundle  <dist_dir> --out libpybundle.so
 ```
 
-`inspect` 会打印：private.tar 的顶层构成、Python 版本目录、`site-packages` 里
-pygame / pymunk / cffi / pygamestudio 是否齐全、pygame 的扩展模块清单（缺哪个就说明
-recipe 少编了哪块，比如 `font` 缺失 = SDL2_ttf/freetype 没编进去）、`libs/<abi>/*.so`
-体积明细、Java 引导包名、Manifest 模板位置。
+`inspect` 会打印：bundle 目录构成（stdlib.zip / modules / site-packages）、
+pygame / pymunk / cffi / pygame 扩展模块是否齐全、`libs/<abi>/*.so` 体积明细、
+Java 引导包名、Manifest 模板位置。
 
-> 这套检查已经在合成数据上验证过：`inspect` 与 `roundtrip` 都能跑通（roundtrip 会连
-> symlink 一起比对）。
+`bundle` 按 p4a 的规则（gzip、USTAR、uid/gid=0、mtime=0、成员相对
+`_python_bundle__<arch>`）重建 `libpybundle.so`，并校验顶层目录是 `_python_bundle`。
+
+> 两个子命令都在合成数据上验证过：`inspect` 的输出与 CI 的 grep 门禁逐条匹配，
+> `bundle` 产出的归档解出来就是 `_python_bundle/{modules,site-packages,stdlib.zip}`。
 
 ## spike 3：真机验证
 
+APK 在 CI 的 artifact 里（Actions → 那次运行 → 页面底部 Artifacts → `pygs-android-spike`，
+下载后解压，里面的 `bin/pygsspike-0.1.0-arm64-v8a-debug.apk` 就是）：
+
 ```powershell
-adb install -r tools\android_spike\bin\pygsspike-0.1.0-arm64-v8a-debug.apk
+adb install -r bin\pygsspike-0.1.0-arm64-v8a-debug.apk
 adb logcat -s python          # p4a 的 Python 输出都带这个 tag
 ```
 屏幕会逐行显示 `image / font / mixer` 的自检结果，点一下屏幕会打印触摸事件。
