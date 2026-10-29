@@ -6,3 +6,7 @@ pyproject.toml
 .idea/
 .vscode/
 node_modules/
+# Local scratch tooling stays out of the repo, but the Android runtime spike
+# is part of the build pipeline and has to be tracked.
+/tools/*
+!/tools/android_spike/

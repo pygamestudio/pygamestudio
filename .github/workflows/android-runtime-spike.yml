@@ -1,0 +1,92 @@
+name: android-runtime-spike
+
+# Spike 1 + 2 of the Android runtime plan:
+#   1. cross-compile python3 + pygame-ce + cffi + pymunk for arm64-v8a (p4a)
+#   2. publish the produced `dist/` + a report of its private.tar layout, so the
+#      Windows side can verify that the payload can be rebuilt locally.
+#
+# This runner installs the Android SDK/NDK - it is the *one* place allowed to do
+# that. The editor on a user machine never downloads a toolchain.
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'tools/android_spike/**'
+      - '.github/workflows/android-runtime-spike.yml'
+
+concurrency:
+  group: android-runtime-spike-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    container:
+      image: kivy/buildozer:latest
+      options: --user root
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The SDK/NDK download is the slow part (~20 min); keep it between runs.
+      # Delete this step if the repository cache quota becomes a problem.
+      - name: Cache buildozer (SDK, NDK, p4a builds)
+        uses: actions/cache@v4
+        with:
+          path: tools/android_spike/.buildozer
+          key: pygs-android-spike-${{ hashFiles('tools/android_spike/buildozer.spec') }}-${{ hashFiles('tools/android_spike/p4a_recipes/**') }}
+          restore-keys: |
+            pygs-android-spike-
+
+      - name: Build the spike APK
+        working-directory: tools/android_spike
+        run: |
+          set -o pipefail
+          buildozer -v android debug 2>&1 | tee buildozer.log
+
+      - name: Inspect the produced dist
+        working-directory: tools/android_spike
+        run: |
+          DIST=$(ls -d .buildozer/android/platform/build-*/dists/*/ | head -n 1)
+          DIST="${DIST%/}"
+          echo "DIST=$DIST" >> "$GITHUB_ENV"
+          python3 inspect_dist.py inspect "$DIST" | tee inspect.log
+          python3 inspect_dist.py roundtrip "$DIST" --out dist_private_rebuilt.tar
+
+      # Spike 1 + 2 acceptance: the payload must carry the four packages the
+      # engine needs, every pygame extension module must be compiled in, and
+      # private.tar must survive a stdlib-only rebuild.
+      - name: Check the payload
+        working-directory: tools/android_spike
+        run: |
+          grep -qE 'required modules missing  : none' inspect.log || {
+            echo "::error::pygame is missing extension modules - see inspect.log"; exit 1; }
+          for package in pygame pymunk cffi _cffi_backend; do
+            grep -qE "^     ${package} +[0-9]+ files.* ok$" inspect.log || {
+              echo "::error::${package} is missing from site-packages"; exit 1; }
+          done
+          echo "payload ok"
+
+      - name: Pack the dist
+        working-directory: tools/android_spike
+        run: |
+          tar -czf pygs-dist.tgz -C "$(dirname "${DIST}")" "$(basename "${DIST}")"
+
+      - name: Upload spike artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pygs-android-spike
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            tools/android_spike/bin/*.apk
+            tools/android_spike/buildozer.log
+            tools/android_spike/inspect.log
+            tools/android_spike/pygs-dist.tgz
+
+      - name: Show the tail of the log on failure
+        if: failure()
+        working-directory: tools/android_spike
+        run: tail -n 200 buildozer.log || true

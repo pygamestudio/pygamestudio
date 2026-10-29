@@ -1,0 +1,7 @@
+# buildozer / p4a output (spike only)
+.buildozer/
+bin/
+*.log
+pygs-dist.tgz
+dist_private_rebuilt.tar
+private_rebuilt.tar
