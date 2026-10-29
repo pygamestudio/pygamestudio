@@ -15,7 +15,11 @@ Why the workarounds (each one was a separate CI failure):
 1. ``hostpython_prerequisites`` - the sdist ships ``.pyx`` sources, so
    ``setup.py build_ext`` aborts with "You need cython" unless Cython is
    importable from the interpreter driving the cross build.
-2. the two patches in ``prebuild_arch`` - see their docstrings.
+2. ``install_python_package`` override - pygame's setup.py only works when it is
+   *started as a script*; pip drives it through the PEP 517 backend (exec,
+   different argv) and the build dies at whatever it touches next. Installing
+   from a wheel built on the command line keeps the path that already works.
+3. the two patches in ``prebuild_arch`` - see their docstrings.
 
 Do *not* reach for ``setup_extra_args`` here: p4a appends it to
 ``setup.py build_ext`` as well as to ``pip install``, so pip-only flags such as
@@ -60,6 +64,42 @@ class PygameCERecipe(Pygame2Recipe):
         build_dir = Path(self.get_build_dir(arch.arch))
         _use_setuptools_backend(build_dir)
         _make_source_dir_importable(build_dir)
+
+    def install_python_package(self, arch, name=None, env=None, is_dir=True):
+        """Install the built package without letting pip run setup.py again.
+
+        p4a's default is ``pip install .``, which hands setup.py to a PEP 517
+        backend: pygame's setup.py assumes it runs as a script (it rewrites its
+        own sys.argv and imports sibling directories) and fails there. Build the
+        wheel from the command line - the same way p4a's ``build_ext`` step
+        already runs - and unpack it into the target site-packages.
+        """
+        import sh
+        import zipfile
+
+        from pythonforandroid.logger import shprint
+        try:
+            from pythonforandroid.util import current_directory
+        except ImportError:                       # older p4a releases
+            from pythonforandroid.toolchain import current_directory
+
+        recipe_env = self.get_recipe_env(arch)
+        hostpython_location = getattr(self, 'real_hostpython_location', None) or self.ctx.hostpython
+        build_dir = Path(self.get_build_dir(arch.arch))
+        target_dir = Path(self.ctx.get_python_install_dir(arch.arch))
+        wheel_dir = build_dir / '_pygs_wheel'
+        wheel_dir.mkdir(exist_ok=True)
+
+        with current_directory(build_dir.as_posix()):
+            shprint(sh.Command(hostpython_location), 'setup.py', 'bdist_wheel',
+                    '--dist-dir', wheel_dir.as_posix(), _env=recipe_env)
+
+        wheels = sorted(wheel_dir.glob('*.whl'))
+        if not wheels:
+            raise RuntimeError(f'{self.name}: bdist_wheel produced no wheel in {wheel_dir}')
+
+        with zipfile.ZipFile(wheels[-1]) as wheel:
+            wheel.extractall(target_dir)
 
 
 def _use_setuptools_backend(build_dir):
