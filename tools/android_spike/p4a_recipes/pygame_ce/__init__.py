@@ -28,6 +28,7 @@ Do *not* reach for ``setup_extra_args`` here: p4a appends it to
 
 import ast
 import re
+import shutil
 from pathlib import Path
 
 from pythonforandroid.recipes.pygame import Pygame2Recipe
@@ -84,22 +85,40 @@ class PygameCERecipe(Pygame2Recipe):
             from pythonforandroid.toolchain import current_directory
 
         recipe_env = self.get_recipe_env(arch)
-        hostpython_location = getattr(self, 'real_hostpython_location', None) or self.ctx.hostpython
+        hostpython = sh.Command(getattr(self, 'real_hostpython_location', None) or self.ctx.hostpython)
         build_dir = Path(self.get_build_dir(arch.arch))
         target_dir = Path(self.ctx.get_python_install_dir(arch.arch))
         wheel_dir = build_dir / '_pygs_wheel'
         wheel_dir.mkdir(exist_ok=True)
 
+        wheels = []
+        try:
+            with current_directory(build_dir.as_posix()):
+                shprint(hostpython, 'setup.py', 'bdist_wheel',
+                        '--dist-dir', wheel_dir.as_posix(), _env=recipe_env)
+            wheels = sorted(wheel_dir.glob('*.whl'))
+        except Exception as error:                # noqa: BLE001 - fall back below
+            info(f'{self.name}: bdist_wheel failed ({error}), copying the build tree instead')
+
+        if wheels:
+            with zipfile.ZipFile(wheels[-1]) as wheel:
+                wheel.extractall(target_dir)
+            return
+
+        # Fallback for a hostpython without the bdist_wheel command: a plain
+        # ``setup.py build`` and a copy of the produced package tree.
         with current_directory(build_dir.as_posix()):
-            shprint(sh.Command(hostpython_location), 'setup.py', 'bdist_wheel',
-                    '--dist-dir', wheel_dir.as_posix(), _env=recipe_env)
+            shprint(hostpython, 'setup.py', 'build', _env=recipe_env)
 
-        wheels = sorted(wheel_dir.glob('*.whl'))
-        if not wheels:
-            raise RuntimeError(f'{self.name}: bdist_wheel produced no wheel in {wheel_dir}')
-
-        with zipfile.ZipFile(wheels[-1]) as wheel:
-            wheel.extractall(target_dir)
+        lib_dirs = sorted(build_dir.glob('build/lib*'))
+        if not lib_dirs:
+            raise RuntimeError(f'{self.name}: setup.py build produced no build/lib* directory')
+        for entry in lib_dirs[-1].iterdir():
+            destination = target_dir / entry.name
+            if entry.is_dir():
+                shutil.copytree(entry, destination, dirs_exist_ok=True)
+            else:
+                shutil.copy2(entry, destination)
 
 
 def _use_setuptools_backend(build_dir):
