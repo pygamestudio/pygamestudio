@@ -101,6 +101,11 @@ py -3.10 tools/android_spike/android_assets.py <dist_dir> `
 > stateless"），也就是说**每次打包都会把资源重置成 `src/res_initial` 里的那份**。
 > 只改 `src/main/res` 的话，下一次打包（例如注入后再打一次）就会把图标还原成 Kivy。
 > 脚本因此同时写入 `src/main/res` 和 `src/res_initial`。
+>
+> 第三个坑：`make_package()` 还会把 p4a 自带的默认图
+> `templates/kivy-icon.png` / `templates/kivy-presplash.jpg` 拷进 res 覆盖同名资源。
+> 只改 res 的话首屏永远退回 Kivy logo（图标侥幸没被覆盖，因为它的目标路径不同）。
+> 脚本会把这两个模板文件也一起替换。
 
 ## spike 3：真机验证
 

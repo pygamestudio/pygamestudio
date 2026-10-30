@@ -210,18 +210,47 @@ def write_adaptive_icon(res_dir, image, background):
     return written
 
 
-def write_presplash(res_dir, image, background):
+def processed_presplash(image, background):
+    """Flatten onto the splash colour (JPEG has no alpha) and keep it small."""
+    flattened = flatten(image, background)
+    width, height = image_size(flattened)
+    if width <= PRESPLASH_MAX[0] and height <= PRESPLASH_MAX[1]:
+        return flattened
+    return fit(flattened, PRESPLASH_MAX)
+
+
+def write_presplash(res_dir, processed):
     folder = res_dir / 'drawable'
     folder.mkdir(parents=True, exist_ok=True)
     target = folder / 'presplash.jpg'
-
-    # JPEG has no alpha channel: flatten onto the splash colour first.
-    flattened = flatten(image, background)
-    width, height = image_size(flattened)
-    scaled = flattened if (width <= PRESPLASH_MAX[0] and height <= PRESPLASH_MAX[1]) \
-        else fit(flattened, PRESPLASH_MAX)
-    save_jpeg(scaled, target, PRESPLASH_QUALITY)
+    save_jpeg(processed, target, PRESPLASH_QUALITY)
     return [target]
+
+
+def write_template_defaults(dist_dir, icon_image, processed):
+    """Replace p4a's own default assets with ours.
+
+    ``make_package()`` copies ``templates/kivy-icon.png`` and
+    ``templates/kivy-presplash.jpg`` into ``res/`` on every packaging run, which
+    is why the splash kept coming back as the Kivy logo even after the res tree
+    had been patched. Overwriting the defaults makes any packaging run - ours or
+    p4a's - end up with the right artwork.
+    """
+    written = []
+    templates = dist_dir / 'templates'
+    if not templates.is_dir():
+        return written
+
+    icon = templates / 'kivy-icon.png'
+    if icon_image is not None and icon.is_file():
+        save_png(square_on_transparent(icon_image, LAUNCHER_SIZES['xxxhdpi']), icon)
+        written.append(icon)
+
+    splash = templates / 'kivy-presplash.jpg'
+    if processed is not None and splash.is_file():
+        save_jpeg(processed, splash, PRESPLASH_QUALITY)
+        written.append(splash)
+    return written
 
 
 def update_strings(res_dir, app_name=None, presplash_color=None):
@@ -271,11 +300,11 @@ def update_template(dist_dir, app_name=None, presplash_color=None):
     return path
 
 
-def _apply_to(res_dir, icon_image, splash_image, app_name, color, adaptive):
+def _apply_to(res_dir, icon_image, processed, app_name, color, adaptive):
     """Write every asset into one res directory, return the files touched."""
     written = []
-    if splash_image is not None:
-        written += write_presplash(res_dir, splash_image, color)
+    if processed is not None:
+        written += write_presplash(res_dir, processed)
 
     if icon_image is not None:
         written += write_launcher_icon(res_dir, icon_image)
@@ -284,7 +313,7 @@ def _apply_to(res_dir, icon_image, splash_image, app_name, color, adaptive):
 
     if app_name or color:
         path, changed = update_strings(res_dir, app_name,
-                                       color if splash_image is not None else None)
+                                       color if processed is not None else None)
         if path is not None:
             written.append(path)
         for line in changed:
@@ -302,8 +331,10 @@ def run(dist_dir, icon, presplash, app_name=None, background='auto', adaptive=Tr
     splash_image = load_image(presplash, 'presplash') if presplash else None
     icon_image = load_image(icon, 'icon') if icon else None
     color = None
+    processed = None
     if splash_image is not None:
         color = corner_color(splash_image) if background == 'auto' else background
+        processed = processed_presplash(splash_image, color)
 
     # p4a's make_package() starts by restoring src/main/res from src/res_initial
     # ("make res_dir stateless"), so patching only src/main/res is undone by the
@@ -316,12 +347,15 @@ def run(dist_dir, icon, presplash, app_name=None, background='auto', adaptive=Tr
 
     written = []
     for target in targets:
-        written += _apply_to(target, icon_image, splash_image, app_name, color, adaptive)
+        written += _apply_to(target, icon_image, processed, app_name, color, adaptive)
         print(f'  patched {target.relative_to(dist_dir).as_posix()}')
+
+    # p4a copies its bundled defaults over the res tree on every packaging run.
+    written += write_template_defaults(dist_dir, icon_image, processed)
 
     if app_name or color:
         template = update_template(dist_dir, app_name,
-                                   color if splash_image is not None else None)
+                                   color if processed is not None else None)
         if template is not None:
             written.append(template)
 
