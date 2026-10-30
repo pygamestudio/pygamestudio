@@ -95,6 +95,12 @@ py -3.10 tools/android_spike/android_assets.py <dist_dir> `
 
 > 注意：`values/strings.xml` 在每次打包时都会从 `templates/strings.tmpl.xml` 重新渲染，
 > 所以两个文件都要写，否则第二次打包会退回默认的 `#000000`。
+>
+> 还有一个更隐蔽的坑：p4a 的 `make_package()` 开头会执行
+> `rmdir(src/main/res)` + `copytree(src/res_initial, src/main/res)`（"make res_dir
+> stateless"），也就是说**每次打包都会把资源重置成 `src/res_initial` 里的那份**。
+> 只改 `src/main/res` 的话，下一次打包（例如注入后再打一次）就会把图标还原成 Kivy。
+> 脚本因此同时写入 `src/main/res` 和 `src/res_initial`。
 
 ## spike 3：真机验证
 

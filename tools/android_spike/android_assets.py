@@ -228,7 +228,7 @@ def update_strings(res_dir, app_name=None, presplash_color=None):
     """Patch values/strings.xml in place (p4a renders app_name/presplash_color)."""
     path = res_dir / 'values' / 'strings.xml'
     if not path.is_file():
-        raise SystemExit(f'missing {path}')
+        return None, []
     text = path.read_text(encoding='utf-8')
     changed = []
 
@@ -271,37 +271,63 @@ def update_template(dist_dir, app_name=None, presplash_color=None):
     return path
 
 
+def _apply_to(res_dir, icon_image, splash_image, app_name, color, adaptive):
+    """Write every asset into one res directory, return the files touched."""
+    written = []
+    if splash_image is not None:
+        written += write_presplash(res_dir, splash_image, color)
+
+    if icon_image is not None:
+        written += write_launcher_icon(res_dir, icon_image)
+        if adaptive:
+            written += write_adaptive_icon(res_dir, icon_image, color or '#000000')
+
+    if app_name or color:
+        path, changed = update_strings(res_dir, app_name,
+                                       color if splash_image is not None else None)
+        if path is not None:
+            written.append(path)
+        for line in changed:
+            print(f'  {line}')
+    return written
+
+
 def run(dist_dir, icon, presplash, app_name=None, background='auto', adaptive=True):
     res_dir = dist_dir / 'src' / 'main' / 'res'
     if not res_dir.is_dir():
         raise SystemExit(f'not a p4a dist (no src/main/res): {dist_dir}')
 
     print(f'backend: {BACKEND}')
-    written = []
-    color = None
-    if presplash:
-        splash_image = load_image(presplash, 'presplash')
-        color = corner_color(splash_image) if background == 'auto' else background
-        written += write_presplash(res_dir, splash_image, color)
 
-    if icon:
-        icon_image = load_image(icon, 'icon')
-        written += write_launcher_icon(res_dir, icon_image)
-        if adaptive:
-            written += write_adaptive_icon(res_dir, icon_image, color or '#000000')
+    splash_image = load_image(presplash, 'presplash') if presplash else None
+    icon_image = load_image(icon, 'icon') if icon else None
+    color = None
+    if splash_image is not None:
+        color = corner_color(splash_image) if background == 'auto' else background
+
+    # p4a's make_package() starts by restoring src/main/res from src/res_initial
+    # ("make res_dir stateless"), so patching only src/main/res is undone by the
+    # next packaging run - which is exactly what happened to the first attempt.
+    # The pristine copy has to carry the new assets too.
+    targets = [res_dir]
+    res_initial = dist_dir / 'src' / 'res_initial'
+    if res_initial.is_dir():
+        targets.append(res_initial)
+
+    written = []
+    for target in targets:
+        written += _apply_to(target, icon_image, splash_image, app_name, color, adaptive)
+        print(f'  patched {target.relative_to(dist_dir).as_posix()}')
 
     if app_name or color:
-        path, changed = update_strings(res_dir, app_name, color if presplash else None)
-        written.append(path)
-        for line in changed:
-            print(f'  {line}')
-        template = update_template(dist_dir, app_name, color if presplash else None)
+        template = update_template(dist_dir, app_name,
+                                   color if splash_image is not None else None)
         if template is not None:
             written.append(template)
 
     for path in written:
         print(f'  wrote {path.relative_to(dist_dir).as_posix()}   {path.stat().st_size} B')
-    print(f'\n{len(written)} file(s) updated in {res_dir}')
+    print(f'\n{len(written)} file(s) updated')
     return 0
 
 
