@@ -79,6 +79,9 @@ py -3.10 tools/android_spike/android_assets.py <dist_dir> `
   --presplash tools/android_spike/assets/presplash.jpg
 ```
 
+> 图像处理有两个后端：编辑器/开发机用 **PySide6**（引擎已有依赖），CI 容器没有 Qt 也没有显示服务，
+> 自动退回 **Pillow**（`pip install pillow`），输出等价。
+
 生成的内容（都只动 `src/main/res`，不需要改 p4a 源码）：
 
 | 目标 | 说明 |

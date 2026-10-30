@@ -26,8 +26,15 @@ import re
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QImage, QPainter
+try:                                                    # editor / developer machine
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QColor, QImage, QPainter
+
+    BACKEND = 'PySide6'
+except ImportError:                                     # plain build container
+    from PIL import Image
+
+    BACKEND = 'Pillow'
 
 #: Launcher icon size per density bucket (48dp).
 LAUNCHER_SIZES = {'mdpi': 48, 'hdpi': 72, 'xhdpi': 96, 'xxhdpi': 144, 'xxxhdpi': 192}
@@ -54,17 +61,32 @@ COLORS_XML = '''<?xml version="1.0" encoding="utf-8"?>
 
 
 def load_image(path, what):
-    image = QImage(path)
-    if image.isNull():
-        raise SystemExit(f'cannot read {what}: {path}')
-    return image
+    if BACKEND == 'PySide6':
+        image = QImage(path.as_posix())
+        if image.isNull():
+            raise SystemExit(f'cannot read {what}: {path}')
+        return image
+    try:
+        return Image.open(path.as_posix())
+    except Exception as error:                          # noqa: BLE001 - report and stop
+        raise SystemExit(f'cannot read {what}: {path} ({error})')
+
+
+def image_size(image):
+    if BACKEND == 'PySide6':
+        return image.width(), image.height()
+    return image.size
 
 
 def fit(image, size):
     """Scale to fit inside ``size`` (keeps the aspect ratio, smooth filter)."""
     width, height = size
-    return image.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio,
-                        Qt.TransformationMode.SmoothTransformation)
+    if BACKEND == 'PySide6':
+        return image.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio,
+                            Qt.TransformationMode.SmoothTransformation)
+    scaled = image.copy()
+    scaled.thumbnail((width, height), Image.LANCZOS)
+    return scaled
 
 
 def square_on_transparent(image, size, fill_ratio=1.0):
@@ -73,21 +95,66 @@ def square_on_transparent(image, size, fill_ratio=1.0):
     ``fill_ratio`` shrinks the artwork into a smaller centred box - the adaptive
     icon needs that safe zone because launchers may crop the outer third.
     """
-    canvas = QImage(size, size, QImage.Format.Format_ARGB32)
-    canvas.fill(Qt.GlobalColor.transparent)
     box = max(1, int(round(size * fill_ratio)))
     scaled = fit(image, (box, box))
-    painter = QPainter(canvas)
-    painter.drawImage((size - scaled.width()) // 2, (size - scaled.height()) // 2, scaled)
-    painter.end()
+    scaled_w, scaled_h = image_size(scaled)
+
+    if BACKEND == 'PySide6':
+        canvas = QImage(size, size, QImage.Format.Format_ARGB32)
+        canvas.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(canvas)
+        painter.drawImage((size - scaled_w) // 2, (size - scaled_h) // 2, scaled)
+        painter.end()
+        return canvas
+
+    canvas = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+    canvas.paste(scaled.convert('RGBA'), ((size - scaled_w) // 2, (size - scaled_h) // 2))
     return canvas
+
+
+def flatten(image, background):
+    """Composite onto a flat colour (JPEG has no alpha channel)."""
+    if BACKEND == 'PySide6':
+        canvas = QImage(image.size(), QImage.Format.Format_RGB32)
+        canvas.fill(QColor(background))
+        painter = QPainter(canvas)
+        painter.drawImage(0, 0, image)
+        painter.end()
+        return canvas
+    canvas = Image.new('RGB', image_size(image), background)
+    rgba = image.convert('RGBA')
+    canvas.paste(rgba, (0, 0), rgba)
+    return canvas
+
+
+def save_png(image, path):
+    if BACKEND == 'PySide6':
+        image.save(path.as_posix(), 'PNG')
+    else:
+        image.save(path.as_posix(), 'PNG')
+
+
+def save_jpeg(image, path, quality):
+    if BACKEND == 'PySide6':
+        ok = image.save(path.as_posix(), 'JPEG', quality)
+    else:
+        image.convert('RGB').save(path.as_posix(), 'JPEG', quality=quality)
+        ok = True
+    if not ok:
+        raise SystemExit(f'could not write {path}')
 
 
 def corner_color(image, fallback='#000000'):
     """The colour the splash bars should be painted in."""
-    points = ((0, 0), (image.width() - 1, 0),
-              (0, image.height() - 1), (image.width() - 1, image.height() - 1))
-    colors = {image.pixelColor(x, y).name() for x, y in points}
+    width, height = image_size(image)
+    points = ((0, 0), (width - 1, 0), (0, height - 1), (width - 1, height - 1))
+
+    if BACKEND == 'PySide6':
+        colors = {image.pixelColor(x, y).name() for x, y in points}
+    else:
+        rgb = image.convert('RGB')
+        colors = {'#%02x%02x%02x' % rgb.getpixel(point) for point in points}
+
     if len(colors) == 1:
         return colors.pop()
     print(f'  presplash corners differ ({", ".join(sorted(colors))}), using {fallback}')
@@ -100,21 +167,21 @@ def write_launcher_icon(res_dir, image):
         folder = res_dir / f'mipmap-{density}'
         folder.mkdir(parents=True, exist_ok=True)
         target = folder / 'icon.png'
-        square_on_transparent(image, size).save(target.as_posix(), 'PNG')
+        save_png(square_on_transparent(image, size), target)
         written.append(target)
 
         # p4a's launcher resources use the same picture, keep them in sync.
         drawable = res_dir / f'drawable-{density}'
         drawable.mkdir(parents=True, exist_ok=True)
         target = drawable / 'ic_launcher.png'
-        square_on_transparent(image, size).save(target.as_posix(), 'PNG')
+        save_png(square_on_transparent(image, size), target)
         written.append(target)
 
     # Density-less fallback the dist ships.
     fallback = res_dir / 'mipmap'
     fallback.mkdir(parents=True, exist_ok=True)
     target = fallback / 'icon.png'
-    square_on_transparent(image, LAUNCHER_SIZES['xxxhdpi']).save(target.as_posix(), 'PNG')
+    save_png(square_on_transparent(image, LAUNCHER_SIZES['xxxhdpi']), target)
     written.append(target)
     return written
 
@@ -126,7 +193,7 @@ def write_adaptive_icon(res_dir, image, background):
         folder.mkdir(parents=True, exist_ok=True)
         target = folder / 'ic_launcher_foreground.png'
         # The launcher may crop everything outside the centre safe zone.
-        square_on_transparent(image, size, ADAPTIVE_SAFE_ZONE).save(target.as_posix(), 'PNG')
+        save_png(square_on_transparent(image, size, ADAPTIVE_SAFE_ZONE), target)
         written.append(target)
 
     folder = res_dir / 'mipmap-anydpi-v26'
@@ -149,17 +216,11 @@ def write_presplash(res_dir, image, background):
     target = folder / 'presplash.jpg'
 
     # JPEG has no alpha channel: flatten onto the splash colour first.
-    flattened = QImage(image.size(), QImage.Format.Format_RGB32)
-    flattened.fill(QColor(background))
-    painter = QPainter(flattened)
-    painter.drawImage(0, 0, image)
-    painter.end()
-
-    scaled = flattened if (flattened.width() <= PRESPLASH_MAX[0]
-                           and flattened.height() <= PRESPLASH_MAX[1]) \
+    flattened = flatten(image, background)
+    width, height = image_size(flattened)
+    scaled = flattened if (width <= PRESPLASH_MAX[0] and height <= PRESPLASH_MAX[1]) \
         else fit(flattened, PRESPLASH_MAX)
-    if not scaled.save(target.as_posix(), 'JPEG', PRESPLASH_QUALITY):
-        raise SystemExit(f'could not write {target}')
+    save_jpeg(scaled, target, PRESPLASH_QUALITY)
     return [target]
 
 
@@ -215,6 +276,7 @@ def run(dist_dir, icon, presplash, app_name=None, background='auto', adaptive=Tr
     if not res_dir.is_dir():
         raise SystemExit(f'not a p4a dist (no src/main/res): {dist_dir}')
 
+    print(f'backend: {BACKEND}')
     written = []
     color = None
     if presplash:

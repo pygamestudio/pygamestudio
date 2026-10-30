@@ -92,6 +92,11 @@ jobs:
       # is the asset step the editor will run before Gradle. p4a re-renders
       # res/values/strings.xml from templates/strings.tmpl.xml on every packaging
       # run, so android_assets.py pins the splash colour in both places.
+      # The script uses PySide6 on a developer machine and falls back to Pillow;
+      # this container has neither Qt nor a display, so install Pillow.
+      - name: Install the asset tool dependencies
+        run: python3 -m pip install --quiet pillow
+
       - name: Apply icon and splash
         working-directory: tools/android_spike
         run: |
@@ -108,8 +113,10 @@ jobs:
 
       # Never let a failed inspection cost us the APK again: this step may fail,
       # the artefacts are uploaded unconditionally right after it, and only then
-      # does the payload gate decide whether the job is red.
+      # does the payload gate decide whether the job is red. if: always() is what
+      # keeps it running when an earlier step (the asset injection) failed.
       - name: Inspect the produced dist
+        if: always()
         continue-on-error: true
         working-directory: tools/android_spike
         run: |
@@ -148,6 +155,10 @@ jobs:
         if: always()
         working-directory: tools/android_spike
         run: |
+          if [ ! -s inspect.log ]; then
+            echo "::error::inspect.log is missing - an earlier step failed, see its log above"
+            exit 1
+          fi
           grep -qE 'required modules missing  : none' inspect.log || {
             echo "::error::pygame is missing extension modules - see inspect.log"; exit 1; }
           for package in pygame pymunk cffi _cffi_backend; do
