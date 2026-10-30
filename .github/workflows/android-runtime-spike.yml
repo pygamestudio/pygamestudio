@@ -48,33 +48,39 @@ jobs:
       # cannot install API 34, and then fails with "Requested API target 34 is
       # not available". Install the platform ourselves with a current
       # sdkmanager; buildozer then finds an SDK that already has it.
+      # buildozer also insists on the legacy <sdk>/tools/bin/sdkmanager path,
+      # so link the modern binary there.
       - name: Prepare the Android SDK
         run: |
           set -euo pipefail
           SDK="$HOME/.buildozer/android/platform/android-sdk"
           echo "SDK=$SDK"
-          if [ -d "$SDK/platforms/android-34" ] && [ -d "$SDK/build-tools" ]; then
-            echo "platform 34 already installed"
-            ls "$SDK/platforms"
-            exit 0
-          fi
 
-          mkdir -p "$SDK/cmdline-tools"
-          python3 - <<'PY'
+          if [ ! -d "$SDK/platforms/android-34" ] || [ ! -d "$SDK/build-tools/34.0.0" ]; then
+            mkdir -p "$SDK/cmdline-tools"
+            python3 - <<'PY'
           import urllib.request
           url = ('https://dl.google.com/android/repository/'
                  'commandlinetools-linux-11076708_latest.zip')
           urllib.request.urlretrieve(url, '/tmp/cmdline-tools.zip')
           PY
-          unzip -q /tmp/cmdline-tools.zip -d "$SDK/cmdline-tools"
-          if [ ! -d "$SDK/cmdline-tools/latest" ]; then
-            mv "$SDK/cmdline-tools/cmdline-tools" "$SDK/cmdline-tools/latest"
+            unzip -q /tmp/cmdline-tools.zip -d "$SDK/cmdline-tools"
+            if [ ! -d "$SDK/cmdline-tools/latest" ]; then
+              mv "$SDK/cmdline-tools/cmdline-tools" "$SDK/cmdline-tools/latest"
+            fi
+
+            SDKM="$SDK/cmdline-tools/latest/bin/sdkmanager"
+            yes | "$SDKM" --sdk_root="$SDK" --licenses > /dev/null || true
+            "$SDKM" --sdk_root="$SDK" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
           fi
 
-          SDKM="$SDK/cmdline-tools/latest/bin/sdkmanager"
-          yes | "$SDKM" --sdk_root="$SDK" --licenses > /dev/null || true
-          "$SDKM" --sdk_root="$SDK" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+          # buildozer only knows the pre-2021 layout.
+          mkdir -p "$SDK/tools/bin"
+          ln -sf ../../cmdline-tools/latest/bin/sdkmanager "$SDK/tools/bin/sdkmanager"
+          ln -sf ../../cmdline-tools/latest/bin/avdmanager "$SDK/tools/bin/avdmanager"
+
           ls "$SDK/platforms" "$SDK/build-tools"
+          ls -l "$SDK/tools/bin"
 
       - name: Build the spike APK
         working-directory: tools/android_spike
