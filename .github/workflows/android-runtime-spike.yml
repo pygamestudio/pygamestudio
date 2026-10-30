@@ -32,13 +32,49 @@ jobs:
 
       # The SDK/NDK download is the slow part (~20 min); keep it between runs.
       # Delete this step if the repository cache quota becomes a problem.
+      # NOTE: buildozer keeps the SDK in $HOME/.buildozer/android/platform, not
+      # in the project's .buildozer, so both paths have to be cached.
       - name: Cache buildozer (SDK, NDK, p4a builds)
         uses: actions/cache@v4
         with:
-          path: tools/android_spike/.buildozer
-          key: pygs-android-spike-${{ hashFiles('tools/android_spike/buildozer.spec') }}-${{ hashFiles('tools/android_spike/p4a_recipes/**') }}
+          path: |
+            tools/android_spike/.buildozer
+            /github/home/.buildozer/android/platform
+          key: pygs-android-spike-v2-${{ hashFiles('tools/android_spike/buildozer.spec') }}-${{ hashFiles('tools/android_spike/p4a_recipes/**') }}
           restore-keys: |
             pygs-android-spike-
+
+      # buildozer downloads a 2020 vintage command line tools whose sdkmanager
+      # cannot install API 34, and then fails with "Requested API target 34 is
+      # not available". Install the platform ourselves with a current
+      # sdkmanager; buildozer then finds an SDK that already has it.
+      - name: Prepare the Android SDK
+        run: |
+          set -euo pipefail
+          SDK="$HOME/.buildozer/android/platform/android-sdk"
+          echo "SDK=$SDK"
+          if [ -d "$SDK/platforms/android-34" ] && [ -d "$SDK/build-tools" ]; then
+            echo "platform 34 already installed"
+            ls "$SDK/platforms"
+            exit 0
+          fi
+
+          mkdir -p "$SDK/cmdline-tools"
+          python3 - <<'PY'
+          import urllib.request
+          url = ('https://dl.google.com/android/repository/'
+                 'commandlinetools-linux-11076708_latest.zip')
+          urllib.request.urlretrieve(url, '/tmp/cmdline-tools.zip')
+          PY
+          unzip -q /tmp/cmdline-tools.zip -d "$SDK/cmdline-tools"
+          if [ ! -d "$SDK/cmdline-tools/latest" ]; then
+            mv "$SDK/cmdline-tools/cmdline-tools" "$SDK/cmdline-tools/latest"
+          fi
+
+          SDKM="$SDK/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKM" --sdk_root="$SDK" --licenses > /dev/null || true
+          "$SDKM" --sdk_root="$SDK" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+          ls "$SDK/platforms" "$SDK/build-tools"
 
       - name: Build the spike APK
         working-directory: tools/android_spike
@@ -116,7 +152,15 @@ jobs:
             echo "::error::libpybundle.so could not be rebuilt - see inspect.log"; exit 1; }
           echo "payload ok"
 
-      - name: Show the tail of the log on failure
+      - name: Show diagnostics on failure
         if: failure()
         working-directory: tools/android_spike
-        run: tail -n 200 buildozer.log || true
+        run: |
+          SDK="$HOME/.buildozer/android/platform/android-sdk"
+          echo '--- SDK platforms'; ls "$SDK/platforms" 2>/dev/null || echo '(none)'
+          echo '--- SDK cmdline-tools'; ls "$SDK/cmdline-tools" 2>/dev/null || echo '(none)'
+          echo '--- SDK build-tools'; ls "$SDK/build-tools" 2>/dev/null || echo '(none)'
+          echo '--- errors in the log'
+          grep -n -i -E 'error|exception|traceback|not available' buildozer.log | tail -n 40 || true
+          echo '--- log tail'
+          tail -n 120 buildozer.log || true
