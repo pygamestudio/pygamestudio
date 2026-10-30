@@ -68,6 +68,31 @@ Java 引导包名、Manifest 模板位置。
 > 两个子命令都在合成数据上验证过：`inspect` 的输出与 CI 的 grep 门禁逐条匹配，
 > `bundle` 产出的归档解出来就是 `_python_bundle/{modules,site-packages,stdlib.zip}`。
 
+## 图标 / 首屏（spike 3c）
+
+`assets/icon.png`（1024×1024 PNG，带透明）与 `assets/presplash.jpg`（1920×1080）由
+`android_assets.py` 写进 dist，CI 会在第一次打包后自动执行并重新打包：
+
+```powershell
+py -3.10 tools/android_spike/android_assets.py <dist_dir> `
+  --icon tools/android_spike/assets/icon.png `
+  --presplash tools/android_spike/assets/presplash.jpg
+```
+
+生成的内容（都只动 `src/main/res`，不需要改 p4a 源码）：
+
+| 目标 | 说明 |
+|---|---|
+| `mipmap-{mdpi..xxxhdpi}/icon.png` | 48/72/96/144/192，另写 `mipmap/icon.png` 兜底 |
+| `drawable-{mdpi..xxxhdpi}/ic_launcher.png` | 同尺寸，p4a launcher 资源保持一致 |
+| `mipmap-anydpi-v26/icon.xml` | Android 8+ 自适应图标 |
+| `drawable-*/ic_launcher_foreground.png` | 108dp 五档，图形限制在中心 66% 安全区 |
+| `drawable/presplash.jpg` | p4a 用 `ScaleType.FIT_CENTER` 显示，不裁剪不拉伸 |
+| `values/strings.xml` + `templates/strings.tmpl.xml` | `presplash_color` 自动取首屏图四角的主色（两张图底色一致就不会露边） |
+
+> 注意：`values/strings.xml` 在每次打包时都会从 `templates/strings.tmpl.xml` 重新渲染，
+> 所以两个文件都要写，否则第二次打包会退回默认的 `#000000`。
+
 ## spike 3：真机验证
 
 APK 在 CI 的 artifact 里（Actions → 那次运行 → 页面底部 Artifacts → `pygs-android-spike`，

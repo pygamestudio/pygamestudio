@@ -46,6 +46,24 @@ jobs:
           set -o pipefail
           buildozer -v android debug 2>&1 | tee buildozer.log
 
+      # Inject the app's own icon and splash into the dist, then repackage: this
+      # is the asset step the editor will run before Gradle. p4a re-renders
+      # res/values/strings.xml from templates/strings.tmpl.xml on every packaging
+      # run, so android_assets.py pins the splash colour in both places.
+      - name: Apply icon and splash
+        working-directory: tools/android_spike
+        run: |
+          DIST=$(ls -d .buildozer/android/platform/build-*/dists/*/ | head -n 1)
+          python3 android_assets.py "${DIST%/}" \
+            --icon assets/icon.png \
+            --presplash assets/presplash.jpg
+
+      - name: Repackage the APK with the new assets
+        working-directory: tools/android_spike
+        run: |
+          set -o pipefail
+          buildozer -v android debug 2>&1 | tee -a buildozer.log
+
       # Never let a failed inspection cost us the APK again: this step may fail,
       # the artefacts are uploaded unconditionally right after it, and only then
       # does the payload gate decide whether the job is red.
