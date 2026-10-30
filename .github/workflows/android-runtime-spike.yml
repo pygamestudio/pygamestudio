@@ -82,6 +82,12 @@ jobs:
           ls "$SDK/platforms" "$SDK/build-tools"
           ls -l "$SDK/tools/bin"
 
+      - name: Stage the engine into the spike app
+        run: |
+          python3 tools/android_spike/engine_runtime.py \
+            src/pygamestudio tools/android_spike/app
+          find tools/android_spike/app/pygamestudio -name '*.py' | wc -l
+
       - name: Build the spike APK
         working-directory: tools/android_spike
         run: |
@@ -167,6 +173,12 @@ jobs:
           done
           grep -qE '^RESULT : bundle rebuilt in the layout the Android side expects' inspect.log || {
             echo "::error::libpybundle.so could not be rebuilt - see inspect.log"; exit 1; }
+          # Spike 3b: the app payload has to carry the entrypoint as .py (p4a
+          # byte-compiles it away otherwise), the spike project and the engine.
+          grep -qE '^RESULT : app payload complete' inspect.log || {
+            echo "::error::the APK payload is missing the engine or the project - see inspect.log"; exit 1; }
+          grep -qE '^   engine files +: [0-9]{2,}' inspect.log || {
+            echo "::error::the engine was not staged into the app payload - see inspect.log"; exit 1; }
           echo "payload ok"
 
       - name: Show diagnostics on failure

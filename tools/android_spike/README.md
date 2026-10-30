@@ -6,7 +6,8 @@
 |---|---|---|---|
 | 1 | pygame-ce / cffi / pymunk 能不能为 arm64-v8a 交叉编译？ | `buildozer -v android debug` 结束于 BUILD SUCCESSFUL，且 `bin/` 里有 APK | APK + 完整 `buildozer.log` |
 | 2 | Windows 上能否只用标准库重建 `private.tar`（不装 Linux）？ | `inspect_dist.py roundtrip` 输出 `RESULT : identical member list` | 报告 + `private_rebuilt.tar` |
-| 3 | 真机上 pygame 的显示/图片/字体/音频是否可用？ | Demo 屏幕 4 项全绿、触摸有日志 | 截图 + `adb logcat` 片段 |
+| 3a | 真机上 pygame 的显示/图片/字体/音频是否可用？ | Demo 屏幕 4 项全绿、触摸有日志 | 截图 + `adb logcat` 片段 |
+| 3b | **真机上引擎能不能跑起来？**（无 PySide6、项目配置、场景、脚本、触摸、画布缩放） | 屏幕上 `engine/project/scene` 全绿、拖动方块跟手、点按 pad 有 `[ENGINE]` 日志 | 截图 + `adb logcat` 片段 |
 
 ## 目录
 
@@ -16,8 +17,19 @@ tools/android_spike/
 ├─ p4a_recipes/
 │  ├─ pygame_ce/__init__.py  # 复用 p4a 的 pygame recipe，只换源码地址
 │  └─ pymunk/__init__.py     # p4a 自带 recipe 是 6.0.0，这里提到 7.3.1
-├─ app/main.py               # 最小 demo：显示 / 图片 / 字体 / 音频 四项自检
-└─ inspect_dist.py           # Windows 上检查 dist 并验证 private.tar 可重建
+├─ engine_runtime.py         # 挑选「运行时需要的引擎子集」并拷进 app/（未来运行时产物的原型）
+├─ smoke_engine.py           # 本机无头预演：真的加载场景、拖动、点按、跑一遍 main.py
+├─ app/
+│  ├─ main.py                # spike 3b 入口：引擎 Game + 屏幕自检报告
+│  ├─ spike1_pygame_only.py  # spike 1/3a 的纯 pygame demo（不进 APK，留作对照）
+│  ├─ project.pygs           # 最小工程配置（800×600 画布，current_scene）
+│  ├─ scenes/main.scene      # 画布 + 标题 + 提示 + 触摸区 + 可拖动方块
+│  ├─ scripts/drag.py        # 只实现鼠标拖拽族（验证“手指也会走 on_drag”）
+│  ├─ scripts/pad.py         # 只实现触摸族（验证 FINGER 事件与去重）
+│  └─ assets/box.png         # 拖拽用的 128×128 精灵
+├─ android_assets.py         # 图标 / 首屏 / 应用名注入
+├─ assets/                   # 图标与首屏素材
+└─ inspect_dist.py           # Windows 上检查 dist 并验证 payload 可重建
 ```
 
 `.github/workflows/android-runtime-spike.yml` 会在 GitHub 的 Linux runner 里跑同一套流程。
@@ -116,7 +128,80 @@ APK 在 CI 的 artifact 里（Actions → 那次运行 → 页面底部 Artifact
 adb install -r bin\pygsspike-0.1.0-arm64-v8a-debug.apk
 adb logcat -s python          # p4a 的 Python 输出都带这个 tag
 ```
-屏幕会逐行显示 `image / font / mixer` 的自检结果，点一下屏幕会打印触摸事件。
+屏幕会逐行显示自检结果，点一下屏幕会打印触摸事件。
+
+## spike 3b：引擎上机
+
+前面三项证明的是「pygame 能用」。这一项证明的是「**引擎**能用」——APK 里跑的是真的
+`pygamestudio` 运行时：真的 `project.pygs`、真的 `.scene`、真的行为脚本、真的触摸分发。
+
+### 引擎子集怎么进 APK
+
+设备上没有 pip、没有 PySide6，所以只拷运行时需要的那部分（`engine_runtime.py`）：
+
+| 进 | 不进 |
+|---|---|
+| `api/`（Game / 场景加载 / 音频 / 物理 / 窗口） | `game/core/manager.py`、`game/core/command.py`（Qt 场景树、QUndoCommand） |
+| `game/`（场景对象、碰撞、物理） | `common/utils/config.py`、`theme.py`、`qr.py`（QSettings / QSS / QImage） |
+| `common/`（i18n 词条、资源容器、路径工具） | `common/res/resources_rc.py`（Qt 编译资源） |
+| `gui/console/logger.py`（运行时经翻译器用到它，纯 Python） | `common/res/{fonts,pyodide,wheels,qss,templates,sdk,audios}`（9.3 MB 字体、14.5 MB pyodide…） |
+| `common/res/images/`（`window.py` 用 logo 当默认图标，0.12 MB） | `sdk/`（TapTap 是 Windows DLL，Toy 是浏览器 SDK），改成空的 `sdk/__init__.py` 占位 |
+
+当前规模：**156 个文件 / 0.6 MB**。
+
+CI 在第一次构建前执行 `engine_runtime.py src/pygamestudio tools/android_spike/app`，
+引擎就直接躺在 `app/` 里，跟着应用代码一起进 `assets/private.tar`。
+
+### 两个必须知道的 p4a 行为
+
+1. **p4a 默认把 `.py` 编译成 `.pyc`**（`make_tar(byte_compile_python=True)`），
+   `private.tar` 里只剩 `main.pyc`。本引擎的行为脚本是按路径读的
+   （`scripts/drag.py`），编译掉就静默不挂载脚本。`buildozer.spec` 里因此加了：
+   ```
+   p4a.extra_args = --no-byte-compile-python
+   ```
+   这对正式版是硬要求：加密发布时，工程里的模块是**密文**，`compileall` 会直接语法错误。
+2. **入口是 `PyRun_SimpleFile(main.py)`**（见 `jni/application/src/start.c`），
+   所以 `main.py` 就是最外层 Python 帧，`Game._init_game()` 的
+   `inspect.stack()[-1]` 能正确拿到 `/data/data/<pkg>/files/app/main.py`，
+   项目根目录也就是它所在目录。spike 会把「引擎解析出的路径」和「本文件所在目录」都打印出来对照。
+
+### 上机前先在本机跑一遍（省一个 CI 来回）
+
+```powershell
+py -3.10 tools/android_spike/smoke_engine.py
+```
+
+它把**将要进 APK 的那批文件**拷到临时目录，用 `SDL_VIDEODRIVER=dummy` 无头跑：
+
+* 引擎导入 / 工程配置 / 场景加载 / 两个行为脚本挂载 / 图片对象出图；
+* 模拟鼠标拖拽（方块要动）和手指点按（`on_touch_*` 要收到 3 次 move）；
+* 渲染一帧；
+* 最后用 `python main.py` **在子进程里跑真的入口**（`SPIKE_MAX_FRAMES=3` 自动退出），
+  验证 `Game.run()` 全链路和项目路径解析。
+
+全绿时最后一行是 `RESULT : the staged engine runs the spike project headless`。
+
+### 上机要看什么
+
+屏幕上方的报告面板（红字 = 失败，绿字 = 通过）逐行是：
+`engine / project / pygame / scene / screen / pointer+ finger 计数 / fps`。
+
+| 行 | 期望 | 说明 |
+|---|---|---|
+| `engine` | `imported` | 没有 PySide6 也能 import |
+| `project` | `'PyGS engine spike' canvas (800, 600)` | `project.pygs` 读到了 |
+| `scene` | `5 object(s), 2 script(s)` | 场景 + 行为脚本都挂上了 |
+| `screen` | `2400x1080 window for a 800x600 canvas -> scale 3.00` | **关键测量**：Android 给的窗口像素 vs 编辑器画布 |
+| 计数 | 拖动时 `pointer` 增长，点 pad 时 `finger` 增长 | 两族事件都到了引擎 |
+
+`[ENGINE]` 前缀的日志来自场景脚本，`adb logcat -s python` 里能直接看到
+`drag_start / drag #n / drag_end` 和 `touch_down / touch_move #n / touch_up / tap`。
+
+> `screen` 那行会暴露一个已知问题：引擎现在把场景按 1:1 像素画在窗口左上角，
+> 手机分辨率远大于 800×600 时画面只占左上角一块。真机数字出来后，
+> 再决定是「引擎加设计分辨率缩放层」还是「构建时让项目按设备分辨率出图」。
+
 
 ## 失败时的处置（按概率排序）
 

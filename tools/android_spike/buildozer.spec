@@ -15,9 +15,12 @@ title = PyGS Spike
 package.name = pygsspike
 package.domain = org.pygamestudio
 
-# The demo app (pure pygame: display / image / font / mixer checks).
+# The demo app: a real engine project (project.pygs + scene + scripts) plus the
+# staged runtime engine. ``spike1_pygame_only.py`` is the previous, engine-free
+# demo kept for reference - it stays out of the APK.
 source.dir = app
-source.include_exts = py,png,jpg,json
+source.include_exts = py,png,pygs,scene,json
+source.exclude_patterns = spike1_pygame_only.py
 
 version = 0.1.0
 
@@ -46,6 +49,13 @@ android.allow_backup = False
 # window is drawn on. This is the piece Chaquopy does not have.
 p4a.bootstrap = sdl2
 p4a.local_recipes = p4a_recipes
+
+# Ship the app's .py files verbatim instead of letting p4a byte-compile them
+# (p4a's make_package() replaces every .py with a .pyc, and the runtime loads
+# the object scripts by path - ``scripts/drag.py`` would not exist). It is also
+# a hard requirement for real builds: protected projects ship ENCRYPTED modules,
+# which compileall cannot parse at all.
+p4a.extra_args = --no-byte-compile-python
 
 [buildozer]
 log_level = 2

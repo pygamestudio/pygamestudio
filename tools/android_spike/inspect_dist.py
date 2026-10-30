@@ -41,6 +41,32 @@ from pathlib import Path
 #: Extension modules the engine actually needs from pygame.
 PYGAME_REQUIRED_MODULES = ('base', 'surface', 'display', 'font', 'image', 'mixer', 'time')
 
+#: Files the spike project needs next to its entrypoint (relative to the app
+#: private dir). A missing one answers "why is the screen black?" before the
+#: APK is even installed.
+APP_REQUIRED_FILES = (
+    'project.pygs',
+    'scenes/main.scene',
+    'scripts/drag.py',
+    'scripts/pad.py',
+    'assets/box.png',
+)
+#: Engine modules the game runtime cannot start without (the subset staged by
+#: ``engine_runtime.py``).
+ENGINE_REQUIRED_FILES = (
+    'pygamestudio/__init__.py',
+    'pygamestudio/api/core/game.py',
+    'pygamestudio/api/core/scene.py',
+    'pygamestudio/game/object/base.py',
+    'pygamestudio/game/core/collision.py',
+    'pygamestudio/common/utils/assets.py',
+    'pygamestudio/common/utils/path.py',
+    'pygamestudio/common/i18n/languages/en.json',
+    'pygamestudio/common/res/images/logo.png',
+    'pygamestudio/gui/console/logger.py',
+    'pygamestudio/sdk/__init__.py',
+)
+
 
 def human(size):
     for unit in ('B', 'KB', 'MB', 'GB'):
@@ -85,6 +111,7 @@ def inspect(dist_dir):
     _inspect_libs(dist_dir)
     _inspect_java(dist_dir)
     _inspect_manifest(dist_dir)
+    _inspect_app(dist_dir)
 
 
 def _inspect_bundle(dist_dir, bundle_dir):
@@ -181,6 +208,57 @@ def _inspect_tar(private_tar, members):
         print(f'   required modules missing  : {", ".join(missing) if missing else "none"}')
     else:
         print('   pygame extension modules: none found')
+
+
+def _inspect_app(dist_dir):
+    """Report the app payload (``src/main/assets/private.tar``).
+
+    This is what spike 3b needs on the device: the entrypoint, the spike project
+    (config, scene, scripts, images) and the staged engine. Two things are worth
+    knowing before installing the APK:
+
+    * p4a byte-compiles the app by default, which replaces ``scripts/*.py`` with
+      ``*.pyc`` - the runtime loads object scripts by path, so only the ``.py``
+      variant works (``--no-byte-compile-python``);
+    * every engine file has to be in this tar, because the device has no other
+      copy of the engine.
+    """
+    app_tar = dist_dir / 'src' / 'main' / 'assets' / 'private.tar'
+    print()
+    if not app_tar.is_file():
+        print('-- src/main/assets/private.tar: not found')
+        print('RESULT : app payload missing')
+        return False
+
+    with tarfile.open(app_tar, 'r:*') as tar:
+        members = [member for member in tar.getmembers() if member.isfile()]
+    names = {member.name.lstrip('./') for member in members}
+    total = sum(member.size for member in members)
+
+    entrypoint = next((name for name in ('main.py', 'main.pyc') if name in names), None)
+    compiled = sum(1 for name in names if name.endswith('.pyc'))
+    engine_files = sorted(name for name in names if name.startswith('pygamestudio/'))
+
+    print(f'-- {app_tar.relative_to(dist_dir).as_posix()}: {len(members)} files, {human(total)}')
+    print(f'   {"entrypoint":<25}: {entrypoint or "MISSING"}')
+    print(f'   {".py shipped verbatim":<25}: '
+          f'{"yes" if entrypoint == "main.py" else "NO - p4a byte-compiled the app"}'
+          f' ({compiled} .pyc in the tar)')
+    print(f'   {"engine files":<25}: {len(engine_files)}')
+
+    ok = entrypoint == 'main.py'
+    for relative in APP_REQUIRED_FILES:
+        present = relative in names
+        ok = ok and present
+        print(f'   {relative:<25}: {"ok" if present else "MISSING"}')
+    missing_engine = [relative for relative in ENGINE_REQUIRED_FILES
+                      if relative not in names]
+    ok = ok and not missing_engine
+    print(f'   {"engine core":<25}: '
+          f'{"ok" if not missing_engine else str(len(missing_engine)) + " MISSING"}')
+
+    print(f'RESULT : {"app payload complete" if ok else "app payload INCOMPLETE"}')
+    return ok
 
 
 def _inspect_libs(dist_dir):

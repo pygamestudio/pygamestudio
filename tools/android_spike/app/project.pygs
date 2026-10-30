@@ -1,0 +1,15 @@
+{
+    "caption": "PyGS engine spike",
+    "screen_width": 800,
+    "screen_height": 600,
+    "screen_size": [800, 600],
+    "asset": {
+        "current_scene": "scenes/main.scene",
+        "sort_type": 1
+    },
+    "build": {
+        "app_name": "PyGS Engine Spike",
+        "app_icon": "",
+        "output_dir": ""
+    }
+}

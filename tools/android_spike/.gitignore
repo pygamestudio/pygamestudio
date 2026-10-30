@@ -5,3 +5,7 @@ bin/
 pygs-dist.tgz
 dist_private_rebuilt.tar
 private_rebuilt.tar
+
+# the engine subset staged into the app by engine_runtime.py (regenerated on
+# every build, never committed - the installed engine is the single source)
+app/pygamestudio/
