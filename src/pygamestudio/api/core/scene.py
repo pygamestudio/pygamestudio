@@ -112,6 +112,12 @@ class SceneLoader:
         # duplicate newline TEXTINPUT that some platforms also emit for the
         # Return key is swallowed (otherwise it would double the line break).
         self._skip_next_newline_textinput = False
+        # What every object drew last frame (uuid -> key), the cached background
+        # composed from the objects that did not change, and the keys it holds.
+        # ``_previous_keys = None`` means "no previous frame yet".
+        self._previous_keys = None
+        self._background = None
+        self._background_keys = None
 
     def load_scene(self, screen_surface:pygame.Surface, scene_path:str=''):
         if not scene_path and self._current_scene_path or scene_path and scene_path==self._current_scene_path:
@@ -135,6 +141,9 @@ class SceneLoader:
         self._all_object_tree_struct = {}
         self._object_by_uuid = {}
         self._parent_by_uuid = {}
+        self._previous_keys = None
+        self._background = None
+        self._background_keys = None
         self._hoverable_uuids = set()
         self._touchable_uuids = set()
         # Nothing is left to destroy: the whole tree is gone already.
@@ -335,11 +344,94 @@ class SceneLoader:
         return canvas_rect.contains(screen_surface.get_rect())
 
     def _update_scene(self, screen_surface:pygame.Surface):
+        """Advance the scene by one frame.
+
+        Every blit of a semi-transparent object costs real time (measured: alpha
+        blending runs ~270x slower than an opaque copy on a phone), so the frame
+        is not redrawn from scratch: objects that did not change are composited
+        ONCE into a background surface, and a frame is that background plus the
+        handful of objects that actually moved or updated.
+
+        The whole surface is still repainted every frame, from that cache - so a
+        game that draws on ``get_screen()`` itself keeps the old contract (its
+        drawing is erased each frame) and no stale pixel can survive.
+
+        Scenes with child clipping keep the plain full redraw: a clipping parent
+        draws its children into its own layer, which the flat cache cannot
+        express.
+        """
+        self._update_physics()
+        if self._scene_uses_clipping():
+            self._draw_scene_full(screen_surface)
+            return
+
+        draws = []
+        self._collect_draws(draws)
+        self._draw_cached(screen_surface, draws)
+
+        self._update_collision_events()
+        if self._pending_destroy:
+            self._flush_destroyed()
+
+    #: Object types whose bitmap animates itself: they change every frame even
+    #: when no property does, so they are never baked into the background.
+    ANIMATED_TYPES = (OBJECT_PARTICLE, OBJECT_FRAME_SEQUENCE, OBJECT_KEYFRAME,
+                      OBJECT_TEXT_INPUT)
+
+    def _scene_uses_clipping(self) -> bool:
+        """True when any object clips its children (needs the layered draw)."""
+        for obj in self._iter_objects():
+            if getattr(obj, 'clip_children', False):
+                return True
+        return False
+
+    @staticmethod
+    def _draw_key(obj):
+        """Everything that decides what an object puts on the screen."""
+        surface = obj.surface
+        return (obj.x, obj.y, obj.width, obj.height, obj.scale_x, obj.scale_y,
+                obj.angle, bool(obj.visible), id(surface),
+                getattr(obj, '_render_state', None))
+
+    def _draw_cached(self, screen_surface, draws):
+        """Present the cached background plus whatever changed this frame."""
+        previous = self._previous_keys
+        static = []
+        dynamic = []
+        static_keys = {}
+        current_keys = {}
+        for obj, surface, rect in draws:
+            key = self._draw_key(obj)
+            current_keys[obj.uuid] = key
+            if (previous is not None and previous.get(obj.uuid) == key
+                    and obj.type not in self.ANIMATED_TYPES):
+                static.append((obj, surface, rect))
+                static_keys[obj.uuid] = key
+            else:
+                dynamic.append((obj, surface, rect))
+        self._previous_keys = current_keys
+
+        if self._background is None \
+                or self._background.get_size() != screen_surface.get_size():
+            self._background = pygame.Surface(screen_surface.get_size()).convert()
+            self._background_keys = None
+
+        if static_keys != self._background_keys:
+            # The set of still objects changed: compose the background once.
+            # From the next frame on this is a single opaque copy.
+            self._background.fill((0, 0, 0))
+            for _obj, surface, rect in static:
+                self._background.blit(surface, rect)
+            self._background_keys = static_keys
+
+        screen_surface.blit(self._background, (0, 0))
+        for _obj, surface, rect in dynamic:
+            screen_surface.blit(surface, rect)
+
+    def _draw_scene_full(self, screen_surface):
+        """Draw the whole tree the classic way (one blit per object, in order)."""
         if not self._root_covers_surface(screen_surface):
             screen_surface.fill((0, 0, 0))
-        # Physics runs before the scripts: on_update() sees the position the
-        # bodies ended up in, and can push them for the next frame.
-        self._update_physics()
 
         def _update(object_tree_struct, surface, parent_transform, parent_ops):
             """Draw one subtree onto ``surface``.
@@ -389,9 +481,46 @@ class SceneLoader:
         if self._all_object_tree_struct:
             _update(self._all_object_tree_struct, screen_surface,
                     TRANSFORM_IDENTITY, ())
+        self._previous_keys = None
+        self._background = None
+        self._background_keys = None
         self._update_collision_events()
         if self._pending_destroy:
             self._flush_destroyed()
+
+    def _collect_draws(self, out):
+        """Refresh bitmaps and scripts, collect ``(object, surface, rect)``."""
+
+        def _collect(object_tree_struct, parent_transform, parent_ops):
+            value = list(object_tree_struct.values())[0]
+            obj = value['object']
+            obj._update_surface()
+            self._update_script(obj)
+
+            if not obj.visible:
+                return
+
+            world_transform = parent_transform.compose(obj._local_transform())
+            child_ops = parent_ops
+            if obj.angle or obj.scale_x != 1 or obj.scale_y != 1:
+                child_ops = parent_ops + ((float(obj.scale_x), float(obj.scale_y),
+                                           float(obj.angle)),)
+
+            surface, rect = obj._drawn_bitmap_in(parent_transform, parent_ops)
+            out.append((obj, surface, rect))
+            for child_object_tree_struct in value['children']:
+                _collect(child_object_tree_struct, world_transform, child_ops)
+
+        if self._all_object_tree_struct:
+            _collect(self._all_object_tree_struct, TRANSFORM_IDENTITY, ())
+
+    @staticmethod
+    def _draw_key(obj):
+        """Everything that decides what an object puts on the screen."""
+        surface = obj.surface
+        return (obj.x, obj.y, obj.width, obj.height, obj.scale_x, obj.scale_y,
+                obj.angle, bool(obj.visible), id(surface),
+                getattr(obj, '_render_state', None))
 
     def _set_delta_time(self, delta_time):
         """Set the per-frame delta time (seconds) passed to scripts' on_update."""
@@ -1371,6 +1500,7 @@ class SceneLoader:
 
 
 scene_loader = SceneLoader()
+
 
 def load_scene(screen_surface:pygame.Surface, scene_path:str=''):
     scene_loader.load_scene(screen_surface, scene_path)

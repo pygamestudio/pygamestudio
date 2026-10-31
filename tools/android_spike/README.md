@@ -287,29 +287,54 @@ screen: surface 800x600, window 1875x1054 (sdl 828x1180), mode show_all, present
 
 ## 性能
 
-### 真实数据（三轮）
+### 真实数据（四轮）
 
 | 轮次 | 引擎 | 结论 |
 |---|---|---|
 | 第 1 轮（1:1，无缩放） | 26 fps | 空帧呈现 809 fps → 瓶颈在引擎：`ObjectCanvas` 每帧重建 800×600 SRCALPHA 表面 |
-| 第 2 轮（smoothscale 呈现） | **6 fps** | **我们自己把帧率砸下去的**：`smoothscale` 一帧 141.9 ms（整屏双线性） |
-| 第 3 轮（nearest + 画布缓存） | **47–50 fps** | `scene draw 9.6 ms / other 11.2 ms`，两者各占一半 |
-| 第 4 轮（本轮） | 待测 | 又砍了两处整屏写入，目标 55–60 |
+| 第 2 轮（smoothscale 呈现） | **6 fps** | 我们自己砸的：`smoothscale` 一帧 141.9 ms |
+| 第 3 轮（nearest + 画布缓存） | 47–50 fps | `scene draw 9.6 / other 11.2` |
+| 第 4 轮（1280×720 画布） | 27 fps | 画布像素翻倍，`scene draw` 跟着翻倍 |
+| 第 5 轮（960×540 + 分项） | 38–42 fps | `canvas blit 0.1 ms`，瓶颈锁定在 **每个对象的 alpha blit** |
 
-第 4 轮砍掉的两处（都在每帧路径上，各是一次多余的整屏写入）：
+### 逐对象 blit 实测（960×540 画布）
 
-1. `_update_scene()` 开头先 `fill((0,0,0))` 再把**不透明的画布**贴满——现在只要根 canvas
-   确实盖住整个表面且 alpha=255，就直接跳过这次 fill（`_root_covers_surface()`）；
-2. `_present()` 先把缩放结果写进中转表面、再 blit 到窗口——`show_all` 这类居中场景现在
-   **直接缩放进 `display.subsurface(rect)`**（subsurface 只是视图），再一次整屏 blit 也省了。
+```
+blits: Canvas 0.09 ms 960x540 opaque
+       Title  2.17 ms 864x54 alpha
+       Hint   1.35 ms 864x33 alpha
+       Pad    6.13 ms 360x360 alpha
+       Box    1.08 ms 150x150 alpha
+```
 
-> 如果还不够 60：剩下的空间在 `scene draw`（对象树遍历 + 逐个 blit）里，
-> 下一步要做的是脏矩形（只重画变化区域），不是再抠呈现层。
+换算下来非常一致：
+
+| 类型 | 吞吐 | 说明 |
+|---|---|---|
+| 不透明拷贝 | **~5.8 Gpx/s** | 纯 memcpy 路径 |
+| 逐像素 alpha 混合 | **~21 Mpx/s** | 慢 **270 倍** |
+
+所以问题从来不是“Python 太慢”，也不是画布太大，而是**每帧都在重新混合静态的透明对象**。
+
+### 第 6 轮：静态背景缓存
+
+`SceneLoader._update_scene()` 现在把**上一帧没变化的对象一次性合成到一张背景表面**里，
+每帧只做：「贴背景（不透明拷贝）+ 重画这一帧真正变了的对象」。
+
+* 静止的对象（背景、标题、HUD、按钮底图）只合成一次，之后每帧几乎免费；
+* 移动/变化的对象（以及 `PARTICLE` / `FRAME_SEQUENCE` / `KEYFRAME` / `TEXT_INPUT`
+  这类自己会动的类型）永远每帧重画，不会被烤进背景；
+* **整张画面仍然每帧重画**（从背景缓存贴回来），所以“游戏可以直接往 `get_screen()` 上画”
+  这个契约不变——上一帧手绘的内容照样被擦掉，不会残影；
+* 带 `clip_children` 的场景（子对象裁切到父层）继续走原来的整树重画路径。
+
+预期：`scene draw` 11.6 ms → 1.5 ms 左右，帧率回到 55–60（受 60Hz 上限约束）。
+
+`smoke_engine.py` 里新增一项 `dirty-rect redraw` 检查来盯住正确性：手绘到画布上的内容
+下一帧必须被擦掉、静止对象必须还在、移动对象不能留残影。
+
 
 教训：**整屏双线性缩放不要放在每帧路径上**，尤其在 ARM / 模拟器上。
-现在默认 `nearest`（`pygame.transform.scale`，接近内存拷贝），`smooth` 只作为可选项留给
-桌面或性能充裕的机型；`present` 还加了两条快路径：画布大小等于窗口时直接 blit（不缩放），
-`exact_fit` 时直接缩放到窗口表面（省掉中转表面和第二次整屏 blit）。
 
 ### 这一轮的测量
 

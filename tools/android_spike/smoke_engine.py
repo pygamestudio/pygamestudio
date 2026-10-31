@@ -316,6 +316,49 @@ print('opt out', plain._screen.get_size())
         assert display.get_at((150, 60))[:3] == (0, 0, 0), 'the 1:1 path drew too much'
         return f'show_all {rect.size} at {rect.topleft}, canvas back to 1:1'
 
+    def dirty_redraw():
+        """The cached background keeps the frame correct on the cheap path.
+
+        Still objects are composited once into a background surface and a frame
+        is that background plus whatever moved. Two properties have to hold, or
+        the optimisation would change what players see:
+
+        * the whole surface is still repainted every frame (a game that draws on
+          ``get_screen()`` itself keeps working - its drawing is erased);
+        * a moved object leaves nothing behind, and still objects are still
+          there.
+        """
+        screen = state['screen']
+        loader = studio.scene_loader
+        studio.load_scene(screen)                       # first frame: full draw
+        studio.load_scene(screen)                       # warm the background
+        canvas = loader.get_root_object()
+        box = loader.find_objects(name='Box')[0]
+        pad = loader.find_objects(name='Pad')[0]
+
+        # Anything painted onto the canvas by hand must be gone next frame.
+        screen.fill((255, 0, 255))
+        studio.load_scene(screen)
+        assert screen.get_at((5, 5))[:3] != (255, 0, 255), \
+            'the frame was not repainted from the background cache'
+        pad_centre = (int(pad.x + pad.width / 2), int(pad.y + pad.height / 2))
+        assert screen.get_at(pad_centre)[:3] == tuple(pad.color[:3]), \
+            f'a still object is missing from the cache: {screen.get_at(pad_centre)}'
+
+        before = (box.x, box.y)
+        centre_before = (int(before[0] + box.width / 2), int(before[1] + box.height / 2))
+        box.x += 100
+        studio.load_scene(screen)
+        centre_after = (int(box.x + box.width / 2), int(box.y + box.height / 2))
+
+        assert screen.get_at(centre_after)[:3] != (255, 0, 255), \
+            'the object was not drawn at its new position'
+        assert screen.get_at(centre_before)[:3] == tuple(canvas.color[:3]), \
+            f'the old position was not restored: {screen.get_at(centre_before)}'
+        box.x = before[0]
+        studio.load_scene(screen)
+        return f'{before} -> {(before[0] + 100, before[1])} and back'
+
     def project_imports():
         """Reject imports the Android runtime cannot satisfy (the phone's black screen)."""
         import project_scan
@@ -366,6 +409,7 @@ print('opt out', plain._screen.get_size())
     checks.run('pointer drag', pointer_drag)
     checks.run('finger tap', finger_tap)
     checks.run('render frame', render_frame)
+    checks.run('dirty-rect redraw', dirty_redraw)
     checks.run('imports without Android-missing pygame modules', android_imports)
     checks.run('scaled display', scaled_display)
     checks.run('project imports', project_imports)
