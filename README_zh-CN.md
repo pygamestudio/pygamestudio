@@ -21,7 +21,7 @@
 <br>
 
 # 安装教程
-你可以通过 pip 快速安装 Pygame Studio（请确保已安装 Python 3.9 及以上版本）：
+你可以通过 pip 快速安装 Pygame Studio（请确保已安装 Python 3.10 及以上版本）：
 
 ```bash
 pip install pygamestudio

@@ -21,7 +21,7 @@ English&nbsp; | &nbsp;[简体中文](https://github.com/pygamestudio/pygamestudi
 <br>
 
 # Installation
-Install Pygame Studio easily via pip (ensure you have Python 3.9 or higher installed):
+Install Pygame Studio easily via pip (ensure you have Python 3.10 or higher installed):
 
 ```bash
 pip install pygamestudio
