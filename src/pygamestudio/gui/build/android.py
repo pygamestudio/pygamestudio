@@ -107,6 +107,12 @@ class AndroidAppBuildWindow(QScrollArea):
         self._progress_bar = QProgressBar()
         self._build_button = QPushButton()
         self._open_output_dir_button = QPushButton()
+        #: Publishing-platform picker (bottom-right corner), the same icons as
+        #: the desktop tab. The pick is recorded in project.pygs
+        #: (build.android_platform) so the project knows where it is headed;
+        #: TapTap mobile needs nothing extra inside the APK today.
+        self._platform_label = QLabel()
+        self._platform_combobox = QComboBox()
 
         self._build_thread = AndroidBuildThread(game_manager)
         self._is_building = False
@@ -159,6 +165,8 @@ class AndroidAppBuildWindow(QScrollArea):
         self._progress_bar.setValue(0)
         self._build_button.setText(T.tr('build.build', 'Build'))
         self._open_output_dir_button.setText(T.tr('build.open_output_dir', 'Open Output Dir'))
+        self._platform_label.setText(T.tr('build.platform_label', 'Publishing Platform:'))
+        self._set_platform_texts()
         self._update_button_widths()
 
     def _add_password_toggle(self, field):
@@ -199,6 +207,7 @@ class AndroidAppBuildWindow(QScrollArea):
         self._version_code_lineedit.editingFinished.connect(self._on_version_code_edited)
         self._orientation_combobox.activated.connect(self._on_orientation_activated)
         self._build_type_combobox.activated.connect(self._on_build_type_activated)
+        self._platform_combobox.activated.connect(self._on_platform_activated)
         self._keystore_browse_button.clicked.connect(self._browse_keystore)
         self._keystore_create_button.clicked.connect(self._create_keystore)
         self._keystore_lineedit.editingFinished.connect(self._on_signing_edited)
@@ -218,6 +227,10 @@ class AndroidAppBuildWindow(QScrollArea):
         def row_with(*widgets):
             """A line edit plus its buttons, as one grid cell."""
             row = QWidget()
+            # Fixed height: the cell must stay one control tall. Otherwise a
+            # window taller than the page gives the spare height to these
+            # containers, which grows them into tall empty boxes.
+            row.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
             layout = QHBoxLayout(row)
             layout.setContentsMargins(0, 0, 0, 0)
             layout.setSpacing(6)
@@ -227,6 +240,7 @@ class AndroidAppBuildWindow(QScrollArea):
 
         def version_row():
             row = QWidget()
+            row.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
             layout = QHBoxLayout(row)
             layout.setContentsMargins(0, 0, 0, 0)
             layout.setSpacing(6)
@@ -251,6 +265,9 @@ class AndroidAppBuildWindow(QScrollArea):
         button_layout.addSpacing(6)
         button_layout.addWidget(self._open_output_dir_button)
         button_layout.addStretch()
+        # Bottom-right corner: label + platform picker of the build.
+        button_layout.addWidget(self._platform_label)
+        button_layout.addWidget(self._platform_combobox)
 
         layout = QGridLayout(self._central_widget)
         layout.setHorizontalSpacing(10)
@@ -281,7 +298,10 @@ class AndroidAppBuildWindow(QScrollArea):
         layout.addWidget(self._key_password_lineedit, 10, 1)
         layout.addWidget(self._progress_bar, 11, 0, 1, 2)
         layout.addLayout(button_layout, 12, 0, 1, 2)
-        layout.setRowStretch(13, 1)
+        # Exactly the desktop/web layout: a plain grid, no stretch row of its
+        # own. A window taller than the page then shares the spare height
+        # between the rows (what those two tabs do) instead of collecting it
+        # in one dead band - below the buttons or above them, both looked wrong.
         self._update_signing_enabled()
 
     def _set_orientation_texts(self):
@@ -320,6 +340,44 @@ class AndroidAppBuildWindow(QScrollArea):
         if changed and self.isVisible():
             self.layout_changed_signal.emit()
 
+    def _set_platform_texts(self):
+        """(Re)fill the platform picker with the desktop tab's icons.
+
+        Only "无平台" for now: the TapTap **Android** SDK is not integrated yet
+        (the PC bridge is Windows-only), so offering the pick would promise a
+        package that behaves exactly like the plain one. The entry list and the
+        `build.android_platform` key stay in place so it can come back with the
+        SDK without touching the rest of the tab.
+        """
+        selected = self._platform_combobox.currentData()
+        self._platform_combobox.blockSignals(True)
+        self._platform_combobox.clear()
+        self._platform_combobox.addItem(QIcon(':/images/ban.png'),
+                                        T.tr('build.no_platform', 'None'), '')
+        index = self._platform_combobox.findData(selected)
+        self._platform_combobox.setCurrentIndex(index if index >= 0 else 0)
+        self._platform_combobox.blockSignals(False)
+        self._set_platform_tooltip()
+
+    def _set_platform_tooltip(self):
+        """Tooltip of the picker (nothing to explain while TapTap is out)."""
+        self._platform_combobox.setToolTip('')
+
+    def _on_platform_activated(self, index):
+        """Remember the pick right away (build.android_platform)."""
+        update_project_config('build.android_platform', self.get_platform())
+        self._set_platform_tooltip()
+
+    def get_platform(self):
+        """The chosen platform id ('' while "无平台" is picked)."""
+        return str(self._platform_combobox.currentData() or '')
+
+    def set_platform_selected(self, platform_id):
+        """Select a platform from code (MCP tools, tests)."""
+        index = self._platform_combobox.findData(str(platform_id or ''))
+        self._platform_combobox.setCurrentIndex(max(0, index))
+        self._set_platform_tooltip()
+
     def _update_button_widths(self):
         width = max(self._build_button.sizeHint().width(),
                     self._open_output_dir_button.sizeHint().width())
@@ -345,6 +403,7 @@ class AndroidAppBuildWindow(QScrollArea):
         self._orientation_combobox.setCurrentIndex(index if index >= 0 else 0)
         index = self._build_type_combobox.findData(str(build_config.get('android_build_type') or 'debug'))
         self._build_type_combobox.setCurrentIndex(index if index >= 0 else 0)
+        self.set_platform_selected(str(build_config.get('android_platform') or ''))
 
         self._keystore_lineedit.setText(str(build_config.get('android_keystore') or ''))
         self._key_alias_lineedit.setText(str(build_config.get('android_key_alias') or ''))
@@ -495,6 +554,7 @@ class AndroidAppBuildWindow(QScrollArea):
             'version_name': self._version_name_lineedit.text().strip() or '1.0.0',
             'version_code': self._version_code_lineedit.text().strip() or '1',
             'build_type': self.get_build_type(),
+            'platform': self.get_platform(),
             'keystore': self._keystore_lineedit.text().strip(),
             'key_alias': self._key_alias_lineedit.text().strip(),
             'store_password': self._store_password_lineedit.text(),
@@ -639,6 +699,8 @@ class AndroidAppBuildWindow(QScrollArea):
         self._update_password_tooltips()
         self._set_orientation_texts()
         self._set_build_type_texts()
+        self._platform_label.setText(T.tr('build.platform_label', 'Publishing Platform:'))
+        self._set_platform_texts()
         self._build_button.setText(T.tr('build.build', 'Build') if not self._is_building
                                    else T.tr('build.stop', 'Stop'))
         self._open_output_dir_button.setText(T.tr('build.open_output_dir', 'Open Output Dir'))

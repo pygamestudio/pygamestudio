@@ -575,4 +575,17 @@ class AgentSession(QObject):
         self._awaiting_confirmation = None
         self.status_changed.emit('', False)
         if was_busy or error_text:
+            # The debugging window the agent opened must not outlive the turn
+            # (the bridge watchdog closed it after 25 s of silence; the user
+            # should not have to wait that long). A game the user started
+            # himself is left alone.
+            self._close_agent_game()
             self.finished.emit(error_text or '')
+
+    def _close_agent_game(self):
+        """Close the test run this turn started, if there is one."""
+        try:
+            from pygamestudio.mcp.bridge import bridge
+            bridge.stop_agent_game()
+        except Exception as error:  # noqa: BLE001 - closing is best effort
+            Logger.warning('Could not close the agent test run: {}'.format(error))

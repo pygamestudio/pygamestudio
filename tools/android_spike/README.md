@@ -541,7 +541,7 @@ pygs-android-runtime-1.0.0-arm64-v8a.zip: 21.0 MB (2.16x smaller, lzma)
 | `gui/build/android_assets.py` | 图标 / 首屏 / 应用名注入；本目录的 `android_assets.py` 同样是按路径的壳 |
 | `gui/build/android_dist.py` | 解包成型 → 从包里恢复 res → `values/strings.xml` → `AndroidManifest.xml` → 图标 |
 | `gui/build/android_apk.py` | **真正打包**：aapt2 → javac → jar/d8 → zip → zipalign → apksigner |
-| `gui/build/android.py` | Build 窗口「安卓应用」tab（构建类型、签名、进度、停止） |
+| `gui/build/android.py` | Build 窗口「安卓应用」tab（构建类型、签名、进度、停止；右下角发布平台占位） |
 | `gui/settings/editor.py` | 「编辑器设置 > 安卓打包」：只有 JDK 和 Android SDK 两个路径 |
 
 缓存目录（`platformdirs.user_cache_dir()/PygameStudio/android/`）：
@@ -575,6 +575,11 @@ APK 就是「资源 + dex + 原生库 + 清单」的压缩包，这个工程的�
 
 输出到 `<输出目录>/build/Android/`，文件名带构建类型：`<应用名>-debug.apk` /
 `<应用名>-release.apk`——同一个应用调一次调试、打一次发布，两个包都在，不会互相覆盖。
+
+右下角还有一个**发布平台**下拉框（位置、图标和桌面 tab 一样），现在只有「无平台」一项——
+**TapTap 安卓 SDK 还没接入**（`sdk/taptap/pc` 那套 ctypes 桥接是 Windows 专用的），
+挂上去等于承诺一个和普通包完全一样的 APK。选项列表和 `build.android_platform` 键先留着，
+等 SDK 接进来直接加回来，tab 其余部分不用动。
 
 只有真跑才会踩到的三个坑：
 
@@ -617,16 +622,28 @@ tab 里选「发布」后用你自己的 keystore 签名：`apksigner` 的密码
 
 ### 触摸坐标
 
-`Game._to_canvas` 把窗口像素换成画布像素（适配方案不同，换算也不同）。这段数学有专门的
-无头测试（`check_pointer_mapping.py`，15 项，覆盖拉伸/留黑边/裁剪/整数倍/桌面），所以
-“点左上角却命中右下角”不会是换算公式写错。如果真机上重现，引擎会在 logcat 打印前 5 个指针事件：
+`Game._to_canvas` 把指针位置换成画布像素，**两步**：
+
+1. **SDL 窗口→ surface**：SDL 上报的鼠标/触摸坐标是 **窗口** 坐标，而我们画进的是 display
+   surface。真机上两者经常不等（密度、刘海、旋转后 surface 没跟着变），以前直接当 surface
+   像素用，整套映射就正好差那个比例——看起来就是“点哪儿都不是”。现在两边尺寸不同时先按
+   比例换成 surface 像素（桌面两者相等，这一步是 no-op）。
+2. **surface → 画布**：再按适配矩形换算（`_fit_rect`）。
+
+另外：脚本里直接写 `pygame.mouse.get_pos()` 拿到的也是窗口坐标，所以画布被缩放时引擎会把
+**这个调用本身**换成画布坐标（`_install_pointer_scaling`，只在缩放时安装），`studio.get_mouse_position()`
+也不会重复换算。`check_pointer_mapping.py`（15 项）覆盖公式，`smoke_engine.py` 的
+`pointer scaling` 覆盖这两步和 patch。
+
+如果真机上还是偏，引擎会在 logcat 打印前 5 个指针事件：
 
 ```
-[PYGS-INPUT] mouse-down raw=(x, y) window=(2400, 1080) present=(0, 0, 2400, 1080) canvas=(cx, cy)
+[PYGS-INPUT] mouse-down raw=(x, y) sdl=(828, 1180) window=(1875, 1054) present=(240, 0, 1406, 1054) canvas=(cx, cy)
 ```
 
-`raw` 是 SDL 给的原始坐标，`present` 是画布在窗口里的矩形，`canvas` 是我们换算的结果。
-raw 与 canvas 的对应关系一眼就能看出是偏移、镜像还是缩放，比截图可靠。
+`sdl` 是 SDL 窗口尺寸（事件的坐标空间）、`window` 是我们画进去的 surface、`present` 是画布
+在表面里的矩形、`canvas` 是最终结果。三者一对就能看出是窗口/surface 不匹配、还是适配矩
+形/公式的问题。
 
 ### 测试
 

@@ -199,6 +199,9 @@ ENGINE_RUNTIME_API = (
     'set_allow_screensaver', 'is_allow_screensaver',
     # project
     'get_project_config', 'get_project_path',
+    # which platform the game runs on (a script can show touch buttons on a
+    # phone, a different control hint in a browser, ...)
+    'is_android', 'is_web',
     # platform bridges (studio.sdk.*): TapTap PC (desktop) and Bilibili Toy
     'sdk', 'taptap', 'toy',
     # keyframe animation helpers (game/object/keyframe.py)

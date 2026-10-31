@@ -7,6 +7,8 @@ from pygamestudio.api.core.scene import scene_loader
 from pygamestudio.api.config.project import get_project_config
 from pygamestudio.api.core.debug import _draw_debug_info
 from pygamestudio.common.i18n.translator import Translator as T
+# is_android() / is_web() are part of the script API (`studio.is_android()`):
+# a game can show touch controls on a phone and a keyboard hint in a browser.
 from pygamestudio.common.utils.system import is_android, is_web
 
 
@@ -47,12 +49,19 @@ class Game:
 
         The normalized values span the WINDOW, not the canvas, so they take the
         same route as a mouse position (see _to_canvas) - otherwise a touch
-        would land at the wrong place whenever the canvas is letterboxed.
+        would land at the wrong place whenever the canvas is letterboxed. The
+        reference size is the SDL window (the space mouse events are in), not
+        the display surface: _to_canvas converts that space into surface pixels
+        itself.
         """
         if self._screen is None:
             return 0, 0
-        width, height = pygame.display.get_surface().get_size() \
-            if pygame.display.get_surface() is not None else self._screen.get_size()
+        try:
+            width, height = pygame.display.get_window_size()
+        except (AttributeError, pygame.error):
+            width, height = ((pygame.display.get_surface().get_size()
+                              if pygame.display.get_surface() is not None
+                              else self._screen.get_size()))
         return self._to_canvas((int(event.x * width), int(event.y * height)))
 
     def _init_game(self):
@@ -178,6 +187,9 @@ class Game:
         self._screen = pygame.Surface((canvas_w, canvas_h)).convert()
         self._display.fill((0, 0, 0))
         self._update_present_rect()
+        # The canvas is not 1:1 with the window, so raw pygame pointer reads
+        # have to follow the same mapping as the engine's own events.
+        self._install_pointer_scaling()
 
     @staticmethod
     def _device_window_size(canvas_size):
@@ -232,11 +244,21 @@ class Game:
                            width, height)
 
     def _to_canvas(self, pos):
-        """Window pixel position -> canvas pixel position.
+        """Pointer position (SDL window pixels) -> canvas pixel position.
+
+        Two steps, because on a device the numbers can pass through two
+        different coordinate spaces:
+
+        1. SDL reports pointer positions in WINDOW coordinates, while the
+           engine draws into the display SURFACE. The two usually match, but a
+           full-screen window on Android can be created at a different size
+           (density, cutout, rotation) - then every event has to be scaled into
+           surface pixels first, otherwise the mapping is off by that ratio.
+        2. The surface then maps into the canvas through the present rectangle
+           (see _fit_rect): the canvas may be scaled, letterboxed or cropped.
 
         Identity while one surface plays both roles (a windowed run on the
-        desktop, or a device that opted out of scaling); a device screen and a
-        full-screen desktop run both need the present rectangle undone.
+        desktop, or a device that opted out of scaling).
         """
         if pos is None or self._screen is None:
             return pos
@@ -245,9 +267,40 @@ class Game:
             return pos
         if rect.width == 0 or rect.height == 0:
             return pos
-        x = (pos[0] - rect.left) * self._screen.get_width() / float(rect.width)
-        y = (pos[1] - rect.top) * self._screen.get_height() / float(rect.height)
+        x, y = pos[0], pos[1]
+        surface_w, surface_h = self._display.get_size()
+        try:
+            window_w, window_h = pygame.display.get_window_size()
+        except (AttributeError, pygame.error):
+            window_w, window_h = surface_w, surface_h
+        if (window_w > 0 and window_h > 0
+                and (window_w, window_h) != (surface_w, surface_h)):
+            x = x * surface_w / float(window_w)
+            y = y * surface_h / float(window_h)
+        x = (x - rect.left) * self._screen.get_width() / float(rect.width)
+        y = (y - rect.top) * self._screen.get_height() / float(rect.height)
         return int(x), int(y)
+
+    def _install_pointer_scaling(self):
+        """Make ``pygame.mouse.get_pos()`` report canvas pixels.
+
+        A game script (and a lot of examples) reads the mouse straight from
+        pygame, which returns WINDOW pixels - with a scaled canvas that number
+        points somewhere else than what the player sees drawn. The engine's own
+        ``get_mouse_position()`` always mapped correctly, so the fix is to make
+        the raw call agree: the wrapper is installed once, only while the canvas
+        is actually scaled, and goes through the same ``_to_canvas``.
+        """
+        if getattr(pygame.mouse.get_pos, '_pygs_scaled', False):
+            return
+        self._mouse_get_pos_original = pygame.mouse.get_pos
+        game = self
+
+        def get_pos_scaled():
+            return tuple(game._to_canvas(game._mouse_get_pos_original()))
+
+        get_pos_scaled._pygs_scaled = True
+        pygame.mouse.get_pos = get_pos_scaled
 
     #: How many pointer events are printed (stdout / logcat) on a device. A
     #: wrong touch position is impossible to reason about from a screenshot, and
@@ -261,8 +314,12 @@ class Game:
             return
         self._pointer_debug_left = remaining - 1
         window = self._display.get_size() if self._display is not None else (0, 0)
+        try:
+            sdl_window = tuple(pygame.display.get_window_size())
+        except (AttributeError, pygame.error):
+            sdl_window = (0, 0)
         rect = tuple(self._present_rect) if self._present_rect is not None else None
-        print(f'[PYGS-INPUT] {kind} raw={tuple(raw)} window={window} '
+        print(f'[PYGS-INPUT] {kind} raw={tuple(raw)} sdl={sdl_window} window={window} '
               f'present={rect} canvas={tuple(mapped)}', flush=True)
 
     def _present(self):
@@ -760,11 +817,16 @@ def get_mouse_position() -> tuple:
     设备上窗口是整块屏幕、画布是缩放后显示其中，所以这里要按适配方案
     （见 Game.SCALE_MODES）换算回画布坐标，否则屏幕被拉伸/留黑边后，
     指针只在画布那么大的左上角区域里“有效”。
+
+    画布被缩放时 `pygame.mouse.get_pos()` 本身也是这个函数（见
+    `_install_pointer_scaling`），所以那份结果不能再换算第二次。
     """
     try:
         position = tuple(pygame.mouse.get_pos())
     except pygame.error:
         return (0, 0)
+    if getattr(pygame.mouse.get_pos, '_pygs_scaled', False):
+        return position
     game = Game._instance
     if game is None:
         return position

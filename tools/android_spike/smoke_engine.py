@@ -419,6 +419,49 @@ print('browser', pygame.display.get_window_size())
         assert display.get_at((150, 60))[:3] == (0, 0, 0), 'the 1:1 path drew too much'
         return f'show_all {rect.size} at {rect.topleft}, canvas back to 1:1'
 
+    def pointer_scaling():
+        """The two conversions a device pointer goes through.
+
+        * SDL reports positions in WINDOW coordinates while the engine draws
+          into the display SURFACE; when a full-screen window comes back at a
+          different size (density, cutout, rotation) every event has to be
+          scaled into surface pixels first - otherwise the whole mapping is off
+          by that ratio, which is exactly what "my taps land somewhere else"
+          looks like.
+        * A script reading ``pygame.mouse.get_pos()`` gets window pixels too,
+          so the engine replaces that call with the canvas mapping while the
+          canvas is scaled (and ``get_mouse_position()`` must not map twice).
+        """
+        game = studio.Game()
+        display = pygame.display.set_mode((800, 600))
+        game._screen = pygame.Surface((800, 600)).convert()
+        game._display = display
+        game._scale_mode = 'show_all'
+        game._present_window = None
+        game._update_present_rect()
+
+        # 1) window space != surface space: the SDL window is half the size.
+        original_window_size = pygame.display.get_window_size
+        try:
+            pygame.display.get_window_size = lambda: (400, 300)
+            assert game._to_canvas((200, 150)) == (400, 300), game._to_canvas((200, 150))
+            assert game._to_canvas((0, 0)) == (0, 0), game._to_canvas((0, 0))
+        finally:
+            pygame.display.get_window_size = original_window_size
+
+        # 2) equal spaces: the plain mapping still holds.
+        assert game._to_canvas((400, 300)) == (400, 300), game._to_canvas((400, 300))
+
+        # 3) pygame.mouse.get_pos() follows the canvas
+        game._install_pointer_scaling()
+        assert getattr(pygame.mouse.get_pos, '_pygs_scaled', False), 'not patched'
+        game._mouse_get_pos_original = lambda: (200, 150)     # window pixels
+        assert pygame.mouse.get_pos() == (200, 150), pygame.mouse.get_pos()
+        studio.Game._instance = game
+        assert studio.get_mouse_position() == (200, 150), studio.get_mouse_position()
+        studio.Game._instance = None
+        return 'surface mapping + patched get_pos'
+
     def dirty_redraw():
         """The cached background keeps the frame correct on the cheap path.
 
@@ -517,6 +560,7 @@ print('browser', pygame.display.get_window_size())
     checks.run('scaled display', scaled_display)
     checks.run('desktop full screen', desktop_fullscreen)
     checks.run('browser display', browser_display)
+    checks.run('pointer scaling', pointer_scaling)
     checks.run('project imports', project_imports)
     checks.run('entry point on the real path', run_entry_point)
     checks.run('present path', present_path)

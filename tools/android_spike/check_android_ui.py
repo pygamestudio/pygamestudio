@@ -94,6 +94,23 @@ def main():
     check('retranslate keeps the orientation pick',
           window._orientation_combobox.currentData() == 'landscape')
 
+    print('1a) the publishing-platform picker')
+    platform_combo = window._platform_combobox
+    check('only 无平台 is offered (TapTap mobile is not integrated)',
+          platform_combo.count() == 1
+          and platform_combo.findData('taptap') == -1,
+          [platform_combo.itemText(i) for i in range(platform_combo.count())])
+    check('the entry carries the ban icon', not platform_combo.itemIcon(0).isNull())
+    check('it starts on 无平台', window.get_platform() == '', window.get_platform())
+    check('the pick reaches the build config',
+          window.get_build_config()['platform'] == '')
+    window.set_platform_selected('taptap')
+    check('a stored TapTap pick falls back to 无平台',
+          window.get_platform() == '', window.get_platform())
+    window.retranslate()
+    check('retranslate keeps the platform pick', window.get_platform() == '')
+    window.set_platform_selected('')
+
     print('1b) the password fields have an eye')
     for name, field in (('keystore', window._store_password_lineedit),
                         ('key', window._key_password_lineedit)):
@@ -147,6 +164,29 @@ def main():
     android_height = window.height()
     check('the android tab is taller', android_height > desktop_height,
           f'{desktop_height} -> {android_height}')
+
+    # A window taller than the page must share the spare height between the
+    # rows, exactly like the desktop/web tabs - the Android page used to keep a
+    # stretch row below its buttons and collect a wide dead band there.
+    def bottom_gap(index, height):
+        window._build_window_body.setCurrentIndex(index)
+        window.setMinimumHeight(0)
+        window.setMaximumHeight(16777215)
+        window._fit_height()
+        window.resize(window.width(), height)
+        app.processEvents()
+        page = window._build_window_body.currentWidget()
+        inner = page.widget() if hasattr(page, 'widget') else page
+        tab = (window._build_window_body._android_app_build_window if index == 2
+               else window._build_window_body._desktop_app_build_window)
+        return inner.height() - tab._build_button.mapTo(
+            inner, tab._build_button.rect().bottomLeft()).y()
+
+    android_gap = bottom_gap(2, 700)
+    desktop_gap = bottom_gap(0, 700)
+    check('a tall window spreads the android rows like the desktop tab',
+          android_gap <= desktop_gap + 40,
+          f'android {android_gap}px vs desktop {desktop_gap}px')
     window.close()
 
     print('2c) "New..." without a JDK')
