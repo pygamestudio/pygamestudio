@@ -110,6 +110,34 @@ jobs:
           set -o pipefail
           buildozer -v android debug 2>&1 | tee buildozer.log
 
+      # pygame._freetype links against libfreetype.so, so that library has to be
+      # in the dist's libs dir (p4a copies recipe libraries there). If a build
+      # ever links it from the recipe's build tree only, the .so would be missing
+      # from the APK and the import would fail on the device - so check and fix
+      # it here, and say so in the log.
+      - name: Make sure libfreetype ships with the app
+        if: always()
+        working-directory: tools/android_spike
+        run: |
+          DIST=$(ls -d .buildozer/android/platform/build-*/dists/*/ 2>/dev/null | head -n 1)
+          DIST="${DIST%/}"
+          [ -n "$DIST" ] || { echo "no dist yet, nothing to fix"; exit 0; }
+          LIBS="$DIST/libs/arm64-v8a"
+          mkdir -p "$LIBS"
+          if ls "$LIBS"/libfreetype*.so >/dev/null 2>&1; then
+            echo "libfreetype already in $LIBS"
+            exit 0
+          fi
+          SRC=$(ls .buildozer/android/platform/build-*/build/other_builds/freetype/*/freetype/objs/.libs/libfreetype.so \
+                  "$HOME"/.buildozer/android/platform/build-*/build/other_builds/freetype/*/freetype/objs/.libs/libfreetype.so \
+                  2>/dev/null | head -n 1)
+          if [ -n "$SRC" ]; then
+            cp "$SRC" "$LIBS/"
+            echo "copied $SRC into $LIBS"
+          else
+            echo "::warning::libfreetype.so not found - pygame._freetype would fail to load on the device"
+          fi
+
       # Inject the app's own icon and splash into the dist, then repackage: this
       # is the asset step the editor will run before Gradle. p4a re-renders
       # res/values/strings.xml from templates/strings.tmpl.xml on every packaging
