@@ -254,7 +254,7 @@ for mode, (expected, why) in CASES.items():
 print('fit modes', len(CASES))
 
 game = studio.Game()
-game._create_display((800, 600), {{}})
+game._create_display((800, 600), {{'screen_scale_mode': 'show_all'}})
 assert game._screen.get_size() == (800, 600), game._screen.get_size()
 assert game._screen is not game._display, 'the canvas must be its own surface'
 assert game._present_rect is not None, 'no present rectangle'

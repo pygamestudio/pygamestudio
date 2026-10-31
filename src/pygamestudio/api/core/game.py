@@ -88,23 +88,23 @@ class Game:
         self._create_display(project_config['screen_size'], project_config)
         self._clock = pygame.time.Clock()
 
-    #: How the canvas is fitted into the device screen (``screen_scale_mode``):
+    #: How the canvas is fitted into the device screen (``screen_scale_mode``).
+    #: A project that does not choose stays at ``none``, which is exactly what
+    #: every build did before the option existed.
     #:
+    #: ``none``          draw 1:1 into the top-left corner (no fit). Default.
     #: ``show_all``      contain - the whole canvas is visible, the spare edges
-    #:                   are letterboxed (Cocos' SHOW_ALL). Default.
-    #: ``no_border``     cover - the canvas fills the screen, the overflow is
-    #:                   cropped (NO_BORDER): no black bars, but the HUD at the
-    #:                   canvas edge can be cut off.
-    #: ``fixed_width``   the width always fills, the height follows the aspect
-    #:                   (FIXED_WIDTH): safe for games whose play area is
-    #:                   horizontal, spare room appears top/bottom.
-    #: ``fixed_height``  the height always fills, the width follows (FIXED_HEIGHT).
-    #: ``exact_fit``     stretch to the screen, ignoring the aspect (EXACT_FIT).
+    #:                   are letterboxed.
+    #: ``no_border``     cover - the canvas fills the screen and the overflow is
+    #:                   cropped: no bars, but content near the edge can be cut.
+    #: ``fixed_width``   the width always fills, the height follows the aspect:
+    #:                   spare room appears above and below.
+    #: ``fixed_height``  the height always fills, the width follows the aspect.
+    #: ``exact_fit``     stretch to the screen, ignoring the aspect.
     #: ``integer``       the largest whole multiple that still fits, so pixels
     #:                   stay crisp (pixel art); bars on the remaining edges.
-    #: ``none``          draw 1:1 into the top-left corner (debugging).
-    SCALE_MODES = ('show_all', 'no_border', 'fixed_width', 'fixed_height',
-                   'exact_fit', 'integer', 'none')
+    SCALE_MODES = ('none', 'show_all', 'no_border', 'fixed_width',
+                   'fixed_height', 'exact_fit', 'integer')
 
     def _create_display(self, canvas_size, project_config=None):
         """Create the window and the surface the scene is drawn on.
@@ -123,8 +123,12 @@ class Game:
         """
         project_config = project_config or {}
         canvas_w, canvas_h = int(canvas_size[0]), int(canvas_size[1])
-        self._scale_mode = str(project_config.get('screen_scale_mode') or 'show_all')
-        self._smooth_scale = str(project_config.get('screen_scale_filter') or 'smooth') != 'nearest'
+        self._scale_mode = str(project_config.get('screen_scale_mode') or 'none')
+        if self._scale_mode not in self.SCALE_MODES:
+            self._scale_mode = 'none'
+        # Nearest-neighbour by default: bilinear scaling of a full 800x600 frame
+        # costs ~140 ms/frame on an Android emulator, which is 6 fps on its own.
+        self._smooth_scale = str(project_config.get('screen_scale_filter') or 'nearest') == 'smooth'
         self._present_surface = None
         self._present_window = None
         self._present_rect = None
@@ -226,12 +230,20 @@ class Game:
         rect = self._present_rect
         if rect is None:
             return
-        if self._surface_size != rect.size:
-            self._present_surface = None
-        if self._present_surface is None:
+        if rect.size == self._screen.get_size() and rect.topleft == (0, 0):
+            # Nothing to scale (no fit, or the canvas is exactly the window): a
+            # copy is an order of magnitude cheaper than any scaling call.
+            display.blit(self._screen, (0, 0))
+            return
+        scaler = pygame.transform.smoothscale if self._smooth_scale else pygame.transform.scale
+        if rect.size == display.get_size() and rect.topleft == (0, 0):
+            # Stretched to the whole window: scale straight into it, no extra
+            # full-screen surface and no second blit.
+            scaler(self._screen, rect.size, display)
+            return
+        if self._present_surface is None or self._surface_size != rect.size:
             self._present_surface = pygame.Surface(rect.size).convert()
             self._surface_size = rect.size
-        scaler = pygame.transform.smoothscale if self._smooth_scale else pygame.transform.scale
         scaler(self._screen, rect.size, self._present_surface)
         display.blit(self._present_surface, rect.topleft)
 

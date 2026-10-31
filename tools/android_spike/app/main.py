@@ -222,10 +222,15 @@ def build_game(studio):
             screen = self._screen
             width, height = screen.get_size()
             canvas_w, canvas_h = STATE['canvas']
+            display = pygame.display.get_surface()
+            window = display.get_size() if display is not None else (0, 0)
             try:
-                window = pygame.display.get_window_size()
+                # get_window_size() reports the SDL window, which on a device can
+                # differ from the surface we blit into (density) - both numbers
+                # are printed so the pair is never mistaken for a mismatch.
+                api_window = pygame.display.get_window_size()
             except pygame.error:                        # older pygame / no window
-                window = (0, 0)
+                api_window = (0, 0)
             rect = getattr(self, '_present_rect', None)
             if rect is not None and rect.width:
                 STATE['scale'] = rect.width / float(canvas_w)
@@ -234,32 +239,41 @@ def build_game(studio):
             else:
                 STATE['scale'] = 1.0
                 present = 'not scaled'
-            set_line('screen', f'surface {width}x{height}, window {window[0]}x{window[1]}, '
+            set_line('screen', f'surface {width}x{height}, window {window[0]}x{window[1]} '
+                               f'(sdl {api_window[0]}x{api_window[1]}), '
                                f'mode {getattr(self, "_scale_mode", "?")}, present {present}',
                      True)
             STATE['window'] = window
 
         def _perf_probe(self):
-            """How fast can this device present a frame?
+            """How fast can this device present a frame, with each scale filter?
 
             One frame costs the scene draw plus ``present`` (scale the canvas
-            into the window) plus the flip. This probe measures the latter two
-            with an empty canvas, so a low fps can be attributed to the device
-            or to the engine - not guessed.
+            into the window) plus the flip. This probe measures present+flip on
+            an empty canvas for BOTH filters, because the first device run
+            showed the difference is enormous: bilinear (smoothscale) took
+            ~140 ms/frame there (6 fps on its own) while nearest is a memcpy-ish
+            pass. Knowing both numbers decides what the default must be.
             """
             screen = studio.get_screen()
-            frames = 20
-            start = time.perf_counter()
-            for index in range(frames):
-                screen.fill((20, 20, 24) if index % 2 else (24, 22, 28))
-                self._present()
-                pygame.display.flip()
-            elapsed = time.perf_counter() - start
-            milliseconds = elapsed * 1000 / frames if frames else 0.0
-            fps = 1000 / milliseconds if milliseconds else 0.0
-            set_line('perf', f'present {fps:.0f} fps ({milliseconds:.1f} ms/frame, canvas '
-                             f'{screen.get_size()[0]}x{screen.get_size()[1]})',
-                     milliseconds <= 20)
+            frames = 12
+            original = self._smooth_scale
+            results = {}
+            for smooth in (False, True):
+                self._smooth_scale = smooth
+                self._present_surface = None
+                start = time.perf_counter()
+                for index in range(frames):
+                    screen.fill((20, 20, 24) if index % 2 else (24, 22, 28))
+                    self._present()
+                    pygame.display.flip()
+                results['smooth' if smooth else 'nearest'] = (time.perf_counter() - start) * 1000 / frames
+            self._smooth_scale = original
+            self._present_surface = None
+            set_line('perf', f'present: nearest {results["nearest"]:.1f} ms, '
+                             f'smooth {results["smooth"]:.1f} ms '
+                             f'(canvas {screen.get_size()[0]}x{screen.get_size()[1]})',
+                     results['nearest'] <= 20)
 
 
         def _overlay(self):

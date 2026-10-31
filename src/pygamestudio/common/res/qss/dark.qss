@@ -128,6 +128,26 @@ QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
     image: url(:/images/down_arrow.png);
 }
 
+/* Spin boxes that show a unit suffix instead of the step buttons (see
+   SuffixSpinBox): the buttons are kept in the style's arrow state - needed by
+   PySide6 6.12, which collapses the value field when ButtonSymbols.NoButtons
+   is used - and simply take no room while the suffix is showing. The arrow
+   images have to be dropped as well, otherwise they are painted clipped at
+   the right edge as two small slivers. */
+QDoubleSpinBox[spinButtons="off"]::up-button,
+QDoubleSpinBox[spinButtons="off"]::down-button {
+    width: 0px;
+    padding: 0px;
+    border: none;
+}
+
+QDoubleSpinBox[spinButtons="off"]::up-arrow,
+QDoubleSpinBox[spinButtons="off"]::down-arrow {
+    width: 0px;
+    height: 0px;
+    image: none;
+}
+
 QSpinBox QLabel, QDoubleSpinBox QLabel {
     background-color: #1e1e1e;
 }
@@ -177,6 +197,11 @@ QComboBox QAbstractItemView {
 
 QComboBox QAbstractItemView::item:selected {
     background-color: #007acc;
+}
+
+/* Hover feedback inside the drop-down list. */
+QComboBox QAbstractItemView::item:hover:!selected {
+    background-color: #404142;
 }
 
 QMenu {
@@ -526,8 +551,12 @@ QWidget#hierarchy QPushButton:pressed {
 }
 
 /* ----- Console ----- */
+/* border: none is what suppresses the Windows 11 style's text field frame:
+   the base style painted it as a grey underline below the log that turned
+   accent blue as soon as the panel got the focus. */
 QTextBrowser#consoleLogBrowser {
     background-color: #282828;
+    border: none;
     padding-left: 4px;
     padding-top: 4px;
 }

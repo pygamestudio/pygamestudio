@@ -236,74 +236,76 @@ renderer，实际按整倍数取整（1.73 → 1.0），于是 800×600 原样�
 
 ### 适配方式（`screen_scale_mode`）
 
-| 值 | 语义 | 800×600 → 1920×1038 的结果 | 对应 Cocos |
-|---|---|---|---|
-| `show_all`（默认） | 完整显示画布，多余留黑边 | 1384×1038 居中，左右各 268px 黑边 | SHOW_ALL |
-| `no_border` | 铺满屏幕，超出部分裁掉 | 1920×1440，上下各裁 201px | NO_BORDER |
-| `fixed_width` | 宽度总是铺满 | 1920×1440，上下裁 | FIXED_WIDTH |
-| `fixed_height` | 高度总是铺满 | 1384×1038，左右黑边 | FIXED_HEIGHT |
-| `exact_fit` | 拉伸铺满，不管比例 | 1920×1038（会变形） | EXACT_FIT |
-| `integer` | 最大整数倍，像素不糊 | 800×600 居中（1.73 → 1 倍） | — |
-| `none` | 1:1 画在左上角（调试用） | 800×600 在左上角 | — |
+| 值 | 语义 | 800×600 → 1920×1038 的结果 |
+|---|---|---|
+| `none`（默认） | 不缩放，1:1 画在左上角 | 800×600 在左上角 |
+| `show_all` | 完整显示画布，多余留黑边 | 1384×1038 居中，左右各 268px 黑边 |
+| `no_border` | 铺满屏幕，超出部分裁掉 | 1920×1440，上下各裁 201px |
+| `fixed_width` | 宽度总是铺满 | 1920×1440，上下裁 |
+| `fixed_height` | 高度总是铺满 | 1384×1038，左右黑边 |
+| `exact_fit` | 拉伸铺满，不管比例 | 1920×1038（会变形） |
+| `integer` | 最大整数倍，像素不糊 | 800×600 居中（1.73 → 1 倍） |
+
+编辑器的 **项目设置 → 游戏窗口 → 移动端屏幕适配** 就是这一项（下拉框，默认"无适配"），
+写进 `project.pygs` 的 `screen_scale_mode`。旧的工程没有这个键，读出来就是 `none`，
+行为和以前完全一致。
 
 ```json
 {
   "screen_size": [800, 600],
   "screen_scaled": true,
   "screen_scale_mode": "show_all",
-  "screen_scale_filter": "smooth"
+  "screen_scale_filter": "nearest"
 }
 ```
 
-* `screen_scaled: false` → 不缩放（1:1，老行为）；
-* `screen_scale_filter`: `smooth`（默认，双线性，文字好看）或 `nearest`（像素风最快）；
+* `screen_scaled: false` → 完全不缩放（等价于 `none`，保留给老构建）；
+* `screen_scale_filter`: `nearest`（默认，快）或 `smooth`（双线性，好看但极慢，见下）；
 * 桌面（编辑器「运行」、桌面版）完全不进这套逻辑，仍然开真的 800×600 窗口。
 
 真机上要看的新报告行（`_fit_rect` 的 7 种模式在 `smoke_engine.py` 里有断言）：
 
 ```
-screen: surface 800x600, window 1920x1038, mode show_all, present 1384x1038 at (268, 0) = 1.73x
+screen: surface 800x600, window 1875x1054 (sdl 828x1180), mode show_all, present 1406x1054 at (240, 0) = 1.76x
 ```
 
-`present` 是画布被缩放到的矩形；`show_all` 应该是「高度铺满、左右等宽黑边」，
-如果还是 800×600 居中，说明 `screen_scaled` 被关掉了或走了 `none`。
+> 注意 `window` 和 `sdl` 两个数字可能不同：前者是我们真正 blit 进去的 display surface，
+> 后者是 SDL 报告的窗口尺寸（设备密度不同）。缩放以 **surface** 为准。
 
 ## 性能
 
-### 第一轮数字与结论
+### 真实数据（三轮）
 
-| 指标 | 数值 | 含义 |
+| 轮次 | 引擎 | 结论 |
 |---|---|---|
-| `fill+flip`（空画布清屏+呈现） | **809 fps / 1.2 ms** | 呈现不是瓶颈：设备/模拟器能跑 800 帧 |
-| 引擎主循环 | **26 fps** | 瓶颈在引擎侧，~38 ms/帧的活 |
+| 第 1 轮（1:1，无缩放） | 26 fps | 空帧呈现 809 fps → 瓶颈在引擎：`ObjectCanvas` 每帧重建 800×600 SRCALPHA 表面 |
+| 第 2 轮（smoothscale 呈现） | **6 fps** | **我们自己把帧率砸下去的**：`smoothscale` 一帧 141.9 ms（整屏双线性），`other 155 ms` 就是它 |
+| 第 3 轮（本轮） | 待测 | 画布缓存已修 + 默认改 `nearest` + 1:1/整屏两条快路径 |
 
-最大的嫌疑已经确认并修掉：`ObjectCanvas._update_surface()` **每帧**都新建一块
-800×600 的 `SRCALPHA` 表面并重绘——每帧 1.9 MB 分配 + 清零 + 全屏 alpha 混合。
-现在它和其它对象一样按状态缓存，并且不透明背景（alpha=255）用无 alpha 表面，
-blit 从「半透明混合 48 万像素」变成「纯拷贝」。
+教训：**整屏双线性缩放不要放在每帧路径上**，尤其在 ARM / 模拟器上。
+现在默认 `nearest`（`pygame.transform.scale`，接近内存拷贝），`smooth` 只作为可选项留给
+桌面或性能充裕的机型；`present` 还加了两条快路径：画布大小等于窗口时直接 blit（不缩放），
+`exact_fit` 时直接缩放到窗口表面（省掉中转表面和第二次整屏 blit）。
 
-### 这一轮新增的测量
+### 这一轮的测量
 
-`on_start` 里的探针现在测的是**真实呈现路径**（含缩放）：
+`on_start` 里的探针会**两个滤镜都测一遍**：
 
 ```
-perf: present 42 fps (23.8 ms/frame, canvas 800x600)
+perf: present: nearest 3.8 ms, smooth 141.9 ms (canvas 800x600)
 ```
 
-面板里每秒多一行分项：
+面板里每秒还有一行分项：
 
 ```
 frame: scene draw 4.2 ms, other 12.5 ms, fps 60
 ```
 
 * `scene draw` = `load_scene()` 的耗时（场景绘制 + 脚本 + 物理）；
-* `other` = 一帧剩余时间（事件 + `_present` 的缩放 + flip + 60Hz 上限）；
-* 如果 `other` 里绝大部分是缩放：把 `screen_scale_filter` 改成 `nearest` 对比；
-* 如果 `scene draw` 很高：才是场景/对象的问题。
+* `other` = 一帧剩余时间（事件 + `_present` + flip + 60Hz 上限）。
 
-> MuMu 这类模拟器跑的是 x86 上的 ARM 翻译 + 软件合成，fps 参考价值有限；
-> 真机数字才作数。引擎自身还有优化空间（脏矩形、避免整屏 smoothscale 等），
-> 等这轮真机分项数据出来再决定动哪里。
+> MuMu 这类模拟器跑的是 x86 上的 ARM 翻译 + 软件合成，fps 参考价值有限；真机数字才作数。
+
 
 
 ## 依赖扫描（构建前就报错，而不是装机后黑屏）
