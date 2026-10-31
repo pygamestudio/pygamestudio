@@ -752,7 +752,7 @@
     },
 
     "about": {
-        "version": "Version {}"
+        "version": "v{}"
     },
 
     "agent": {

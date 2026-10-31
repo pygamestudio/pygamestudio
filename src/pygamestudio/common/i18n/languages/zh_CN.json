@@ -750,7 +750,7 @@
     },
 
     "about": {
-        "version": "版本{}"
+        "version": "v{}"
     },
     "agent": {
         "title": "AI 助手",

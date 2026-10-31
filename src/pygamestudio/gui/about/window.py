@@ -18,7 +18,6 @@ class AboutBody(QWidget):
 
     def _set_up(self):
         self._set_widget()
-        self._set_signal()
         self._set_layout()
         self._set_object_name()
 
@@ -28,11 +27,8 @@ class AboutBody(QWidget):
         scaled_pixmap = pixmap.scaled(self._logo_label.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         self._logo_label.setPixmap(scaled_pixmap)
 
-        self._version_label.setText(T.tr('about.version', 'Version {}').format(VERSION))
+        self._version_label.setText(f'v{VERSION}')
         self._copyright_label.setText(f'Pygame Studio © Ren Lushun (Louis Ren) {datetime.now().year} All rights reserved')
-
-    def _set_signal(self):
-        T.add_observer(self)
 
     def _set_layout(self):
         v_layout = QVBoxLayout(self)
@@ -44,9 +40,6 @@ class AboutBody(QWidget):
 
     def _set_object_name(self):
         self._copyright_label.setObjectName('aboutCopyrightLabel')
-
-    def retranslate(self):
-        self._version_label.setText(T.tr('about.version', 'Version {}').format(VERSION))
 
     def enterEvent(self, event):
         self.setCursor(Qt.CursorShape.ArrowCursor)
