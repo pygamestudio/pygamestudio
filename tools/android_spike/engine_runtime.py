@@ -70,6 +70,21 @@ this namespace; every bridge it expects is missing on purpose.
 __all__ = []
 '''
 
+#: pygame submodules a desktop build has but the p4a build does not.
+#:
+#: p4a's pygame recipe deliberately leaves the optional C extensions out
+#: (``freetype``, ``postmidi``, the camera binding), so ``import pygame.freetype``
+#: - which a desktop run happily executes - dies on the device with
+#: ``ModuleNotFoundError: No module named 'pygame._freetype'``. The engine hit
+#: exactly that on its first device run; this list lets the smoke test block the
+#: modules and reproduce the device import graph on a developer machine.
+ANDROID_MISSING_PYGAME_MODULES = (
+    'pygame._freetype', 'pygame.freetype',
+    'pygame._camera', 'pygame.camera',
+    'pygame.pypm', 'pygame.midi',
+    'pygame.system',
+)
+
 #: Version marker of the staged runtime (the editor's real artefact carries far
 #: more: python / pygame_ce / cffi / pymunk / p4a / ndk versions, ABI, ...).
 VERSION = {

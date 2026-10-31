@@ -176,6 +176,52 @@ def main():
         studio.scene_loader._update_scene(state['screen'])
         return f'{state["screen"].get_size()}'
 
+    def android_imports():
+        """Import the engine with the pygame modules Android lacks blocked.
+
+        p4a's pygame build has no ``_freetype`` (its recipe leaves the optional C
+        extensions out), but every desktop pygame has it - so a stray
+        ``import pygame.freetype`` passes here and only fails on the phone. This
+        blocks those modules in a fresh interpreter and imports the runtime the
+        way the device does.
+        """
+        import subprocess
+        blocked = list(engine_runtime.ANDROID_MISSING_PYGAME_MODULES)
+        code = f'''
+import sys
+
+BLOCKED = {blocked!r}
+
+
+class Blocker:
+    """Refuse the pygame C extensions the p4a build does not contain."""
+
+    def find_spec(self, name, path=None, target=None):
+        if name in BLOCKED:
+            raise ModuleNotFoundError(f"not in the Android build: {{name}}", name=name)
+        return None
+
+
+sys.meta_path.insert(0, Blocker())
+sys.path.insert(0, {str(project_dir)!r})
+import pygame
+pygame.display.init()
+pygame.font.init()
+import pygamestudio
+from pygamestudio.api.core import game, scene, audio, physics, window
+from pygamestudio.game.object import (base, button, canvas, ellipse, image, line,
+                                      particle, rect, text, text_input, tile_map)
+print('ok')
+'''
+        environment = dict(os.environ, SDL_VIDEODRIVER='dummy',
+                           SDL_AUDIODRIVER='dummy')
+        process = subprocess.run([sys.executable, '-c', code], cwd=str(project_dir),
+                                 env=environment, capture_output=True, text=True)
+        if process.returncode != 0 or 'ok' not in process.stdout:
+            raise AssertionError(f'importing the engine without {blocked} failed\n'
+                                 f'{process.stdout}\n{process.stderr}')
+        return f'{len(blocked)} module(s) blocked'
+
     def run_entry_point():
         """Run the real ``main.py`` the way the device does - as the script.
 
@@ -215,6 +261,7 @@ def main():
     checks.run('pointer drag', pointer_drag)
     checks.run('finger tap', finger_tap)
     checks.run('render frame', render_frame)
+    checks.run('imports without Android-missing pygame modules', android_imports)
     checks.run('entry point on the real path', run_entry_point)
 
     same_files = None

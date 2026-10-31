@@ -1,6 +1,5 @@
 import uuid
 import pygame
-import pygame.freetype
 from pathlib import Path
 from pygamestudio.game.object.type import *
 from pygamestudio.game.object.base import ObjectBase

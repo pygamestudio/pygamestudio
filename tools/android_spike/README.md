@@ -165,6 +165,17 @@ CI 在第一次构建前执行 `engine_runtime.py src/pygamestudio tools/android
    所以 `main.py` 就是最外层 Python 帧，`Game._init_game()` 的
    `inspect.stack()[-1]` 能正确拿到 `/data/data/<pkg>/files/app/main.py`，
    项目根目录也就是它所在目录。spike 会把「引擎解析出的路径」和「本文件所在目录」都打印出来对照。
+3. **p4a 编出来的 pygame 少了几个可选 C 扩展**：`_freetype`、`_camera`、`pypm`、`system`
+   （p4a 的 pygame recipe 明确不管 freetype / midi / camera）。第一次上机就栽在这：
+   `game/object/text.py` 顶部有一行**没用到**的 `import pygame.freetype`，桌面环境有这模块、
+   手机上直接 `ModuleNotFoundError: No module named 'pygame._freetype'`，整个引擎 import 失败。
+   已删掉那行；引擎的文字渲染一直用的是 `pygame.font.Font`，行为不变。
+
+   这类问题桌面永远测不出来，所以 `smoke_engine.py` 里加了一道门禁：
+   在子进程里用 import hook **屏蔽** `engine_runtime.ANDROID_MISSING_PYGAME_MODULES` 列出的模块，
+   再 import 整个运行时（`api` + `game.object.*`），模拟真机的 import 图。
+   顺带一条产品结论：用户游戏里若用了 `pygame.freetype` / `pygame.midi` / `pygame.camera`，
+   在 Android 上跑不起来——要支持就得自己往 recipe 里补依赖。
 
 ### 上机前先在本机跑一遍（省一个 CI 来回）
 
@@ -177,6 +188,7 @@ py -3.10 tools/android_spike/smoke_engine.py
 * 引擎导入 / 工程配置 / 场景加载 / 两个行为脚本挂载 / 图片对象出图；
 * 模拟鼠标拖拽（方块要动）和手指点按（`on_touch_*` 要收到 3 次 move）；
 * 渲染一帧；
+* **屏蔽 Android 上缺失的 pygame 扩展后**再 import 一遍整个运行时（真机 import 图）；
 * 最后用 `python main.py` **在子进程里跑真的入口**（`SPIKE_MAX_FRAMES=3` 自动退出），
   验证 `Game.run()` 全链路和项目路径解析。
 
