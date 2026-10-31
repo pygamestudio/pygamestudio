@@ -1,19 +1,18 @@
 name: android-runtime-spike
 
-# Spike 1 + 2 of the Android runtime plan:
-#   1. cross-compile python3 + pygame-ce + cffi + pymunk for arm64-v8a (p4a)
-#   2. publish the produced `dist/` + a report of its private.tar layout, so the
-#      Windows side can verify that the payload can be rebuilt locally.
+# This job does NOT build anybody's game - games are packaged inside the editor,
+# on the user's machine, with the Android SDK tools (see gui/build/android_apk.py)
+# and without Gradle, AGP or a network connection.
 #
-# This runner installs the Android SDK/NDK - it is the *one* place allowed to do
-# that. The editor on a user machine never downloads a toolchain.
-
+# Its ONE purpose is to (re)build the frozen runtime pack that ships in
+# src/pygamestudio/common/res/android: python + pygame-ce + pymunk + SDL2
+# cross-compiled for Android by python-for-android. That is the only step that
+# needs a Linux container, an NDK and ~1 hour. Run it by hand - and only when a
+# version inside the pack changes (pygame-ce / pymunk / cffi / p4a / python /
+# the Android platform); the "when to re-freeze" table in
+# tools/android_spike/README.md lists the cases.
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - 'tools/android_spike/**'
-      - '.github/workflows/android-runtime-spike.yml'
 
 concurrency:
   group: android-runtime-spike-${{ github.ref }}

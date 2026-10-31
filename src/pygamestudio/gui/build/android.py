@@ -66,6 +66,9 @@ class AndroidAppBuildWindow(QScrollArea):
     #: (build.app_icon / build.app_name); the build window saves and mirrors them.
     app_icon_changed_signal = Signal(str)
     app_name_changed_signal = Signal(str)
+    #: The signing rows come and go with the build type, so the window has to
+    #: re-measure itself (see BuildWindow._fit_height).
+    layout_changed_signal = Signal()
 
     def __init__(self, game_manager):
         super().__init__()
@@ -153,7 +156,6 @@ class AndroidAppBuildWindow(QScrollArea):
         self._build_button.setText(T.tr('build.build', 'Build'))
         self._open_output_dir_button.setText(T.tr('build.open_output_dir', 'Open Output Dir'))
         self._update_button_widths()
-        self._update_signing_enabled()
 
     def _set_signal(self):
         self._app_name_lineedit.editingFinished.connect(self._on_app_name_edited)
@@ -181,15 +183,14 @@ class AndroidAppBuildWindow(QScrollArea):
         T.add_observer(self)
 
     def _set_layout(self):
-        def with_buttons(edit, *buttons):
-            """A line edit plus its buttons, sharing one form row."""
+        def row_with(*widgets):
+            """A line edit plus its buttons, as one grid cell."""
             row = QWidget()
             layout = QHBoxLayout(row)
             layout.setContentsMargins(0, 0, 0, 0)
             layout.setSpacing(6)
-            layout.addWidget(edit, 1)
-            for button in buttons:
-                layout.addWidget(button)
+            for index, widget in enumerate(widgets):
+                layout.addWidget(widget, 1 if index == 0 else 0)
             return row
 
         def version_row():
@@ -202,29 +203,16 @@ class AndroidAppBuildWindow(QScrollArea):
             layout.addWidget(self._version_code_lineedit, 1)
             return row
 
-        # A form layout keeps every label and field on one grid, so nothing is
-        # crammed against its neighbour when the tab is narrow.
-        form = QFormLayout()
-        form.setContentsMargins(5, 5, 5, 5)
-        form.setHorizontalSpacing(10)
-        form.setVerticalSpacing(8)
-        form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
-        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        form.addRow(self._app_name_label, self._app_name_lineedit)
-        form.addRow(self._app_icon_label,
-                    with_buttons(self._app_icon_lineedit, self._app_icon_browse_button))
-        form.addRow(self._output_dir_label,
-                    with_buttons(self._output_dir_lineedit, self._output_dir_browse_button))
-        form.addRow(self._package_label, self._package_lineedit)
-        form.addRow(self._version_name_label, version_row())
-        form.addRow(self._orientation_label, self._orientation_combobox)
-        form.addRow(self._build_type_label, self._build_type_combobox)
-        form.addRow(self._keystore_label,
-                    with_buttons(self._keystore_lineedit, self._keystore_browse_button,
-                                 self._keystore_create_button))
-        form.addRow(self._key_alias_label, self._key_alias_lineedit)
-        form.addRow(self._store_password_label, self._store_password_lineedit)
-        form.addRow(self._key_password_label, self._key_password_lineedit)
+        # Same grid as the desktop and web tabs; only the spacing is tuned so a
+        # label never sits against its field.
+        self._icon_row = row_with(self._app_icon_lineedit, self._app_icon_browse_button)
+        self._output_row = row_with(self._output_dir_lineedit, self._output_dir_browse_button)
+        self._keystore_row = row_with(self._keystore_lineedit, self._keystore_browse_button,
+                                      self._keystore_create_button)
+        self._signing_rows = (self._keystore_label, self._keystore_row,
+                              self._key_alias_label, self._key_alias_lineedit,
+                              self._store_password_label, self._store_password_lineedit,
+                              self._key_password_label, self._key_password_lineedit)
 
         button_layout = QHBoxLayout()
         button_layout.addWidget(self._build_button)
@@ -232,13 +220,37 @@ class AndroidAppBuildWindow(QScrollArea):
         button_layout.addWidget(self._open_output_dir_button)
         button_layout.addStretch()
 
-        layout = QVBoxLayout(self._central_widget)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(10)
-        layout.addLayout(form)
-        layout.addWidget(self._progress_bar)
-        layout.addLayout(button_layout)
-        layout.addStretch()
+        layout = QGridLayout(self._central_widget)
+        layout.setHorizontalSpacing(10)
+        layout.setVerticalSpacing(8)
+        layout.setColumnStretch(1, 1)
+        layout.setContentsMargins(5, 5, 5, 0)
+        layout.addWidget(self._app_name_label, 0, 0)
+        layout.addWidget(self._app_name_lineedit, 0, 1)
+        layout.addWidget(self._app_icon_label, 1, 0)
+        layout.addWidget(self._icon_row, 1, 1)
+        layout.addWidget(self._output_dir_label, 2, 0)
+        layout.addWidget(self._output_row, 2, 1)
+        layout.addWidget(self._package_label, 3, 0)
+        layout.addWidget(self._package_lineedit, 3, 1)
+        layout.addWidget(self._version_name_label, 4, 0)
+        layout.addWidget(version_row(), 4, 1)
+        layout.addWidget(self._orientation_label, 5, 0)
+        layout.addWidget(self._orientation_combobox, 5, 1)
+        layout.addWidget(self._build_type_label, 6, 0)
+        layout.addWidget(self._build_type_combobox, 6, 1)
+        layout.addWidget(self._keystore_label, 7, 0)
+        layout.addWidget(self._keystore_row, 7, 1)
+        layout.addWidget(self._key_alias_label, 8, 0)
+        layout.addWidget(self._key_alias_lineedit, 8, 1)
+        layout.addWidget(self._store_password_label, 9, 0)
+        layout.addWidget(self._store_password_lineedit, 9, 1)
+        layout.addWidget(self._key_password_label, 10, 0)
+        layout.addWidget(self._key_password_lineedit, 10, 1)
+        layout.addWidget(self._progress_bar, 11, 0, 1, 2)
+        layout.addLayout(button_layout, 12, 0, 1, 2)
+        layout.setRowStretch(13, 1)
+        self._update_signing_enabled()
 
     def _set_orientation_texts(self):
         selected = self._orientation_combobox.currentData()
@@ -261,13 +273,20 @@ class AndroidAppBuildWindow(QScrollArea):
         self._build_type_combobox.blockSignals(False)
 
     def _update_signing_enabled(self):
-        """Signing only matters for a release build (debug uses its own key)."""
+        """The signing rows only exist for a release build.
+
+        A debug build signs with the debug key the tooling generates, so showing
+        four empty fields would only be confusing. Hiding them also shrinks the
+        page, which the window follows (layout_changed_signal).
+        """
         is_release = self.get_build_type() == 'release'
-        for widget in (self._keystore_lineedit, self._keystore_browse_button,
-                       self._keystore_create_button,
-                       self._key_alias_lineedit, self._store_password_lineedit,
-                       self._key_password_lineedit):
-            widget.setEnabled(is_release)
+        changed = False
+        for widget in getattr(self, '_signing_rows', ()):
+            if widget.isVisible() != is_release:
+                changed = True
+            widget.setVisible(is_release)
+        if changed and self.isVisible():
+            self.layout_changed_signal.emit()
 
     def _update_button_widths(self):
         width = max(self._build_button.sizeHint().width(),

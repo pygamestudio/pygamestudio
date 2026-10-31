@@ -1,5 +1,11 @@
 # Android 运行时验证（spike）
 
+> **这个 workflow 不构建游戏。** 游戏打包发生在编辑器里（`gui/build/android.py` +
+> `android_apk.py`），用本机 JDK 和 Android SDK 自带的工具，不联网、不用 Gradle/AGP。
+> 这个目录和 `.github/workflows/android-runtime-spike.yml` 只有一个用途：
+> **重新生成运行时包**（`src/pygamestudio/common/res/android/` 里那个 21 MB 的 zip）。
+> 只有包里的版本要变时才需要手动跑它（`workflow_dispatch`），大约 1 小时。
+
 这一步**不产出编辑器功能**，只回答三个问题。三项都过了再写 `gui/build/android.py`。
 
 | # | 问题 | 判定标准 | 产出 |
@@ -33,8 +39,8 @@ tools/android_spike/
 └─ inspect_dist.py           # Windows 上检查 dist 并验证 payload 可重建
 ```
 
-`.github/workflows/android-runtime-spike.yml` 会在 GitHub 的 Linux runner 里跑同一套流程。
-**只有这台 runner 允许下载 Android SDK/NDK**——用户机器永远不下载工具链。
+`.github/workflows/android-runtime-spike.yml` 只在**手动触发**时运行（不再跟着 push 跑）：
+它是唯一允许下载 Android SDK/NDK 的地方，用来重新冻结运行时包；用户机器永远不下载工具链。
 
 ## 跑法 A：GitHub Actions（推荐，本机零安装）
 
@@ -538,11 +544,25 @@ tab 里选「发布」后用你自己的 keystore 签名：`apksigner` 的密码
 「新建...」按钮用 JDK 自带的 `keytool` 生成一个 2048 位、10000 天的自签名密钥
 （密码通过 `-storepass:env` 传递，不出现在进程列表）。
 
+### 触摸坐标
+
+`Game._to_canvas` 把窗口像素换成画布像素（适配方案不同，换算也不同）。这段数学有专门的
+无头测试（`check_pointer_mapping.py`，15 项，覆盖拉伸/留黑边/裁剪/整数倍/桌面），所以
+“点左上角却命中右下角”不会是换算公式写错。如果真机上重现，引擎会在 logcat 打印前 5 个指针事件：
+
+```
+[PYGS-INPUT] mouse-down raw=(x, y) window=(2400, 1080) present=(0, 0, 2400, 1080) canvas=(cx, cy)
+```
+
+`raw` 是 SDL 给的原始坐标，`present` 是画布在窗口里的矩形，`canvas` 是我们换算的结果。
+raw 与 canvas 的对应关系一眼就能看出是偏移、镜像还是缩放，比截图可靠。
+
 ### 测试
 
 ```powershell
 py -3.10 tools/android_spike/smoke_android_build.py   # 52 项：解包 → 保护 → payload → private.tar → 清单/strings
-py -3.10 tools/android_spike/check_android_ui.py      # 28 项：「安卓应用」tab + 设置页（offscreen，不碰用户配置）
+py -3.10 tools/android_spike/check_android_ui.py      # 27 项：「安卓应用」tab + 设置页（offscreen，不碰用户配置）
+py -3.10 tools/android_spike/check_pointer_mapping.py # 15 项：窗口坐标 → 画布坐标
 py -3.10 tools/android_spike/smoke_engine.py          # 16 项：真机路径的引擎回归
 py -3.10 tools/android_spike/project_scan.py tools/android_spike/app
 ```

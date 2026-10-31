@@ -219,6 +219,22 @@ class Game:
         y = (pos[1] - rect.top) * self._screen.get_height() / float(rect.height)
         return int(x), int(y)
 
+    #: How many pointer events are printed (stdout / logcat) on a device. A
+    #: wrong touch position is impossible to reason about from a screenshot, and
+    #: these five lines say whether the raw event or the mapping is off.
+    POINTER_DEBUG_EVENTS = 5
+
+    def _log_pointer(self, kind, raw, mapped):
+        """Print the first pointer events of a device run (diagnostics only)."""
+        remaining = getattr(self, '_pointer_debug_left', self.POINTER_DEBUG_EVENTS)
+        if remaining <= 0 or not is_android():
+            return
+        self._pointer_debug_left = remaining - 1
+        window = self._display.get_size() if self._display is not None else (0, 0)
+        rect = tuple(self._present_rect) if self._present_rect is not None else None
+        print(f'[PYGS-INPUT] {kind} raw={tuple(raw)} window={window} '
+              f'present={rect} canvas={tuple(mapped)}', flush=True)
+
     def _present(self):
         """Scale the canvas into the window and hand the frame to SDL."""
         display = pygame.display.get_surface()
@@ -270,7 +286,9 @@ class Game:
             # see SceneLoader._TOUCH_EVENTS.
             for event in events:
                 if event.type == pygame.FINGERDOWN:
-                    scene_loader.handle_finger_down(event.finger_id, self._finger_pos(event))
+                    finger_pos = self._finger_pos(event)
+                    self._log_pointer('finger-down', (event.x, event.y), finger_pos)
+                    scene_loader.handle_finger_down(event.finger_id, finger_pos)
                 elif event.type == pygame.FINGERMOTION:
                     scene_loader.handle_finger_move(event.finger_id, self._finger_pos(event))
                 elif event.type == pygame.FINGERUP:
@@ -303,6 +321,7 @@ class Game:
                     # into it); clicking elsewhere blurs it. Sliders start a
                     # drag when clicked.
                     pos = self._to_canvas(event.pos)
+                    self._log_pointer('mouse-down', event.pos, pos)
                     scene_loader.handle_pointer_down(pos, event.button)
                     self.on_mouse_button_down(pos, event.button, getattr(event, 'touch', 0), getattr(event, "clicks", 1), getattr(event, 'window', None))
                 elif event.type == pygame.MOUSEBUTTONUP:

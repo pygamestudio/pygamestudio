@@ -42,6 +42,7 @@ class BuildWindowBody(QTabWidget):
         self._desktop_app_build_window.app_name_changed_signal.connect(self._on_app_name_changed)
         self._web_app_build_window.app_name_changed_signal.connect(self._on_app_name_changed)
         self._android_app_build_window.app_name_changed_signal.connect(self._on_app_name_changed)
+        self._android_app_build_window.layout_changed_signal.connect(self.height_hint_changed.emit)
 
     def _on_app_icon_changed(self, icon_path):
         """Store the pick in project.pygs and show it in both tabs."""
