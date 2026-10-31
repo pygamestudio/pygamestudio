@@ -95,6 +95,17 @@ jobs:
         working-directory: tools/android_spike
         run: python3 project_scan.py app | tee scan.log
 
+      # p4a skips a recipe whose build tree and stamp are still there, and the
+      # cache restores that tree - so a recipe edit could look applied while the
+      # old library was reused (that is how the first _freetype attempt shipped
+      # without the module). Drop pygame's build tree; its dependencies
+      # (sdl2, freetype, png, jpeg) stay cached and are reused.
+      - name: Force pygame to rebuild after recipe edits
+        run: |
+          rm -rf "$HOME"/.buildozer/android/platform/build-*/build/other_builds/pygame_ce* || true
+          rm -rf tools/android_spike/.buildozer/android/platform/build-*/build/other_builds/pygame_ce* || true
+          ls "$HOME"/.buildozer/android/platform/build-*/build/other_builds/ 2>/dev/null || true
+
       - name: Build the spike APK
         working-directory: tools/android_spike
         run: |

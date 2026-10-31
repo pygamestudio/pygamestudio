@@ -154,14 +154,21 @@ def build_game(studio):
                     set_line('scene', f'{len(objects)} object(s), '
                                       f'{scripts} script(s): {names}', True)
             self._draw_total += time.perf_counter() - started
+            self._price_canvas_blit()
             if self._frames % 60 == 0:
                 # Where the frame time goes: the scene draw is measured here,
                 # everything else (events + present + flip + the 60 Hz cap) is
-                # the remainder of the real frame time.
+                # the remainder of the real frame time. The canvas blit inside
+                # ``scene draw`` is priced once, so the line shows how much of it
+                # is pixels (dirty rects would help) and how much is Python
+                # walking the object tree (they would not).
                 draw_ms = self._draw_total / 60 * 1000
                 fps = self._clock.get_fps()
                 frame_ms = 1000.0 / fps if fps else 0.0
-                set_line('frame', f'scene draw {draw_ms:.1f} ms, other '
+                canvas_ms = STATE.get('canvas_ms')
+                detail = (f', canvas blit {canvas_ms:.1f} ms' if canvas_ms is not None
+                          else '')
+                set_line('frame', f'scene draw {draw_ms:.1f} ms{detail}, other '
                                   f'{max(0.0, frame_ms - draw_ms):.1f} ms, fps {fps:.0f}',
                          frame_ms == 0.0 or draw_ms < frame_ms)
                 self._draw_total = 0.0
@@ -169,6 +176,26 @@ def build_game(studio):
                 log(f'SPIKE_MAX_FRAMES={MAX_FRAMES} reached, stopping')
                 self._running = False
             self._overlay()
+
+        def _price_canvas_blit(self):
+            """Price one full-canvas copy, once, to split the scene draw.
+
+            The scene draw is a full-canvas blit plus a Python walk over the
+            object tree. Measuring the blit once tells the two apart: dirty
+            rects cut the first, they do nothing for the second.
+            """
+            if STATE.get('canvas_ms') is not None:
+                return
+            root = studio.scene_loader.get_root_object()
+            surface = getattr(root, 'surface', None)
+            if surface is None:
+                return
+            screen = studio.get_screen()
+            repeats = 5
+            start = time.perf_counter()
+            for _index in range(repeats):
+                screen.blit(surface, (0, 0))
+            STATE['canvas_ms'] = (time.perf_counter() - start) * 1000 / repeats
 
         # ----------------------------------------------------------- input
         def on_mouse_button_down(self, pos, btn, touch=0, clicks=1, window=None):
