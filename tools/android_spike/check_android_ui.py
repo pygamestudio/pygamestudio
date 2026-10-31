@@ -32,7 +32,7 @@ sys.path.insert(0, str(REPO_ROOT / 'src'))
 from PySide6.QtWidgets import QApplication                        # noqa: E402
 
 from pygamestudio.gui.build.android import AndroidAppBuildWindow, is_valid_package  # noqa: E402
-from pygamestudio.gui.build.window import BuildWindowBody          # noqa: E402
+from pygamestudio.gui.build.window import BuildWindow, BuildWindowBody      # noqa: E402
 from pygamestudio.gui.settings.editor import EditorSettingsBody    # noqa: E402
 
 results = []
@@ -95,6 +95,21 @@ def main():
     body.retranslate()
     check('tab titles survive retranslate', all(body.tabText(i) for i in range(3)))
 
+    print('2b) the window follows the tab height')
+    window = BuildWindow(manager)
+    window.get_ready_for_project()
+    window.show()
+    app.processEvents()
+    window._build_window_body.setCurrentIndex(0)
+    window._fit_height()
+    desktop_height = window.height()
+    window._build_window_body.setCurrentIndex(2)
+    window._fit_height()
+    android_height = window.height()
+    check('the android tab is taller', android_height > desktop_height,
+          f'{desktop_height} -> {android_height}')
+    window.close()
+
     print('3) settings page')
     settings = EditorSettingsBody(manager)
     check('three settings pages', settings._list_widget.count() == 3,
@@ -107,7 +122,7 @@ def main():
           == settings._list_widget.maximumWidth(),
           settings._list_widget.minimumWidth())
     check('no runtime pack row', not hasattr(settings, '_android_pack_label'))
-    check('gradle field exists', hasattr(settings, '_android_gradle_lineedit'))
+    check('only jdk and sdk fields', not hasattr(settings, '_android_gradle_lineedit'))
     settings.retranslate()
     check('labels survive retranslate', settings._android_jdk_label.text() != '')
 

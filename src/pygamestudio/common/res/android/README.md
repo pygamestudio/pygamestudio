@@ -27,37 +27,37 @@ VERSION.json                               版本 / 路径 / 包清单 / sha256
 
 ## 打包时怎么用（已接进编辑器）
 
-「Build 构建」窗口的第三个标签页 **安卓 APK** 会按顺序做：
+「Build 构建」窗口的第三个标签页 **安卓应用** 会按顺序做：
 
 1. 校验压缩包的 sha256，解压到用户缓存（`platformdirs.user_cache_dir()/PygameStudio/android/runtime-<version>-<abi>/`，
    只解压一次，包里记一个 `.archive.sha256` 标记）；
-2. 读「编辑器设置 > 安卓打包」里的 JDK / SDK 路径（空着就自动探测），检查 JDK ≥ 17 和
-   `platforms/android-34`（`build-tools` 缺失不阻塞：AGP 会自己装它要的那个版本）；
+2. 读「编辑器设置 > 安卓打包」里的 JDK / SDK 路径（空着就自动探测），检查 JDK ≥ 17、
+   `platforms/android-34`、`build-tools`（aapt2/d8/zipalign/apksigner 都在里面）；
 3. 用 `gui/build/protection.py` 保护工程（去注释 + 加密资源），
    再用 `gui/build/runtime_payload.py` 把引擎运行子集放进去；
 4. 把包拷到缓存的 `dist/` 工作目录，**从包里的** `src/res_initial` 恢复 `src/main/res`
    （不能从工作目录恢复，否则上一个工程的图标会一直留着），
-   写入图标 / 首屏 / 应用名 / `values/strings.xml` / `AndroidManifest.xml`，
-   改 `build.gradle`（namespace、applicationId、versionCode/Name、SDK 版本，
-   并删掉包里钉死的 `buildToolsVersion`）和 `local.properties`；
+   写入图标 / 应用名 / `values/strings.xml` / `AndroidManifest.xml`；
 5. 写 `src/main/assets/private.tar`（工程 + 引擎，`.py` 不编译）；
-6. 用 `gradlew assembleDebug` / `assembleRelease` 打包，把 APK 拷到 `<输出目录>/build/Android/<应用名>.apk`。
+6. `gui/build/android_apk.py` 用 SDK 自带工具打包：`aapt2 → javac → d8 → zipalign → apksigner`，
+   把 APK 拷到 `<输出目录>/build/Android/<应用名>.apk`。
+
+**不需要 Gradle / AGP / NDK，也不需要联网**：依赖已在包里编译好，一次构建约 5 秒。
+包里的 `build.gradle`、`gradlew` 是冻结 p4a dist 时留下来的，编辑器不使用它们。
 
 构建类型在 tab 里选：**调试**用 Android 的调试证书，**发布**用你选的 keystore
-（密码只在构建时通过环境变量传给 Gradle，不写进任何文件；「新建...」会用 JDK 自带的
-`keytool` 现场生成一个）。Gradle 本身可以预装——设置页里选好路径就不会再下载发行版。
-
-Gradle 的缓存放在 `.../android/gradle/`，所以同一个工程第二次构建只需几秒。
+（密码只在构建时通过环境变量传给 `apksigner`，不写进任何文件；「新建...」会用 JDK 自带的
+`keytool` 现场生成一个）。首屏默认用包里的那张，应用图标只做启动器图标。
 
 ## 三个坑（已在代码里绕开）
 
 - **`values/strings.xml` 不在包里**：p4a 是按 `templates/strings.tmpl.xml` 在每次打包时
   现场渲染它的，`src/res_initial` 里没有；而清单引用了 `@string/app_name` 和
   `@style/KivySupportCutout`，少了它 AAPT 直接失败。编辑器会自己生成这个文件。
-- **`applicationId`**：AGP 8 默认把 `namespace` 当应用 ID，改包名后必须显式写
-  `applicationId`，否则装出来还是旧包名。
-- **`buildToolsVersion` 不能钉死**：AGP 8.11 最低要 35，包里是 CI 的版本；钉着只会报警告，
-  删掉这一行让 AGP 自己决定（它会自己装）。
+- **清单必须有 `package`**：没有 AGP 就没有 `applicationId` 帮忙注入，aapt2 要求清单
+  自带 `package="..."`，它就是应用 ID。
+- **`javac` 不能用 `-bootclasspath android.jar`**：引导层用了 lambda，替换引导类路径会让
+  `LambdaMetafactory` 消失；`android.jar` 放 classpath，lambda 交给 d8 desugar。
 
 ## 什么时候需要换这个包
 

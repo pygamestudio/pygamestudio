@@ -42,8 +42,9 @@ class EditorSettingsBody(QWidget):
         self._mcp_token_button = QPushButton()
         self._mcp_status_label = QLabel()
 
-        # Android build page: where the machine's JDK, Android SDK and (optionally)
-        # a pre-installed Gradle live. The APK builder reads these paths.
+        # Android build page: where the machine's JDK and Android SDK live.
+        # The APK builder reads these paths; nothing else is configurable because
+        # the build needs no other tool (no Gradle, no AGP, no NDK).
         self._android_stacked_widget = QWidget()
         self._android_jdk_label = QLabel()
         self._android_jdk_lineedit = QLineEdit()
@@ -51,9 +52,6 @@ class EditorSettingsBody(QWidget):
         self._android_sdk_label = QLabel()
         self._android_sdk_lineedit = QLineEdit()
         self._android_sdk_browse_button = QPushButton()
-        self._android_gradle_label = QLabel()
-        self._android_gradle_lineedit = QLineEdit()
-        self._android_gradle_browse_button = QPushButton()
 
         self._lang_dict = {
             'en': 'English',
@@ -98,10 +96,8 @@ class EditorSettingsBody(QWidget):
         self._mcp_token_button.clicked.connect(self._copy_mcp_token)
         self._android_jdk_browse_button.clicked.connect(self._browse_android_jdk)
         self._android_sdk_browse_button.clicked.connect(self._browse_android_sdk)
-        self._android_gradle_browse_button.clicked.connect(self._browse_android_gradle)
         self._android_jdk_lineedit.editingFinished.connect(self._on_android_path_edited)
         self._android_sdk_lineedit.editingFinished.connect(self._on_android_path_edited)
-        self._android_gradle_lineedit.editingFinished.connect(self._on_android_path_edited)
         T.add_observer(self)
 
     def _set_layout(self):
@@ -130,12 +126,9 @@ class EditorSettingsBody(QWidget):
         android_layout.addWidget(self._android_sdk_label, 1, 0, 1, 1)
         android_layout.addWidget(self._android_sdk_lineedit, 1, 1, 1, 1)
         android_layout.addWidget(self._android_sdk_browse_button, 1, 2, 1, 1)
-        android_layout.addWidget(self._android_gradle_label, 2, 0, 1, 1)
-        android_layout.addWidget(self._android_gradle_lineedit, 2, 1, 1, 1)
-        android_layout.addWidget(self._android_gradle_browse_button, 2, 2, 1, 1)
         android_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         android_layout.setColumnStretch(1, 1)
-        android_layout.setRowStretch(3, 1)
+        android_layout.setRowStretch(2, 1)
 
         main_h_layout = QHBoxLayout(self)
         main_h_layout.addWidget(self._list_widget)
@@ -195,7 +188,7 @@ class EditorSettingsBody(QWidget):
         self._update_mcp_status()
 
     def _set_android_stacked_widget(self):
-        """Fill the Android page: the three toolchain paths, nothing else."""
+        """Fill the Android page: the two toolchain paths, nothing else."""
         editor_config = get_editor_config()
         self._android_jdk_label.setText(T.tr('settings.android_jdk', 'JDK'))
         self._android_jdk_lineedit.setPlaceholderText(T.tr(
@@ -205,15 +198,6 @@ class EditorSettingsBody(QWidget):
         self._android_sdk_lineedit.setPlaceholderText(T.tr(
             'settings.android_sdk_placeholder', 'Folder that contains platforms/ and build-tools/'))
         self._android_sdk_browse_button.setIcon(QIcon(':/images/browse.png'))
-        self._android_gradle_label.setText(T.tr('settings.android_gradle', 'Gradle'))
-        self._android_gradle_lineedit.setPlaceholderText(T.tr(
-            'settings.android_gradle_placeholder',
-            'Optional: an installed Gradle (leave empty to download it once)'))
-        self._android_gradle_lineedit.setToolTip(T.tr(
-            'settings.android_gradle_tooltip',
-            'Point this at an unpacked Gradle 8.11 or newer to skip the one-time download. '
-            'Android Studio bundles one under its "gradle" folder.'))
-        self._android_gradle_browse_button.setIcon(QIcon(':/images/browse.png'))
 
         # Show the effective path, not only the stored one: a build uses the
         # autodetected JDK/SDK until somebody picks another one.
@@ -221,8 +205,6 @@ class EditorSettingsBody(QWidget):
                                                or android_runtime.guess_jdk()))
         self._android_sdk_lineedit.setText(str(editor_config.get('android_sdk')
                                                or android_runtime.guess_sdk()))
-        self._android_gradle_lineedit.setText(str(editor_config.get('android_gradle')
-                                                  or android_runtime.guess_gradle()))
 
     def _browse_android_jdk(self):
         start = self._android_jdk_lineedit.text().strip() or get_editor_data_dir().as_posix()
@@ -240,19 +222,10 @@ class EditorSettingsBody(QWidget):
             self._android_sdk_lineedit.setText(Path(sdk_dir).as_posix())
             update_editor_config('android_sdk', Path(sdk_dir).as_posix())
 
-    def _browse_android_gradle(self):
-        start = self._android_gradle_lineedit.text().strip() or get_editor_data_dir().as_posix()
-        gradle_dir = QFileDialog.getExistingDirectory(
-            self, T.tr('settings.android_choose_gradle', 'Select the Gradle folder'), start)
-        if gradle_dir:
-            self._android_gradle_lineedit.setText(Path(gradle_dir).as_posix())
-            update_editor_config('android_gradle', Path(gradle_dir).as_posix())
-
     def _on_android_path_edited(self):
         """A typed path is stored as soon as the field loses focus."""
         update_editor_config('android_jdk', self._android_jdk_lineedit.text().strip())
         update_editor_config('android_sdk', self._android_sdk_lineedit.text().strip())
-        update_editor_config('android_gradle', self._android_gradle_lineedit.text().strip())
 
     def _ensure_mcp_token(self, editor_config=None) -> str:
         """The token clients must send - created once and stored in the config.
@@ -352,10 +325,6 @@ class EditorSettingsBody(QWidget):
         self._android_sdk_label.setText(T.tr('settings.android_sdk', 'Android SDK'))
         self._android_sdk_lineedit.setPlaceholderText(T.tr(
             'settings.android_sdk_placeholder', 'Folder that contains platforms/ and build-tools/'))
-        self._android_gradle_label.setText(T.tr('settings.android_gradle', 'Gradle'))
-        self._android_gradle_lineedit.setPlaceholderText(T.tr(
-            'settings.android_gradle_placeholder',
-            'Optional: an installed Gradle (leave empty to download it once)'))
 
         self._theme_dict = {
             'dark': T.tr('theme.dark', 'Dark'),

@@ -10,6 +10,9 @@ from pygamestudio.common.utils.config import update_project_config
 
 
 class BuildWindowBody(QTabWidget):
+    #: Emitted when the visible page changes, so the window can follow its height.
+    height_hint_changed = Signal()
+
     def __init__(self, game_manager):
         super().__init__()
         self._desktop_app_build_window = DesktopAppBuildWindow(game_manager)
@@ -28,6 +31,7 @@ class BuildWindowBody(QTabWidget):
     
     def _set_signal(self):
         T.add_observer(self)
+        self.currentChanged.connect(lambda _index: self.height_hint_changed.emit())
         # The app name and icon are one setting for both targets
         # (build.app_name / build.app_icon): an edit in either tab is saved at
         # once and mirrored to the other tab, so it survives closing the editor
@@ -62,6 +66,7 @@ class BuildWindowBody(QTabWidget):
         self._desktop_app_build_window.get_ready_for_project()
         self._web_app_build_window.get_ready_for_project()
         self._android_app_build_window.get_ready_for_project()
+        self.height_hint_changed.emit()
 
     def enterEvent(self, event):
         self.setCursor(Qt.CursorShape.ArrowCursor)
@@ -80,15 +85,55 @@ class BuildWindow(WindowBase):
         self._set_object_name()
 
     def _set_widget(self):
-        self.resize(700, 330)
+        self.resize(720, 330)
         self.set_window_body(self._build_window_body)
         self.window_title.set_title_name(T.tr('build.build', 'Build'))
     
     def _set_signal(self):
         T.add_observer(self)
+        self._build_window_body.height_hint_changed.connect(self._fit_height)
 
     def _set_object_name(self):
         self.setObjectName('build')
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._fit_height()
+
+    def _fit_height(self):
+        """Match the window size to the page that is visible.
+
+        The three tabs have very different amounts of content - the Android one
+        has signing fields - so a fixed height left the desktop and web tabs full
+        of empty space. The height follows the page hint (and the width grows
+        when a page cannot fit in the current one), capped to the screen.
+        """
+        if self.isMaximized():
+            return
+        page = self._build_window_body.currentWidget()
+        if page is None:
+            return
+
+        inner = page.widget() if isinstance(page, QScrollArea) else page
+        frame = 2 * (page.frameWidth() if isinstance(page, QScrollArea) else 0)
+        if inner is not None:
+            content = inner.sizeHint().height() + frame
+            width_needed = inner.sizeHint().width() + frame
+        else:
+            content = page.sizeHint().height()
+            width_needed = 0
+
+        tab_bar = self._build_window_body.tabBar().sizeHint().height()
+        title = self.window_title.sizeHint().height()
+        target_height = title + tab_bar + content + 30      # margins + frame
+        target_width = max(self.width(), width_needed + 30)
+
+        screen = QApplication.primaryScreen()
+        if screen is not None:
+            available = screen.availableGeometry()
+            target_height = min(target_height, int(available.height() * 0.9))
+            target_width = min(target_width, int(available.width() * 0.9))
+        self.resize(int(target_width), max(240, int(target_height)))
 
     def retranslate(self):
         self.window_title.set_title_name(T.tr('build.build', 'Build'))

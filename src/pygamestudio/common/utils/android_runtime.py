@@ -70,63 +70,6 @@ def cache_root() -> Path:
     return Path(user_cache_dir()) / 'PygameStudio' / 'android'
 
 
-def default_gradle_home() -> Path:
-    """Gradle's cache folder: the editor's own, so builds never share state.
-
-    It holds the downloaded Gradle distribution and the Android Gradle Plugin
-    jars, which is why it must survive between builds: the first build pays for
-    them once. A user who does not want that first download can point the editor
-    at an already installed Gradle in the settings (the distribution part); the
-    plugin jars come from Google Maven either way.
-    """
-    return cache_root() / 'gradle'
-
-
-#: A Gradle the pack's Android Gradle Plugin can run (8.11 is its minimum).
-_MIN_GRADLE = (8, 11)
-
-
-def guess_gradle() -> str:
-    """An installed Gradle that is new enough, or ''.
-
-    Looks where Android Studio and the Gradle installer put it. A folder whose
-    name says it is older than 8.11 is ignored on purpose: the build would stop
-    at the first task with a version error instead of downloading the right one.
-    """
-    candidates = []
-    system = platform.system()
-    if system == 'Windows':
-        program_files = Path(os.environ.get('ProgramFiles', r'C:\Program Files'))
-        local = os.environ.get('LOCALAPPDATA') or ''
-        candidates += [program_files / 'Android' / 'Android Studio' / 'gradle',
-                       program_files / 'Gradle',
-                       Path(local) / 'Programs' / 'Android Studio' / 'gradle',
-                       Path(local) / 'Programs' / 'Gradle']
-    elif system == 'Darwin':
-        candidates += [Path('/Applications/Android Studio.app/Contents/gradle'),
-                       Path.home() / '.sdkman' / 'candidates' / 'gradle']
-    else:
-        candidates += [Path('/opt/android-studio/gradle'), Path('/usr/share/gradle'),
-                       Path.home() / '.sdkman' / 'candidates' / 'gradle']
-
-    executable = shutil.which('gradle')
-    if executable:
-        candidates.append(Path(executable).parent.parent)
-
-    found = []
-    for root in candidates:
-        if not root.is_dir():
-            continue
-        found.extend(sorted(path for path in root.glob('gradle-*') if (path / 'bin').is_dir()))
-        if (root / 'bin').is_dir():
-            found.append(root)
-    for path in found:
-        match = re.search(r'gradle-(\d+)\.(\d+)', path.name)
-        if match and (int(match.group(1)), int(match.group(2))) >= _MIN_GRADLE:
-            return path.as_posix()
-    return ''
-
-
 def hash_file(path) -> str:
     """SHA-256 of a file (1 MB chunks, so a 22 MB archive costs no memory)."""
     digest = hashlib.sha256()
@@ -417,7 +360,7 @@ def check_toolchain(jdk='', sdk='') -> dict:
     :return: ``{'ok': bool, 'problems': [reason key, ...], 'jdk', 'java',
                'sdk', 'build_tools', 'platforms', 'compile_sdk'}``
     """
-    result = {'ok': False, 'problems': [], 'notes': [], 'jdk': str(jdk or ''),
+    result = {'ok': False, 'problems': [], 'jdk': str(jdk or ''),
               'java': 0, 'sdk': str(sdk or ''), 'build_tools': '',
               'platforms': [], 'compile_sdk': COMPILE_SDK}
 
@@ -442,13 +385,12 @@ def check_toolchain(jdk='', sdk='') -> dict:
             result['problems'].append('android.platform_missing')
         build_tools = _installed_build_tools(resolved_sdk)
         if not build_tools:
-            # Not blocking: every Android Gradle Plugin installs the build-tools
-            # it wants into the SDK itself (it only needs network + licenses).
-            result['notes'].append('android.build_tools_missing')
+            # aapt2/d8/zipalign/apksigner live here - without them nothing is built
+            result['problems'].append('android.build_tools_missing')
         else:
-            matching = [version for version in build_tools
-                        if version.startswith(f'{COMPILE_SDK}.')]
-            result['build_tools'] = (matching or build_tools)[-1]
+            # The newest one is safest: aapt2/d8 only ever gain support for the
+            # platform they are used with.
+            result['build_tools'] = build_tools[-1]
 
     result['ok'] = not result['problems']
     return result

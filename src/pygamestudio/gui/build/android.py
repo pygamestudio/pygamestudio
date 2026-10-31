@@ -6,10 +6,8 @@ ships inside the editor as the frozen runtime pack, so this tab only has to:
 * unpack the pack (once, into the user cache),
 * protect the project the same way the desktop/web builds do,
 * stage the engine and write ``assets/private.tar``,
-* run Gradle (debug, or release with the user's keystore) and copy the APK out.
-
-The work folder lives in the cache on purpose: Gradle keeps its incremental
-state there, so the second build of a project takes seconds instead of minutes.
+* build and sign the APK with the SDK's own build-tools (no Gradle, no AGP,
+  nothing to download) and copy it to the output folder.
 """
 import os
 import platform
@@ -29,6 +27,7 @@ from pygamestudio.common.utils.config import (get_editor_config,
                                               get_project_config,
                                               update_editor_config,
                                               update_project_config)
+from pygamestudio.gui.build import android_apk
 from pygamestudio.gui.build import android_dist
 from pygamestudio.gui.build import protection
 from pygamestudio.gui.build import runtime_payload
@@ -182,63 +181,64 @@ class AndroidAppBuildWindow(QScrollArea):
         T.add_observer(self)
 
     def _set_layout(self):
-        icon_layout = QHBoxLayout()
-        icon_layout.addWidget(self._app_icon_lineedit)
-        icon_layout.addSpacing(5)
-        icon_layout.addWidget(self._app_icon_browse_button)
-        output_layout = QHBoxLayout()
-        output_layout.addWidget(self._output_dir_lineedit)
-        output_layout.addSpacing(5)
-        output_layout.addWidget(self._output_dir_browse_button)
-        version_layout = QHBoxLayout()
-        version_layout.addWidget(self._version_name_lineedit, 2)
-        version_layout.addWidget(self._version_code_label)
-        version_layout.addWidget(self._version_code_lineedit, 1)
-        orientation_layout = QHBoxLayout()
-        orientation_layout.addWidget(self._orientation_combobox, 1)
-        orientation_layout.addSpacing(10)
-        orientation_layout.addWidget(self._build_type_label)
-        orientation_layout.addWidget(self._build_type_combobox, 1)
-        keystore_layout = QHBoxLayout()
-        keystore_layout.addWidget(self._keystore_lineedit)
-        keystore_layout.addSpacing(5)
-        keystore_layout.addWidget(self._keystore_browse_button)
-        keystore_layout.addWidget(self._keystore_create_button)
-        signing_layout = QHBoxLayout()
-        signing_layout.addWidget(self._key_alias_lineedit, 2)
-        signing_layout.addWidget(self._store_password_label)
-        signing_layout.addWidget(self._store_password_lineedit, 2)
-        signing_layout.addWidget(self._key_password_label)
-        signing_layout.addWidget(self._key_password_lineedit, 2)
+        def with_buttons(edit, *buttons):
+            """A line edit plus its buttons, sharing one form row."""
+            row = QWidget()
+            layout = QHBoxLayout(row)
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.setSpacing(6)
+            layout.addWidget(edit, 1)
+            for button in buttons:
+                layout.addWidget(button)
+            return row
+
+        def version_row():
+            row = QWidget()
+            layout = QHBoxLayout(row)
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.setSpacing(6)
+            layout.addWidget(self._version_name_lineedit, 2)
+            layout.addWidget(self._version_code_label)
+            layout.addWidget(self._version_code_lineedit, 1)
+            return row
+
+        # A form layout keeps every label and field on one grid, so nothing is
+        # crammed against its neighbour when the tab is narrow.
+        form = QFormLayout()
+        form.setContentsMargins(5, 5, 5, 5)
+        form.setHorizontalSpacing(10)
+        form.setVerticalSpacing(8)
+        form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        form.addRow(self._app_name_label, self._app_name_lineedit)
+        form.addRow(self._app_icon_label,
+                    with_buttons(self._app_icon_lineedit, self._app_icon_browse_button))
+        form.addRow(self._output_dir_label,
+                    with_buttons(self._output_dir_lineedit, self._output_dir_browse_button))
+        form.addRow(self._package_label, self._package_lineedit)
+        form.addRow(self._version_name_label, version_row())
+        form.addRow(self._orientation_label, self._orientation_combobox)
+        form.addRow(self._build_type_label, self._build_type_combobox)
+        form.addRow(self._keystore_label,
+                    with_buttons(self._keystore_lineedit, self._keystore_browse_button,
+                                 self._keystore_create_button))
+        form.addRow(self._key_alias_label, self._key_alias_lineedit)
+        form.addRow(self._store_password_label, self._store_password_lineedit)
+        form.addRow(self._key_password_label, self._key_password_lineedit)
+
         button_layout = QHBoxLayout()
         button_layout.addWidget(self._build_button)
-        button_layout.addSpacing(1)
+        button_layout.addSpacing(6)
         button_layout.addWidget(self._open_output_dir_button)
         button_layout.addStretch()
 
-        layout = QGridLayout(self._central_widget)
-        layout.setHorizontalSpacing(10)
-        layout.setVerticalSpacing(8)
-        layout.addWidget(self._app_name_label, 0, 0)
-        layout.addWidget(self._app_name_lineedit, 0, 1)
-        layout.addWidget(self._app_icon_label, 1, 0)
-        layout.addLayout(icon_layout, 1, 1)
-        layout.addWidget(self._output_dir_label, 2, 0)
-        layout.addLayout(output_layout, 2, 1)
-        layout.addWidget(self._package_label, 3, 0)
-        layout.addWidget(self._package_lineedit, 3, 1)
-        layout.addWidget(self._version_name_label, 4, 0)
-        layout.addLayout(version_layout, 4, 1)
-        layout.addWidget(self._orientation_label, 5, 0)
-        layout.addLayout(orientation_layout, 5, 1)
-        layout.addWidget(self._keystore_label, 6, 0)
-        layout.addLayout(keystore_layout, 6, 1)
-        layout.addWidget(self._key_alias_label, 7, 0)
-        layout.addLayout(signing_layout, 7, 1)
-        layout.addWidget(self._progress_bar, 8, 0, 1, 2)
-        layout.addLayout(button_layout, 9, 0, 1, 2)
-        layout.setColumnStretch(1, 1)
-        layout.setContentsMargins(5, 5, 5, 0)
+        layout = QVBoxLayout(self._central_widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(10)
+        layout.addLayout(form)
+        layout.addWidget(self._progress_bar)
+        layout.addLayout(button_layout)
+        layout.addStretch()
 
     def _set_orientation_texts(self):
         selected = self._orientation_combobox.currentData()
@@ -440,7 +440,6 @@ class AndroidAppBuildWindow(QScrollArea):
             'key_password': self._key_password_lineedit.text(),
             'jdk': str(editor_config.get('android_jdk') or ''),
             'sdk': str(editor_config.get('android_sdk') or ''),
-            'gradle': str(editor_config.get('android_gradle') or ''),
         }
 
     def _check_before_build(self):
@@ -601,7 +600,6 @@ class AndroidBuildThread(QThread):
         self._build_config = {}
         self._stop_requested = False
         self.apk_path = None
-
     def set_build_config(self, build_config):
         """Take a snapshot (filled in on the UI thread, read by the worker)."""
         self._build_config = dict(build_config or {})
@@ -679,10 +677,10 @@ class AndroidBuildThread(QThread):
                 orientation=config.get('orientation') or android_dist.DEFAULT_ORIENTATION,
                 min_sdk=android_runtime.MIN_SDK,
                 compile_sdk=android_runtime.COMPILE_SDK,
-                sdk_dir=toolchain['sdk'],
+                # The icon is the launcher icon only: the splash keeps the
+                # engine's own image unless the project brings one.
                 icon=config.get('app_icon') or '',
-                presplash=config.get('app_icon') or '',
-                signing=signing,
+                presplash='',
                 on_progress=self._emit(35, 70))
 
             Logger.info(T.tr('build.android_payload_tar', 'Writing assets/private.tar...'))
@@ -698,59 +696,25 @@ class AndroidBuildThread(QThread):
                 self._finish_stopped()
                 return
 
-            Logger.info(T.tr('build.android_gradle',
-                             'Running Gradle (the first build downloads its dependencies)...'))
-            task = android_dist.RELEASE_TASK if is_release else android_dist.DEBUG_TASK
-            codes = []
-            gradle_home = android_runtime.default_gradle_home()
-            gradle_dir = config.get('gradle') or ''
-            secrets_env = android_dist.signing_environment(signing, config)
-            code = android_dist.run_gradle(
-                dist_dir, toolchain['jdk'], toolchain['sdk'], gradle_home,
-                task=task,
-                on_line=lambda line: self._on_gradle_line(line, codes),
-                on_progress=self._emit(75, 95),
-                stop_check=self._check_stop,
-                gradle_dir=gradle_dir,
-                extra_environment=secrets_env)
-
-            # A machine behind a proxy (the usual Clash/v2ray setup) reaches the
-            # internet in the browser but not from Java, which has no system
-            # proxy support: the very first download times out. Retry once with
-            # the proxy Java ignores.
-            if code != 0 and not self._stop_requested:
-                proxy = android_dist.windows_proxy()
-                if proxy and android_dist.is_network_failure('\n'.join(codes[-80:])):
-                    Logger.info(T.tr('build.android_proxy_retry',
-                                     'The download failed; retrying through the system proxy {}:{}').format(*proxy))
-                    android_dist.use_proxy(dist_dir, proxy)
-                    codes.clear()
-                    code = android_dist.run_gradle(
-                        dist_dir, toolchain['jdk'], toolchain['sdk'], gradle_home,
-                        task=task,
-                        on_line=lambda line: self._on_gradle_line(line, codes),
-                        on_progress=self._emit(75, 95),
-                        stop_check=self._check_stop,
-                        gradle_dir=gradle_dir,
-                        extra_environment=secrets_env,
-                        proxy=proxy)
+            Logger.info(T.tr('build.android_building',
+                             'Building the APK with the SDK build-tools...'))
+            apk = android_apk.build_apk(
+                dist_dir, android_runtime.cache_root(),
+                sdk_dir=toolchain['sdk'],
+                jdk=toolchain['jdk'],
+                compile_sdk=android_runtime.COMPILE_SDK,
+                min_sdk=android_runtime.MIN_SDK,
+                debug=not is_release,
+                signing=signing,
+                cache_dir=android_runtime.cache_root(),
+                extra_environment=android_dist.signing_environment(signing, config),
+                on_line=self._on_build_line,
+                on_progress=self._emit(75, 98),
+                stop_check=self._check_stop)
 
             if self._stop_requested:
                 self._finish_stopped()
                 return
-            if code != 0:
-                hint = android_dist.translate_error('\n'.join(codes[-80:]))
-                raise android_dist.AndroidBuildError(
-                    T.tr('build.android_gradle_failed',
-                         'Gradle failed (exit code {}). See the console for the full log.').format(code),
-                    hint or 'android.error_build')
-
-            apk = android_dist.find_apk(dist_dir)
-            if apk is None:
-                raise android_dist.AndroidBuildError(
-                    T.tr('build.android_apk_missing',
-                         'Gradle finished but no APK was produced.'),
-                    'android.error_apk_missing')
 
             suffix = '-release' if is_release else ''
             target = output_dir / f'{self._safe_file_name(app_name)}{suffix}.apk'
@@ -760,6 +724,9 @@ class AndroidBuildThread(QThread):
             Logger.info(T.tr('build.android_apk_done', 'APK: {}').format(target.as_posix()))
             self.finished_signal.emit(True)
         except android_runtime.AndroidRuntimeError as error:
+            Logger.error(T.tr(error.reason, str(error)))
+            self.finished_signal.emit(False)
+        except android_apk.ApkBuildError as error:
             Logger.error(T.tr(error.reason, str(error)))
             self.finished_signal.emit(False)
         except android_dist.AndroidBuildError as error:
@@ -777,12 +744,11 @@ class AndroidBuildThread(QThread):
         Logger.info(T.tr('build.build_stopped', 'Build stopped'))
         self.stopped_signal.emit()
 
-    def _on_gradle_line(self, line, codes):
-        codes.append(line)
+    def _on_build_line(self, line):
         lowered = line.lower()
         if 'error' in lowered or line.startswith('FAILURE'):
             Logger.error(line)
-        elif 'warning' in lowered:
+        elif 'warning' in lowered or 'warning:' in lowered:
             Logger.warning(line)
         else:
             Logger.info(line)

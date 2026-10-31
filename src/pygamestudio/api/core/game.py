@@ -706,11 +706,20 @@ def is_key_pressed(key) -> bool:
         return False
 
 def get_mouse_position() -> tuple:
-    """鼠标指针在窗口内的位置 (x, y)，无窗口时返回 (0, 0)。The pointer position inside the window."""
+    """鼠标指针在画布内的位置 (x, y)，无窗口时返回 (0, 0)。
+
+    设备上窗口是整块屏幕、画布是缩放后显示其中，所以这里要按适配方案
+    （见 Game.SCALE_MODES）换算回画布坐标，否则屏幕被拉伸/留黑边后，
+    指针只在画布那么大的左上角区域里“有效”。
+    """
     try:
-        return tuple(pygame.mouse.get_pos())
+        position = tuple(pygame.mouse.get_pos())
     except pygame.error:
         return (0, 0)
+    game = Game._instance
+    if game is None:
+        return position
+    return tuple(game._to_canvas(position))
 
 def is_mouse_button_pressed(button:int=1) -> bool:
     """某个鼠标键当前是否被按住：1 = 左键，2 = 中键，3 = 右键。True while that mouse button is held."""

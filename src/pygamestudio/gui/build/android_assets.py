@@ -320,8 +320,7 @@ def _apply_to(res_dir, icon_image, processed, app_name, color, adaptive):
             written += write_adaptive_icon(res_dir, icon_image, color or '#000000')
 
     if app_name or color:
-        path, changed = update_strings(res_dir, app_name,
-                                       color if processed is not None else None)
+        path, changed = update_strings(res_dir, app_name, color)
         if path is not None:
             written.append(path)
         for line in changed:
@@ -349,6 +348,15 @@ def run(dist_dir, icon, presplash, app_name=None, background='auto', adaptive=Tr
     if splash_image is not None:
         color = corner_color(splash_image) if background == 'auto' else background
         processed = processed_presplash(splash_image, color)
+    else:
+        # Keep the shipped splash, but read its corner colour so the bars the
+        # bootstrap paints behind it still match the picture.
+        shipped = res_dir / 'drawable' / 'presplash.jpg'
+        if shipped.is_file():
+            try:
+                color = corner_color(load_image(shipped, 'presplash'))
+            except AndroidAssetsError:
+                color = None
 
     # p4a's make_package() starts by restoring src/main/res from src/res_initial
     # ("make res_dir stateless"), so patching only src/main/res is undone by the
@@ -368,8 +376,7 @@ def run(dist_dir, icon, presplash, app_name=None, background='auto', adaptive=Tr
     written += write_template_defaults(dist_dir, icon_image, processed)
 
     if app_name or color:
-        template = update_template(dist_dir, app_name,
-                                   color if processed is not None else None)
+        template = update_template(dist_dir, app_name, color)
         if template is not None:
             written.append(template)
 
