@@ -573,6 +573,9 @@ APK 就是「资源 + dex + 原生库 + 清单」的压缩包，这个工程的�
 **5.3 s**，各 16.8 MB；`aapt dump badging` 显示包名、版本、label、`native-code: arm64-v8a`
 全部正确，`apksigner verify` 分别显示 `CN=Android Debug` 和测试 keystore 的证书。
 
+输出到 `<输出目录>/build/Android/`，文件名带构建类型：`<应用名>-debug.apk` /
+`<应用名>-release.apk`——同一个应用调一次调试、打一次发布，两个包都在，不会互相覆盖。
+
 只有真跑才会踩到的三个坑：
 
 | 现象 | 原因 | 处置 |
@@ -598,6 +601,8 @@ APK 就是「资源 + dex + 原生库 + 清单」的压缩包，这个工程的�
 tab 里选「发布」后用你自己的 keystore 签名：`apksigner` 的密码通过环境变量传入
 （`PYGS_KEYSTORE_PASSWORD` / `PYGS_KEY_PASSWORD`），**不会**写进任何文件；签名文件路径和
 别名存在 `project.pygs`（属于工程），两个密码存在 `editor.pygs`（只在这台机器上）。
+两个密码框右侧有 `eye_off.png`，点一下变 `eye_open.png` 并显示明文（再点变回星号），
+省得打错了等到 apksigner 那一步才发现。
 「新建...」按钮用 JDK 自带的 `keytool` 生成一个 2048 位、10000 天的自签名密钥
 （密码通过 `-storepass:env` 传递，不出现在进程列表）。
 

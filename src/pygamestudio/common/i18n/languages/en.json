@@ -902,6 +902,8 @@
         "android_keystore_created": "Signing key created: {}",
         "android_keystore_create_failed": "Could not create the signing key: {}",
         "android_password_hint": "Keystore Password (at least 6 characters)",
+        "android_show_password": "Show the password",
+        "android_hide_password": "Hide the password",
         "android_password_too_short": "The password needs at least {} characters - keytool refuses shorter ones",
         "android_keytool_missing": "The JDK folder has no bin/keytool: {}",
         "android_alias_missing": "Please enter the key alias",

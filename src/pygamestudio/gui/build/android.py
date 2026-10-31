@@ -147,8 +147,12 @@ class AndroidAppBuildWindow(QScrollArea):
         self._key_alias_label.setText(T.tr('build.android_key_alias', 'Key Alias'))
         self._store_password_label.setText(T.tr('build.android_store_password', 'Keystore Password'))
         self._key_password_label.setText(T.tr('build.android_key_password', 'Key Password'))
+        # A mistyped key password only shows up when apksigner runs, so both
+        # fields get an eye that switches them to plain text.
+        self._password_actions = {}
         for field in (self._store_password_lineedit, self._key_password_lineedit):
             field.setEchoMode(QLineEdit.EchoMode.Password)
+            self._password_actions[field] = self._add_password_toggle(field)
         self._set_orientation_texts()
         self._set_build_type_texts()
         self._progress_bar.setRange(0, 100)
@@ -156,6 +160,34 @@ class AndroidAppBuildWindow(QScrollArea):
         self._build_button.setText(T.tr('build.build', 'Build'))
         self._open_output_dir_button.setText(T.tr('build.open_output_dir', 'Open Output Dir'))
         self._update_button_widths()
+
+    def _add_password_toggle(self, field):
+        """Put the eye at the right end of a password field; return its action."""
+        action = field.addAction(QIcon(':/images/eye_off.png'),
+                                 QLineEdit.ActionPosition.TrailingPosition)
+        action.setToolTip(T.tr('build.android_show_password', 'Show the password'))
+        action.triggered.connect(lambda: self._toggle_password_visibility(field, action))
+        return action
+
+    def _toggle_password_visibility(self, field, action=None):
+        """eye_off (hidden) <-> eye_open (plain text)."""
+        action = action or self._password_actions.get(field)
+        showing = field.echoMode() == QLineEdit.EchoMode.Normal
+        field.setEchoMode(QLineEdit.EchoMode.Password if showing
+                          else QLineEdit.EchoMode.Normal)
+        if action is not None:
+            self._set_password_action_look(action, showing)
+
+    def _set_password_action_look(self, action, showing):
+        """Icon and tooltip for one eye: open eye while the password shows."""
+        action.setIcon(QIcon(':/images/eye_off.png' if showing else ':/images/eye_open.png'))
+        action.setToolTip(T.tr('build.android_show_password', 'Show the password') if showing
+                          else T.tr('build.android_hide_password', 'Hide the password'))
+
+    def _update_password_tooltips(self):
+        for field, action in getattr(self, '_password_actions', {}).items():
+            self._set_password_action_look(action,
+                                           field.echoMode() == QLineEdit.EchoMode.Normal)
 
     def _set_signal(self):
         self._app_name_lineedit.editingFinished.connect(self._on_app_name_edited)
@@ -604,6 +636,7 @@ class AndroidAppBuildWindow(QScrollArea):
         self._key_alias_label.setText(T.tr('build.android_key_alias', 'Key Alias'))
         self._store_password_label.setText(T.tr('build.android_store_password', 'Keystore Password'))
         self._key_password_label.setText(T.tr('build.android_key_password', 'Key Password'))
+        self._update_password_tooltips()
         self._set_orientation_texts()
         self._set_build_type_texts()
         self._build_button.setText(T.tr('build.build', 'Build') if not self._is_building
@@ -672,8 +705,8 @@ class AndroidBuildThread(QThread):
                         '\n'.join(T.tr(key, key) for key in toolchain['problems'])),
                     toolchain['problems'][0])
 
-            # Empty paths in Editor Settings mean "find it for me", so say which
-            # JDK and SDK the build actually uses instead of leaving it a mystery.
+            # Say which JDK/SDK this build is using: the paths come straight
+            # from Editor Settings, so a wrong one is worth seeing in the log.
             Logger.info(T.tr('build.android_toolchain_used', 'Using JDK {} and Android SDK {} (build-tools {})').format(
                 toolchain['jdk'], toolchain['sdk'], toolchain['build_tools'] or '-'))
 
@@ -750,8 +783,10 @@ class AndroidBuildThread(QThread):
                 self._finish_stopped()
                 return
 
-            suffix = '-release' if is_release else ''
-            target = output_dir / f'{self._safe_file_name(app_name)}{suffix}.apk'
+            # The build type is part of the file name: a debug APK and a
+            # release APK of the same app can then sit in one folder without
+            # overwriting each other.
+            target = output_dir / self.output_file_name(app_name, is_release)
             shutil.copy2(apk, target)
             self.apk_path = target
             self.progress_signal.emit(100)
@@ -798,3 +833,12 @@ class AndroidBuildThread(QThread):
     def _safe_file_name(name):
         cleaned = re.sub(r'[\\/:*?"<>|]+', '', str(name or 'game')).strip()
         return cleaned or 'game'
+
+    def output_file_name(self, app_name, is_release):
+        """``<app>-debug.apk`` / ``<app>-release.apk``.
+
+        The build type is in the name so a debug and a release build of the
+        same app never overwrite each other in one output folder.
+        """
+        suffix = '-release' if is_release else '-debug'
+        return '{}{}.apk'.format(self._safe_file_name(app_name), suffix)

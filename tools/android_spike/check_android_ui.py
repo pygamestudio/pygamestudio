@@ -34,7 +34,9 @@ os.environ['PROJECT_PATH'] = str(PROJECT_DIR)
 sys.path.insert(0, str(REPO_ROOT / 'src'))
 
 from PySide6.QtWidgets import QApplication                        # noqa: E402
+from PySide6.QtWidgets import QLineEdit                           # noqa: E402
 
+from pygamestudio.common.res import resources_rc                   # noqa: E402,F401 - registers :/images
 from pygamestudio.gui.build.android import AndroidAppBuildWindow, is_valid_package  # noqa: E402
 import pygamestudio.gui.build.android as android_module                # noqa: E402
 from pygamestudio.gui.build.window import BuildWindow, BuildWindowBody      # noqa: E402
@@ -91,6 +93,35 @@ def main():
     window.retranslate()
     check('retranslate keeps the orientation pick',
           window._orientation_combobox.currentData() == 'landscape')
+
+    print('1b) the password fields have an eye')
+    for name, field in (('keystore', window._store_password_lineedit),
+                        ('key', window._key_password_lineedit)):
+        actions = field.actions()
+        check(f'the {name} password starts hidden',
+              field.echoMode() == QLineEdit.EchoMode.Password, field.echoMode())
+        check(f'the {name} password has one action with a real icon',
+              len(actions) == 1 and not actions[0].icon().isNull(), len(actions))
+        actions[0].trigger()
+        check(f'clicking the eye shows the {name} password',
+              field.echoMode() == QLineEdit.EchoMode.Normal)
+        check(f'the {name} eye still has an icon when open',
+              not actions[0].icon().isNull())
+        actions[0].trigger()
+        check(f'clicking again hides the {name} password',
+              field.echoMode() == QLineEdit.EchoMode.Password)
+
+    print('1c) the APK name says which build type it is')
+    thread = window._build_thread
+    check('a debug build is named <app>-debug.apk',
+          thread.output_file_name('My Game', False) == 'My Game-debug.apk',
+          thread.output_file_name('My Game', False))
+    check('a release build is named <app>-release.apk',
+          thread.output_file_name('My Game', True) == 'My Game-release.apk',
+          thread.output_file_name('My Game', True))
+    check('a dangerous name is still a file name',
+          thread.output_file_name('a/b:c*?', False) == 'abc-debug.apk',
+          thread.output_file_name('a/b:c*?', False))
 
     print('2) build window tabs')
     body = BuildWindowBody(manager)
