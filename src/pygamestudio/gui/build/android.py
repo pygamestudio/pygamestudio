@@ -418,7 +418,8 @@ class AndroidAppBuildWindow(QScrollArea):
         if not accepted or not alias.strip():
             return
         password, accepted = QInputDialog.getText(
-            self, title, T.tr('build.android_store_password', 'Keystore Password'),
+            self, title,
+            T.tr('build.android_password_hint', 'Keystore Password (at least 6 characters)'),
             QLineEdit.EchoMode.Password)
         if not accepted or not password:
             return

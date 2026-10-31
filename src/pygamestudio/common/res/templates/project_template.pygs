@@ -7,7 +7,7 @@
     "screen_scale_mode": "show_all",
     "screen_scale_filter": "nearest",
     "desktop_display_mode": "window",
-    "web_scale_mode": "none",
+    "web_scale_mode": "show_all",
     "asset": {
         "current_scene": "",
         "sort_type": 1

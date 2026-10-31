@@ -114,8 +114,15 @@ def main():
     print('3) a project without a fit mode')
     project = make_project({})
     _bundle, page = build(project, 'out-default')
-    check('the page falls back to no fit',
+    check('the page falls back to letterbox',
           f'const CANVAS_FIT = "{DEFAULT_WEB_FIT}";' in page,
+          re.search(r'const CANVAS_FIT = "\w+";', page).group(0))
+
+    print('4) a project that still stores the retired "none"')
+    project = make_project({'web_scale_mode': 'none'})
+    _bundle, page = build(project, 'out-retired')
+    check('a retired no-fit is read as letterbox',
+          'const CANVAS_FIT = "show_all";' in page,
           re.search(r'const CANVAS_FIT = "\w+";', page).group(0))
 
     app.processEvents()

@@ -304,8 +304,10 @@ renderer，实际按整倍数取整（1.73 → 1.0），于是 800×600 原样�
 ### 网页画布（`web_scale_mode`）
 
 **项目设置 → 游戏窗口 → 网页画布适配**，写进 `project.pygs` 的 `web_scale_mode`，
-网页打包时烘进 `index.html`：`none`（默认，按画布原大小显示）/ `show_all` / `exact_fit` /
-`integer`。
+网页打包时烘进 `index.html`：`show_all`（默认，完整显示留黑边）/ `exact_fit` / `integer`。
+
+和手机端一样，这里**没有“不缩放”**：一个 800×600 的画布放进任何窗口，不缩放就只能
+摆在中间一小块。旧工程里存的 `none` 会被当成 `show_all` 处理（`RETIRED_WEB_FIT_MODES`）。
 
 网页这层只改 canvas 的 **CSS 宽高**，不用 `object-fit`——元素盒子必须和画面一样大，
 否则 SDL 用 `getBoundingClientRect()` 算出来的鼠标位置会偏（`object-fit` 的留白算在盒子里）。
@@ -598,6 +600,11 @@ tab 里选「发布」后用你自己的 keystore 签名：`apksigner` 的密码
 别名存在 `project.pygs`（属于工程），两个密码存在 `editor.pygs`（只在这台机器上）。
 「新建...」按钮用 JDK 自带的 `keytool` 生成一个 2048 位、10000 天的自签名密钥
 （密码通过 `-storepass:env` 传递，不出现在进程列表）。
+
+* 密码**至少 6 个字符**（keytool 的硬要求）。长度在编辑器里先判，报
+  「密码至少需要 6 个字符」，否则 keytool 会甩一串 Java 堆栈；
+* keytool 的输出按**控制台代码页**解码（`decode_line`），所以中文 Windows 上的
+  「keytool 错误: ... 未生成密钥对」不会再变成 `����`。
 
 > 「新建...」先检查 JDK，再弹文件/别名/密码三个对话框。JDK 没填时直接报
 > 「请到「编辑器设置 > 安卓打包」配置：JDK 路径没有填写」，不会先问完三个问题再

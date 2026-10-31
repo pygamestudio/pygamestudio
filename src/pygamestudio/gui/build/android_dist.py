@@ -25,6 +25,11 @@ from xml.sax.saxutils import escape as xml_escape
 
 from pygamestudio.common.utils.android_runtime import COMPILE_SDK, MIN_SDK
 from pygamestudio.common.i18n.translator import Translator as T
+from pygamestudio.gui.build.android_apk import decode_line
+
+#: keytool refuses a store/key password shorter than this, and says so with a
+#: Java stack trace in the console code page - hence the check up front.
+MIN_KEYSTORE_PASSWORD_LENGTH = 6
 
 #: Manifest written for every build. Based on what p4a's SDL2 bootstrap renders
 #: (the version that ran on the device in spike 3b). The ``package`` attribute
@@ -244,6 +249,16 @@ def create_keystore(jdk, path, alias, password, common_name='Pygame Studio Game'
     not visible in the process list. Everything else is a normal, valid release
     key: 2048-bit RSA, ten thousand days.
     """
+    password = str(password)
+    # keytool's own refusal is a Java stack trace in the console code page
+    # ("密钥口令必须至少为 6 个字符" turned into garbage), so it is checked here.
+    if len(password) < MIN_KEYSTORE_PASSWORD_LENGTH:
+        raise AndroidBuildError(
+            T.tr('build.android_password_too_short',
+                 'The password needs at least {} characters - keytool refuses shorter ones')
+            .format(MIN_KEYSTORE_PASSWORD_LENGTH),
+            'android.password_too_short')
+
     keytool = Path(jdk) / 'bin' / ('keytool.exe' if platform.system() == 'Windows' else 'keytool')
     if not keytool.is_file():
         # The path is printed even when it is empty: the caller checks the
@@ -257,8 +272,8 @@ def create_keystore(jdk, path, alias, password, common_name='Pygame Studio Game'
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     environment = dict(os.environ)
-    environment['PYGS_STORE_PASSWORD'] = str(password)
-    environment['PYGS_KEY_PASSWORD'] = str(password)
+    environment['PYGS_STORE_PASSWORD'] = password
+    environment['PYGS_KEY_PASSWORD'] = password
     command = [str(keytool), '-genkeypair', '-v',
                '-keystore', str(path), '-alias', str(alias),
                '-keyalg', 'RSA', '-keysize', '2048', '-validity', '10000',
@@ -266,12 +281,15 @@ def create_keystore(jdk, path, alias, password, common_name='Pygame Studio Game'
                '-keypass:env', 'PYGS_KEY_PASSWORD',
                '-dname', f'CN={common_name}, O=PygameStudio, C=CN']
     completed = subprocess.run(command, stdout=subprocess.PIPE,
-                               stderr=subprocess.STDOUT, text=True,
-                               encoding='utf-8', errors='replace',
+                               stderr=subprocess.STDOUT,
                                env=environment, timeout=180,
                                creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+    # keytool speaks the console code page (cp936 on a Chinese Windows), so the
+    # bytes are decoded line by line instead of trusting ``text=True``.
+    output = '\n'.join(decode_line(line)
+                       for line in (completed.stdout or b'').splitlines())
     if completed.returncode != 0:
-        raise AndroidBuildError(completed.stdout or 'keytool failed',
+        raise AndroidBuildError(output or 'keytool failed',
                                 'android.error_keystore')
     return path
 

@@ -186,8 +186,9 @@ def main():
           project_settings._desktop_display_combobox.count() == 7
           and project_settings._desktop_display_combobox.findData('none') == -1,
           project_settings._desktop_display_combobox.count())
-    check('web picker has the four page modes',
-          project_settings._web_fit_combobox.count() == 4,
+    check('web picker = the three page modes, no "no fit"',
+          project_settings._web_fit_combobox.count() == 3
+          and project_settings._web_fit_combobox.findData('none') == -1,
           project_settings._web_fit_combobox.count())
     check('mobile defaults to letterboxed',
           project_settings._screen_fit_combobox.currentData() == 'show_all',
@@ -195,8 +196,8 @@ def main():
     check('desktop defaults to windowed',
           project_settings._desktop_display_combobox.currentData() == 'window',
           project_settings._desktop_display_combobox.currentData())
-    check('web defaults to no fit',
-          project_settings._web_fit_combobox.currentData() == 'none',
+    check('web defaults to letterboxed',
+          project_settings._web_fit_combobox.currentData() == 'show_all',
           project_settings._web_fit_combobox.currentData())
 
     project_settings._desktop_display_combobox.setCurrentIndex(

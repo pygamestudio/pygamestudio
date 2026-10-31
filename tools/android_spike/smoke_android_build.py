@@ -216,6 +216,17 @@ def main():
               'keytool' in keystore_error and 'D:/no-such-jdk' in keystore_error,
               keystore_error[:80])
 
+        # keytool needs six characters and answers with a Java stack trace in
+        # the console code page, so the length is checked before it runs.
+        try:
+            android_dist.create_keystore('D:/no-such-jdk',
+                                         temp / 'y.jks', 'release', '123')
+            password_error = ''
+        except android_dist.AndroidBuildError as error:
+            password_error = str(error)
+        check('a short password is refused before keytool runs',
+              'at least 6' in password_error, password_error[:80])
+
         jdk = os.environ.get('PYGS_TEST_JDK', 'D:/JDK')
         sdk = os.environ.get('PYGS_TEST_SDK', 'D:/SDK')
         toolchain = android_runtime.check_toolchain(jdk, sdk)
@@ -229,6 +240,17 @@ def main():
             android_dist.create_keystore(toolchain['jdk'], keystore_path, 'release', 'secret')
             check('a signing key can be created with the JDK',
                   keystore_path.is_file() and keystore_path.stat().st_size > 0)
+            # Running it twice fails inside keytool; its message is printed in
+            # the console code page and used to arrive as "����: ...".
+            try:
+                android_dist.create_keystore(toolchain['jdk'], keystore_path,
+                                             'release', 'secret')
+                keytool_message = ''
+            except android_dist.AndroidBuildError as error:
+                keytool_message = str(error)
+            check('keytool output is decoded, not mojibake',
+                  keytool_message and '\ufffd' not in keytool_message,
+                  keytool_message.splitlines()[0][:70] if keytool_message else '')
         else:
             print(f'   (SDK tools not installed here, tool lookup skipped: {toolchain["problems"]})')
 

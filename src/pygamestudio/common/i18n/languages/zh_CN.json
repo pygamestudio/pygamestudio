@@ -897,6 +897,8 @@
         "android_keystore_new_title": "创建签名文件",
         "android_keystore_created": "已创建签名文件：{}",
         "android_keystore_create_failed": "创建签名文件失败：{}",
+        "android_password_hint": "密钥库密码（至少 6 个字符）",
+        "android_password_too_short": "密码至少需要 {} 个字符（keytool 不接受更短的）",
         "android_keytool_missing": "JDK 文件夹里没有 bin/keytool（需要的是 JDK，不是 JRE）：{}",
         "android_alias_missing": "请填写密钥别名",
         "android_pack_missing": "编辑器内缺少安卓运行时包：{}",

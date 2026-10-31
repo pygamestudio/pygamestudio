@@ -24,9 +24,9 @@ class ProjectSettingsBody(QWidget):
     #: is covered by ``window`` and is not offered.
     DESKTOP_FIT_MODES = (('window', 'settings.desktop_window', 'Windowed (default)'),) + SCREEN_FIT_MODES
     #: Browser canvas fit: how the page scales the canvas. Stored as
-    #: ``web_scale_mode``. The page shows the canvas at its own size by default.
+    #: ``web_scale_mode``. Like the phone, the page keeps the whole canvas
+    #: visible by default; "no fit" is not offered any more.
     WEB_FIT_MODES = (
-        ('none', 'settings.screen_fit_none', 'No fit (1:1)'),
         ('show_all', 'settings.screen_fit_show_all', 'Show all (letterbox)'),
         ('exact_fit', 'settings.screen_fit_exact_fit', 'Stretch to screen'),
         ('integer', 'settings.screen_fit_integer', 'Integer scale (crisp)'),
@@ -129,7 +129,7 @@ class ProjectSettingsBody(QWidget):
         self._web_fit_combobox.clear()
         for value, key, fallback in self.WEB_FIT_MODES:
             self._web_fit_combobox.addItem(T.tr(key, fallback), value)
-        web = str(get_project_config().get('web_scale_mode') or 'none')
+        web = str(get_project_config().get('web_scale_mode') or 'show_all')
         self._web_fit_combobox.setCurrentIndex(max(0, self._web_fit_combobox.findData(web)))
 
         self._screen_width_spinbox.blockSignals(False)
