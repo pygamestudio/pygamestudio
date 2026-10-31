@@ -25,18 +25,42 @@ VERSION.json                               版本 / 路径 / 包清单 / sha256
 不含 `build/`、`obj/`、`jni/`、`.gradle/`（构建垃圾，其中 `jni/` 是 573 MB 的 SDL 源码），
 也不含任何工程的 `assets/private.tar`——那份由编辑器按用户工程生成。
 
-## 打包时怎么用
+## 打包时怎么用（已接进编辑器）
 
-1. 解压到缓存目录（例如 `%LOCALAPPDATA%\PygameStudio\android-runtime-<version>\`）；
-2. 建 `assets/private.tar`（工程 + 引擎子集，`.py` 不编译）；
-3. 往 `src/main/res` 注入图标 / 首屏 / 应用名，并同步写 `src/res_initial`（p4a 每次打包都会从它恢复）；
-4. 拷 `gradlew` + SDK 路径跑 `assembleDebug` / `assembleRelease`。
+「Build 构建」窗口的第三个标签页 **安卓 APK** 会按顺序做：
+
+1. 校验压缩包的 sha256，解压到用户缓存（`platformdirs.user_cache_dir()/PygameStudio/android/runtime-<version>-<abi>/`，
+   只解压一次，包里记一个 `.archive.sha256` 标记）；
+2. 读「编辑器设置 > 安卓打包」里的 JDK / SDK 路径（空着就自动探测），检查 JDK ≥ 17 和
+   `platforms/android-34`（`build-tools` 缺失不阻塞：AGP 会自己装它要的那个版本）；
+3. 用 `gui/build/protection.py` 保护工程（去注释 + 加密资源），
+   再用 `gui/build/runtime_payload.py` 把引擎运行子集放进去；
+4. 把包拷到缓存的 `dist/` 工作目录，**从包里的** `src/res_initial` 恢复 `src/main/res`
+   （不能从工作目录恢复，否则上一个工程的图标会一直留着），
+   写入图标 / 首屏 / 应用名 / `values/strings.xml` / `AndroidManifest.xml`，
+   改 `build.gradle`（namespace、applicationId、versionCode/Name、SDK 版本，
+   并删掉包里钉死的 `buildToolsVersion`）和 `local.properties`；
+5. 写 `src/main/assets/private.tar`（工程 + 引擎，`.py` 不编译）；
+6. 用 `gradlew assembleDebug` 打包，把 APK 拷到 `<输出目录>/build/Android/<应用名>.apk`。
+
+Gradle 的缓存放在 `.../android/gradle/`，所以同一个工程第二次构建只需几秒。
+
+## 三个坑（已在代码里绕开）
+
+- **`values/strings.xml` 不在包里**：p4a 是按 `templates/strings.tmpl.xml` 在每次打包时
+  现场渲染它的，`src/res_initial` 里没有；而清单引用了 `@string/app_name` 和
+  `@style/KivySupportCutout`，少了它 AAPT 直接失败。编辑器会自己生成这个文件。
+- **`applicationId`**：AGP 8 默认把 `namespace` 当应用 ID，改包名后必须显式写
+  `applicationId`，否则装出来还是旧包名。
+- **`buildToolsVersion` 不能钉死**：AGP 8.11 最低要 35，包里是 CI 的版本；钉着只会报警告，
+  删掉这一行让 AGP 自己决定（它会自己装）。
 
 ## 什么时候需要换这个包
 
-见 `tools/android_spike/README.md` 的「运行时产物冻结」一节：
-只要**引擎运行时代码**、**pygame-ce / pymunk 版本**、**p4a 或它的 Java 引导层**、
-**Android 平台 / NDK** 里任何一项变了，就要重新生成。
+见 `tools/android_spike/README.md` 的「运行时产物冻结」一节。简单说：
+**引擎自己的代码变了不用换**（引擎在 `private.tar` 里），但
+**pygame-ce / pymunk / cffi 版本**、**p4a 或它的 Java 引导层**、
+**Python 版本**、**Android 平台 / NDK** 里任何一项变了，就要重新生成。
 
 ## 注意
 

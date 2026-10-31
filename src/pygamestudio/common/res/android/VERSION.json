@@ -1,0 +1,37 @@
+{
+    "format": 2,
+    "name": "pygs-android-runtime",
+    "version": "1.0.0",
+    "layout": {
+        "python_bundle": "_python_bundle__arm64-v8a/_python_bundle",
+        "libs": "libs/arm64-v8a",
+        "java": "src/main/java",
+        "resources": "src/res_initial"
+    },
+    "files": 357,
+    "bytes": 49104133,
+    "abi": "arm64-v8a",
+    "python": "3.14",
+    "packages": {
+        "cffi": "2.0.0",
+        "pycparser": "2.14",
+        "pygame_ce": "2.5.8",
+        "pymunk": "7.3.1",
+        "setuptools": "84.2.1"
+    },
+    "pygame_ce": "2.5.8",
+    "pymunk": "7.3.1",
+    "cffi": "2.0.0",
+    "site_packages": [
+        "cffi",
+        "pycparser",
+        "pygame",
+        "pymunk",
+        "setuptools"
+    ],
+    "archive": {
+        "name": "pygs-android-runtime-1.0.0-arm64-v8a.zip",
+        "bytes": 22544785,
+        "sha256": "0eef962b5a7f5d73a394a3a5bfb17c4d6ae1de34b7cace5d9d6c341e66d53d5d"
+    }
+}

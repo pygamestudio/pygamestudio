@@ -428,7 +428,6 @@ pygs-android-runtime-1.0.0-arm64-v8a.zip: 21.0 MB (2.16x smaller, lzma)
 | 桌面打包 | 只收集 `common/res/images`、`i18n/languages`、`common/res/sdk`，天然不受影响 |
 
 ### 什么时候要重新冻结
-
 | 变了什么 | 要不要重冻 |
 |---|---|
 | 引擎运行时代码（`api/` `game/` `common/` `gui/console/logger.py`） | **不要**——引擎是打进每个工程的 `private.tar` 的，运行时产物不含它 |
@@ -464,8 +463,73 @@ pygs-android-runtime-1.0.0-arm64-v8a.zip: 21.0 MB (2.16x smaller, lzma)
 | `error: use of undeclared identifier 'cpMessage'` 之类 | Chipmunk 源码与 NDK 版本不匹配 | 先把 `android.ndk` 固定为 `25b` 再试 |
 | 首次构建超时（CI 150 分钟） | 缓存未命中 | 重跑一次，缓存命中后只编译增量 |
 
-## 三项都通过之后
+## 编辑器侧：安卓打包（已实现）
 
-1. 固化 `VERSION.json`（python / pygame-ce / pymunk / abi / 平台 sdl2 版本 / 校验和）；
-2. 写 `AndroidRuntime`（校验 + 版本匹配）与 `AndroidAppBuilder`（重组 private.tar → 注入 → Gradle）；
-3. `BuildWindowBody` 加第三个 tab，设置页加 Android 页（SDK/JDK/Gradle 路径 + 检测）。
+运行时包进仓库后，编辑器不再需要任何工具链下载，用户机器上只要求 **JDK 17+** 和
+**Android SDK（platform 34 + build-tools）**。
+
+| 位置 | 作用 |
+|---|---|
+| `common/utils/android_runtime.py` | 找包、校验 sha256、解压到缓存；探测 JDK/SDK 并检查版本（不依赖 Qt，可脚本调用） |
+| `gui/build/runtime_payload.py` | 「一个安卓包要带哪些引擎文件」的唯一清单；本目录的 `engine_runtime.py` 按路径加载它 |
+| `gui/build/android_assets.py` | 图标 / 首屏 / 应用名注入；本目录的 `android_assets.py` 同样是按路径的壳 |
+| `gui/build/android_dist.py` | 解包成型 → 恢复 res → 清单 / strings.xml / build.gradle / local.properties → 调 Gradle |
+| `gui/build/android.py` | Build 窗口第三个 tab（安卓 APK）+ 后台线程 |
+| `gui/settings/editor.py` | 「编辑器设置 > 安卓打包」：JDK、SDK、运行时包信息、环境检查 |
+
+缓存目录（`platformdirs.user_cache_dir()/PygameStudio/android/`）：
+
+```
+runtime-1.0.0-arm64-v8a/   解压后的运行时包（带 .archive.sha256 标记）
+dist/                      拼好的 Gradle 工程（增量构建靠它，第二次几秒）
+gradle/                    GRADLE_USER_HOME（Gradle 发行版 + AGP 依赖缓存）
+payload/                   每次构建重新生成的 private.tar 内容
+```
+
+### 接线时发现的两个 p4a 坑
+
+| 现象 | 原因 | 处置 |
+|---|---|---|
+| AAPT 报 `resource string/app_name not found` / `style/KivySupportCutout not found` | p4a 每次打包时才从 `templates/strings.tmpl.xml` 渲染 `values/strings.xml`，`src/res_initial` 里**没有**它，冻结包自然也带不上 | 编辑器自己生成（含 `app_name`、`presplash_color`、`private_version` 和那个 style），同时写进 `res_initial` |
+| 改包名后装出来还是旧包名 | AGP 8 用 `namespace` 当 applicationId | `build.gradle` 里显式写 `applicationId` |
+
+### 真机前最后一关：本机 Gradle
+
+已在一台 Windows 11 + JDK 17 + SDK（platform 34）上跑通完整链路：解包 → 保护 → 引擎 →
+`private.tar` → 图标/首屏/清单 → `gradlew assembleDebug` → 拷出 APK。`aapt dump badging` 验过：
+
+```
+package: name='org.pygamestudio.buildtest' versionCode='7' versionName='1.2.3'
+application-label:'PyGS Build Test'
+launchable-activity: org.kivy.android.PythonActivity
+native-code: 'arm64-v8a'
+APK 17.7 MB • 45 entries • 14 个 .so（含 libfreetype / libpybundle）• assets/private.tar 267 KB
+第二次构建：Gradle 2 s（缓存生效）
+```
+
+那一次还修了两个只有真正跑 Gradle 才会暴露的问题：
+
+| 现象 | 原因 | 处置 |
+|---|---|---|
+| `BUILD FAILED`：`Could not download gradle-8.11.0.jar … Remote host terminated the handshake` | 本机 Clash 代理对 Java 无效（Java 不读系统代理）；直接放开后又因并发握手过多被代理掐断 | 失败后自动**走系统代理重试**：`GRADLE_OPTS` + `JAVA_TOOL_OPTIONS`（守护进程也要）+ `systemProp.*`，并把 `maxConnections` 降到 4 |
+| 警告 `buildToolsVersion 34.0.0 is ignored, below the minimum (35.0.0) for AGP 8.11` | 包里钉的是 CI 的 build-tools 版本，而每个 AGP 有自己的下限，且会自己装 | 生成 `build.gradle` 时**删掉** `buildToolsVersion`，让 AGP 决定；设置页也不再把它当阻塞项 |
+
+
+### 测试
+
+```powershell
+py -3.10 tools/android_spike/smoke_android_build.py   # 49 项：解包 → 保护 → payload → private.tar → 清单/Gradle
+py -3.10 tools/android_spike/check_android_ui.py      # 22 项：第三个 tab + 设置页（offscreen，不碰用户配置）
+py -3.10 tools/android_spike/smoke_engine.py          # 16 项：真机路径的引擎回归
+py -3.10 tools/android_spike/project_scan.py tools/android_spike/app
+```
+
+### 还没做
+
+1. **release 签名**：目前只出 `assembleDebug`（可安装，debug 证书）。release 需要
+   keystore + `apksigner`，以及一个「签名」设置页；
+2. **AAB**：`assembleRelease` 换成 `bundleRelease` 即可，但要先有签名；
+3. **按工程裁剪 ABI**：现在只发 arm64-v8a（手机够用，模拟器 x86_64 不行）；
+4. **扩展包**：往 `site-packages` 加库后需要重打 `libpybundle.so`（见上一节）；
+5. **首次构建的网络**：Gradle 发行版 + AGP + androidx 约 250 MB，需要联网（有系统代理会自动重试）。
+
