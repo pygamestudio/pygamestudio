@@ -93,8 +93,13 @@ class PygameCERecipe(Pygame2Recipe):
                  f'_freetype will be skipped')
             return env
 
-        for key in ('CFLAGS', 'CPPFLAGS'):
-            flag = f'-I{include_dir.as_posix()}'
+        # -I for the headers (they stay in the build tree) and -L for the shared
+        # library (p4a also installs it into the dist's libs dir, but pointing at
+        # the build tree costs nothing and covers a recipe that skipped it).
+        flags = (('CFLAGS', f'-I{include_dir.as_posix()}'),
+                 ('CPPFLAGS', f'-I{include_dir.as_posix()}'),
+                 ('LDFLAGS', f'-L{(freetype_dir / "objs" / ".libs").as_posix()}'))
+        for key, flag in flags:
             if flag not in env.get(key, ''):
                 env[key] = (env.get(key, '') + ' ' + flag).strip()
         info(f'{self.name}: freetype headers at {include_dir.as_posix()} (for _freetype)')
@@ -220,7 +225,13 @@ def _patch_setup_text(text):
             enabled = True
         elif stripped.startswith('FREETYPE'):
             indent = line[:len(line) - len(stripped)]
-            result.append(f'{indent}FREETYPE = -lfreetype\n')
+            # ``-Isrc_c`` is what makes the module compile at all: its header
+            # lives in src_c/freetype/ but includes "pgcompat.h" / "pgplatform.h"
+            # / "include/pygame_freetype.h", which are one and two levels up.
+            # (Every other extension sits directly in src_c, so the compiler
+            # finds those headers next to its own source.) harfbuzz is dropped:
+            # p4a only builds it when it is in the requirements.
+            result.append(f'{indent}FREETYPE = -lfreetype -Isrc_c\n')
         else:
             result.append(line)
     return ''.join(result), enabled
