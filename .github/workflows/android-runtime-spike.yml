@@ -198,6 +198,19 @@ jobs:
           echo "packing $DIST"
           tar -czf pygs-dist.tgz -C "$(dirname "${DIST}")" "$(basename "${DIST}")"
 
+      # The artefact the editor ships: everything an APK needs except the game.
+      # LZMA by default - ~12% smaller than deflate and the editor only pays for
+      # it once, when it unpacks the pack into its cache.
+      - name: Freeze the runtime artefact
+        if: always()
+        working-directory: tools/android_spike
+        run: |
+          DIST="${DIST:-$(ls -d .buildozer/android/platform/build-*/dists/*/ | head -n 1)}"
+          DIST="${DIST%/}"
+          [ -d "$DIST" ] || { echo "::warning::no dist to freeze"; exit 0; }
+          python3 freeze_runtime.py "$DIST" --out bin --version 1.0.0 \
+            | tee -a inspect.log
+
       - name: Upload spike artefacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -207,6 +220,8 @@ jobs:
           retention-days: 14
           path: |
             tools/android_spike/bin/*.apk
+            tools/android_spike/bin/pygs-android-runtime-*.zip
+            tools/android_spike/bin/VERSION.json
             tools/android_spike/buildozer.log
             tools/android_spike/inspect.log
             tools/android_spike/scan.log

@@ -386,6 +386,70 @@ RESULT : imports UNSUPPORTED      (exit 1)
 CI 在构建前就跑这一步（`scan.log` 也会上传），失败时给出的是模块名，不是一台黑屏的手机。
 
 
+## 运行时产物冻结（第 7 步）
+
+`freeze_runtime.py` 把 CI 产出的 `dist/` 压成编辑器要发的那一份：
+
+```powershell
+py -3.10 tools/android_spike/freeze_runtime.py <dist_dir> --out bin --version 1.0.0
+```
+
+实测（arm64-v8a，pygame-ce 2.5.8 / pymunk 7.3.1 / python 3.14）：
+
+```
+files   : 355, 45.5 MB raw
+  _python_bundle__arm64-v8a   265 files  14.6 MB
+  libs                         13 files  30.2 MB
+  src (java + res_initial)     54 files   0.7 MB
+  gradle / templates           19 files   0.1 MB
+
+pygs-android-runtime-1.0.0-arm64-v8a.zip: 21.0 MB (2.16x smaller, lzma)
+（deflate 9 为 23.9 MB）
+```
+
+要点：
+
+* **不含** `jni/`（573 MB 的 SDL 源码）、`build/`、`obj/`、`.gradle/`，也不含工程的
+  `assets/private.tar`（那份由编辑器按用户工程生成）；
+* p4a 的 `build.gradle` 里**没有** `externalNativeBuild`，只有 `jniLibs.srcDir 'libs'` ——
+  所以**打包 APK 不需要 NDK**，JDK + Android SDK + Gradle 足够；
+* 压缩默认 LZMA（`zipfile.ZIP_LZMA`），解压只需要 Python 的 `lzma`，代价是编辑器首次
+  使用时多花几秒；`--compressor deflate` 可切回，`--compare-compressors` 两个都压一遍报尺寸；
+* `VERSION.json` 里有 `layout`（各路径）、`packages`（从 `*.dist-info` 读出的
+  pygame_ce / pymunk / cffi 版本）、`python`、`abi`、`archive.sha256`，编辑器用它做
+  版本校验和解压后校验。
+
+产物放进 `src/pygamestudio/common/res/android/`（那里有说明），并且：
+
+| 位置 | 处理 |
+|---|---|
+| 网页打包 | `gui/build/web.py` 的 `_ENGINE_RES_SKIP` 加了 `'android'`，不会进网页包 |
+| APK payload | `engine_runtime.RUNTIME_SKIP_DIRS` 加了 `('common','res','android')` |
+| 桌面打包 | 只收集 `common/res/images`、`i18n/languages`、`common/res/sdk`，天然不受影响 |
+
+### 什么时候要重新冻结
+
+| 变了什么 | 要不要重冻 |
+|---|---|
+| 引擎运行时代码（`api/` `game/` `common/` `gui/console/logger.py`） | **不要**——引擎是打进每个工程的 `private.tar` 的，运行时产物不含它 |
+| 编辑器打包逻辑（icon/splash 注入、`private.tar` 生成、适配下拉框） | **不要** |
+| `pygame-ce` / `pymunk` / `cffi` 版本（recipe 里的 `version`） | **要** |
+| p4a 版本、`android.api` / `android.minapi` / bootstrap / NDK | **要**（libs 和 Java 引导层都会变） |
+| Python 版本（p4a 升级带来的） | **要** |
+| 新增一个要内置进去的第三方库 | 要，或者做成独立的"扩展包"（见下） |
+
+### 第三方库的安卓依赖怎么来
+
+* **纯 Python 库**（requests、attrs…）：把 wheel 解压后丢进 `site-packages` 即可，不需要原生代码。
+* **带 C 扩展的库**（numpy、Pillow…）：PyPI 的 `manylinux` wheel 在 Android 上**不能直接用**
+  （bionic libc ≠ glibc，ABI 不兼容）。必须交叉编译成 arm64-v8a 的 `.so`：
+  1. 写一个 p4a recipe（和 `p4a_recipes/pygame_ce`、`pymunk` 一模一样的形式）；
+  2. CI 打出"扩展包"（只含该库的 `site-packages` 内容 + 它的 `.so`）；
+  3. 编辑器和运行时产物比对 `python` / `abi` 后合并进 `libpybundle.so`。
+  p4a 已经自带 numpy / Pillow / openssl / libffi 等 recipe，所以这条路是通的，只是要逐个验证。
+* 版本必须与运行时产物**同 python 小版本、同 abi、同 p4a**，否则 `.so` 加载会失败——
+  `VERSION.json` 里这两个字段就是给编辑器做校验用的。
+
 
 ## 失败时的处置（按概率排序）
 

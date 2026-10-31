@@ -51,6 +51,7 @@ RUNTIME_SKIP_DIRS = (
     ('common', 'res', 'pyodide'),    # 14.5 MB browser runtime
     ('common', 'res', 'wheels'),     # browser wheels
     ('common', 'res', 'sdk'),        # Windows SDK binaries
+    ('common', 'res', 'android'),    # frozen Android runtime pack (built from a dist)
 )
 
 #: ``pygamestudio/sdk/__init__.py`` written into a build.

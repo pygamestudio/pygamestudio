@@ -115,7 +115,8 @@ _ENGINE_EXTRA_FILES = ('gui/__init__.py', 'gui/console/__init__.py', 'gui/consol
 #: project; the TapTap SDK binaries are Windows desktop data). The physics
 #: wheels and the self-hosted Pyodide runtime ship NEXT TO the bundle, never
 #: inside the archive.
-_ENGINE_RES_SKIP = ('fonts', 'qss', 'templates', 'audios', 'wheels', 'pyodide', 'sdk')
+_ENGINE_RES_SKIP = ('fonts', 'qss', 'templates', 'audios', 'wheels', 'pyodide', 'sdk',
+                    'android')
 #: Folder in ``common/res`` holding the Pyodide wheels of the engine.
 WHEELS_DIR_NAME = 'wheels'
 #: Boot template placeholder holding the pymunk install source ('' = none).
