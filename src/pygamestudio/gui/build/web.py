@@ -83,6 +83,8 @@ DEFAULT_CANVAS_SIZE = (800, 600)
 DEFAULT_WEB_FIT = 'none'
 #: Splash image shown while the page loads, before the canvas appears.
 SPLASH_IMAGE_NAME = 'presplash_logo.png'
+#: Progress bar width used when the splash cannot be measured.
+SPLASH_BAR_RATIO_FALLBACK = 0.9
 #: Values written by the project settings' "Web Canvas Fit" picker and honoured
 #: by the page script (see web_index_template.html).
 WEB_FIT_MODES = ('none', 'show_all', 'exact_fit', 'integer')
@@ -1064,6 +1066,9 @@ class WebAppBuilder:
         # without that folder the page falls back to the CDN.
         pyodide_url = (build_config.get('pyodide_url') or '').strip()
         self._bundle_pyodide = False
+        #: Width of the progress bar relative to the splash (measured when the
+        #: splash is written, see _measure_splash_text).
+        self._splash_bar_ratio = SPLASH_BAR_RATIO_FALLBACK
         #: Loader file the page imports; the bundled copy ships as .js (see
         #: _rename_runtime_modules) so every static server serves it with a
         #: JavaScript MIME type.
@@ -1340,7 +1345,61 @@ class WebAppBuilder:
             Logger.warning(T.tr('build.web_splash_missing', 'The page splash image is missing: {}').format(source.as_posix()))
             return ''
         shutil.copyfile(source, bundle_dir / SPLASH_IMAGE_NAME)
+        # The progress bar is made exactly as wide as the wordmark under the
+        # logo, so it reads as part of the picture instead of a stray stripe.
+        self._splash_bar_ratio = self._measure_splash_text(source)
         return '<img id="splash" src="{}" alt="">'.format(SPLASH_IMAGE_NAME)
+
+    @staticmethod
+    def _measure_splash_text(image_path, width_limit=200):
+        """Width of the wordmark on the splash, as a fraction of the image.
+
+        Measured from the picture itself (rows with ink are grouped into bands;
+        the wordmark is the last one, under the logo) so replacing
+        ``presplash_logo.png`` needs no code change. The scan runs on a
+        downscaled copy - a ratio is all that is needed and it keeps a 400x348
+        image from costing a second of build time.
+        """
+        image = QImage(str(image_path))
+        if image.isNull() or image.width() < 8 or image.height() < 8:
+            return SPLASH_BAR_RATIO_FALLBACK
+        if image.width() > width_limit:
+            image = image.scaledToWidth(width_limit, Qt.TransformationMode.SmoothTransformation)
+        width, height = image.width(), image.height()
+        background = image.pixelColor(1, 1)
+
+        def is_ink(x, y):
+            color = image.pixelColor(x, y)
+            if color.alpha() < 40:
+                return False
+            return (abs(color.red() - background.red())
+                    + abs(color.green() - background.green())
+                    + abs(color.blue() - background.blue())) > 60
+
+        bands = []
+        start = None
+        for y in range(height):
+            row_has_ink = any(is_ink(x, y) for x in range(width))
+            if row_has_ink and start is None:
+                start = y
+            elif not row_has_ink and start is not None:
+                bands.append((start, y - 1))
+                start = None
+        if start is not None:
+            bands.append((start, height - 1))
+        if not bands:
+            return SPLASH_BAR_RATIO_FALLBACK
+
+        top, bottom = bands[-1]
+        left, right = width, -1
+        for y in range(top, bottom + 1):
+            for x in range(width):
+                if is_ink(x, y):
+                    left = min(left, x)
+                    right = max(right, x)
+        if right < left:
+            return SPLASH_BAR_RATIO_FALLBACK
+        return (right - left + 1) / float(width)
 
     def _read_canvas_size(self):
         """The canvas size of the project, so the page is right before starting."""
@@ -1370,6 +1429,7 @@ class WebAppBuilder:
                 .replace('__PYGS_TITLE__', html.escape(self._page_title))
                 .replace('__PYGS_FAVICON_LINK__', favicon_links)
                 .replace('__PYGS_SPLASH_TAG__', splash_tag)
+                .replace('__PYGS_SPLASH_BAR_RATIO__', '{:.3f}'.format(self._splash_bar_ratio))
                 .replace('__PYGS_CANVAS_WIDTH__', str(canvas_size[0]))
                 .replace('__PYGS_CANVAS_HEIGHT__', str(canvas_size[1]))
                 .replace('__PYGS_WEB_FIT__', self._read_web_fit())

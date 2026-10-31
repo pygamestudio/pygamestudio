@@ -204,6 +204,18 @@ def main():
         check('a filled-in path is used as it is, no scanning',
               android_runtime.check_toolchain('', 'X:/nowhere')['sdk'] == 'X:/nowhere')
 
+        # The "New..." button asks for the JDK before any dialog; when it does
+        # reach create_keystore the message has to say what is missing.
+        try:
+            android_dist.create_keystore('D:/no-such-jdk',
+                                         temp / 'x.jks', 'release', 'secret')
+            keystore_error = ''
+        except android_dist.AndroidBuildError as error:
+            keystore_error = str(error)
+        check('a JDK without keytool says which folder was tried',
+              'keytool' in keystore_error and 'D:/no-such-jdk' in keystore_error,
+              keystore_error[:80])
+
         jdk = os.environ.get('PYGS_TEST_JDK', 'D:/JDK')
         sdk = os.environ.get('PYGS_TEST_SDK', 'D:/SDK')
         toolchain = android_runtime.check_toolchain(jdk, sdk)
@@ -212,6 +224,11 @@ def main():
             jar = android_apk.android_jar(toolchain['sdk'], android_runtime.COMPILE_SDK)
             check('SDK tools found', tools_dir.is_dir(), tools_dir.as_posix())
             check('android.jar found', jar.is_file(), jar.as_posix())
+            # The "New..." button ends up here; a real JDK has to produce a key.
+            keystore_path = temp / 'release-test.jks'
+            android_dist.create_keystore(toolchain['jdk'], keystore_path, 'release', 'secret')
+            check('a signing key can be created with the JDK',
+                  keystore_path.is_file() and keystore_path.stat().st_size > 0)
         else:
             print(f'   (SDK tools not installed here, tool lookup skipped: {toolchain["problems"]})')
 

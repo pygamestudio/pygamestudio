@@ -324,6 +324,11 @@ renderer，实际按整倍数取整（1.73 → 1.0），于是 800×600 原样�
 | 加载中 | 标题 → `presplash_logo.png`（`common/res/images`，打包时拷到页面旁边）→ 进度条，垂直排列居中 |
 | 运行中 | 只剩画布（`body.running` 把标题/首屏/进度条 `display:none`，`#app` 取消内边距） |
 
+进度条的宽度不是写死的：打包时从 `presplash_logo.png` 里量出“Pygame Studio”这行字
+的横向占比（现在这张图是 400px 宽、文字占 x=20..381，即 0.905），写进页面的
+`const SPLASH_BAR_RATIO`，运行时按首屏**实际渲染宽度**算条的长度，所以换图不用改代码，
+手机上（首屏被 `70vw` 压窄时）也还是和文字一样长。
+
 画布在加载阶段用 `visibility: hidden` 而不是 `display: none` 隐藏，并 `position: absolute`
 离流——它始终保持一个真实元素盒子，因为 SDL 靠这个盒子换算鼠标/触摸坐标，0×0 会算出 NaN。
 
@@ -593,6 +598,10 @@ tab 里选「发布」后用你自己的 keystore 签名：`apksigner` 的密码
 别名存在 `project.pygs`（属于工程），两个密码存在 `editor.pygs`（只在这台机器上）。
 「新建...」按钮用 JDK 自带的 `keytool` 生成一个 2048 位、10000 天的自签名密钥
 （密码通过 `-storepass:env` 传递，不出现在进程列表）。
+
+> 「新建...」先检查 JDK，再弹文件/别名/密码三个对话框。JDK 没填时直接报
+> 「请到「编辑器设置 > 安卓打包」配置：JDK 路径没有填写」，不会先问完三个问题再
+> 甩一句 `keytool not found in `（那个空路径就是 JDK 字段为空）。
 
 ### 触摸坐标
 

@@ -24,6 +24,7 @@ from pathlib import Path
 from xml.sax.saxutils import escape as xml_escape
 
 from pygamestudio.common.utils.android_runtime import COMPILE_SDK, MIN_SDK
+from pygamestudio.common.i18n.translator import Translator as T
 
 #: Manifest written for every build. Based on what p4a's SDL2 bootstrap renders
 #: (the version that ran on the device in spike 3b). The ``package`` attribute
@@ -245,7 +246,13 @@ def create_keystore(jdk, path, alias, password, common_name='Pygame Studio Game'
     """
     keytool = Path(jdk) / 'bin' / ('keytool.exe' if platform.system() == 'Windows' else 'keytool')
     if not keytool.is_file():
-        raise AndroidBuildError(f'keytool not found in {jdk}', 'android.error_java_too_old')
+        # The path is printed even when it is empty: the caller checks the
+        # toolchain first, so this is only reached with a folder that has no
+        # keytool (a JRE instead of a JDK, or a wrong folder).
+        raise AndroidBuildError(
+            T.tr('build.android_keytool_missing',
+                 'The JDK folder has no bin/keytool: {}').format(Path(jdk).as_posix() or '(empty)'),
+            'android.jdk_missing')
 
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -36,6 +36,7 @@ sys.path.insert(0, str(REPO_ROOT / 'src'))
 from PySide6.QtWidgets import QApplication                        # noqa: E402
 
 from pygamestudio.gui.build.android import AndroidAppBuildWindow, is_valid_package  # noqa: E402
+import pygamestudio.gui.build.android as android_module                # noqa: E402
 from pygamestudio.gui.build.window import BuildWindow, BuildWindowBody      # noqa: E402
 from pygamestudio.gui.settings.editor import EditorSettingsBody    # noqa: E402
 from pygamestudio.gui.settings.project import ProjectSettingsBody  # noqa: E402
@@ -116,6 +117,41 @@ def main():
     check('the android tab is taller', android_height > desktop_height,
           f'{desktop_height} -> {android_height}')
     window.close()
+
+    print('2c) "New..." without a JDK')
+    # The reported bug: with an empty JDK path the button asked for a file, an
+    # alias and a password and only then failed with "keytool not found in ".
+    # It has to refuse up front, and without opening a dialog.
+    class _NoDialog:
+        @staticmethod
+        def getSaveFileName(*args, **kwargs):
+            raise AssertionError('a file dialog was opened without a JDK')
+
+    class _RecordingLogger:
+        errors = []
+
+        @classmethod
+        def error(cls, message, *args, **kwargs):
+            cls.errors.append(str(message))
+
+        @staticmethod
+        def info(*args, **kwargs):
+            pass
+
+        warning = info
+
+    build_window = AndroidAppBuildWindow(manager)
+    build_window.get_ready_for_project()
+    original_dialog, original_logger = android_module.QFileDialog, android_module.Logger
+    android_module.QFileDialog, android_module.Logger = _NoDialog, _RecordingLogger
+    try:
+        build_window._create_keystore()
+    finally:
+        android_module.QFileDialog, android_module.Logger = original_dialog, original_logger
+    check('no dialog before the JDK is known', bool(_RecordingLogger.errors))
+    check('the message names the setting, not "keytool not found in "',
+          _RecordingLogger.errors and 'Android Build' in _RecordingLogger.errors[0],
+          (_RecordingLogger.errors[0].replace('\n', ' ')[:70] if _RecordingLogger.errors else ''))
 
     print('3) settings page')
     settings = EditorSettingsBody(manager)

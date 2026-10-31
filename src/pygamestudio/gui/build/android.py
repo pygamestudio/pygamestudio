@@ -391,6 +391,18 @@ class AndroidAppBuildWindow(QScrollArea):
 
     def _create_keystore(self):
         """Create a self-signed release key with the JDK's keytool."""
+        # Checked before the dialogs: the JDK is needed for keytool, and three
+        # questions followed by "keytool not found in " helps nobody.
+        config = get_editor_config()
+        toolchain = android_runtime.check_toolchain(config.get('android_jdk') or '',
+                                                    config.get('android_sdk') or '')
+        jdk_problems = [key for key in toolchain['problems'] if key.startswith('android.jdk')]
+        if jdk_problems:
+            Logger.error(T.tr('build.android_toolchain_problem',
+                              'Missing build tools - open Editor Settings > Android Build:\n{}')
+                         .format('\n'.join(T.tr(key, key) for key in jdk_problems)))
+            return
+
         title = T.tr('build.android_keystore_new_title', 'Create a signing key')
         output_dir = (self._output_dir_lineedit.text().strip()
                       or self._game_manager.get_project_path())
@@ -412,10 +424,7 @@ class AndroidAppBuildWindow(QScrollArea):
             return
 
         try:
-            config = get_editor_config()
-            toolchain = android_runtime.check_toolchain(config.get('android_jdk') or '',
-                                                        config.get('android_sdk') or '')
-            android_dist.create_keystore(toolchain.get('jdk') or '', path,
+            android_dist.create_keystore(toolchain['jdk'], path,
                                          alias.strip(), password, common_name=app_name)
         except Exception as error:                        # noqa: BLE001 - report in the console
             Logger.error(T.tr('build.android_keystore_create_failed',

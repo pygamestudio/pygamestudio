@@ -24,7 +24,9 @@ sys.path.insert(0, str(REPO_ROOT / 'src'))
 
 from PySide6.QtWidgets import QApplication                        # noqa: E402
 
-from pygamestudio.gui.build.web import WebAppBuilder, DEFAULT_WEB_FIT    # noqa: E402
+from pygamestudio.gui.build.web import (WebAppBuilder, DEFAULT_WEB_FIT,
+                                        SPLASH_BAR_RATIO_FALLBACK)    # noqa: E402
+from pygamestudio.common.utils.path import RES_PATH                   # noqa: E402
 
 results = []
 
@@ -98,7 +100,18 @@ def main():
     check('the canvas keeps the project size',
           'width="800" height="600"' in page)
 
-    print('2) a project without a fit mode')
+    print('2) the progress bar matches the wordmark on the splash')
+    splash = RES_PATH / 'images' / 'presplash_logo.png'
+    ratio = WebAppBuilder._measure_splash_text(splash)
+    # The wordmark of the shipped logo spans x=20..381 of 400 px.
+    check('the wordmark width is measured from the picture',
+          0.85 <= ratio <= 0.95, round(ratio, 3))
+    check('the page gets that ratio',
+          f'const SPLASH_BAR_RATIO = {ratio:.3f};' in page)
+    check('a missing splash falls back instead of failing',
+          WebAppBuilder._measure_splash_text(TEMP / 'nope.png') == SPLASH_BAR_RATIO_FALLBACK)
+
+    print('3) a project without a fit mode')
     project = make_project({})
     _bundle, page = build(project, 'out-default')
     check('the page falls back to no fit',

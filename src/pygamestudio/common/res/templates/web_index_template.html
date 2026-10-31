@@ -40,8 +40,7 @@ __PYGS_TOY_SDK_SCRIPT__
     #splash { max-width: min(70vw, 400px); max-height: 40vh; border-radius: 8px; }
     body.running #splash, body.running h1#title, body.running #loader { display: none; }
     #loader { display: flex; flex-direction: column; align-items: center; gap: 8px;
-              width: min(320px, 80vw); }
-    #loader-track { width: 100%; height: 4px; border-radius: 2px; background: #2a2c33; overflow: hidden; }
+              width: min(320px, 80vw); }    #loader-track { width: 100%; height: 4px; border-radius: 2px; background: #2a2c33; overflow: hidden; }
     #loader-bar { width: 4%; height: 100%; border-radius: 2px; background: #4f8cff;
                   transition: width .25s ease; }
     #loader-text { font-size: 12.5px; color: #a9adb8; text-align: center; }
@@ -77,8 +76,25 @@ __PYGS_TOY_SDK_SCRIPT__
     const CANVAS_WIDTH = __PYGS_CANVAS_WIDTH__;
     const CANVAS_HEIGHT = __PYGS_CANVAS_HEIGHT__;
     const CANVAS_FIT = "__PYGS_WEB_FIT__";
+    // Width of the wordmark printed on the splash, measured by the build from
+    // presplash_logo.png itself (see WebAppBuilder._measure_splash_text).
+    const SPLASH_BAR_RATIO = __PYGS_SPLASH_BAR_RATIO__;
     const appElement = document.getElementById("app");
     const canvasElement = document.getElementById("canvas");
+
+    // The bar under the splash is as wide as the "Pygame Studio" wordmark, so
+    // the two read as one lockup at every screen size.
+    function fitSplashBar() {
+        const splash = document.getElementById("splash");
+        const loader = document.getElementById("loader");
+        if (!splash || !loader) {
+            return;
+        }
+        const width = splash.getBoundingClientRect().width;
+        if (width > 0) {
+            loader.style.width = Math.round(width * SPLASH_BAR_RATIO) + "px";
+        }
+    }
 
     function isShown(element) {
         if (!element) {
@@ -134,13 +150,22 @@ __PYGS_TOY_SDK_SCRIPT__
     }
 
     window.applyCanvasFit = applyCanvasFit;
+    window.fitSplashBar = fitSplashBar;
     // The boot calls this right before the game loop starts: drop the title,
     // the splash and the bar, show the canvas, and size it to the whole page.
     window.showGameCanvas = function () {
         document.body.classList.add("running");
         applyCanvasFit();
     };
-    window.addEventListener("resize", applyCanvasFit);
+    window.addEventListener("resize", function () {
+        fitSplashBar();
+        applyCanvasFit();
+    });
+    fitSplashBar();
+    const splashImage = document.getElementById("splash");
+    if (splashImage && !splashImage.complete) {
+        splashImage.addEventListener("load", fitSplashBar);
+    }
 })();
 </script>
 

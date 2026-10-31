@@ -897,6 +897,7 @@
         "android_keystore_new_title": "创建签名文件",
         "android_keystore_created": "已创建签名文件：{}",
         "android_keystore_create_failed": "创建签名文件失败：{}",
+        "android_keytool_missing": "JDK 文件夹里没有 bin/keytool（需要的是 JDK，不是 JRE）：{}",
         "android_alias_missing": "请填写密钥别名",
         "android_pack_missing": "编辑器内缺少安卓运行时包：{}",
         "android_toolchain_problem": "缺少打包工具，请到「编辑器设置 > 安卓打包」配置：\n{}",
