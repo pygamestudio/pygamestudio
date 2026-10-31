@@ -126,9 +126,9 @@ def main():
           settings._android_jdk_lineedit.text() == ''
           and settings._android_sdk_lineedit.text() == '',
           [settings._android_jdk_lineedit.text(), settings._android_sdk_lineedit.text()])
-    check('the empty field names what it falls back to',
-          settings._android_jdk_lineedit.placeholderText() != ''
-          and settings._android_sdk_lineedit.placeholderText() != '',
+    check('the placeholder asks for a folder instead of guessing one',
+          'Auto-detected' not in settings._android_jdk_lineedit.placeholderText()
+          and settings._android_jdk_lineedit.placeholderText() != '',
           settings._android_jdk_lineedit.placeholderText())
     check('permission list keeps its width',
           settings._list_widget.minimumWidth() == 170
@@ -142,20 +142,25 @@ def main():
     print('4) display fit settings')
     project_settings = ProjectSettingsBody(manager)
     project_settings.get_ready_for_project()
-    check('mobile fit picker has every mode',
-          project_settings._screen_fit_combobox.count() == 7,
+    check('mobile fit picker offers no "no fit"',
+          project_settings._screen_fit_combobox.count() == 6
+          and project_settings._screen_fit_combobox.findData('none') == -1,
           project_settings._screen_fit_combobox.count())
-    check('desktop picker = windowed + the modes',
-          project_settings._desktop_display_combobox.count() == 8,
+    check('desktop picker = windowed + the modes, no "no fit"',
+          project_settings._desktop_display_combobox.count() == 7
+          and project_settings._desktop_display_combobox.findData('none') == -1,
           project_settings._desktop_display_combobox.count())
     check('web picker has the four page modes',
           project_settings._web_fit_combobox.count() == 4,
           project_settings._web_fit_combobox.count())
+    check('mobile defaults to letterboxed',
+          project_settings._screen_fit_combobox.currentData() == 'show_all',
+          project_settings._screen_fit_combobox.currentData())
     check('desktop defaults to windowed',
           project_settings._desktop_display_combobox.currentData() == 'window',
           project_settings._desktop_display_combobox.currentData())
-    check('web defaults to show_all',
-          project_settings._web_fit_combobox.currentData() == 'show_all',
+    check('web defaults to no fit',
+          project_settings._web_fit_combobox.currentData() == 'none',
           project_settings._web_fit_combobox.currentData())
 
     project_settings._desktop_display_combobox.setCurrentIndex(
@@ -191,6 +196,18 @@ def main():
     page_css = page_source.split('<style>')[1].split('</style>')[0]
     check('the page never scales the canvas with object-fit',
           'object-fit' not in page_css)
+    check('the page shows a splash image while loading',
+          '__PYGS_SPLASH_TAG__' in page_source
+          and (RES_PATH / 'images' / web.SPLASH_IMAGE_NAME).is_file(),
+          web.SPLASH_IMAGE_NAME)
+    check('the canvas is hidden until the game starts',
+          'visibility: hidden' in page_css and 'body.running canvas#canvas' in page_css)
+    check('the loading stage keeps title, splash and bar',
+          all(token in page_source
+              for token in ('id="title"', 'id="loader"', '__PYGS_SPLASH_TAG__')))
+    check('the running stage keeps nothing but the canvas',
+          'body.running #splash, body.running h1#title, body.running #loader { display: none; }'
+          in page_css)
 
     app.processEvents()
 

@@ -7,7 +7,7 @@ from pygamestudio.api.core.scene import scene_loader
 from pygamestudio.api.config.project import get_project_config
 from pygamestudio.api.core.debug import _draw_debug_info
 from pygamestudio.common.i18n.translator import Translator as T
-from pygamestudio.common.utils.system import is_android
+from pygamestudio.common.utils.system import is_android, is_web
 
 
 class Game:
@@ -89,12 +89,12 @@ class Game:
         self._clock = pygame.time.Clock()
 
     #: How the canvas is fitted into the device screen (``screen_scale_mode``).
-    #: A project that does not choose stays at ``none``, which is exactly what
-    #: every build did before the option existed.
+    #: A project that does not choose - and one that still stores the retired
+    #: ``none`` - gets ``show_all``: a phone screen is never the canvas size, so
+    #: "no fit" could only ever put the game in a corner.
     #:
-    #: ``none``          draw 1:1 into the top-left corner (no fit). Default.
     #: ``show_all``      contain - the whole canvas is visible, the spare edges
-    #:                   are letterboxed.
+    #:                   are letterboxed. Default.
     #: ``no_border``     cover - the canvas fills the screen and the overflow is
     #:                   cropped: no bars, but content near the edge can be cut.
     #: ``fixed_width``   the width always fills, the height follows the aspect:
@@ -103,6 +103,8 @@ class Game:
     #: ``exact_fit``     stretch to the screen, ignoring the aspect.
     #: ``integer``       the largest whole multiple that still fits, so pixels
     #:                   stay crisp (pixel art); bars on the remaining edges.
+    #: ``none``          draw 1:1 into the top-left corner. Only read from old
+    #:                   projects (see _create_display) and used by the tests.
     SCALE_MODES = ('none', 'show_all', 'no_border', 'fixed_width',
                    'fixed_height', 'exact_fit', 'integer')
 
@@ -120,13 +122,23 @@ class Game:
         The same canvas path is used on the desktop when the project asks for a
         full-screen game (``desktop_display_mode``): the window then covers the
         screen and the chosen fit mode decides how the canvas fills it. A
-        plain desktop run (the default) keeps one surface for both roles: the
-        editor's "run game" and a built game expect a real canvas-sized window.
+        windowed desktop run keeps one surface for both roles: the editor's
+        "run game" and a built game expect a real canvas-sized window.
+
+        A browser build is a third case: the page owns the window and scales the
+        canvas with CSS (``web_scale_mode``), so the engine draws 1:1 and never
+        asks for a full screen window - browsers turn that request into their
+        own fullscreen mode, which used to steal the page on the first click.
         """
         project_config = project_config or {}
         canvas_w, canvas_h = int(canvas_size[0]), int(canvas_size[1])
-        requested = str(project_config.get('screen_scale_mode') or 'none')
-        self._scale_mode = requested if requested in self.SCALE_MODES else 'none'
+        # "No fit" is not offered any more for phones: a canvas that does not
+        # match the screen would just sit in the corner, so an old project that
+        # stored it gets the letterboxed default instead.
+        requested = str(project_config.get('screen_scale_mode') or 'show_all')
+        if requested in ('none', ''):
+            requested = 'show_all'
+        self._scale_mode = requested if requested in self.SCALE_MODES else 'show_all'
         # Nearest-neighbour by default: bilinear scaling of a full 800x600 frame
         # costs ~140 ms/frame on an Android emulator, which is 6 fps on its own.
         self._smooth_scale = str(project_config.get('screen_scale_filter') or 'nearest') == 'smooth'
@@ -135,8 +147,13 @@ class Game:
         self._present_rect = None
 
         on_device = is_android()
+        # 'none' on the desktop means the window: there is no separate "do not
+        # adapt" choice any more.
         desktop_mode = str(project_config.get('desktop_display_mode') or 'window')
-        desktop_fullscreen = not on_device and desktop_mode in self.SCALE_MODES
+        if desktop_mode == 'none':
+            desktop_mode = 'window'
+        desktop_fullscreen = (not on_device and not is_web()
+                              and desktop_mode in self.SCALE_MODES)
         device_scaled = on_device and project_config.get('screen_scaled', True)
 
         if not desktop_fullscreen and not device_scaled:

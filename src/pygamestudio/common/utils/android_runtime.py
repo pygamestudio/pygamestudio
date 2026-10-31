@@ -199,38 +199,6 @@ def describe(metadata=None) -> str:
 
 # ---------------------------------------------------------------- toolchain
 
-def _candidates_jdk():
-    system = platform.system()
-    found = []
-    for key in ('JAVA_HOME', 'JDK_HOME'):
-        value = os.environ.get(key)
-        if value:
-            found.append(Path(value))
-    if system == 'Windows':
-        roots = [
-            Path(os.environ.get('ProgramFiles', r'C:\Program Files')) / 'Java',
-            Path(os.environ.get('ProgramFiles', r'C:\Program Files')) / 'Eclipse Adoptium',
-            Path(os.environ.get('ProgramFiles', r'C:\Program Files')) / 'Microsoft',
-            Path(os.environ.get('ProgramFiles', r'C:\Program Files')) / 'Android' / 'Android Studio' / 'jbr',
-            Path(os.environ.get('LOCALAPPDATA', '')) / 'Programs' / 'Eclipse Adoptium',
-            Path(os.environ.get('LOCALAPPDATA', '')) / 'JetBrains' / 'Toolbox' / 'apps',
-        ]
-        for root in roots:
-            if not root.is_dir():
-                continue
-            if (root / 'bin').is_dir():
-                found.append(root)
-            found.extend(sorted(path for path in root.glob('*') if (path / 'bin').is_dir()))
-    else:
-        roots = [Path('/usr/lib/jvm'), Path('/Library/Java/JavaVirtualMachines'),
-                 Path('/opt/homebrew/opt'), Path('/usr/local/opt')]
-        for root in roots:
-            if root.is_dir():
-                found.extend(sorted((path / 'Contents' / 'Home' if (path / 'Contents' / 'Home').is_dir()
-                                     else path) for path in root.glob('*')))
-    return [path for path in found if java_executable(path) is not None]
-
-
 def java_executable(jdk) -> Path:
     """``.../bin/java(.exe)`` of a JDK folder, or None when it is not one."""
     jdk = Path(jdk)
@@ -272,58 +240,11 @@ def java_version(jdk) -> int:
     return major
 
 
-def guess_jdk() -> str:
-    """The JDK the editor should try first (highest version wins)."""
-    candidates = _candidates_jdk()
-    if not candidates:
-        return ''
-    candidates.sort(key=java_version, reverse=True)
-    return candidates[0].as_posix()
-
-
-def _candidates_sdk():
-    found = []
-    for key in ('ANDROID_HOME', 'ANDROID_SDK_ROOT'):
-        value = os.environ.get(key)
-        if value:
-            found.append(Path(value))
-    system = platform.system()
-    if system == 'Windows':
-        local = os.environ.get('LOCALAPPDATA')
-        if local:
-            found.append(Path(local) / 'Android' / 'Sdk')
-        # Android Studio and the command line tools accept any folder, so a
-        # user with a second drive has the SDK somewhere the default paths do
-        # not know about; a handful of stat calls per drive finds those.
-        for letter in 'CDEFGHIJK':
-            drive = Path(f'{letter}:/')
-            if not drive.is_dir():
-                continue
-            found.extend((drive / 'Android' / 'Sdk', drive / 'Android' / 'sdk',
-                          drive / 'SDK', drive / 'Android'))
-    elif system == 'Darwin':
-        found.append(Path.home() / 'Library' / 'Android' / 'sdk')
-    else:
-        found.append(Path.home() / 'Android' / 'Sdk')
-    return [path for path in found if _looks_like_sdk(path)]
-
-
 def _looks_like_sdk(path) -> bool:
     """An SDK folder is one that (at least) has a platforms/ build-tools/ ..."""
     path = Path(path)
     return path.is_dir() and any((path / name).is_dir()
                                  for name in ('platforms', 'build-tools', 'cmdline-tools'))
-
-
-def guess_sdk() -> str:
-    """The Android SDK the editor should try first (the one with the platform)."""
-    candidates = _candidates_sdk()
-    if not candidates:
-        return ''
-    candidates.sort(key=lambda path: (len(_installed_platforms(path)),
-                                     bool(_installed_build_tools(path))),
-                    reverse=True)
-    return candidates[0].as_posix()
 
 
 def _installed_platforms(sdk) -> list:
@@ -355,7 +276,12 @@ def _installed_build_tools(sdk) -> list:
 
 
 def check_toolchain(jdk='', sdk='') -> dict:
-    """Look for everything an APK needs; never raises, reports what is missing.
+    """Check the toolchain the user configured; never raises, reports what is missing.
+
+    Only what Editor Settings holds is used: an empty path is a problem, not a
+    hint to go looking around the machine. Wandering the disk found a working
+    JDK often enough, but it also looked like the editor was scanning folders
+    the user never pointed it at - and it hid a typo instead of showing it.
 
     :return: ``{'ok': bool, 'problems': [reason key, ...], 'jdk', 'java',
                'sdk', 'build_tools', 'platforms', 'compile_sdk'}``
@@ -364,8 +290,10 @@ def check_toolchain(jdk='', sdk='') -> dict:
               'java': 0, 'sdk': str(sdk or ''), 'build_tools': '',
               'platforms': [], 'compile_sdk': COMPILE_SDK}
 
-    resolved_jdk = Path(jdk) if jdk else (Path(guess_jdk()) if guess_jdk() else None)
-    if resolved_jdk is None or java_executable(resolved_jdk) is None:
+    resolved_jdk = Path(jdk) if jdk else None
+    if resolved_jdk is None:
+        result['problems'].append('android.jdk_not_set')
+    elif java_executable(resolved_jdk) is None:
         result['problems'].append('android.jdk_missing')
     else:
         result['jdk'] = resolved_jdk.as_posix()
@@ -374,8 +302,10 @@ def check_toolchain(jdk='', sdk='') -> dict:
         if dominant < MIN_JAVA_VERSION:
             result['problems'].append('android.jdk_old')
 
-    resolved_sdk = Path(sdk) if sdk else (Path(guess_sdk()) if guess_sdk() else None)
-    if resolved_sdk is None or not _looks_like_sdk(resolved_sdk):
+    resolved_sdk = Path(sdk) if sdk else None
+    if resolved_sdk is None:
+        result['problems'].append('android.sdk_not_set')
+    elif not _looks_like_sdk(resolved_sdk):
         result['problems'].append('android.sdk_missing')
     else:
         result['sdk'] = resolved_sdk.as_posix()

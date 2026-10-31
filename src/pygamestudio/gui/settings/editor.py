@@ -4,7 +4,6 @@ from pathlib import Path
 from PySide6.QtCore import *
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import *
-from pygamestudio.common.utils import android_runtime
 from pygamestudio.common.utils.config import *
 from pygamestudio.gui.base.window import WindowBase
 from pygamestudio.common.utils.theme import set_editor_theme
@@ -194,26 +193,21 @@ class EditorSettingsBody(QWidget):
         self._android_jdk_browse_button.setIcon(QIcon(':/images/browse.png'))
         self._android_sdk_label.setText(T.tr('settings.android_sdk', 'Android SDK'))
         self._android_sdk_browse_button.setIcon(QIcon(':/images/browse.png'))
-        self._update_android_placeholders()
+        self._set_android_placeholders()
 
-        # An empty field is not "no toolchain": the build then looks for one by
-        # itself. The placeholder says which one it would use, so leaving the
-        # field empty is a visible choice instead of a silent fallback.
+        # What is stored is what the build uses: an empty field is an empty
+        # field, and packaging then reports "pick the folder" instead of
+        # quietly going off to look for a JDK somewhere on the machine.
         self._android_jdk_lineedit.setText(str(editor_config.get('android_jdk') or ''))
         self._android_sdk_lineedit.setText(str(editor_config.get('android_sdk') or ''))
 
-    def _update_android_placeholders(self):
-        """Describe what an empty field falls back to, next to the field."""
-        auto = T.tr('settings.android_auto_path', 'Auto-detected: {}')
-        detected_jdk = android_runtime.guess_jdk()
+    def _set_android_placeholders(self):
+        """Ask for the folder; nothing is filled in behind the user's back."""
         self._android_jdk_lineedit.setPlaceholderText(
-            auto.format(Path(detected_jdk).as_posix()) if detected_jdk
-            else T.tr('settings.android_jdk_placeholder', 'Folder of a JDK 17 or newer'))
-        detected_sdk = android_runtime.guess_sdk()
+            T.tr('settings.android_jdk_placeholder', 'Folder of a JDK 17 or newer'))
         self._android_sdk_lineedit.setPlaceholderText(
-            auto.format(Path(detected_sdk).as_posix()) if detected_sdk
-            else T.tr('settings.android_sdk_placeholder',
-                      'Folder that contains platforms/ and build-tools/'))
+            T.tr('settings.android_sdk_placeholder',
+                 'Folder that contains platforms/ and build-tools/'))
 
     def _browse_android_jdk(self):
         start = self._android_jdk_lineedit.text().strip() or get_editor_data_dir().as_posix()
@@ -235,9 +229,6 @@ class EditorSettingsBody(QWidget):
         """A typed path is stored as soon as the field loses focus."""
         update_editor_config('android_jdk', self._android_jdk_lineedit.text().strip())
         update_editor_config('android_sdk', self._android_sdk_lineedit.text().strip())
-        # Clearing a field hands the choice back to the auto-detection; show what
-        # that would be.
-        self._update_android_placeholders()
 
     def _ensure_mcp_token(self, editor_config=None) -> str:
         """The token clients must send - created once and stored in the config.
@@ -333,7 +324,7 @@ class EditorSettingsBody(QWidget):
 
         self._android_jdk_label.setText(T.tr('settings.android_jdk', 'JDK'))
         self._android_sdk_label.setText(T.tr('settings.android_sdk', 'Android SDK'))
-        self._update_android_placeholders()
+        self._set_android_placeholders()
 
         self._theme_dict = {
             'dark': T.tr('theme.dark', 'Dark'),

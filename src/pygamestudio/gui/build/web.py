@@ -78,8 +78,11 @@ BUNDLE_STAGING_SUFFIX = '.building'
 PROTECTED_WORK_DIR_NAME = '_protected'
 #: Fallback canvas size when a project has none (the editor's own default).
 DEFAULT_CANVAS_SIZE = (800, 600)
-#: Default page fit: the canvas keeps its aspect ratio inside the window.
-DEFAULT_WEB_FIT = 'show_all'
+#: Default page fit: the canvas is shown at its own size, as the project was
+#: authored (the page used to letterbox it, which nobody asked for).
+DEFAULT_WEB_FIT = 'none'
+#: Splash image shown while the page loads, before the canvas appears.
+SPLASH_IMAGE_NAME = 'presplash_logo.png'
 #: Values written by the project settings' "Web Canvas Fit" picker and honoured
 #: by the page script (see web_index_template.html).
 WEB_FIT_MODES = ('none', 'show_all', 'exact_fit', 'integer')
@@ -1130,11 +1133,12 @@ class WebAppBuilder:
         self._check_stopped()
 
         favicon_links = self._write_favicon(bundle_dir)
+        splash_tag = self._write_splash(bundle_dir)
         self._prepare_runtime(bundle_dir)
         self._progress(90)
 
         canvas_size = self._read_canvas_size()
-        (bundle_dir / 'index.html').write_text(self._render_index(index_template, favicon_links, canvas_size, archive_name), encoding=_SOURCE_ENCODING)
+        (bundle_dir / 'index.html').write_text(self._render_index(index_template, favicon_links, canvas_size, archive_name, splash_tag), encoding=_SOURCE_ENCODING)
         if self._is_toy:
             self._apply_toy_package(bundle_dir)
         self._progress(95)
@@ -1324,6 +1328,20 @@ class WebAppBuilder:
         icon_type = 'image/x-icon' if favicon_name.endswith('.ico') else 'image/png'
         return '<link rel="icon" type="{}" href="{}">'.format(icon_type, favicon_name)
 
+    def _write_splash(self, bundle_dir):
+        """Bundle the splash shown before the game starts; return its <img> tag.
+
+        The page shows title, splash and loading bar while Pyodide boots, then
+        swaps all three for the canvas. The picture ships with the engine, so
+        every web build has one; without it the page simply has no splash.
+        """
+        source = RES_PATH / 'images' / SPLASH_IMAGE_NAME
+        if not source.exists():
+            Logger.warning(T.tr('build.web_splash_missing', 'The page splash image is missing: {}').format(source.as_posix()))
+            return ''
+        shutil.copyfile(source, bundle_dir / SPLASH_IMAGE_NAME)
+        return '<img id="splash" src="{}" alt="">'.format(SPLASH_IMAGE_NAME)
+
     def _read_canvas_size(self):
         """The canvas size of the project, so the page is right before starting."""
         try:
@@ -1347,10 +1365,11 @@ class WebAppBuilder:
             Logger.warning('Failed to read the web fit mode from project.pygs: {}'.format(e))
         return DEFAULT_WEB_FIT
 
-    def _render_index(self, template, favicon_links, canvas_size, archive_name='game.zip'):
+    def _render_index(self, template, favicon_links, canvas_size, archive_name='game.zip', splash_tag=''):
         return (template
                 .replace('__PYGS_TITLE__', html.escape(self._page_title))
                 .replace('__PYGS_FAVICON_LINK__', favicon_links)
+                .replace('__PYGS_SPLASH_TAG__', splash_tag)
                 .replace('__PYGS_CANVAS_WIDTH__', str(canvas_size[0]))
                 .replace('__PYGS_CANVAS_HEIGHT__', str(canvas_size[1]))
                 .replace('__PYGS_WEB_FIT__', self._read_web_fit())

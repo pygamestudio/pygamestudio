@@ -308,6 +308,12 @@ legacy._create_display((800, 600), {{}})
 assert legacy._screen is legacy._display, 'a project without the key must not change'
 print('no key', pygame.display.get_window_size())
 
+# 'none' was offered once and means "window" on the desktop now.
+retired = studio.Game()
+retired._create_display((800, 600), {{'desktop_display_mode': 'none'}})
+assert retired._screen is retired._display, 'a retired no-fit must stay a window'
+print('retired none', pygame.display.get_window_size())
+
 for mode in ('show_all', 'exact_fit', 'integer'):
     game = studio.Game()
     game._create_display((800, 600), {{'desktop_display_mode': mode}})
@@ -332,6 +338,48 @@ print('fullscreen', pygame.display.get_window_size())
                                  env=environment, capture_output=True, text=True)
         if process.returncode != 0:
             raise AssertionError(f'the desktop full screen path failed\n{process.stdout}\n'
+                                 f'{process.stderr}')
+        return ' '.join(process.stdout.split())
+
+    def browser_display():
+        """A browser build draws 1:1 and never asks for a full screen window.
+
+        The page owns the window there (it scales the canvas with CSS), so the
+        engine taking the whole screen made the browser pop its own fullscreen
+        mode on the first click. ``is_web`` guards that, and it has to be the
+        browser's own marker - ``sys.platform == 'emscripten'``.
+        """
+        import subprocess
+        code = f'''
+import sys
+sys.path.insert(0, {str(project_dir)!r})
+import pygame
+pygame.init()
+import pygamestudio as studio
+from pygamestudio.common.utils.system import is_web
+
+assert is_web() is False, 'a desktop interpreter is not a browser'
+
+# The browser reports emscripten; the engine must then ignore
+# desktop_display_mode and keep one surface at the project size.
+sys.platform = 'emscripten'
+assert is_web() is True, 'the browser marker was not picked up'
+for config in ({{}}, {{'desktop_display_mode': 'exact_fit'}}, {{'desktop_display_mode': 'show_all'}}):
+    game = studio.Game()
+    game._create_display((800, 600), config)
+    assert game._screen is game._display, ('the page owns the window', config)
+    assert pygame.display.get_window_size() == (800, 600), pygame.display.get_window_size()
+    assert not (pygame.display.get_surface().get_flags() & pygame.FULLSCREEN), \
+        'the browser build must never ask for a full screen window'
+print('browser', pygame.display.get_window_size())
+'''
+        environment = dict(os.environ, SDL_VIDEODRIVER='dummy', SDL_AUDIODRIVER='dummy')
+        for name in ('ANDROID_ARGUMENT', 'ANDROID_PRIVATE', 'ANDROID_APP_PATH'):
+            environment.pop(name, None)
+        process = subprocess.run([sys.executable, '-c', code], cwd=str(project_dir),
+                                 env=environment, capture_output=True, text=True)
+        if process.returncode != 0:
+            raise AssertionError(f'the browser display path failed\n{process.stdout}\n'
                                  f'{process.stderr}')
         return ' '.join(process.stdout.split())
 
@@ -468,6 +516,7 @@ print('fullscreen', pygame.display.get_window_size())
     checks.run('imports without Android-missing pygame modules', android_imports)
     checks.run('scaled display', scaled_display)
     checks.run('desktop full screen', desktop_fullscreen)
+    checks.run('browser display', browser_display)
     checks.run('project imports', project_imports)
     checks.run('entry point on the real path', run_entry_point)
     checks.run('present path', present_path)

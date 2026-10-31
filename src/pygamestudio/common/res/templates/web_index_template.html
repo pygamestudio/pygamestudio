@@ -23,8 +23,22 @@ __PYGS_TOY_SDK_SCRIPT__
     #app { min-height: 100vh; display: flex; flex-direction: column; align-items: center;
            justify-content: center; gap: 14px; padding: 24px; box-sizing: border-box; }
     h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: .3px; }
-    canvas#canvas { background: #000; max-width: none; height: auto; border-radius: 6px;
-                    box-shadow: 0 10px 40px rgba(0, 0, 0, .55); outline: none; }
+    /* While the runtime loads the page shows title + splash + progress bar;
+       once the game runs only the canvas is left on screen. The canvas is
+       hidden with visibility (not display) and taken out of the flow, so it
+       keeps a real element box the whole time - SDL reads that box to map
+       mouse and touch positions, and a 0x0 one would divide by zero. */
+    canvas#canvas { position: absolute; visibility: hidden;
+                    background: #000; max-width: none; height: auto;
+                    border-radius: 6px; box-shadow: 0 10px 40px rgba(0, 0, 0, .55);
+                    outline: none; }
+    body.running canvas#canvas { position: static; visibility: visible;
+                                 border-radius: 0; box-shadow: none; }
+    /* Once the game runs nothing else is on the page, so it may use the whole
+       window - that is what makes "stretch to screen" actually stretch. */
+    body.running #app { padding: 0; }
+    #splash { max-width: min(70vw, 400px); max-height: 40vh; border-radius: 8px; }
+    body.running #splash, body.running h1#title, body.running #loader { display: none; }
     #loader { display: flex; flex-direction: column; align-items: center; gap: 8px;
               width: min(320px, 80vw); }
     #loader-track { width: 100%; height: 4px; border-radius: 2px; background: #2a2c33; overflow: hidden; }
@@ -37,7 +51,8 @@ __PYGS_TOY_SDK_SCRIPT__
 </head>
 <body>
 <div id="app">
-    <h1>__PYGS_TITLE__</h1>
+    <h1 id="title">__PYGS_TITLE__</h1>
+    __PYGS_SPLASH_TAG__
     <canvas id="canvas" width="__PYGS_CANVAS_WIDTH__" height="__PYGS_CANVAS_HEIGHT__" tabindex="0"></canvas>
     <div id="loader">
         <div id="loader-track"><div id="loader-bar"></div></div>
@@ -47,42 +62,70 @@ __PYGS_TOY_SDK_SCRIPT__
 </div>
 
 <script>
-// -- Canvas fit ---------------------------------------------------------
-// A plain script, not part of the module below: the canvas is sized correctly
-// even when the Pyodide module cannot load (offline, blocked CDN), and the
-// game starts inside an already-sized canvas.
+// -- Page stages --------------------------------------------------------
+// Two stages, driven from here so the page is right even when the Pyodide
+// module cannot load (offline, blocked CDN):
 //
-// The page scales the canvas through CSS width/height and never with
-// object-fit: the element box has to match the picture pixel for pixel,
-// because SDL maps mouse and touch positions with getBoundingClientRect().
+//   loading  title + splash + progress bar, vertical, centred. No canvas yet.
+//   running  the canvas only - everything else is removed from the layout.
+//
+// The canvas is scaled through CSS width/height and never with object-fit:
+// the element box has to match the picture pixel for pixel, because SDL maps
+// mouse and touch positions with getBoundingClientRect(). Its drawing buffer
+// (the width/height attributes) never changes, so a window resize is free.
 (function () {
     const CANVAS_WIDTH = __PYGS_CANVAS_WIDTH__;
     const CANVAS_HEIGHT = __PYGS_CANVAS_HEIGHT__;
     const CANVAS_FIT = "__PYGS_WEB_FIT__";
+    const appElement = document.getElementById("app");
     const canvasElement = document.getElementById("canvas");
 
+    function isShown(element) {
+        if (!element) {
+            return false;
+        }
+        const styles = getComputedStyle(element);
+        return styles.display !== "none" && styles.visibility !== "hidden";
+    }
+
     function applyCanvasFit() {
-        const app = document.getElementById("app");
-        const title = app ? app.querySelector("h1") : null;
-        const loader = document.getElementById("loader");
-        // Everything that is not the canvas: padding (24+24), the gap around
-        // the canvas (14+14), the title, and the loading bar while it is up.
-        const title_height = title ? title.offsetHeight : 24;
-        const loader_height = loader && loader.offsetHeight ? loader.offsetHeight + 14 : 0;
-        const available_width = Math.max(64, (app ? app.clientWidth : window.innerWidth) - 48);
-        const available_height = Math.max(64, window.innerHeight - title_height - loader_height - 76);
+        if (!isShown(canvasElement)) {
+            return;                     // still loading: nothing to fit yet
+        }
+        const styles = getComputedStyle(appElement);
+        const gap = parseFloat(styles.rowGap) || 0;
+        const paddingX = (parseFloat(styles.paddingLeft) || 0)
+            + (parseFloat(styles.paddingRight) || 0);
+        const paddingY = (parseFloat(styles.paddingTop) || 0)
+            + (parseFloat(styles.paddingBottom) || 0);
+        // Whatever the canvas shares the column with (nothing, once running),
+        // plus one gap between every pair of visible items.
+        let usedHeight = 0;
+        let visibleCount = 0;
+        for (const child of appElement.children) {
+            if (child === canvasElement || !isShown(child)) {
+                continue;
+            }
+            usedHeight += child.offsetHeight;
+            visibleCount += 1;
+        }
+        visibleCount += 1;              // the canvas itself
+        const availableWidth = Math.max(64, appElement.clientWidth - paddingX);
+        const availableHeight = Math.max(64, window.innerHeight - paddingY
+            - usedHeight - gap * (visibleCount - 1));
         let width = CANVAS_WIDTH;
         let height = CANVAS_HEIGHT;
         if (CANVAS_FIT === "show_all") {
-            const scale = Math.min(available_width / CANVAS_WIDTH, available_height / CANVAS_HEIGHT);
+            const scale = Math.min(availableWidth / CANVAS_WIDTH,
+                                   availableHeight / CANVAS_HEIGHT);
             width = Math.round(CANVAS_WIDTH * scale);
             height = Math.round(CANVAS_HEIGHT * scale);
         } else if (CANVAS_FIT === "exact_fit") {
-            width = Math.round(available_width);
-            height = Math.round(available_height);
+            width = Math.round(availableWidth);
+            height = Math.round(availableHeight);
         } else if (CANVAS_FIT === "integer") {
-            const scale = Math.max(1, Math.floor(Math.min(available_width / CANVAS_WIDTH,
-                                                         available_height / CANVAS_HEIGHT)));
+            const scale = Math.max(1, Math.floor(Math.min(availableWidth / CANVAS_WIDTH,
+                                                         availableHeight / CANVAS_HEIGHT)));
             width = CANVAS_WIDTH * scale;
             height = CANVAS_HEIGHT * scale;
         }
@@ -90,11 +133,14 @@ __PYGS_TOY_SDK_SCRIPT__
         canvasElement.style.height = height + "px";
     }
 
-    applyCanvasFit();
-    window.addEventListener("resize", applyCanvasFit);
-    // The boot hides the loading bar when the game is about to start; the
-    // canvas gets that room back. Called from the module below as well.
     window.applyCanvasFit = applyCanvasFit;
+    // The boot calls this right before the game loop starts: drop the title,
+    // the splash and the bar, show the canvas, and size it to the whole page.
+    window.showGameCanvas = function () {
+        document.body.classList.add("running");
+        applyCanvasFit();
+    };
+    window.addEventListener("resize", applyCanvasFit);
 })();
 </script>
 
@@ -184,11 +230,10 @@ try {
     // button, no extra click.
     globalThis.__pygsProgress = setProgress;
     globalThis.__pygsGameStarted = () => {
-        loaderElement.style.display = "none";
-        // The loading bar took vertical room; the canvas can use it now. The
-        // canvas keeps its drawing buffer, so resizing it here is free.
-        if (window.applyCanvasFit) {
-            window.applyCanvasFit();
+        // The page switches from "loading" to "running": title, splash and bar
+        // go away, the canvas appears and takes the whole window.
+        if (window.showGameCanvas) {
+            window.showGameCanvas();
         }
     };
     await pyodide.runPythonAsync(bootSource);

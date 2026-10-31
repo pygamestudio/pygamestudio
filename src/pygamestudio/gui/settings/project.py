@@ -8,10 +8,10 @@ from pygamestudio.common.i18n.translator import Translator as T
 class ProjectSettingsBody(QWidget):
     #: Mobile screen fit modes: (config value, translation key, fallback text).
     #: The value is what the runtime reads from project.pygs as
-    #: ``screen_scale_mode``; ``none`` is the default so an existing project
-    #: behaves exactly as before this option existed.
+    #: ``screen_scale_mode``. There is no "no fit" entry: a phone screen is
+    #: never the canvas size, so 1:1 could only put the game in a corner;
+    #: ``show_all`` (letterboxed) is the default.
     SCREEN_FIT_MODES = (
-        ('none', 'settings.screen_fit_none', 'No fit (1:1)'),
         ('show_all', 'settings.screen_fit_show_all', 'Show all (letterbox)'),
         ('no_border', 'settings.screen_fit_no_border', 'Fill screen (crop)'),
         ('fixed_width', 'settings.screen_fit_fixed_width', 'Fit width'),
@@ -19,11 +19,12 @@ class ProjectSettingsBody(QWidget):
         ('exact_fit', 'settings.screen_fit_exact_fit', 'Stretch to screen'),
         ('integer', 'settings.screen_fit_integer', 'Integer scale (crisp)'),
     )
-    #: Desktop display: windowed (the default, exactly as before) or full screen
-    #: with one of the fit modes above. Stored as ``desktop_display_mode``.
-    DESKTOP_DISPLAY_MODES = (('window', 'settings.desktop_window', 'Windowed (default)'),) + SCREEN_FIT_MODES
+    #: Desktop fit: a window (the default, exactly as before) or full screen with
+    #: one of the fit modes above. Stored as ``desktop_display_mode``; "no fit"
+    #: is covered by ``window`` and is not offered.
+    DESKTOP_FIT_MODES = (('window', 'settings.desktop_window', 'Windowed (default)'),) + SCREEN_FIT_MODES
     #: Browser canvas fit: how the page scales the canvas. Stored as
-    #: ``web_scale_mode``; ``show_all`` keeps the current page behaviour.
+    #: ``web_scale_mode``. The page shows the canvas at its own size by default.
     WEB_FIT_MODES = (
         ('none', 'settings.screen_fit_none', 'No fit (1:1)'),
         ('show_all', 'settings.screen_fit_show_all', 'Show all (letterbox)'),
@@ -95,7 +96,7 @@ class ProjectSettingsBody(QWidget):
         self._screen_width_label.setText(T.tr('settings.screen_width', 'Screen Width'))
         self._screen_height_label.setText(T.tr('settings.screen_height', 'Screen Height'))
         self._screen_fit_label.setText(T.tr('settings.screen_fit', 'Mobile Screen Fit'))
-        self._desktop_display_label.setText(T.tr('settings.desktop_display', 'Desktop Display'))
+        self._desktop_display_label.setText(T.tr('settings.desktop_fit', 'Desktop Fit'))
         self._web_fit_label.setText(T.tr('settings.web_fit', 'Web Canvas Fit'))
 
         self._screen_width_spinbox.blockSignals(True)
@@ -113,11 +114,13 @@ class ProjectSettingsBody(QWidget):
         self._screen_fit_combobox.clear()
         for value, key, fallback in self.SCREEN_FIT_MODES:
             self._screen_fit_combobox.addItem(T.tr(key, fallback), value)
-        current = str(get_project_config().get('screen_scale_mode') or 'none')
+        # An old project may still store the retired "no fit": show the default
+        # the engine actually uses for it (show_all) instead of an empty box.
+        current = str(get_project_config().get('screen_scale_mode') or 'show_all')
         self._screen_fit_combobox.setCurrentIndex(max(0, self._screen_fit_combobox.findData(current)))
 
         self._desktop_display_combobox.clear()
-        for value, key, fallback in self.DESKTOP_DISPLAY_MODES:
+        for value, key, fallback in self.DESKTOP_FIT_MODES:
             self._desktop_display_combobox.addItem(T.tr(key, fallback), value)
         desktop = str(get_project_config().get('desktop_display_mode') or 'window')
         self._desktop_display_combobox.setCurrentIndex(
@@ -126,7 +129,7 @@ class ProjectSettingsBody(QWidget):
         self._web_fit_combobox.clear()
         for value, key, fallback in self.WEB_FIT_MODES:
             self._web_fit_combobox.addItem(T.tr(key, fallback), value)
-        web = str(get_project_config().get('web_scale_mode') or 'show_all')
+        web = str(get_project_config().get('web_scale_mode') or 'none')
         self._web_fit_combobox.setCurrentIndex(max(0, self._web_fit_combobox.findData(web)))
 
         self._screen_width_spinbox.blockSignals(False)
@@ -169,12 +172,12 @@ class ProjectSettingsBody(QWidget):
         self._screen_width_label.setText(T.tr('settings.screen_width', 'Screen Width'))
         self._screen_height_label.setText(T.tr('settings.screen_height', 'Screen Height'))
         self._screen_fit_label.setText(T.tr('settings.screen_fit', 'Mobile Screen Fit'))
-        self._desktop_display_label.setText(T.tr('settings.desktop_display', 'Desktop Display'))
+        self._desktop_display_label.setText(T.tr('settings.desktop_fit', 'Desktop Fit'))
         self._web_fit_label.setText(T.tr('settings.web_fit', 'Web Canvas Fit'))
         for index, (_value, key, fallback) in enumerate(self.SCREEN_FIT_MODES):
             if index < self._screen_fit_combobox.count():
                 self._screen_fit_combobox.setItemText(index, T.tr(key, fallback))
-        for index, (_value, key, fallback) in enumerate(self.DESKTOP_DISPLAY_MODES):
+        for index, (_value, key, fallback) in enumerate(self.DESKTOP_FIT_MODES):
             if index < self._desktop_display_combobox.count():
                 self._desktop_display_combobox.setItemText(index, T.tr(key, fallback))
         for index, (_value, key, fallback) in enumerate(self.WEB_FIT_MODES):

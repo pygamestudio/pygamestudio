@@ -26,6 +26,7 @@ tools/android_spike/
 ├─ engine_runtime.py         # 挑选「运行时需要的引擎子集」并拷进 app/（未来运行时产物的原型）
 ├─ project_scan.py           # 静态扫 import：运行时没有的模块直接报错，而不是装机后黑屏
 ├─ smoke_engine.py           # 本机无头预演：真的加载场景、拖动、点按、跑一遍 main.py
+├─ check_web_page.py         # 真跑一次网页打包，检查首屏 / 画布阶段和适配值
 ├─ spike1_pygame_only.py     # spike 1/3a 的纯 pygame demo（不进 APK，留作对照）
 ├─ app/
 │  ├─ main.py                # spike 3b 入口：引擎 Game + 屏幕自检报告
@@ -257,17 +258,19 @@ renderer，实际按整倍数取整（1.73 → 1.0），于是 800×600 原样�
 
 | 值 | 语义 | 800×600 → 1920×1038 的结果 |
 |---|---|---|
-| `none`（默认） | 不缩放，1:1 画在左上角 | 800×600 在左上角 |
-| `show_all` | 完整显示画布，多余留黑边 | 1384×1038 居中，左右各 268px 黑边 |
+| `show_all`（默认） | 完整显示画布，多余留黑边 | 1384×1038 居中，左右各 268px 黑边 |
 | `no_border` | 铺满屏幕，超出部分裁掉 | 1920×1440，上下各裁 201px |
 | `fixed_width` | 宽度总是铺满 | 1920×1440，上下裁 |
 | `fixed_height` | 高度总是铺满 | 1384×1038，左右黑边 |
 | `exact_fit` | 拉伸铺满，不管比例 | 1920×1038（会变形） |
 | `integer` | 最大整数倍，像素不糊 | 800×600 居中（1.73 → 1 倍） |
 
-编辑器的 **项目设置 → 游戏窗口 → 移动端屏幕适配** 就是这一项（下拉框，默认"无适配"），
-写进 `project.pygs` 的 `screen_scale_mode`。旧的工程没有这个键，读出来就是 `none`，
-行为和以前完全一致。
+编辑器的 **项目设置 → 游戏窗口 → 移动端屏幕适配** 就是这一项（下拉框，默认
+“完整显示（留黑边）”），写进 `project.pygs` 的 `screen_scale_mode`。
+
+**没有“不适配”这一项**：手机屏幕永远不会刚好等于画布尺寸，1:1 只会把游戏摆在左上角。
+引擎里 `none` 仍然认得（`_fit_rect` 的数学和测试还在用），但读到一个旧工程存的 `none`
+时会按 `show_all` 处理，所以老工程升级后直接就是“完整显示”。
 
 ```json
 {
@@ -283,7 +286,7 @@ renderer，实际按整倍数取整（1.73 → 1.0），于是 800×600 原样�
 
 ### 桌面全屏（`desktop_display_mode`）
 
-同一套适配逻辑现在也用在桌面上：**项目设置 → 游戏窗口 → 桌面端显示**，默认"窗口模式"
+同一套适配逻辑现在也用在桌面上：**项目设置 → 游戏窗口 → 桌面端适配**，默认“窗口模式”
 （就是以前的行为：开一个 800×600 的真窗口，一个 surface 两用，不做任何缩放）。
 选任意一种适配模式后，桌面运行/桌面版会开全屏窗口，用**同一块画布 surface + `_present` +
 `_to_canvas`**，所以三种平台（安卓 / 桌面 / 网页）的行为和坐标换算是一致的：
@@ -295,17 +298,34 @@ renderer，实际按整倍数取整（1.73 → 1.0），于是 800×600 原样�
 ```
 
 `window` 或没有这个键 → 老行为。`show_all` / `no_border` / `fixed_width` / `fixed_height` /
-`exact_fit` / `integer` / `none` → 全屏 + 对应的适配方式（`none` 就是全屏但画布 1:1 放左上角）。
+`exact_fit` / `integer` → 全屏 + 对应的适配方式。这里同样没有“不适配”：它就是窗口模式。
 按键、鼠标坐标都走 `_to_canvas`，不会因为全屏而偏移。
 
 ### 网页画布（`web_scale_mode`）
 
 **项目设置 → 游戏窗口 → 网页画布适配**，写进 `project.pygs` 的 `web_scale_mode`，
-网页打包时烘进 `index.html`：`none` / `show_all`（默认）/ `exact_fit` / `integer`。
+网页打包时烘进 `index.html`：`none`（默认，按画布原大小显示）/ `show_all` / `exact_fit` /
+`integer`。
 
 网页这层只改 canvas 的 **CSS 宽高**，不用 `object-fit`——元素盒子必须和画面一样大，
 否则 SDL 用 `getBoundingClientRect()` 算出来的鼠标位置会偏（`object-fit` 的留白算在盒子里）。
 窗口大小变了会重新算一次（`resize` 监听），所以拉伸浏览器窗口不会让点击错位。
+
+> 浏览器里引擎**不会**请求全屏：`is_web()`（`sys.platform == 'emscripten'`）把网页从
+> “桌面全屏”分支里排除，否则 `pygame.FULLSCREEN` 会被浏览器变成它自己的全屏模式，
+> 第一次点击就整页跳全屏。
+
+### 网页首屏
+
+页面有两个阶段，切换在 `web_index_template.html` 里：
+
+| 阶段 | 页面内容 |
+|---|---|
+| 加载中 | 标题 → `presplash_logo.png`（`common/res/images`，打包时拷到页面旁边）→ 进度条，垂直排列居中 |
+| 运行中 | 只剩画布（`body.running` 把标题/首屏/进度条 `display:none`，`#app` 取消内边距） |
+
+画布在加载阶段用 `visibility: hidden` 而不是 `display: none` 隐藏，并 `position: absolute`
+离流——它始终保持一个真实元素盒子，因为 SDL 靠这个盒子换算鼠标/触摸坐标，0×0 会算出 NaN。
 
 真机上要看的新报告行（`_fit_rect` 的 7 种模式在 `smoke_engine.py` 里有断言）：
 
@@ -502,9 +522,14 @@ pygs-android-runtime-1.0.0-arm64-v8a.zip: 21.0 MB (2.16x smaller, lzma)
 运行时包进仓库后，编辑器不再需要任何工具链下载，用户机器上只要求 **JDK 17+** 和
 **Android SDK（platform 34 + build-tools）**。没有 Gradle、没有 AGP、没有 NDK，也**不联网**。
 
+两个路径必须由用户在「编辑器设置 > 安卓打包」里填。**编辑器不会自己去扫盘找 JDK / SDK**：
+扫盘虽然常常能“碰对”，但会让人以为程序在翻他的电脑，而且会掩盖一个填错的路径。空着打包
+就直接报错（`android.jdk_not_set` / `android.sdk_not_set`），填错了报另一个（`jdk_missing` /
+`sdk_missing`），日志第一行还会打印这次实际用的 JDK、SDK 和 build-tools 版本。
+
 | 位置 | 作用 |
 |---|---|
-| `common/utils/android_runtime.py` | 找包、校验 sha256、解压到缓存；探测 JDK / SDK 并检查版本（不依赖 Qt） |
+| `common/utils/android_runtime.py` | 找包、校验 sha256、解压到缓存；检查设置里填的 JDK / SDK（**只认填写的路径**，空的就是空，不扫盘，不依赖 Qt） |
 | `gui/build/runtime_payload.py` | 「一个安卓包要带哪些引擎文件」的唯一清单；本目录的 `engine_runtime.py` 按路径加载它 |
 | `gui/build/android_assets.py` | 图标 / 首屏 / 应用名注入；本目录的 `android_assets.py` 同样是按路径的壳 |
 | `gui/build/android_dist.py` | 解包成型 → 从包里恢复 res → `values/strings.xml` → `AndroidManifest.xml` → 图标 |
@@ -585,10 +610,11 @@ raw 与 canvas 的对应关系一眼就能看出是偏移、镜像还是缩放�
 ### 测试
 
 ```powershell
-py -3.10 tools/android_spike/smoke_android_build.py   # 52 项：解包 → 保护 → payload → private.tar → 清单/strings
-py -3.10 tools/android_spike/check_android_ui.py      # 27 项：「安卓应用」tab + 设置页（offscreen，不碰用户配置）
-py -3.10 tools/android_spike/check_pointer_mapping.py # 15 项：窗口坐标 → 画布坐标
-py -3.10 tools/android_spike/smoke_engine.py          # 16 项：真机路径的引擎回归
+py -3.10 tools/android_spike/smoke_android_build.py    # 55 项：解包 → 保护 → payload → private.tar → 清单/strings
+py -3.10 tools/android_spike/check_android_ui.py       # 47 项：「安卓应用」tab + 设置页 + 显示适配（offscreen，不碰用户配置）
+py -3.10 tools/android_spike/check_web_page.py         #  9 项：真跑一次网页打包，检查首屏/画布阶段和适配值
+py -3.10 tools/android_spike/check_pointer_mapping.py  # 15 项：窗口坐标 → 画布坐标
+py -3.10 tools/android_spike/smoke_engine.py           # 18 项：真机路径的引擎回归（含桌面全屏、浏览器不全屏）
 py -3.10 tools/android_spike/project_scan.py tools/android_spike/app
 ```
 

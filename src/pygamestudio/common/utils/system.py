@@ -74,6 +74,15 @@ def is_android() -> bool:
     """
     return bool(os.environ.get('ANDROID_ARGUMENT') or os.environ.get('ANDROID_PRIVATE'))
 
+def is_web() -> bool:
+    """True when the process runs in a browser (Pyodide / Emscripten).
+
+    Needed because a web build is neither a phone nor a desktop: the page owns
+    the window and scales the canvas with CSS, so the engine must not ask for a
+    full screen window there (browsers answer that request with their own
+    fullscreen mode on the first click).
+    """
+    return sys.platform == 'emscripten'
 
 def get_lan_ip() -> str:
     """The LAN address of this machine ('' when it cannot be found).

@@ -196,7 +196,17 @@ def main():
         check('decode_line survives GBK output',
               android_apk.decode_line(chinese.encode('gbk')) == chinese)
 
-        toolchain = android_runtime.check_toolchain('', '')
+        empty = android_runtime.check_toolchain('', '')
+        check('an empty JDK path is reported, not guessed',
+              'android.jdk_not_set' in empty['problems'], ', '.join(empty['problems']))
+        check('an empty SDK path is reported, not guessed',
+              'android.sdk_not_set' in empty['problems'], ', '.join(empty['problems']))
+        check('a filled-in path is used as it is, no scanning',
+              android_runtime.check_toolchain('', 'X:/nowhere')['sdk'] == 'X:/nowhere')
+
+        jdk = os.environ.get('PYGS_TEST_JDK', 'D:/JDK')
+        sdk = os.environ.get('PYGS_TEST_SDK', 'D:/SDK')
+        toolchain = android_runtime.check_toolchain(jdk, sdk)
         if toolchain['ok']:
             tools_dir = android_apk.find_tools(toolchain['sdk'])
             jar = android_apk.android_jar(toolchain['sdk'], android_runtime.COMPILE_SDK)
