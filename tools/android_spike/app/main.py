@@ -155,6 +155,11 @@ def build_game(studio):
                                       f'{scripts} script(s): {names}', True)
             self._draw_total += time.perf_counter() - started
             self._price_canvas_blit()
+            if self._frames == 60:
+                try:
+                    self._profile_scene()
+                except Exception as error:          # noqa: BLE001 - report it
+                    fail_line('profile', error)
             if self._frames % 60 == 0:
                 # Where the frame time goes: the scene draw is measured here,
                 # everything else (events + present + flip + the 60 Hz cap) is
@@ -181,8 +186,10 @@ def build_game(studio):
             """Price one full-canvas copy, once, to split the scene draw.
 
             The scene draw is a full-canvas blit plus a Python walk over the
-            object tree. Measuring the blit once tells the two apart: dirty
-            rects cut the first, they do nothing for the second.
+            object tree. Measuring the blit once tells the two apart: on the
+            first device run it turned out to be 0.1 ms, so the remaining ~11 ms
+            of "scene draw" is Python - which is why the next measurement
+            profiles the walk instead of chasing pixels.
             """
             if STATE.get('canvas_ms') is not None:
                 return
@@ -196,6 +203,39 @@ def build_game(studio):
             for _index in range(repeats):
                 screen.blit(surface, (0, 0))
             STATE['canvas_ms'] = (time.perf_counter() - start) * 1000 / repeats
+
+        def _profile_scene(self):
+            """Profile 20 scene updates once and report where the time goes.
+
+            ``scene draw`` is pure Python work on this device, so guessing which
+            call is expensive is a waste of build cycles. The top entries go to
+            logcat (``adb logcat -s python``) and the three worst functions to
+            the on-screen panel.
+            """
+            import cProfile
+            import io
+            import pstats
+
+            screen = studio.get_screen()
+            profiler = cProfile.Profile()
+            profiler.enable()
+            for _index in range(20):
+                studio.load_scene(screen)
+            profiler.disable()
+
+            stats = pstats.Stats(profiler)
+            stats.sort_stats('tottime')
+            stream = io.StringIO()
+            stats.stream = stream
+            stats.print_stats(12)
+            for line in stream.getvalue().splitlines():
+                log(f'profile| {line}')
+
+            entries = sorted(((entry[2], key) for key, entry in stats.stats.items()),
+                             reverse=True)[:3]
+            summary = ', '.join(f'{key[2]} {total / 20:.2f} ms'
+                                for total, key in entries)
+            set_line('profile', f'{summary} (per frame, 20 frame sample)', True)
 
         # ----------------------------------------------------------- input
         def on_mouse_button_down(self, pos, btn, touch=0, clicks=1, window=None):

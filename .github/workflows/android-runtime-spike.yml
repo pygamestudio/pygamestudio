@@ -158,6 +158,10 @@ jobs:
             echo "::warning::pygame._freetype was not built - freetype detection failed, the module is missing"
             echo "_freetype   : missing" | tee -a inspect.log
           fi
+          # Why did it not build? The recipe logs every decision, so keep those
+          # lines in the uploaded report instead of burying them in the log.
+          echo '--- freetype decisions (from the build log)' | tee -a inspect.log
+          grep -i 'freetype' buildozer.log | tail -n 25 | tee -a inspect.log || true
 
       - name: Pack the dist
         if: always()

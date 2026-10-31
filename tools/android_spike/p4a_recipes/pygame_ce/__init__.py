@@ -165,29 +165,56 @@ class PygameCERecipe(Pygame2Recipe):
 
 
 def _enable_freetype(build_dir):
-    """Uncomment ``_freetype`` in the Setup file p4a just generated.
+    """Uncomment ``_freetype`` in the Setup p4a generated - and in its template.
 
     ``buildconfig/Setup.Android.SDL2.in`` ships the module commented out
     ("optional freetype module"), which is *the* reason p4a's pygame has no
     ``_freetype``: no amount of dependency detection can enable a line that is a
-    comment. The same template also links ``-lharfbuzz``, which p4a only builds
-    when harfbuzz is in the requirements, so the FREETYPE variable is rewritten
-    to plain ``-lfreetype``.
+    comment. The same template links ``-lharfbuzz``, which p4a only builds when
+    harfbuzz is in the requirements, so the FREETYPE variable drops it.
 
-    Returns True when the module ended up enabled.
+    Both files are patched: p4a writes ``Setup`` from the template, and a later
+    ``setup.py`` run regenerates it from the template again when it is missing.
+    Every decision is logged with ``info`` - the CI copies those lines into
+    ``inspect.log``, so a silent "module missing" can be told apart from "the
+    patch never ran".
     """
-    setup = Path(build_dir) / 'Setup'
-    if not setup.is_file():
-        return False
-
+    build_dir = Path(build_dir)
+    patched_files = []
     enabled = False
+    for relative in (('buildconfig', 'Setup.Android.SDL2.in'), ('Setup',)):
+        path = build_dir.joinpath(*relative)
+        if not path.is_file():
+            info(f'{build_dir.name}: {"/".join(relative)} not found')
+            continue
+        original = path.read_text(encoding='utf-8')
+        text, file_enabled = _patch_setup_text(original)
+        enabled = enabled or file_enabled
+        if text != original:
+            path.write_text(text, encoding='utf-8')
+            patched_files.append('/'.join(relative))
+        info(f'{build_dir.name}: {"/".join(relative)} freetype lines -> '
+             f'{[line.strip() for line in text.splitlines() if "freetype" in line.lower()]}')
+
+    if patched_files:
+        info(f'{build_dir.name}: _freetype enabled (patched {", ".join(patched_files)})')
+    elif enabled:
+        info(f'{build_dir.name}: _freetype was already enabled')
+    else:
+        info(f'{build_dir.name}: no _freetype line found, the module stays out')
+    return enabled
+
+
+def _patch_setup_text(text):
+    """``(patched text, module enabled)`` for one Setup / template file."""
     result = []
-    for line in setup.read_text(encoding='utf-8').splitlines(keepends=True):
+    enabled = False
+    for line in text.splitlines(keepends=True):
         stripped = line.lstrip()
-        if stripped.startswith('_freetype '):
+        if stripped.startswith('_freetype'):
             enabled = True                        # already active
             result.append(line)
-        elif stripped.startswith('#_freetype '):
+        elif stripped.startswith('#') and stripped.lstrip('#').lstrip().startswith('_freetype'):
             indent = line[:len(line) - len(stripped)]
             result.append(indent + stripped.lstrip('#').lstrip() + '\n')
             enabled = True
@@ -196,13 +223,7 @@ def _enable_freetype(build_dir):
             result.append(f'{indent}FREETYPE = -lfreetype\n')
         else:
             result.append(line)
-
-    if enabled:
-        setup.write_text(''.join(result), encoding='utf-8')
-        info(f'{Path(build_dir).name}: _freetype enabled in Setup')
-    else:
-        info(f'{Path(build_dir).name}: no _freetype line in Setup, left as it is')
-    return enabled
+    return ''.join(result), enabled
 
 
 def _freetype_include_dir(freetype_dir):
