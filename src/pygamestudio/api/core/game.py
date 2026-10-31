@@ -24,6 +24,16 @@ class Game:
         self._fps = 60
         self._clock = None
         self._screen = None
+        # The window the frame is presented into. On desktop it IS _screen; on a
+        # device it is the whole screen and _screen is the canvas (see
+        # _create_display / _present).
+        self._display = None
+        self._present_rect = None
+        self._present_window = None
+        self._present_surface = None
+        self._surface_size = None
+        self._scale_mode = 'show_all'
+        self._smooth_scale = True
         self._project_path = ""
         self._running = False
         # Frame statistics, kept up to date by run() (see get_delta_time(),
@@ -33,9 +43,17 @@ class Game:
         self._frame_count = 0
 
     def _finger_pos(self, event):
-        """Pixel position of a touch event (SDL reports it normalized 0..1)."""
-        width, height = self._screen.get_size() if self._screen is not None else (0, 0)
-        return int(event.x * width), int(event.y * height)
+        """Pixel position of a touch event (SDL reports it normalized 0..1).
+
+        The normalized values span the WINDOW, not the canvas, so they take the
+        same route as a mouse position (see _to_canvas) - otherwise a touch
+        would land at the wrong place whenever the canvas is letterboxed.
+        """
+        if self._screen is None:
+            return 0, 0
+        width, height = pygame.display.get_surface().get_size() \
+            if pygame.display.get_surface() is not None else self._screen.get_size()
+        return self._to_canvas((int(event.x * width), int(event.y * height)))
 
     def _init_game(self):
         """Set up pygame and resolve the project root.
@@ -67,37 +85,155 @@ class Game:
 
         pygame.init()
         pygame.display.set_caption(project_config['caption'])
-        self._screen = self._create_screen(project_config['screen_size'], project_config)
+        self._create_display(project_config['screen_size'], project_config)
         self._clock = pygame.time.Clock()
 
-    def _create_screen(self, size, project_config=None):
-        """Create the game surface - scaled to the real screen on a device.
+    #: How the canvas is fitted into the device screen (``screen_scale_mode``):
+    #:
+    #: ``show_all``      contain - the whole canvas is visible, the spare edges
+    #:                   are letterboxed (Cocos' SHOW_ALL). Default.
+    #: ``no_border``     cover - the canvas fills the screen, the overflow is
+    #:                   cropped (NO_BORDER): no black bars, but the HUD at the
+    #:                   canvas edge can be cut off.
+    #: ``fixed_width``   the width always fills, the height follows the aspect
+    #:                   (FIXED_WIDTH): safe for games whose play area is
+    #:                   horizontal, spare room appears top/bottom.
+    #: ``fixed_height``  the height always fills, the width follows (FIXED_HEIGHT).
+    #: ``exact_fit``     stretch to the screen, ignoring the aspect (EXACT_FIT).
+    #: ``integer``       the largest whole multiple that still fits, so pixels
+    #:                   stay crisp (pixel art); bars on the remaining edges.
+    #: ``none``          draw 1:1 into the top-left corner (debugging).
+    SCALE_MODES = ('show_all', 'no_border', 'fixed_width', 'fixed_height',
+                   'exact_fit', 'integer', 'none')
 
-        A phone/tablet has no window: SDL hands us the whole display, so a scene
-        authored on a fixed canvas (800x600 by default) would be drawn 1:1 into
-        the top-left corner of a 2400x1080 screen. ``pygame.SCALED`` makes SDL
-        render into a logical surface of the canvas size and scale that to the
-        real screen (aspect ratio kept, the remaining edges letterboxed), and it
-        maps mouse/touch positions back to the logical size - which is exactly
-        what the editor's coordinates need for hit tests and drags.
+    def _create_display(self, canvas_size, project_config=None):
+        """Create the window and the surface the scene is drawn on.
 
-        Desktop runs keep the plain window: the editor's "run game" and a built
-        game both expect a real 800x600 window, and a project can opt out on a
-        device too (``"screen_scaled": false`` in project.pygs).
+        On a device the window is the whole screen while the scene is authored
+        on a fixed canvas (800x600 by default), so the game keeps a canvas
+        surface - that is what ``get_screen()`` returns and what every object
+        coordinate refers to - and presents it scaled into the window (see
+        ``_present``). SDL's own ``pygame.SCALED`` flag was tried first and
+        showed the canvas at 1:1 in the middle of a 1920x1038 screen: it leaves
+        the pixel ratio to the renderer, which SDL quantises, so the size is not
+        controllable per project.
+
+        Desktop runs keep one surface for both roles: the editor's "run game"
+        and a built game expect a real 800x600 window, and nothing is scaled.
         """
         project_config = project_config or {}
-        if not project_config.get('screen_scaled', True) or not is_android():
-            return pygame.display.set_mode(size)
+        canvas_w, canvas_h = int(canvas_size[0]), int(canvas_size[1])
+        self._scale_mode = str(project_config.get('screen_scale_mode') or 'show_all')
+        self._smooth_scale = str(project_config.get('screen_scale_filter') or 'smooth') != 'nearest'
+        self._present_surface = None
+        self._present_window = None
+        self._present_rect = None
 
+        if not is_android() or not project_config.get('screen_scaled', True):
+            surface = pygame.display.set_mode((canvas_w, canvas_h))
+            self._screen = surface
+            self._display = surface
+            return
+
+        window_size = self._device_window_size((canvas_w, canvas_h))
         try:
-            # Keep the canvas as the logical size: get_screen() then returns an
-            # 800x600 surface and every object coordinate stays in editor space.
-            return pygame.display.set_mode(size, pygame.SCALED)
+            self._display = pygame.display.set_mode(window_size, pygame.FULLSCREEN)
         except pygame.error as error:
-            print(T.tr('api.display_scaling_failed',
-                       'The screen could not be scaled to {} ({}); drawing at the '
-                       'canvas size instead.').format(size, error))
-            return pygame.display.set_mode(size)
+            print(T.tr('api.display_fullscreen_failed',
+                       'Could not take the whole screen ({}); using a {} window.')
+                  .format(error, window_size))
+            self._display = pygame.display.set_mode(window_size)
+
+        # The window is the screen; the scene lives on its own canvas-sized
+        # surface so every coordinate stays in editor space.
+        self._screen = pygame.Surface((canvas_w, canvas_h)).convert()
+        self._display.fill((0, 0, 0))
+        self._update_present_rect()
+
+    @staticmethod
+    def _device_window_size(canvas_size):
+        """The real screen size of the device (the canvas when unknown)."""
+        try:
+            info = pygame.display.Info()
+            if info.current_w > 0 and info.current_h > 0:
+                return (info.current_w, info.current_h)
+        except pygame.error:
+            pass
+        return (int(canvas_size[0]), int(canvas_size[1]))
+
+    def _update_present_rect(self):
+        """Where the scaled canvas goes inside the window (cached per size)."""
+        display = self._display
+        if display is None:
+            return
+        window = display.get_size()
+        if window == self._present_window:
+            return
+        self._present_window = window
+        self._present_rect = self._fit_rect(self._screen.get_size(), window, self._scale_mode)
+
+    @classmethod
+    def _fit_rect(cls, canvas, window, mode):
+        """Rectangle ``(x, y, w, h)`` the canvas is scaled into (see SCALE_MODES)."""
+        canvas_w, canvas_h = canvas
+        window_w, window_h = window
+        if mode == 'none' or not canvas_w or not canvas_h:
+            return pygame.Rect(0, 0, canvas_w, canvas_h)
+        if mode == 'exact_fit':
+            return pygame.Rect(0, 0, window_w, window_h)
+
+        by_width = window_w / float(canvas_w)
+        by_height = window_h / float(canvas_h)
+        if mode == 'fixed_width':
+            scale = by_width
+        elif mode == 'fixed_height':
+            scale = by_height
+        elif mode == 'no_border':
+            scale = max(by_width, by_height)
+        elif mode == 'integer':
+            scale = max(1, int(min(by_width, by_height)))
+        else:                                       # show_all (default)
+            scale = min(by_width, by_height)
+
+        width = max(1, int(round(canvas_w * scale)))
+        height = max(1, int(round(canvas_h * scale)))
+        # Centred: a cropped mode (no_border) then loses the same amount on both
+        # sides, and a letterboxed mode keeps symmetric bars.
+        return pygame.Rect((window_w - width) // 2, (window_h - height) // 2,
+                           width, height)
+
+    def _to_canvas(self, pos):
+        """Window pixel position -> canvas pixel position (identity on desktop)."""
+        if pos is None or self._screen is None:
+            return pos
+        rect = self._present_rect
+        if rect is None or (self._display is self._screen):
+            return pos
+        if rect.width == 0 or rect.height == 0:
+            return pos
+        x = (pos[0] - rect.left) * self._screen.get_width() / float(rect.width)
+        y = (pos[1] - rect.top) * self._screen.get_height() / float(rect.height)
+        return int(x), int(y)
+
+    def _present(self):
+        """Scale the canvas into the window and hand the frame to SDL."""
+        display = pygame.display.get_surface()
+        if display is None or self._screen is None or display is self._screen:
+            return
+        if self._display is not display:
+            self._display = display
+        self._update_present_rect()
+        rect = self._present_rect
+        if rect is None:
+            return
+        if self._surface_size != rect.size:
+            self._present_surface = None
+        if self._present_surface is None:
+            self._present_surface = pygame.Surface(rect.size).convert()
+            self._surface_size = rect.size
+        scaler = pygame.transform.smoothscale if self._smooth_scale else pygame.transform.scale
+        scaler(self._screen, rect.size, self._present_surface)
+        display.blit(self._present_surface, rect.topleft)
 
     def run(self):
         """Start the game loop. Blocks until the window is closed."""
@@ -137,19 +273,25 @@ class Game:
                     self.on_key_up(event.key, event.mod, getattr(event, 'unicode', ''), event.scancode, getattr(event, 'window', None))
 
                 # ---------- Mouse Event ----------
+                # The OS reports WINDOW pixels; the scene lives in canvas pixels
+                # (the two differ whenever the canvas is scaled to the screen),
+                # so every pointer position is mapped once, right here.
                 elif event.type == pygame.MOUSEMOTION:
-                    scene_loader.handle_pointer_move(event.pos, event.buttons)
-                    self.on_mouse_motion(event.pos, event.rel, event.buttons, getattr(event, 'touch', 0), getattr(event, 'window', None))
+                    pos = self._to_canvas(event.pos)
+                    scene_loader.handle_pointer_move(pos, event.buttons)
+                    self.on_mouse_motion(pos, event.rel, event.buttons, getattr(event, 'touch', 0), getattr(event, 'window', None))
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     # Clicking an input box focuses it (so subsequent keys type
                     # into it); clicking elsewhere blurs it. Sliders start a
                     # drag when clicked.
-                    scene_loader.handle_pointer_down(event.pos, event.button)
-                    self.on_mouse_button_down(event.pos, event.button, getattr(event, 'touch', 0), getattr(event, "clicks", 1), getattr(event, 'window', None))
+                    pos = self._to_canvas(event.pos)
+                    scene_loader.handle_pointer_down(pos, event.button)
+                    self.on_mouse_button_down(pos, event.button, getattr(event, 'touch', 0), getattr(event, "clicks", 1), getattr(event, 'window', None))
                 elif event.type == pygame.MOUSEBUTTONUP:
-                    scene_loader.handle_pointer_up(event.pos, event.button,
+                    pos = self._to_canvas(event.pos)
+                    scene_loader.handle_pointer_up(pos, event.button,
                                                    getattr(event, 'clicks', 1))
-                    self.on_mouse_button_up(event.pos, event.button, getattr(event, 'touch', 0), getattr(event, "clicks", 1), getattr(event, 'window', None))
+                    self.on_mouse_button_up(pos, event.button, getattr(event, 'touch', 0), getattr(event, "clicks", 1), getattr(event, 'window', None))
                 elif event.type == pygame.MOUSEWHEEL:
                     self.on_mouse_wheel(event.flipped, event.x, event.y, getattr(event, 'touch', 0), event.precise_x, event.precise_y, getattr(event, 'window', None))
 
@@ -292,6 +434,9 @@ class Game:
             # Debug info (studio.show_debug_info()): drawn on top of the
             # frame on_update produced, right before it is presented.
             _draw_debug_info(self._screen, self._delta_time)
+            # Device builds draw on the canvas surface and present it scaled
+            # into the window (a no-op on desktop, where both are the same).
+            self._present()
             pygame.display.flip()
 
         # Let every attached behavior script run its on_destroy() cleanup hook

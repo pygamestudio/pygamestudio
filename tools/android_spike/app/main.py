@@ -113,6 +113,7 @@ def build_game(studio):
             self._panel = None
             self._panel_time = 0.0
             self._panel_count = 0
+            self._draw_total = 0.0
 
         # ------------------------------------------------------- life cycle
         def on_start(self):
@@ -138,6 +139,7 @@ def build_game(studio):
 
         def on_update(self, dt):
             self._frames += 1
+            started = time.perf_counter()
             try:
                 studio.load_scene(studio.get_screen())
             except Exception as error:              # noqa: BLE001 - report it
@@ -151,6 +153,18 @@ def build_game(studio):
                                   if getattr(obj, 'script_instance', None))
                     set_line('scene', f'{len(objects)} object(s), '
                                       f'{scripts} script(s): {names}', True)
+            self._draw_total += time.perf_counter() - started
+            if self._frames % 60 == 0:
+                # Where the frame time goes: the scene draw is measured here,
+                # everything else (events + present + flip + the 60 Hz cap) is
+                # the remainder of the real frame time.
+                draw_ms = self._draw_total / 60 * 1000
+                fps = self._clock.get_fps()
+                frame_ms = 1000.0 / fps if fps else 0.0
+                set_line('frame', f'scene draw {draw_ms:.1f} ms, other '
+                                  f'{max(0.0, frame_ms - draw_ms):.1f} ms, fps {fps:.0f}',
+                         frame_ms == 0.0 or draw_ms < frame_ms)
+                self._draw_total = 0.0
             if MAX_FRAMES and self._frames >= MAX_FRAMES:
                 log(f'SPIKE_MAX_FRAMES={MAX_FRAMES} reached, stopping')
                 self._running = False
@@ -197,49 +211,56 @@ def build_game(studio):
             set_line('pygame', ', '.join(results), True)
 
         def _measure(self):
-            """Report the real window against the canvas the scene is authored on.
+            """Report the canvas, the real window and where the canvas landed.
 
-            With ``pygame.SCALED`` (what the engine now uses on a device) the
-            drawing surface stays the canvas size while the window is the whole
-            screen: ``screen`` must read ``800x600`` and ``window`` the device
-            resolution, otherwise the scaling did not take effect.
+            ``surface`` is what the scene draws on (the editor's canvas size),
+            ``window`` the device screen, and ``present`` the rectangle the
+            canvas is scaled into - that is the one that proves the fit mode
+            worked: for an 800x600 canvas on a 1920x1038 screen ``show_all``
+            gives 1384x1038 centred, with 268 px bars left and right.
             """
             screen = self._screen
             width, height = screen.get_size()
             canvas_w, canvas_h = STATE['canvas']
-            STATE['scale'] = min(width / float(canvas_w), height / float(canvas_h))
             try:
                 window = pygame.display.get_window_size()
             except pygame.error:                        # older pygame / no window
                 window = (0, 0)
-            driver = pygame.display.get_driver()
-            scaled = tuple(window) != (width, height)
+            rect = getattr(self, '_present_rect', None)
+            if rect is not None and rect.width:
+                STATE['scale'] = rect.width / float(canvas_w)
+                present = (f'{rect.width}x{rect.height} at ({rect.left}, {rect.top}) '
+                           f'= {STATE["scale"]:.2f}x')
+            else:
+                STATE['scale'] = 1.0
+                present = 'not scaled'
             set_line('screen', f'surface {width}x{height}, window {window[0]}x{window[1]}, '
-                               f'driver {driver}, '
-                               f'{"scaled" if scaled else "NOT scaled"}'
-                               f' (canvas {canvas_w}x{canvas_h})', True)
+                               f'mode {getattr(self, "_scale_mode", "?")}, present {present}',
+                     True)
             STATE['window'] = window
 
         def _perf_probe(self):
-            """How fast can this device fill the screen and present a frame?
+            """How fast can this device present a frame?
 
-            A phone frame costs the scene draw (a few blits onto an 800x600
-            surface) plus one present. Measuring the present alone tells the
-            spike whether a low fps comes from the engine or from the device's
-            renderer - an emulator with a software SDL renderer usually caps
-            here long before the engine matters.
+            One frame costs the scene draw plus ``present`` (scale the canvas
+            into the window) plus the flip. This probe measures the latter two
+            with an empty canvas, so a low fps can be attributed to the device
+            or to the engine - not guessed.
             """
             screen = studio.get_screen()
-            frames = 30
+            frames = 20
             start = time.perf_counter()
             for index in range(frames):
                 screen.fill((20, 20, 24) if index % 2 else (24, 22, 28))
+                self._present()
                 pygame.display.flip()
             elapsed = time.perf_counter() - start
-            fps = frames / elapsed if elapsed else 0.0
-            set_line('perf', f'fill+flip {fps:.0f} fps ({elapsed * 1000 / frames:.1f} '
-                             f'ms/frame at {screen.get_size()[0]}x{screen.get_size()[1]})',
-                     fps >= 30)
+            milliseconds = elapsed * 1000 / frames if frames else 0.0
+            fps = 1000 / milliseconds if milliseconds else 0.0
+            set_line('perf', f'present {fps:.0f} fps ({milliseconds:.1f} ms/frame, canvas '
+                             f'{screen.get_size()[0]}x{screen.get_size()[1]})',
+                     milliseconds <= 20)
+
 
         def _overlay(self):
             """Draw the report on top of the frame the scene just drew.
@@ -259,7 +280,10 @@ def build_game(studio):
                 screen.blit(self._panel, (0, 0))
 
         def _build_panel(self, screen):
-            size = max(12, int(14 * STATE['scale']))
+            # The panel is drawn in CANVAS pixels and scaled up with the rest of
+            # the frame, so its size must not follow the presentation scale.
+            canvas_h = STATE['canvas'][1]
+            size = max(11, int(canvas_h / 45))
             font = pygame.font.Font(None, size)
             line_height = size + 4
             lines = []

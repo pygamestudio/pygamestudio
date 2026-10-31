@@ -4,6 +4,8 @@
     "screen_height": 600,
     "screen_size": [800, 600],
     "screen_scaled": true,
+    "screen_scale_mode": "show_all",
+    "screen_scale_filter": "smooth",
     "asset": {
         "current_scene": "",
         "sort_type": 1

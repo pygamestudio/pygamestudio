@@ -215,52 +215,96 @@ py -3.10 tools/android_spike/smoke_engine.py
 > 手机分辨率远大于 800×600 时画面只占左上角一块。真机数字出来后，
 > 再决定是「引擎加设计分辨率缩放层」还是「构建时让项目按设备分辨率出图」。
 
-## 画面自适应（已实现）
+## 画面自适应（已实现，可挑选适配方式）
 
-第一次真机跑出来的数字是 `1920x1038 window for a 800x600 canvas -> scale 1.73`——
-场景确实只画在左上角。现在引擎在**设备上**改用 SDL 的逻辑分辨率：
+真机第一轮先试了 SDL 自带的 `pygame.SCALED`（逻辑分辨率）。它确实生效了——
+报告里 `surface 800x600 / window 1920x1038`——但**画面居中不变大**：SDL 把缩放比交给
+renderer，实际按整倍数取整（1.73 → 1.0），于是 800×600 原样居中。缩放比不可控，
+也不能按项目选适配方式。
 
-```python
-pygame.display.set_mode(canvas_size, pygame.SCALED)
-```
-
-`SCALED` 让 SDL 把画面渲染到「画布大小」的内部表面再缩放到真实屏幕（保持宽高比，
-多余区域留黑边），**并且把鼠标/触摸坐标反向映射回画布坐标**——所以命中测试、拖拽
-不用改一行代码就继续用编辑器里的坐标系。
-
-| 位置 | 行为 |
-|---|---|
-| 桌面（编辑器「运行」、打包的桌面版） | 仍然开真的 800×600 窗口，行为不变 |
-| Android | 默认 `SCALED`；`get_screen()` 仍是 800×600，`pygame.display.get_window_size()` 是真实分辨率 |
-| 想关掉的项目 | `project.pygs` 里写 `"screen_scaled": false` |
-| 设备不支持 renderer | 捕获 `pygame.error` 后自动退回 1:1，并在控制台打一行提示 |
-
-真机上要看的新报告行：
+所以引擎改成自己做这一层（`api/core/game.py`）：
 
 ```
-screen: surface 800x600, window 1920x1038, driver <name>, scaled (canvas 800x600)
+窗口 surface (_display)  = 真实屏幕 1920×1038
+画布 surface (_screen)   = 项目画布 800×600   ← get_screen() 返回它，脚本/场景对象都画在这里
+每帧：_present() = smoothscale(画布 → 适配矩形) + blit 到窗口 + flip
 ```
 
-`scaled` 出现、且 `surface` 是 800×600 才算成功；若是 `NOT scaled` 说明这台设备
-的 SDL renderer 不支持逻辑缩放，引擎已回退。
+* 坐标：窗口像素 → 画布像素的换算在 `run()` 里对每个鼠标事件做一次（`_to_canvas`），
+  触摸事件本来就是归一化坐标，也走同一条路——命中测试、拖拽、脚本回调全部还是编辑器坐标系；
+* 黑边：窗口先清成黑色，之后只覆盖适配矩形，所以黑边不需要每帧重画。
 
-## 性能（为什么只有 13–14 fps）
+### 适配方式（`screen_scale_mode`）
 
-自检面板每帧重画 8 行文字本身就要吃掉不少帧，所以面板改成**每秒重建一次**；
-同时 `on_start` 里加了一项测量：
+| 值 | 语义 | 800×600 → 1920×1038 的结果 | 对应 Cocos |
+|---|---|---|---|
+| `show_all`（默认） | 完整显示画布，多余留黑边 | 1384×1038 居中，左右各 268px 黑边 | SHOW_ALL |
+| `no_border` | 铺满屏幕，超出部分裁掉 | 1920×1440，上下各裁 201px | NO_BORDER |
+| `fixed_width` | 宽度总是铺满 | 1920×1440，上下裁 | FIXED_WIDTH |
+| `fixed_height` | 高度总是铺满 | 1384×1038，左右黑边 | FIXED_HEIGHT |
+| `exact_fit` | 拉伸铺满，不管比例 | 1920×1038（会变形） | EXACT_FIT |
+| `integer` | 最大整数倍，像素不糊 | 800×600 居中（1.73 → 1 倍） | — |
+| `none` | 1:1 画在左上角（调试用） | 800×600 在左上角 | — |
+
+```json
+{
+  "screen_size": [800, 600],
+  "screen_scaled": true,
+  "screen_scale_mode": "show_all",
+  "screen_scale_filter": "smooth"
+}
+```
+
+* `screen_scaled: false` → 不缩放（1:1，老行为）；
+* `screen_scale_filter`: `smooth`（默认，双线性，文字好看）或 `nearest`（像素风最快）；
+* 桌面（编辑器「运行」、桌面版）完全不进这套逻辑，仍然开真的 800×600 窗口。
+
+真机上要看的新报告行（`_fit_rect` 的 7 种模式在 `smoke_engine.py` 里有断言）：
 
 ```
-perf: fill+flip 58 fps (17.1 ms/frame at 800x600)
+screen: surface 800x600, window 1920x1038, mode show_all, present 1384x1038 at (268, 0) = 1.73x
 ```
 
-它只做「清屏 + flip」，不含任何引擎逻辑。把这两条放在一起就能定位瓶颈：
+`present` 是画布被缩放到的矩形；`show_all` 应该是「高度铺满、左右等宽黑边」，
+如果还是 800×600 居中，说明 `screen_scaled` 被关掉了或走了 `none`。
 
-* `fill+flip` 本身就很低 → 瓶颈在**呈现**（模拟器的软件渲染 / 整屏拷贝），
-  和引擎无关；MuMu 这类模拟器尤其明显，真机会好很多；
-* `fill+flip` 很高、引擎才低 → 才是引擎或场景的问题（对象太多、每帧重建 Surface…）。
+## 性能
 
-`SCALED` 也可能顺带改变这一项：走 SDL_Renderer 时可能用上 GPU（更快），
-也可能在模拟器上退回软件路径（更慢）。这轮上机的 `perf` 行就是答案。
+### 第一轮数字与结论
+
+| 指标 | 数值 | 含义 |
+|---|---|---|
+| `fill+flip`（空画布清屏+呈现） | **809 fps / 1.2 ms** | 呈现不是瓶颈：设备/模拟器能跑 800 帧 |
+| 引擎主循环 | **26 fps** | 瓶颈在引擎侧，~38 ms/帧的活 |
+
+最大的嫌疑已经确认并修掉：`ObjectCanvas._update_surface()` **每帧**都新建一块
+800×600 的 `SRCALPHA` 表面并重绘——每帧 1.9 MB 分配 + 清零 + 全屏 alpha 混合。
+现在它和其它对象一样按状态缓存，并且不透明背景（alpha=255）用无 alpha 表面，
+blit 从「半透明混合 48 万像素」变成「纯拷贝」。
+
+### 这一轮新增的测量
+
+`on_start` 里的探针现在测的是**真实呈现路径**（含缩放）：
+
+```
+perf: present 42 fps (23.8 ms/frame, canvas 800x600)
+```
+
+面板里每秒多一行分项：
+
+```
+frame: scene draw 4.2 ms, other 12.5 ms, fps 60
+```
+
+* `scene draw` = `load_scene()` 的耗时（场景绘制 + 脚本 + 物理）；
+* `other` = 一帧剩余时间（事件 + `_present` 的缩放 + flip + 60Hz 上限）；
+* 如果 `other` 里绝大部分是缩放：把 `screen_scale_filter` 改成 `nearest` 对比；
+* 如果 `scene draw` 很高：才是场景/对象的问题。
+
+> MuMu 这类模拟器跑的是 x86 上的 ARM 翻译 + 软件合成，fps 参考价值有限；
+> 真机数字才作数。引擎自身还有优化空间（脏矩形、避免整屏 smoothscale 等），
+> 等这轮真机分项数据出来再决定动哪里。
+
 
 ## 依赖扫描（构建前就报错，而不是装机后黑屏）
 

@@ -222,12 +222,13 @@ print('ok')
         return f'{len(blocked)} module(s) blocked'
 
     def scaled_display():
-        """The device display path: SCALED keeps the canvas as the logical size.
+        """The device display path: canvas surface + scaled present rectangle.
 
-        With ``ANDROID_ARGUMENT`` set the engine asks SDL for a scaled display,
-        so ``get_screen()`` stays 800x600 (editor coordinates) while the window
-        is the real screen. Without the flag - and when a project opts out -
-        the plain window is used, exactly like on the desktop.
+        On a device the engine keeps the canvas as the drawing surface and
+        presents it scaled into the real window, so ``get_screen()`` stays
+        800x600 (editor coordinates) whatever the screen is. ``_fit_rect()`` is
+        the pure function that decides where the canvas lands - it is asserted
+        here for every fit mode against an 800x600 canvas on a 1920x1038 screen.
         """
         import subprocess
         code = f'''
@@ -237,14 +238,36 @@ import pygame
 pygame.init()
 import pygamestudio as studio
 
-game = studio.Game()
-scaled = game._create_screen((800, 600), {{}})
-assert scaled.get_size() == (800, 600), scaled.get_size()
-print('scaled', scaled.get_size(), pygame.display.get_window_size())
+CASES = {{
+    'show_all': ((268, 0, 1384, 1038), 'letterboxed, whole canvas visible'),
+    'no_border': ((0, -201, 1920, 1440), 'filled, overflow cropped'),
+    'fixed_width': ((0, -201, 1920, 1440), 'width fills'),
+    'fixed_height': ((268, 0, 1384, 1038), 'height fills'),
+    'exact_fit': ((0, 0, 1920, 1038), 'stretched'),
+    'integer': ((560, 219, 800, 600), '1x, crisp pixels'),
+    'none': ((0, 0, 800, 600), '1:1 in the corner'),
+}}
+for mode, (expected, why) in CASES.items():
+    rect = studio.Game._fit_rect((800, 600), (1920, 1038), mode)
+    got = (rect.left, rect.top, rect.width, rect.height)
+    assert got == expected, f'{{mode}}: got {{got}}, expected {{expected}} ({{why}})'
+print('fit modes', len(CASES))
 
-plain = game._create_screen((800, 600), {{'screen_scaled': False}})
-assert plain.get_size() == (800, 600), plain.get_size()
-print('plain', plain.get_size())
+game = studio.Game()
+game._create_display((800, 600), {{}})
+assert game._screen.get_size() == (800, 600), game._screen.get_size()
+assert game._screen is not game._display, 'the canvas must be its own surface'
+assert game._present_rect is not None, 'no present rectangle'
+# a window pixel in the middle of the canvas maps back to the canvas middle
+centre = (game._present_rect.centerx, game._present_rect.centery)
+assert game._to_canvas(centre) == (400, 300), game._to_canvas(centre)
+print('device path', game._screen.get_size(), pygame.display.get_window_size(),
+      tuple(game._present_rect))
+
+plain = studio.Game()
+plain._create_display((800, 600), {{'screen_scaled': False}})
+assert plain._screen is plain._display, 'opting out must keep one surface'
+print('opt out', plain._screen.get_size())
 '''
         environment = dict(os.environ, SDL_VIDEODRIVER='dummy',
                            SDL_AUDIODRIVER='dummy',
