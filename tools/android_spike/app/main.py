@@ -208,6 +208,17 @@ def build_game(studio):
             pygame.mixer.init(frequency=22050, size=-16, channels=1)
             pygame.mixer.quit()
             results.append('mixer')
+            # Optional pygame C extension, depends on the recipe being able to
+            # find freetype. Imported by name on purpose: project_scan.py
+            # rejects a literal "import pygame.freetype" in buildable code, and
+            # this line is a probe, not a dependency.
+            try:
+                import importlib
+                importlib.import_module('pygame.freetype')
+            except Exception as error:                  # noqa: BLE001 - reported below
+                results.append(f'freetype MISSING ({type(error).__name__})')
+            else:
+                results.append('freetype')
             set_line('pygame', ', '.join(results), True)
 
         def _measure(self):
@@ -246,32 +257,46 @@ def build_game(studio):
             STATE['window'] = window
 
         def _perf_probe(self):
-            """How fast can this device present a frame, with each scale filter?
+            """Time every way the canvas can reach the screen.
 
-            One frame costs the scene draw plus ``present`` (scale the canvas
-            into the window) plus the flip. This probe measures present+flip on
-            an empty canvas for BOTH filters, because the first device run
-            showed the difference is enormous: bilinear (smoothscale) took
-            ~140 ms/frame there (6 fps on its own) while nearest is a memcpy-ish
-            pass. Knowing both numbers decides what the default must be.
+            The device frame budget is dominated by how the canvas is presented,
+            so all three variants are timed on an empty canvas:
+
+            * ``nearest`` - scale into the window (the current default),
+            * ``smooth``  - the bilinear filter, kept for comparison,
+            * ``copy``    - a plain 1:1 blit, i.e. the floor without scaling.
+
+            The three numbers separate "how many pixels are written" from
+            "how expensive the scaler is".
             """
             screen = studio.get_screen()
-            frames = 12
-            original = self._smooth_scale
+            display = pygame.display.get_surface()
+            frames = 10
             results = {}
-            for smooth in (False, True):
-                self._smooth_scale = smooth
-                self._present_surface = None
+
+            def measure(label, action):
                 start = time.perf_counter()
                 for index in range(frames):
                     screen.fill((20, 20, 24) if index % 2 else (24, 22, 28))
-                    self._present()
+                    action()
                     pygame.display.flip()
-                results['smooth' if smooth else 'nearest'] = (time.perf_counter() - start) * 1000 / frames
+                results[label] = (time.perf_counter() - start) * 1000 / frames
+
+            original = self._smooth_scale
+            self._present_surface = None
+            self._smooth_scale = False
+            measure('nearest', self._present)
+            self._smooth_scale = True
+            self._present_surface = None
+            measure('smooth', self._present)
             self._smooth_scale = original
             self._present_surface = None
+            if display is not None:
+                measure('copy', lambda: display.blit(screen, (0, 0)))
+
             set_line('perf', f'present: nearest {results["nearest"]:.1f} ms, '
-                             f'smooth {results["smooth"]:.1f} ms '
+                             f'smooth {results["smooth"]:.1f} ms, '
+                             f'copy {results.get("copy", 0.0):.1f} ms '
                              f'(canvas {screen.get_size()[0]}x{screen.get_size()[1]})',
                      results['nearest'] <= 20)
 

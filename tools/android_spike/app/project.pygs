@@ -1,8 +1,8 @@
 {
     "caption": "PyGS engine spike",
-    "screen_width": 1280,
-    "screen_height": 720,
-    "screen_size": [1280, 720],
+    "screen_width": 960,
+    "screen_height": 540,
+    "screen_size": [960, 540],
     "screen_scaled": true,
     "screen_scale_mode": "show_all",
     "screen_scale_filter": "nearest",
