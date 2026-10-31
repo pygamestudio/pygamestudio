@@ -33,6 +33,12 @@ from pathlib import Path
 
 from pythonforandroid.recipes.pygame import Pygame2Recipe
 
+try:
+    from pythonforandroid.logger import info
+except ImportError:                                   # pragma: no cover - p4a always has it
+    def info(message):
+        print(message)
+
 #: Replacement for the sdist's PEP 517 metadata, see _use_setuptools_backend().
 #: Cython has to be listed here as well: pip builds the wheel in an isolated
 #: environment (the image's Python 3.14), which therefore needs its own copy.
@@ -57,6 +63,69 @@ class PygameCERecipe(Pygame2Recipe):
            'pygame_ce-{version}.tar.gz')
     # Cython 3.1 is what has wheels for the Python 3.14 host interpreter.
     hostpython_prerequisites = ['Cython>=3.0,<3.2']
+    # p4a's pygame recipe leaves the optional C extensions out. Adding the
+    # library recipes here (freetype is also pulled in by sdl2_ttf) is what lets
+    # pygame's own buildconfig compile ``pygame._freetype``.
+    depends = ['sdl2', 'sdl2_image', 'sdl2_mixer', 'sdl2_ttf', 'setuptools',
+               'jpeg', 'png', 'freetype']
+
+    def get_recipe_env(self, arch):
+        """Point pygame's freetype detection at the freetype recipe's build tree.
+
+        pygame's ``buildconfig`` looks for freetype through pkg-config, a
+        ``freetype-config`` script (removed in freetype 2.14) or ``FREETYPE_ROOT``.
+        p4a's freetype recipe builds inside its source tree without installing,
+        and leaves no pkg-config file behind, so the detection fails and pygame
+        silently skips ``_freetype`` - the module a desktop build always has.
+
+        This writes a ``freetype2.pc`` that points into that build tree and adds
+        the same include/library paths to CFLAGS/LDFLAGS, so the detection finds
+        a header and a library and the module gets compiled. Detection stays
+        optional: if the recipe is missing or the headers are not there, the
+        environment is left alone and pygame builds exactly as before.
+        """
+        env = super().get_recipe_env(arch)
+        try:
+            freetype = self.get_recipe('freetype', self.ctx)
+            freetype_dir = Path(freetype.get_build_dir(arch.arch))
+        except Exception as error:                    # noqa: BLE001 - optional
+            info(f'{self.name}: no freetype recipe ({error}), _freetype will be skipped')
+            return env
+
+        include_dir = _freetype_include_dir(freetype_dir)
+        lib_dir = freetype_dir / 'objs' / '.libs'
+        if include_dir is None:
+            info(f'{self.name}: no ft2build.h under {freetype_dir.as_posix()}, '
+                 f'_freetype will be skipped')
+            return env
+
+        env['FREETYPE_ROOT'] = freetype_dir.as_posix()
+        flags = (('CFLAGS', f'-I{include_dir.as_posix()}'),
+                 ('CPPFLAGS', f'-I{include_dir.as_posix()}'),
+                 ('LDFLAGS', f'-L{lib_dir.as_posix()}'))
+        for key, flag in flags:
+            if flag not in env.get(key, ''):
+                env[key] = (env.get(key, '') + ' ' + flag).strip()
+
+        pkg_dir = freetype_dir / '_pygs_pkgconfig'
+        pkg_dir.mkdir(exist_ok=True)
+        (pkg_dir / 'freetype2.pc').write_text(
+            'prefix={prefix}\n'
+            'libdir={libdir}\n'
+            'includedir={includedir}\n'
+            '\n'
+            'Name: freetype2\n'
+            'Description: TrueType font engine (python-for-android build)\n'
+            'Version: 2.14.1\n'
+            'Libs: -L${{libdir}} -lfreetype\n'
+            'Cflags: -I${{includedir}}\n'.format(prefix=freetype_dir.as_posix(),
+                                                libdir=lib_dir.as_posix(),
+                                                includedir=include_dir.as_posix()),
+            encoding='utf-8')
+        existing = env.get('PKG_CONFIG_PATH', '')
+        env['PKG_CONFIG_PATH'] = (pkg_dir.as_posix() + (':' + existing if existing else ''))
+        info(f'{self.name}: freetype at {include_dir.as_posix()} (for _freetype)')
+        return env
 
     def prebuild_arch(self, arch):
         # Writes the legacy ``Setup`` file pygame's setup.py consumes.
@@ -119,6 +188,25 @@ class PygameCERecipe(Pygame2Recipe):
                 shutil.copytree(entry, destination, dirs_exist_ok=True)
             else:
                 shutil.copy2(entry, destination)
+
+
+def _freetype_include_dir(freetype_dir):
+    """Folder that makes ``#include <ft2build.h>`` work, or None.
+
+    p4a's freetype recipe only runs ``make install`` when harfbuzz is part of
+    the build, so there are two possible layouts:
+
+    ``<build>/include/freetype2/``  installed prefix (ft2build.h + freetype/)
+    ``<build>/include/``            source tree (ft2build.h + freetype/)
+
+    Both are checked instead of assuming one, because guessing wrong only shows
+    up as "pygame was built without _freetype" an hour into a CI run.
+    """
+    for candidate in (freetype_dir / 'include' / 'freetype2',
+                      freetype_dir / 'include'):
+        if (candidate / 'ft2build.h').is_file():
+            return candidate
+    return None
 
 
 def _use_setuptools_backend(build_dir):

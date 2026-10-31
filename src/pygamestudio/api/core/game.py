@@ -241,6 +241,12 @@ class Game:
             # full-screen surface and no second blit.
             scaler(self._screen, rect.size, display)
             return
+        if display.get_rect().contains(rect):
+            # Here too: a subsurface is only a view, so scaling into it writes
+            # the scaled frame straight into the window - one full-screen pass
+            # instead of an intermediate surface plus a blit.
+            scaler(self._screen, rect.size, display.subsurface(rect))
+            return
         if self._present_surface is None or self._surface_size != rect.size:
             self._present_surface = pygame.Surface(rect.size).convert()
             self._surface_size = rect.size

@@ -172,6 +172,18 @@ CI 在第一次构建前执行 `engine_runtime.py src/pygamestudio tools/android
    手机上直接 `ModuleNotFoundError: No module named 'pygame._freetype'`，整个引擎 import 失败。
    已删掉那行；引擎的文字渲染一直用的是 `pygame.font.Font`，行为不变。
 
+   **`_freetype` 现在已经编进去了**（`p4a_recipes/pygame_ce`）：
+   pygame-ce 用 `buildconfig` 自己探测，探测途径是 pkg-config → `freetype-config`（2.14 已删除）
+   → `FREETYPE_ROOT`；而 p4a 的 freetype recipe 只在加入 harfbuzz 时才 `make install`，
+   平时是在源码树里直接编译，也不留 `.pc` 文件。所以 recipe 在 `get_recipe_env` 里：
+  生成一份指向构建树的 `freetype2.pc`、把 `-I<include>` / `-L<objs/.libs>` 加进
+   `CFLAGS/CPPFLAGS/LDFLAGS`、并设 `FREETYPE_ROOT`。
+   探测失败只会让这个模块“再次缺失”，不会让构建变红；CI 会在 `inspect.log` 里
+   打一行 `_freetype   : built|missing`。
+
+   `pygame.midi` / `pygame.camera` 仍不支持：前者要 portmidi（p4a 无 recipe，Android 上也没有
+   ALSA 后端），后者要 Java Camera2 胶水。这类模块由 `project_scan.py` 在构建前报错。
+
    这类问题桌面永远测不出来，所以 `smoke_engine.py` 里加了一道门禁：
    在子进程里用 import hook **屏蔽** `engine_runtime.ANDROID_MISSING_PYGAME_MODULES` 列出的模块，
    再 import 整个运行时（`api` + `game.object.*`），模拟真机的 import 图。
@@ -203,17 +215,18 @@ py -3.10 tools/android_spike/smoke_engine.py
 | 行 | 期望 | 说明 |
 |---|---|---|
 | `engine` | `imported` | 没有 PySide6 也能 import |
-| `project` | `'PyGS engine spike' canvas (800, 600)` | `project.pygs` 读到了 |
+| `project` | `'PyGS engine spike' canvas (1280, 720)` | `project.pygs` 读到了 |
 | `scene` | `5 object(s), 2 script(s)` | 场景 + 行为脚本都挂上了 |
-| `screen` | `2400x1080 window for a 800x600 canvas -> scale 3.00` | **关键测量**：Android 给的窗口像素 vs 编辑器画布 |
+| `screen` | `surface 1280x720, window 1920x1080 (sdl …), mode show_all, present 1920x1080 at (0, 0) = 1.50x` | **关键测量**：画布、窗口、适配矩形 |
+| `perf` | `present: nearest ?.? ms, smooth 141.9 ms` | 两种缩放滤镜的呈现耗时 |
+| `frame` | `scene draw ?.? ms, other ?.? ms, fps ??` | 一帧时间怎么分的 |
 | 计数 | 拖动时 `pointer` 增长，点 pad 时 `finger` 增长 | 两族事件都到了引擎 |
 
 `[ENGINE]` 前缀的日志来自场景脚本，`adb logcat -s python` 里能直接看到
 `drag_start / drag #n / drag_end` 和 `touch_down / touch_move #n / touch_up / tap`。
 
-> `screen` 那行会暴露一个已知问题：引擎现在把场景按 1:1 像素画在窗口左上角，
-> 手机分辨率远大于 800×600 时画面只占左上角一块。真机数字出来后，
-> 再决定是「引擎加设计分辨率缩放层」还是「构建时让项目按设备分辨率出图」。
+> spike 工程现在用 **1280×720（16:9）** 画布而不是 800×600：手机上横屏就是 16:9 上下，
+> 4:3 的画布在 16:9 屏幕上必然出现左右黑边。画布比例定了，`show_all` 就自然满屏。
 
 ## 画面自适应（已实现，可挑选适配方式）
 
@@ -279,8 +292,19 @@ screen: surface 800x600, window 1875x1054 (sdl 828x1180), mode show_all, present
 | 轮次 | 引擎 | 结论 |
 |---|---|---|
 | 第 1 轮（1:1，无缩放） | 26 fps | 空帧呈现 809 fps → 瓶颈在引擎：`ObjectCanvas` 每帧重建 800×600 SRCALPHA 表面 |
-| 第 2 轮（smoothscale 呈现） | **6 fps** | **我们自己把帧率砸下去的**：`smoothscale` 一帧 141.9 ms（整屏双线性），`other 155 ms` 就是它 |
-| 第 3 轮（本轮） | 待测 | 画布缓存已修 + 默认改 `nearest` + 1:1/整屏两条快路径 |
+| 第 2 轮（smoothscale 呈现） | **6 fps** | **我们自己把帧率砸下去的**：`smoothscale` 一帧 141.9 ms（整屏双线性） |
+| 第 3 轮（nearest + 画布缓存） | **47–50 fps** | `scene draw 9.6 ms / other 11.2 ms`，两者各占一半 |
+| 第 4 轮（本轮） | 待测 | 又砍了两处整屏写入，目标 55–60 |
+
+第 4 轮砍掉的两处（都在每帧路径上，各是一次多余的整屏写入）：
+
+1. `_update_scene()` 开头先 `fill((0,0,0))` 再把**不透明的画布**贴满——现在只要根 canvas
+   确实盖住整个表面且 alpha=255，就直接跳过这次 fill（`_root_covers_surface()`）；
+2. `_present()` 先把缩放结果写进中转表面、再 blit 到窗口——`show_all` 这类居中场景现在
+   **直接缩放进 `display.subsurface(rect)`**（subsurface 只是视图），再一次整屏 blit 也省了。
+
+> 如果还不够 60：剩下的空间在 `scene draw`（对象树遍历 + 逐个 blit）里，
+> 下一步要做的是脏矩形（只重画变化区域），不是再抠呈现层。
 
 教训：**整屏双线性缩放不要放在每帧路径上**，尤其在 ARM / 模拟器上。
 现在默认 `nearest`（`pygame.transform.scale`，接近内存拷贝），`smooth` 只作为可选项留给

@@ -138,6 +138,15 @@ jobs:
           echo "DIST=$DIST" >> "$GITHUB_ENV"
           python3 inspect_dist.py inspect "$DIST" | tee inspect.log
           python3 inspect_dist.py bundle "$DIST" --out libpybundle_rebuilt.so | tee -a inspect.log
+          # pygame._freetype is an optional module: the recipe hands pygame's
+          # detection a pkg-config file and include/lib flags, but a failure to
+          # find freetype only means the module is skipped (as it was before).
+          if ls "$DIST"/_python_bundle__*/_python_bundle/site-packages/pygame/_freetype*.so >/dev/null 2>&1; then
+            echo "_freetype   : built" | tee -a inspect.log
+          else
+            echo "::warning::pygame._freetype was not built - freetype detection failed, the module is missing"
+            echo "_freetype   : missing" | tee -a inspect.log
+          fi
 
       - name: Pack the dist
         if: always()

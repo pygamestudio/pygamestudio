@@ -280,6 +280,42 @@ print('opt out', plain._screen.get_size())
                                  f'{process.stderr}')
         return ' '.join(process.stdout.split())
 
+    def present_path():
+        """Drive _present() on a fake window: the fit maths AND the pixels.
+
+        Runs last because it replaces the display mode. Checks the two device
+        paths that the frame rate depends on: the scaled blit (letterbox bars
+        stay black, the canvas lands inside its rect) and the 1:1 shortcut.
+        """
+        game = studio.Game()
+        display = pygame.display.set_mode((400, 300))
+        display.fill((0, 0, 0))
+        canvas = pygame.Surface((100, 50))
+        canvas.fill((10, 200, 30))
+        game._screen = canvas
+        game._display = display
+        game._scale_mode = 'show_all'
+        game._smooth_scale = False
+        game._present_window = None
+        game._update_present_rect()
+        game._present()
+
+        rect = game._present_rect
+        assert rect.size == (400, 200), f'show_all rect {rect}'
+        assert display.get_at((rect.centerx, rect.centery))[:3] == (10, 200, 30), \
+            'the canvas was not drawn inside its rect'
+        assert display.get_at((5, 5))[:3] == (0, 0, 0), 'the letterbox bar is not black'
+        assert game._to_canvas(rect.center) == (50, 25), game._to_canvas(rect.center)
+
+        display.fill((0, 0, 0))
+        game._scale_mode = 'none'
+        game._present_window = None
+        game._update_present_rect()
+        game._present()
+        assert display.get_at((10, 10))[:3] == (10, 200, 30), 'the 1:1 path did not draw'
+        assert display.get_at((150, 60))[:3] == (0, 0, 0), 'the 1:1 path drew too much'
+        return f'show_all {rect.size} at {rect.topleft}, canvas back to 1:1'
+
     def project_imports():
         """Reject imports the Android runtime cannot satisfy (the phone's black screen)."""
         import project_scan
@@ -334,6 +370,7 @@ print('opt out', plain._screen.get_size())
     checks.run('scaled display', scaled_display)
     checks.run('project imports', project_imports)
     checks.run('entry point on the real path', run_entry_point)
+    checks.run('present path', present_path)
 
     same_files = None
     if (APP_DIR / 'pygamestudio').exists():

@@ -311,8 +311,32 @@ class SceneLoader:
         for child_object_tree_struct in value['children']:
             self._register_tree_struct(obj.uuid, child_object_tree_struct)
 
+    def _root_covers_surface(self, screen_surface) -> bool:
+        """True when the root canvas paints every pixel of the surface.
+
+        Every frame used to start with a full-screen fill and then blit the root
+        canvas over it opaquely - two full-screen writes for one result. The
+        fill is skipped only when the canvas really covers the surface and is
+        fully opaque; anything else (a smaller canvas, transparency, a rotation
+        or a scaled root) keeps it.
+        """
+        if not self._all_object_tree_struct:
+            return False
+        root = list(self._all_object_tree_struct.values())[0]['object']
+        if getattr(root, 'type', '') != OBJECT_CANVAS or not getattr(root, 'visible', False):
+            return False
+        if getattr(root, 'angle', 0) or getattr(root, 'scale_x', 1) != 1 or getattr(root, 'scale_y', 1) != 1:
+            return False
+        color = getattr(root, 'color', (0, 0, 0, 255))
+        if len(color) > 3 and color[3] < 255:
+            return False
+        canvas_rect = pygame.Rect(int(root.x), int(root.y),
+                                  int(root.width), int(root.height))
+        return canvas_rect.contains(screen_surface.get_rect())
+
     def _update_scene(self, screen_surface:pygame.Surface):
-        screen_surface.fill((0, 0, 0))
+        if not self._root_covers_surface(screen_surface):
+            screen_surface.fill((0, 0, 0))
         # Physics runs before the scripts: on_update() sees the position the
         # bodies ended up in, and can push them for the next frame.
         self._update_physics()
