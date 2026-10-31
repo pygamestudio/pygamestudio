@@ -158,6 +158,7 @@ def build_game(studio):
             if self._frames == 60:
                 try:
                     self._profile_scene()
+                    self._blit_bench()
                 except Exception as error:          # noqa: BLE001 - report it
                     fail_line('profile', error)
             if self._frames % 60 == 0:
@@ -233,9 +234,33 @@ def build_game(studio):
 
             entries = sorted(((entry[2], key) for key, entry in stats.stats.items()),
                              reverse=True)[:3]
-            summary = ', '.join(f'{key[2]} {total / 20:.2f} ms'
+            # pstats reports SECONDS; the panel is in milliseconds.
+            summary = ', '.join(f'{key[2]} {total * 1000 / 20:.2f} ms'
                                 for total, key in entries)
             set_line('profile', f'{summary} (per frame, 20 frame sample)', True)
+
+        def _blit_bench(self):
+            """Price every object's blit onto the canvas.
+
+            The first profile said ``blit`` owns nearly the whole scene draw, so
+            the question is *which* blit: an opaque copy, a per-pixel alpha
+            blend, or a big but mostly transparent text box. Each object's
+            surface is blitted 10 times and reported with its size and alpha.
+            """
+            screen = studio.get_screen()
+            results = []
+            for obj in studio.scene_loader.get_all_objects():
+                surface = getattr(obj, 'surface', None)
+                if surface is None:
+                    continue
+                start = time.perf_counter()
+                for _index in range(10):
+                    screen.blit(surface, (0, 0))
+                elapsed = (time.perf_counter() - start) * 1000 / 10
+                alpha = 'alpha' if surface.get_flags() & pygame.SRCALPHA else 'opaque'
+                results.append(f'{obj.name} {elapsed:.2f} ms '
+                               f'{surface.get_width()}x{surface.get_height()} {alpha}')
+            set_line('blits', ', '.join(results) or 'none', True)
 
         # ----------------------------------------------------------- input
         def on_mouse_button_down(self, pos, btn, touch=0, clicks=1, window=None):
