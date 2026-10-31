@@ -64,6 +64,17 @@ def get_system_lang():
     return 'en'
 
 
+def is_android() -> bool:
+    """True when the process runs inside a python-for-android build.
+
+    p4a's bootstrap exports ``ANDROID_ARGUMENT`` / ``ANDROID_PRIVATE`` before the
+    app starts and no desktop sets them, so this works without importing a
+    platform module (and without Qt). ``sys.platform`` is not reliable there: a
+    p4a build reports ``linux``.
+    """
+    return bool(os.environ.get('ANDROID_ARGUMENT') or os.environ.get('ANDROID_PRIVATE'))
+
+
 def get_lan_ip() -> str:
     """The LAN address of this machine ('' when it cannot be found).
 

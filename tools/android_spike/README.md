@@ -18,10 +18,11 @@ tools/android_spike/
 │  ├─ pygame_ce/__init__.py  # 复用 p4a 的 pygame recipe，只换源码地址
 │  └─ pymunk/__init__.py     # p4a 自带 recipe 是 6.0.0，这里提到 7.3.1
 ├─ engine_runtime.py         # 挑选「运行时需要的引擎子集」并拷进 app/（未来运行时产物的原型）
+├─ project_scan.py           # 静态扫 import：运行时没有的模块直接报错，而不是装机后黑屏
 ├─ smoke_engine.py           # 本机无头预演：真的加载场景、拖动、点按、跑一遍 main.py
+├─ spike1_pygame_only.py     # spike 1/3a 的纯 pygame demo（不进 APK，留作对照）
 ├─ app/
 │  ├─ main.py                # spike 3b 入口：引擎 Game + 屏幕自检报告
-│  ├─ spike1_pygame_only.py  # spike 1/3a 的纯 pygame demo（不进 APK，留作对照）
 │  ├─ project.pygs           # 最小工程配置（800×600 画布，current_scene）
 │  ├─ scenes/main.scene      # 画布 + 标题 + 提示 + 触摸区 + 可拖动方块
 │  ├─ scripts/drag.py        # 只实现鼠标拖拽族（验证“手指也会走 on_drag”）
@@ -213,6 +214,82 @@ py -3.10 tools/android_spike/smoke_engine.py
 > `screen` 那行会暴露一个已知问题：引擎现在把场景按 1:1 像素画在窗口左上角，
 > 手机分辨率远大于 800×600 时画面只占左上角一块。真机数字出来后，
 > 再决定是「引擎加设计分辨率缩放层」还是「构建时让项目按设备分辨率出图」。
+
+## 画面自适应（已实现）
+
+第一次真机跑出来的数字是 `1920x1038 window for a 800x600 canvas -> scale 1.73`——
+场景确实只画在左上角。现在引擎在**设备上**改用 SDL 的逻辑分辨率：
+
+```python
+pygame.display.set_mode(canvas_size, pygame.SCALED)
+```
+
+`SCALED` 让 SDL 把画面渲染到「画布大小」的内部表面再缩放到真实屏幕（保持宽高比，
+多余区域留黑边），**并且把鼠标/触摸坐标反向映射回画布坐标**——所以命中测试、拖拽
+不用改一行代码就继续用编辑器里的坐标系。
+
+| 位置 | 行为 |
+|---|---|
+| 桌面（编辑器「运行」、打包的桌面版） | 仍然开真的 800×600 窗口，行为不变 |
+| Android | 默认 `SCALED`；`get_screen()` 仍是 800×600，`pygame.display.get_window_size()` 是真实分辨率 |
+| 想关掉的项目 | `project.pygs` 里写 `"screen_scaled": false` |
+| 设备不支持 renderer | 捕获 `pygame.error` 后自动退回 1:1，并在控制台打一行提示 |
+
+真机上要看的新报告行：
+
+```
+screen: surface 800x600, window 1920x1038, driver <name>, scaled (canvas 800x600)
+```
+
+`scaled` 出现、且 `surface` 是 800×600 才算成功；若是 `NOT scaled` 说明这台设备
+的 SDL renderer 不支持逻辑缩放，引擎已回退。
+
+## 性能（为什么只有 13–14 fps）
+
+自检面板每帧重画 8 行文字本身就要吃掉不少帧，所以面板改成**每秒重建一次**；
+同时 `on_start` 里加了一项测量：
+
+```
+perf: fill+flip 58 fps (17.1 ms/frame at 800x600)
+```
+
+它只做「清屏 + flip」，不含任何引擎逻辑。把这两条放在一起就能定位瓶颈：
+
+* `fill+flip` 本身就很低 → 瓶颈在**呈现**（模拟器的软件渲染 / 整屏拷贝），
+  和引擎无关；MuMu 这类模拟器尤其明显，真机会好很多；
+* `fill+flip` 很高、引擎才低 → 才是引擎或场景的问题（对象太多、每帧重建 Surface…）。
+
+`SCALED` 也可能顺带改变这一项：走 SDL_Renderer 时可能用上 GPU（更快），
+也可能在模拟器上退回软件路径（更慢）。这轮上机的 `perf` 行就是答案。
+
+## 依赖扫描（构建前就报错，而不是装机后黑屏）
+
+运行时只带 **stdlib + pygame-ce + pymunk + cffi + 引擎**，别的第三方库一律没有；
+p4a 编出来的 pygame 还少了 `_freetype` / `_camera` / `pypm` / `system`。
+用户工程一旦 import 这些，APK 照样能打出来，然后在手机上 `ModuleNotFoundError` + 黑屏。
+
+`project_scan.py` 用 `ast` 扫工程里的 `import`，对照「运行时能提供的模块」白名单：
+
+```powershell
+py -3.10 tools/android_spike/project_scan.py tools/android_spike/app
+```
+
+```
+scanned: 3 python file(s)
+imports: os, pathlib, pygame, pygamestudio, sys, time, traceback
+RESULT : project imports ok
+```
+
+负例（`import numpy` + `import pygame.freetype`）：
+
+```
+  BLOCKED pygame.freetype (main.py:2) - p4a does not build it
+  MISSING numpy (main.py:1) - not part of the Android runtime
+RESULT : imports UNSUPPORTED      (exit 1)
+```
+
+CI 在构建前就跑这一步（`scan.log` 也会上传），失败时给出的是模块名，不是一台黑屏的手机。
+
 
 
 ## 失败时的处置（按概率排序）

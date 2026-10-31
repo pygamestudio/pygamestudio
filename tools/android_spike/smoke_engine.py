@@ -178,7 +178,6 @@ def main():
 
     def android_imports():
         """Import the engine with the pygame modules Android lacks blocked.
-
         p4a's pygame build has no ``_freetype`` (its recipe leaves the optional C
         extensions out), but every desktop pygame has it - so a stray
         ``import pygame.freetype`` passes here and only fails on the phone. This
@@ -222,6 +221,53 @@ print('ok')
                                  f'{process.stdout}\n{process.stderr}')
         return f'{len(blocked)} module(s) blocked'
 
+    def scaled_display():
+        """The device display path: SCALED keeps the canvas as the logical size.
+
+        With ``ANDROID_ARGUMENT`` set the engine asks SDL for a scaled display,
+        so ``get_screen()`` stays 800x600 (editor coordinates) while the window
+        is the real screen. Without the flag - and when a project opts out -
+        the plain window is used, exactly like on the desktop.
+        """
+        import subprocess
+        code = f'''
+import sys
+sys.path.insert(0, {str(project_dir)!r})
+import pygame
+pygame.init()
+import pygamestudio as studio
+
+game = studio.Game()
+scaled = game._create_screen((800, 600), {{}})
+assert scaled.get_size() == (800, 600), scaled.get_size()
+print('scaled', scaled.get_size(), pygame.display.get_window_size())
+
+plain = game._create_screen((800, 600), {{'screen_scaled': False}})
+assert plain.get_size() == (800, 600), plain.get_size()
+print('plain', plain.get_size())
+'''
+        environment = dict(os.environ, SDL_VIDEODRIVER='dummy',
+                           SDL_AUDIODRIVER='dummy',
+                           ANDROID_ARGUMENT='/data/user/0/pygs/files/app',
+                           ANDROID_PRIVATE='/data/user/0/pygs/files')
+        process = subprocess.run([sys.executable, '-c', code], cwd=str(project_dir),
+                                 env=environment, capture_output=True, text=True)
+        if process.returncode != 0:
+            raise AssertionError(f'the scaled display path failed\n{process.stdout}\n'
+                                 f'{process.stderr}')
+        return ' '.join(process.stdout.split())
+
+    def project_imports():
+        """Reject imports the Android runtime cannot satisfy (the phone's black screen)."""
+        import project_scan
+        summary = project_scan.scan(project_dir)
+        if summary['missing'] or summary['blocked']:
+            detail = '; '.join(f'{module} ({relative}:{line})'
+                               for module, relative, line
+                               in summary['blocked'] + summary['missing'])
+            raise AssertionError(detail)
+        return f'{summary["files"]} file(s): {", ".join(summary["imports"])}'
+
     def run_entry_point():
         """Run the real ``main.py`` the way the device does - as the script.
 
@@ -262,6 +308,8 @@ print('ok')
     checks.run('finger tap', finger_tap)
     checks.run('render frame', render_frame)
     checks.run('imports without Android-missing pygame modules', android_imports)
+    checks.run('scaled display', scaled_display)
+    checks.run('project imports', project_imports)
     checks.run('entry point on the real path', run_entry_point)
 
     same_files = None

@@ -16,11 +16,9 @@ package.name = pygsspike
 package.domain = org.pygamestudio
 
 # The demo app: a real engine project (project.pygs + scene + scripts) plus the
-# staged runtime engine. ``spike1_pygame_only.py`` is the previous, engine-free
-# demo kept for reference - it stays out of the APK.
+# staged runtime engine (``engine_runtime.py`` copies it in before the build).
 source.dir = app
 source.include_exts = py,png,pygs,scene,json
-source.exclude_patterns = spike1_pygame_only.py
 
 version = 0.1.0
 

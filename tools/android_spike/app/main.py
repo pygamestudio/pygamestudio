@@ -18,6 +18,7 @@ so a failure shows up as a red line instead of a black screen.
 
 import os
 import sys
+import time
 import traceback
 from pathlib import Path
 
@@ -109,6 +110,9 @@ def build_game(studio):
             super().__init__()
             self._frames = 0
             self._scene_loaded = False
+            self._panel = None
+            self._panel_time = 0.0
+            self._panel_count = 0
 
         # ------------------------------------------------------- life cycle
         def on_start(self):
@@ -127,6 +131,10 @@ def build_game(studio):
             except Exception as error:              # noqa: BLE001 - report it
                 fail_line('pygame', error)
             self._measure()
+            try:
+                self._perf_probe()
+            except Exception as error:              # noqa: BLE001 - report it
+                fail_line('perf', error)
 
         def on_update(self, dt):
             self._frames += 1
@@ -189,39 +197,92 @@ def build_game(studio):
             set_line('pygame', ', '.join(results), True)
 
         def _measure(self):
+            """Report the real window against the canvas the scene is authored on.
+
+            With ``pygame.SCALED`` (what the engine now uses on a device) the
+            drawing surface stays the canvas size while the window is the whole
+            screen: ``screen`` must read ``800x600`` and ``window`` the device
+            resolution, otherwise the scaling did not take effect.
+            """
             screen = self._screen
             width, height = screen.get_size()
             canvas_w, canvas_h = STATE['canvas']
             STATE['scale'] = min(width / float(canvas_w), height / float(canvas_h))
-            set_line('screen', f'{width}x{height} window for a {canvas_w}x{canvas_h} '
-                               f'canvas -> scale {STATE["scale"]:.2f}', True)
+            try:
+                window = pygame.display.get_window_size()
+            except pygame.error:                        # older pygame / no window
+                window = (0, 0)
+            driver = pygame.display.get_driver()
+            scaled = tuple(window) != (width, height)
+            set_line('screen', f'surface {width}x{height}, window {window[0]}x{window[1]}, '
+                               f'driver {driver}, '
+                               f'{"scaled" if scaled else "NOT scaled"}'
+                               f' (canvas {canvas_w}x{canvas_h})', True)
+            STATE['window'] = window
+
+        def _perf_probe(self):
+            """How fast can this device fill the screen and present a frame?
+
+            A phone frame costs the scene draw (a few blits onto an 800x600
+            surface) plus one present. Measuring the present alone tells the
+            spike whether a low fps comes from the engine or from the device's
+            renderer - an emulator with a software SDL renderer usually caps
+            here long before the engine matters.
+            """
+            screen = studio.get_screen()
+            frames = 30
+            start = time.perf_counter()
+            for index in range(frames):
+                screen.fill((20, 20, 24) if index % 2 else (24, 22, 28))
+                pygame.display.flip()
+            elapsed = time.perf_counter() - start
+            fps = frames / elapsed if elapsed else 0.0
+            set_line('perf', f'fill+flip {fps:.0f} fps ({elapsed * 1000 / frames:.1f} '
+                             f'ms/frame at {screen.get_size()[0]}x{screen.get_size()[1]})',
+                     fps >= 30)
 
         def _overlay(self):
-            """Draw the report on top of the frame the scene just drew."""
+            """Draw the report on top of the frame the scene just drew.
+
+            The panel is rebuilt once a second, not every frame: rendering ~8
+            text lines per frame costs more than the whole 800x600 scene and
+            would make the fps line measure the overlay instead of the engine.
+            """
             screen = studio.get_screen()
             if screen is None:
                 return
-            size = max(14, int(16 * STATE['scale']))
+            now = time.perf_counter()
+            if self._panel is None or now - self._panel_time > 1.0:
+                self._panel_time = now
+                self._panel = self._build_panel(screen)
+            if self._panel is not None:
+                screen.blit(self._panel, (0, 0))
+
+        def _build_panel(self, screen):
+            size = max(12, int(14 * STATE['scale']))
             font = pygame.font.Font(None, size)
-            line_height = size + 6
+            line_height = size + 4
+            lines = []
+            for label, value, ok in REPORT:
+                lines.append((f'{label}: {value}'[:150],
+                              (150, 240, 190) if ok else (255, 130, 130)))
+            lines.append((f'pointer {STATE["pointer_down"]}/{STATE["pointer_move"]}/'
+                          f'{STATE["pointer_up"]}  finger {STATE["finger_down"]}/'
+                          f'{STATE["finger_move"]}/{STATE["finger_up"]}',
+                          (210, 220, 255)))
+            lines.append((f'fps {self._clock.get_fps():.0f}', (200, 200, 210)))
             panel = pygame.Surface((screen.get_width(),
-                                    min(screen.get_height(),
-                                        line_height * (len(REPORT) + 3))),
+                                    min(screen.get_height(), line_height * len(lines) + 8)),
                                    pygame.SRCALPHA)
             panel.fill((0, 0, 0, 130))
             y = 4
-            for label, value, ok in REPORT:
-                color = (150, 240, 190) if ok else (255, 130, 130)
-                panel.blit(font.render(f'{label}: {value}'[:150], True, color), (8, y))
+            for text, color in lines:
+                panel.blit(font.render(text, True, color), (8, y))
                 y += line_height
-            counts = (f'pointer {STATE["pointer_down"]}/{STATE["pointer_move"]}/'
-                      f'{STATE["pointer_up"]}  finger {STATE["finger_down"]}/'
-                      f'{STATE["finger_move"]}/{STATE["finger_up"]}')
-            panel.blit(font.render(counts, True, (210, 220, 255)), (8, y))
-            y += line_height
-            panel.blit(font.render(f'fps {self._clock.get_fps():.0f}', True,
-                                   (200, 200, 210)), (8, y))
-            screen.blit(panel, (0, 0))
+            self._panel_count += 1
+            if self._panel_count == 1 or self._panel_count % 5 == 0:
+                log(' | '.join(text for text, _color in lines))
+            return panel
 
     return SpikeGame()
 

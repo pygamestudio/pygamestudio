@@ -6,6 +6,8 @@ from pathlib import Path
 from pygamestudio.api.core.scene import scene_loader
 from pygamestudio.api.config.project import get_project_config
 from pygamestudio.api.core.debug import _draw_debug_info
+from pygamestudio.common.i18n.translator import Translator as T
+from pygamestudio.common.utils.system import is_android
 
 
 class Game:
@@ -65,8 +67,37 @@ class Game:
 
         pygame.init()
         pygame.display.set_caption(project_config['caption'])
-        self._screen = pygame.display.set_mode(project_config['screen_size'])
+        self._screen = self._create_screen(project_config['screen_size'], project_config)
         self._clock = pygame.time.Clock()
+
+    def _create_screen(self, size, project_config=None):
+        """Create the game surface - scaled to the real screen on a device.
+
+        A phone/tablet has no window: SDL hands us the whole display, so a scene
+        authored on a fixed canvas (800x600 by default) would be drawn 1:1 into
+        the top-left corner of a 2400x1080 screen. ``pygame.SCALED`` makes SDL
+        render into a logical surface of the canvas size and scale that to the
+        real screen (aspect ratio kept, the remaining edges letterboxed), and it
+        maps mouse/touch positions back to the logical size - which is exactly
+        what the editor's coordinates need for hit tests and drags.
+
+        Desktop runs keep the plain window: the editor's "run game" and a built
+        game both expect a real 800x600 window, and a project can opt out on a
+        device too (``"screen_scaled": false`` in project.pygs).
+        """
+        project_config = project_config or {}
+        if not project_config.get('screen_scaled', True) or not is_android():
+            return pygame.display.set_mode(size)
+
+        try:
+            # Keep the canvas as the logical size: get_screen() then returns an
+            # 800x600 surface and every object coordinate stays in editor space.
+            return pygame.display.set_mode(size, pygame.SCALED)
+        except pygame.error as error:
+            print(T.tr('api.display_scaling_failed',
+                       'The screen could not be scaled to {} ({}); drawing at the '
+                       'canvas size instead.').format(size, error))
+            return pygame.display.set_mode(size)
 
     def run(self):
         """Start the game loop. Blocks until the window is closed."""

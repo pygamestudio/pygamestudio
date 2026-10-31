@@ -88,6 +88,13 @@ jobs:
             src/pygamestudio tools/android_spike/app
           find tools/android_spike/app/pygamestudio -name '*.py' | wc -l
 
+      # A project that imports numpy (or pygame.freetype, which p4a does not
+      # build) packages fine and then dies on the phone with a black screen.
+      # Refuse that here, with the module name.
+      - name: Scan the project imports
+        working-directory: tools/android_spike
+        run: python3 project_scan.py app | tee scan.log
+
       - name: Build the spike APK
         working-directory: tools/android_spike
         run: |
@@ -152,6 +159,7 @@ jobs:
             tools/android_spike/bin/*.apk
             tools/android_spike/buildozer.log
             tools/android_spike/inspect.log
+            tools/android_spike/scan.log
             tools/android_spike/pygs-dist.tgz
 
       # Spike 1 + 2 acceptance: the payload must carry the four packages the
