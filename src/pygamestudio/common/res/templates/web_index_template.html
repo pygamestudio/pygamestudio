@@ -23,7 +23,7 @@ __PYGS_TOY_SDK_SCRIPT__
     #app { min-height: 100vh; display: flex; flex-direction: column; align-items: center;
            justify-content: center; gap: 14px; padding: 24px; box-sizing: border-box; }
     h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: .3px; }
-    canvas#canvas { background: #000; max-width: 100%; height: auto; border-radius: 6px;
+    canvas#canvas { background: #000; max-width: none; height: auto; border-radius: 6px;
                     box-shadow: 0 10px 40px rgba(0, 0, 0, .55); outline: none; }
     #loader { display: flex; flex-direction: column; align-items: center; gap: 8px;
               width: min(320px, 80vw); }
@@ -45,6 +45,58 @@ __PYGS_TOY_SDK_SCRIPT__
     </div>
     <pre id="error"></pre>
 </div>
+
+<script>
+// -- Canvas fit ---------------------------------------------------------
+// A plain script, not part of the module below: the canvas is sized correctly
+// even when the Pyodide module cannot load (offline, blocked CDN), and the
+// game starts inside an already-sized canvas.
+//
+// The page scales the canvas through CSS width/height and never with
+// object-fit: the element box has to match the picture pixel for pixel,
+// because SDL maps mouse and touch positions with getBoundingClientRect().
+(function () {
+    const CANVAS_WIDTH = __PYGS_CANVAS_WIDTH__;
+    const CANVAS_HEIGHT = __PYGS_CANVAS_HEIGHT__;
+    const CANVAS_FIT = "__PYGS_WEB_FIT__";
+    const canvasElement = document.getElementById("canvas");
+
+    function applyCanvasFit() {
+        const app = document.getElementById("app");
+        const title = app ? app.querySelector("h1") : null;
+        const loader = document.getElementById("loader");
+        // Everything that is not the canvas: padding (24+24), the gap around
+        // the canvas (14+14), the title, and the loading bar while it is up.
+        const title_height = title ? title.offsetHeight : 24;
+        const loader_height = loader && loader.offsetHeight ? loader.offsetHeight + 14 : 0;
+        const available_width = Math.max(64, (app ? app.clientWidth : window.innerWidth) - 48);
+        const available_height = Math.max(64, window.innerHeight - title_height - loader_height - 76);
+        let width = CANVAS_WIDTH;
+        let height = CANVAS_HEIGHT;
+        if (CANVAS_FIT === "show_all") {
+            const scale = Math.min(available_width / CANVAS_WIDTH, available_height / CANVAS_HEIGHT);
+            width = Math.round(CANVAS_WIDTH * scale);
+            height = Math.round(CANVAS_HEIGHT * scale);
+        } else if (CANVAS_FIT === "exact_fit") {
+            width = Math.round(available_width);
+            height = Math.round(available_height);
+        } else if (CANVAS_FIT === "integer") {
+            const scale = Math.max(1, Math.floor(Math.min(available_width / CANVAS_WIDTH,
+                                                         available_height / CANVAS_HEIGHT)));
+            width = CANVAS_WIDTH * scale;
+            height = CANVAS_HEIGHT * scale;
+        }
+        canvasElement.style.width = width + "px";
+        canvasElement.style.height = height + "px";
+    }
+
+    applyCanvasFit();
+    window.addEventListener("resize", applyCanvasFit);
+    // The boot hides the loading bar when the game is about to start; the
+    // canvas gets that room back. Called from the module below as well.
+    window.applyCanvasFit = applyCanvasFit;
+})();
+</script>
 
 <script type="module">
 import { loadPyodide } from "__PYGS_PYODIDE_URL____PYGS_PYODIDE_ENTRY__";
@@ -133,6 +185,11 @@ try {
     globalThis.__pygsProgress = setProgress;
     globalThis.__pygsGameStarted = () => {
         loaderElement.style.display = "none";
+        // The loading bar took vertical room; the canvas can use it now. The
+        // canvas keeps its drawing buffer, so resizing it here is free.
+        if (window.applyCanvasFit) {
+            window.applyCanvasFit();
+        }
     };
     await pyodide.runPythonAsync(bootSource);
 } catch (error) {

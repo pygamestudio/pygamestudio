@@ -6,6 +6,8 @@
     "screen_scaled": true,
     "screen_scale_mode": "none",
     "screen_scale_filter": "nearest",
+    "desktop_display_mode": "window",
+    "web_scale_mode": "show_all",
     "asset": {
         "current_scene": "",
         "sort_type": 1

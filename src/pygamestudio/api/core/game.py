@@ -109,23 +109,24 @@ class Game:
     def _create_display(self, canvas_size, project_config=None):
         """Create the window and the surface the scene is drawn on.
 
-        On a device the window is the whole screen while the scene is authored
-        on a fixed canvas (800x600 by default), so the game keeps a canvas
-        surface - that is what ``get_screen()`` returns and what every object
-        coordinate refers to - and presents it scaled into the window (see
-        ``_present``). SDL's own ``pygame.SCALED`` flag was tried first and
-        showed the canvas at 1:1 in the middle of a 1920x1038 screen: it leaves
-        the pixel ratio to the renderer, which SDL quantises, so the size is not
-        controllable per project.
+        A device window is the whole screen while the scene is authored on a
+        fixed canvas, so the game keeps a canvas surface - what ``get_screen()``
+        returns and what every object coordinate refers to - and presents it
+        scaled into the window (see ``_present``). SDL's own ``pygame.SCALED``
+        flag was tried first and showed the canvas at 1:1 in the middle of a
+        1920x1038 screen: it leaves the pixel ratio to the renderer, which SDL
+        quantises, so the size is not controllable per project.
 
-        Desktop runs keep one surface for both roles: the editor's "run game"
-        and a built game expect a real 800x600 window, and nothing is scaled.
+        The same canvas path is used on the desktop when the project asks for a
+        full-screen game (``desktop_display_mode``): the window then covers the
+        screen and the chosen fit mode decides how the canvas fills it. A
+        plain desktop run (the default) keeps one surface for both roles: the
+        editor's "run game" and a built game expect a real canvas-sized window.
         """
         project_config = project_config or {}
         canvas_w, canvas_h = int(canvas_size[0]), int(canvas_size[1])
-        self._scale_mode = str(project_config.get('screen_scale_mode') or 'none')
-        if self._scale_mode not in self.SCALE_MODES:
-            self._scale_mode = 'none'
+        requested = str(project_config.get('screen_scale_mode') or 'none')
+        self._scale_mode = requested if requested in self.SCALE_MODES else 'none'
         # Nearest-neighbour by default: bilinear scaling of a full 800x600 frame
         # costs ~140 ms/frame on an Android emulator, which is 6 fps on its own.
         self._smooth_scale = str(project_config.get('screen_scale_filter') or 'nearest') == 'smooth'
@@ -133,12 +134,19 @@ class Game:
         self._present_window = None
         self._present_rect = None
 
-        if not is_android() or not project_config.get('screen_scaled', True):
+        on_device = is_android()
+        desktop_mode = str(project_config.get('desktop_display_mode') or 'window')
+        desktop_fullscreen = not on_device and desktop_mode in self.SCALE_MODES
+        device_scaled = on_device and project_config.get('screen_scaled', True)
+
+        if not desktop_fullscreen and not device_scaled:
             surface = pygame.display.set_mode((canvas_w, canvas_h))
             self._screen = surface
             self._display = surface
             return
 
+        if desktop_fullscreen:
+            self._scale_mode = desktop_mode
         window_size = self._device_window_size((canvas_w, canvas_h))
         try:
             self._display = pygame.display.set_mode(window_size, pygame.FULLSCREEN)
@@ -207,7 +215,12 @@ class Game:
                            width, height)
 
     def _to_canvas(self, pos):
-        """Window pixel position -> canvas pixel position (identity on desktop)."""
+        """Window pixel position -> canvas pixel position.
+
+        Identity while one surface plays both roles (a windowed run on the
+        desktop, or a device that opted out of scaling); a device screen and a
+        full-screen desktop run both need the present rectangle undone.
+        """
         if pos is None or self._screen is None:
             return pos
         rect = self._present_rect

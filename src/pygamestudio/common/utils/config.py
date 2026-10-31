@@ -14,7 +14,15 @@ EDITOR_CONFIG_VERSION = 2
 
 
 def get_editor_data_dir() -> Path:
-    """Machine-local data folder of the editor (``editor.pygs`` and friends)."""
+    """Machine-local data folder of the editor (``editor.pygs`` and friends).
+
+    ``PYGAMESTUDIO_EDITOR_DIR`` overrides it. The headless checks set it so a
+    test never reads - or writes - the configuration of the machine it runs on
+    (``platformdirs`` asks the shell on Windows and ignores ``APPDATA``).
+    """
+    override = os.environ.get('PYGAMESTUDIO_EDITOR_DIR')
+    if override:
+        return Path(override)
     return Path(user_config_dir()) / 'PygameStudio'
 
 

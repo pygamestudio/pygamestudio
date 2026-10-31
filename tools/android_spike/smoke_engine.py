@@ -280,6 +280,61 @@ print('opt out', plain._screen.get_size())
                                  f'{process.stderr}')
         return ' '.join(process.stdout.split())
 
+    def desktop_fullscreen():
+        """A desktop run takes the screen when the project asks for it.
+
+        ``desktop_display_mode`` is the desktop twin of the mobile fit mode: a
+        built game (or the editor's run) then opens full screen and presents the
+        canvas scaled, exactly like on a phone. An empty/absent key must keep
+        the old behaviour - one 800x600 window - because that is what every
+        existing project expects.
+        """
+        import subprocess
+        code = f'''
+import sys
+sys.path.insert(0, {str(project_dir)!r})
+import pygame
+pygame.init()
+import pygamestudio as studio
+
+windowed = studio.Game()
+windowed._create_display((800, 600), {{'desktop_display_mode': 'window'}})
+assert windowed._screen is windowed._display, 'a windowed desktop run must stay one surface'
+assert pygame.display.get_window_size() == (800, 600), pygame.display.get_window_size()
+print('windowed', pygame.display.get_window_size())
+
+legacy = studio.Game()
+legacy._create_display((800, 600), {{}})
+assert legacy._screen is legacy._display, 'a project without the key must not change'
+print('no key', pygame.display.get_window_size())
+
+for mode in ('show_all', 'exact_fit', 'integer'):
+    game = studio.Game()
+    game._create_display((800, 600), {{'desktop_display_mode': mode}})
+    screen_size = pygame.display.get_window_size()
+    assert game._screen is not game._display, mode + ': the canvas must be its own surface'
+    assert game._screen.get_size() == (800, 600), game._screen.get_size()
+    assert game._present_rect is not None, mode + ': no present rectangle'
+    assert game._present_rect.width <= screen_size[0] + 1, (mode, game._present_rect, screen_size)
+    assert game._scale_mode == mode, (mode, game._scale_mode)
+    # the middle of the canvas is the middle of the window: no mirroring, no offset
+    assert game._present_rect.center == (screen_size[0] // 2, screen_size[1] // 2), \\
+        (mode, game._present_rect.center, screen_size)
+    assert game._to_canvas(game._present_rect.center) == (400, 300), \\
+        (mode, game._to_canvas(game._present_rect.center))
+    game._present()
+print('fullscreen', pygame.display.get_window_size())
+'''
+        environment = dict(os.environ, SDL_VIDEODRIVER='dummy', SDL_AUDIODRIVER='dummy')
+        for name in ('ANDROID_ARGUMENT', 'ANDROID_PRIVATE', 'ANDROID_APP_PATH'):
+            environment.pop(name, None)
+        process = subprocess.run([sys.executable, '-c', code], cwd=str(project_dir),
+                                 env=environment, capture_output=True, text=True)
+        if process.returncode != 0:
+            raise AssertionError(f'the desktop full screen path failed\n{process.stdout}\n'
+                                 f'{process.stderr}')
+        return ' '.join(process.stdout.split())
+
     def present_path():
         """Drive _present() on a fake window: the fit maths AND the pixels.
 
@@ -412,6 +467,7 @@ print('opt out', plain._screen.get_size())
     checks.run('dirty-rect redraw', dirty_redraw)
     checks.run('imports without Android-missing pygame modules', android_imports)
     checks.run('scaled display', scaled_display)
+    checks.run('desktop full screen', desktop_fullscreen)
     checks.run('project imports', project_imports)
     checks.run('entry point on the real path', run_entry_point)
     checks.run('present path', present_path)

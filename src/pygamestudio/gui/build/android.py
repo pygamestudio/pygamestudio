@@ -662,6 +662,11 @@ class AndroidBuildThread(QThread):
                         '\n'.join(T.tr(key, key) for key in toolchain['problems'])),
                     toolchain['problems'][0])
 
+            # Empty paths in Editor Settings mean "find it for me", so say which
+            # JDK and SDK the build actually uses instead of leaving it a mystery.
+            Logger.info(T.tr('build.android_toolchain_used', 'Using JDK {} and Android SDK {} (build-tools {})').format(
+                toolchain['jdk'], toolchain['sdk'], toolchain['build_tools'] or '-'))
+
             Logger.info(T.tr('build.android_staging', 'Protecting the project and staging the engine...'))
             payload_root = android_runtime.cache_root() / 'payload'
             prepared = protection.prepare(project_path, payload_root)

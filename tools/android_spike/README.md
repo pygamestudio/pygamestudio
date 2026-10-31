@@ -280,7 +280,32 @@ renderer，实际按整倍数取整（1.73 → 1.0），于是 800×600 原样�
 
 * `screen_scaled: false` → 完全不缩放（等价于 `none`，保留给老构建）；
 * `screen_scale_filter`: `nearest`（默认，快）或 `smooth`（双线性，好看但极慢，见下）；
-* 桌面（编辑器「运行」、桌面版）完全不进这套逻辑，仍然开真的 800×600 窗口。
+
+### 桌面全屏（`desktop_display_mode`）
+
+同一套适配逻辑现在也用在桌面上：**项目设置 → 游戏窗口 → 桌面端显示**，默认"窗口模式"
+（就是以前的行为：开一个 800×600 的真窗口，一个 surface 两用，不做任何缩放）。
+选任意一种适配模式后，桌面运行/桌面版会开全屏窗口，用**同一块画布 surface + `_present` +
+`_to_canvas`**，所以三种平台（安卓 / 桌面 / 网页）的行为和坐标换算是一致的：
+
+```json
+{
+  "desktop_display_mode": "window"
+}
+```
+
+`window` 或没有这个键 → 老行为。`show_all` / `no_border` / `fixed_width` / `fixed_height` /
+`exact_fit` / `integer` / `none` → 全屏 + 对应的适配方式（`none` 就是全屏但画布 1:1 放左上角）。
+按键、鼠标坐标都走 `_to_canvas`，不会因为全屏而偏移。
+
+### 网页画布（`web_scale_mode`）
+
+**项目设置 → 游戏窗口 → 网页画布适配**，写进 `project.pygs` 的 `web_scale_mode`，
+网页打包时烘进 `index.html`：`none` / `show_all`（默认）/ `exact_fit` / `integer`。
+
+网页这层只改 canvas 的 **CSS 宽高**，不用 `object-fit`——元素盒子必须和画面一样大，
+否则 SDL 用 `getBoundingClientRect()` 算出来的鼠标位置会偏（`object-fit` 的留白算在盒子里）。
+窗口大小变了会重新算一次（`resize` 监听），所以拉伸浏览器窗口不会让点击错位。
 
 真机上要看的新报告行（`_fit_rect` 的 7 种模式在 `smoke_engine.py` 里有断言）：
 

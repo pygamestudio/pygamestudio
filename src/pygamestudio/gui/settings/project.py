@@ -19,6 +19,17 @@ class ProjectSettingsBody(QWidget):
         ('exact_fit', 'settings.screen_fit_exact_fit', 'Stretch to screen'),
         ('integer', 'settings.screen_fit_integer', 'Integer scale (crisp)'),
     )
+    #: Desktop display: windowed (the default, exactly as before) or full screen
+    #: with one of the fit modes above. Stored as ``desktop_display_mode``.
+    DESKTOP_DISPLAY_MODES = (('window', 'settings.desktop_window', 'Windowed (default)'),) + SCREEN_FIT_MODES
+    #: Browser canvas fit: how the page scales the canvas. Stored as
+    #: ``web_scale_mode``; ``show_all`` keeps the current page behaviour.
+    WEB_FIT_MODES = (
+        ('none', 'settings.screen_fit_none', 'No fit (1:1)'),
+        ('show_all', 'settings.screen_fit_show_all', 'Show all (letterbox)'),
+        ('exact_fit', 'settings.screen_fit_exact_fit', 'Stretch to screen'),
+        ('integer', 'settings.screen_fit_integer', 'Integer scale (crisp)'),
+    )
 
     def __init__(self, game_manager):
         super().__init__()
@@ -30,9 +41,13 @@ class ProjectSettingsBody(QWidget):
         self._screen_width_label = QLabel()
         self._screen_height_label = QLabel()
         self._screen_fit_label = QLabel()
+        self._desktop_display_label = QLabel()
+        self._web_fit_label = QLabel()
         self._screen_width_spinbox = QDoubleSpinBox()
         self._screen_height_spinbox = QDoubleSpinBox()
         self._screen_fit_combobox = QComboBox()
+        self._desktop_display_combobox = QComboBox()
+        self._web_fit_combobox = QComboBox()
 
         self._set_up()
 
@@ -54,6 +69,8 @@ class ProjectSettingsBody(QWidget):
         self._screen_width_spinbox.valueChanged.connect(self._update_screen_size)
         self._screen_height_spinbox.valueChanged.connect(self._update_screen_size)
         self._screen_fit_combobox.currentIndexChanged.connect(self._update_screen_fit)
+        self._desktop_display_combobox.currentIndexChanged.connect(self._update_desktop_display)
+        self._web_fit_combobox.currentIndexChanged.connect(self._update_web_fit)
         T.add_observer(self)
 
     def _set_layout(self):
@@ -64,6 +81,10 @@ class ProjectSettingsBody(QWidget):
         screen_stack_grid_layout.addWidget(self._screen_height_spinbox, 1, 1, 1, 1)
         screen_stack_grid_layout.addWidget(self._screen_fit_label, 2, 0, 1, 1)
         screen_stack_grid_layout.addWidget(self._screen_fit_combobox, 2, 1, 1, 1)
+        screen_stack_grid_layout.addWidget(self._desktop_display_label, 3, 0, 1, 1)
+        screen_stack_grid_layout.addWidget(self._desktop_display_combobox, 3, 1, 1, 1)
+        screen_stack_grid_layout.addWidget(self._web_fit_label, 4, 0, 1, 1)
+        screen_stack_grid_layout.addWidget(self._web_fit_combobox, 4, 1, 1, 1)
         screen_stack_grid_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         main_h_layout = QHBoxLayout(self)
@@ -74,10 +95,14 @@ class ProjectSettingsBody(QWidget):
         self._screen_width_label.setText(T.tr('settings.screen_width', 'Screen Width'))
         self._screen_height_label.setText(T.tr('settings.screen_height', 'Screen Height'))
         self._screen_fit_label.setText(T.tr('settings.screen_fit', 'Mobile Screen Fit'))
+        self._desktop_display_label.setText(T.tr('settings.desktop_display', 'Desktop Display'))
+        self._web_fit_label.setText(T.tr('settings.web_fit', 'Web Canvas Fit'))
 
         self._screen_width_spinbox.blockSignals(True)
         self._screen_height_spinbox.blockSignals(True)
         self._screen_fit_combobox.blockSignals(True)
+        self._desktop_display_combobox.blockSignals(True)
+        self._web_fit_combobox.blockSignals(True)
         screen_width = get_project_config()['screen_width']
         screen_height = get_project_config()['screen_height']
         self._screen_width_spinbox.setRange(1, 99999)
@@ -91,13 +116,36 @@ class ProjectSettingsBody(QWidget):
         current = str(get_project_config().get('screen_scale_mode') or 'none')
         self._screen_fit_combobox.setCurrentIndex(max(0, self._screen_fit_combobox.findData(current)))
 
+        self._desktop_display_combobox.clear()
+        for value, key, fallback in self.DESKTOP_DISPLAY_MODES:
+            self._desktop_display_combobox.addItem(T.tr(key, fallback), value)
+        desktop = str(get_project_config().get('desktop_display_mode') or 'window')
+        self._desktop_display_combobox.setCurrentIndex(
+            max(0, self._desktop_display_combobox.findData(desktop)))
+
+        self._web_fit_combobox.clear()
+        for value, key, fallback in self.WEB_FIT_MODES:
+            self._web_fit_combobox.addItem(T.tr(key, fallback), value)
+        web = str(get_project_config().get('web_scale_mode') or 'show_all')
+        self._web_fit_combobox.setCurrentIndex(max(0, self._web_fit_combobox.findData(web)))
+
         self._screen_width_spinbox.blockSignals(False)
         self._screen_height_spinbox.blockSignals(False)
         self._screen_fit_combobox.blockSignals(False)
+        self._desktop_display_combobox.blockSignals(False)
+        self._web_fit_combobox.blockSignals(False)
 
     def _update_screen_fit(self):
         """Remember the fit mode the runtime uses for the mobile screen."""
         update_project_config('screen_scale_mode', self._screen_fit_combobox.currentData())
+
+    def _update_desktop_display(self):
+        """Remember whether a desktop run fills the screen, and how it scales."""
+        update_project_config('desktop_display_mode', self._desktop_display_combobox.currentData())
+
+    def _update_web_fit(self):
+        """Remember how the browser page scales the canvas."""
+        update_project_config('web_scale_mode', self._web_fit_combobox.currentData())
 
     def _update_screen_size(self):
         screen_width = self._screen_width_spinbox.value()
@@ -121,9 +169,17 @@ class ProjectSettingsBody(QWidget):
         self._screen_width_label.setText(T.tr('settings.screen_width', 'Screen Width'))
         self._screen_height_label.setText(T.tr('settings.screen_height', 'Screen Height'))
         self._screen_fit_label.setText(T.tr('settings.screen_fit', 'Mobile Screen Fit'))
+        self._desktop_display_label.setText(T.tr('settings.desktop_display', 'Desktop Display'))
+        self._web_fit_label.setText(T.tr('settings.web_fit', 'Web Canvas Fit'))
         for index, (_value, key, fallback) in enumerate(self.SCREEN_FIT_MODES):
             if index < self._screen_fit_combobox.count():
                 self._screen_fit_combobox.setItemText(index, T.tr(key, fallback))
+        for index, (_value, key, fallback) in enumerate(self.DESKTOP_DISPLAY_MODES):
+            if index < self._desktop_display_combobox.count():
+                self._desktop_display_combobox.setItemText(index, T.tr(key, fallback))
+        for index, (_value, key, fallback) in enumerate(self.WEB_FIT_MODES):
+            if index < self._web_fit_combobox.count():
+                self._web_fit_combobox.setItemText(index, T.tr(key, fallback))
 
     def enterEvent(self, event):
         self.setCursor(Qt.CursorShape.ArrowCursor)

@@ -78,6 +78,11 @@ BUNDLE_STAGING_SUFFIX = '.building'
 PROTECTED_WORK_DIR_NAME = '_protected'
 #: Fallback canvas size when a project has none (the editor's own default).
 DEFAULT_CANVAS_SIZE = (800, 600)
+#: Default page fit: the canvas keeps its aspect ratio inside the window.
+DEFAULT_WEB_FIT = 'show_all'
+#: Values written by the project settings' "Web Canvas Fit" picker and honoured
+#: by the page script (see web_index_template.html).
+WEB_FIT_MODES = ('none', 'show_all', 'exact_fit', 'integer')
 #: Largest page icon edge; bigger images are scaled down before saving.
 FAVICON_MAX_SIZE = 256
 #: Name of the engine package inside the bundle and in the zip archive.
@@ -1331,12 +1336,24 @@ class WebAppBuilder:
             Logger.warning('Failed to read the screen size from project.pygs: {}'.format(e))
         return DEFAULT_CANVAS_SIZE
 
+    def _read_web_fit(self):
+        """How the page should scale the canvas (project settings > Web Canvas Fit)."""
+        try:
+            project_config = json.loads(assets.read_text(self._project_path / 'project.pygs'))
+            mode = str(project_config.get('web_scale_mode') or DEFAULT_WEB_FIT)
+            if mode in WEB_FIT_MODES:
+                return mode
+        except Exception as e:
+            Logger.warning('Failed to read the web fit mode from project.pygs: {}'.format(e))
+        return DEFAULT_WEB_FIT
+
     def _render_index(self, template, favicon_links, canvas_size, archive_name='game.zip'):
         return (template
                 .replace('__PYGS_TITLE__', html.escape(self._page_title))
                 .replace('__PYGS_FAVICON_LINK__', favicon_links)
                 .replace('__PYGS_CANVAS_WIDTH__', str(canvas_size[0]))
                 .replace('__PYGS_CANVAS_HEIGHT__', str(canvas_size[1]))
+                .replace('__PYGS_WEB_FIT__', self._read_web_fit())
                 .replace('__PYGS_GAME_ARCHIVE__', archive_name)
                 .replace('__PYGS_TOY_SDK_SCRIPT__', TOY_SDK_SCRIPT if self._is_toy else '')
                 .replace('__PYGS_PYODIDE_URL__', self._pyodide_url)
