@@ -470,12 +470,12 @@ pygs-android-runtime-1.0.0-arm64-v8a.zip: 21.0 MB (2.16x smaller, lzma)
 
 | 位置 | 作用 |
 |---|---|
-| `common/utils/android_runtime.py` | 找包、校验 sha256、解压到缓存；探测 JDK/SDK 并检查版本（不依赖 Qt，可脚本调用） |
+| `common/utils/android_runtime.py` | 找包、校验 sha256、解压到缓存；探测 JDK/SDK/Gradle（不依赖 Qt，可脚本调用） |
 | `gui/build/runtime_payload.py` | 「一个安卓包要带哪些引擎文件」的唯一清单；本目录的 `engine_runtime.py` 按路径加载它 |
 | `gui/build/android_assets.py` | 图标 / 首屏 / 应用名注入；本目录的 `android_assets.py` 同样是按路径的壳 |
-| `gui/build/android_dist.py` | 解包成型 → 恢复 res → 清单 / strings.xml / build.gradle / local.properties → 调 Gradle |
-| `gui/build/android.py` | Build 窗口第三个 tab（安卓 APK）+ 后台线程 |
-| `gui/settings/editor.py` | 「编辑器设置 > 安卓打包」：JDK、SDK、运行时包信息、环境检查 |
+| `gui/build/android_dist.py` | 解包成型 → 恢复 res → 清单 / strings.xml / build.gradle / local.properties / 签名 → 调 Gradle |
+| `gui/build/android.py` | Build 窗口「安卓应用」tab（debug/release、签名、进度、停止） |
+| `gui/settings/editor.py` | 「编辑器设置 > 安卓打包」：只放 JDK / SDK / Gradle 三个路径 |
 
 缓存目录（`platformdirs.user_cache_dir()/PygameStudio/android/`）：
 
@@ -514,22 +514,48 @@ APK 17.7 MB • 45 entries • 14 个 .so（含 libfreetype / libpybundle）• 
 | `BUILD FAILED`：`Could not download gradle-8.11.0.jar … Remote host terminated the handshake` | 本机 Clash 代理对 Java 无效（Java 不读系统代理）；直接放开后又因并发握手过多被代理掐断 | 失败后自动**走系统代理重试**：`GRADLE_OPTS` + `JAVA_TOOL_OPTIONS`（守护进程也要）+ `systemProp.*`，并把 `maxConnections` 降到 4 |
 | 警告 `buildToolsVersion 34.0.0 is ignored, below the minimum (35.0.0) for AGP 8.11` | 包里钉的是 CI 的 build-tools 版本，而每个 AGP 有自己的下限，且会自己装 | 生成 `build.gradle` 时**删掉** `buildToolsVersion`，让 AGP 决定；设置页也不再把它当阻塞项 |
 
+### release 签名（已实现，已实测）
+
+tab 里选「发布」后：`build.gradle` 里生成 `signingConfigs { release { … } }`，
+但里面**只有 `System.getenv(...)`**，不加任何字面量；密码在构建时通过环境变量传给 Gradle
+（`PYGS_KEYSTORE` / `PYGS_KEY_ALIAS` / `PYGS_KEYSTORE_PASSWORD` / `PYGS_KEY_PASSWORD`），
+不会写进工作目录里的任何文件。签名文件路径和别名存在 `project.pygs`（属于工程），
+两个密码存在 `editor.pygs`（只在这台机器上）。「新建...」按钮用 JDK 自带的 `keytool`
+生成一个 2048 位、10000 天的自签名密钥（密码通过 `-storepass:env` 传递，不出现在进程列表）。
+
+实测（`assembleRelease` 45 s）：
+
+```
+APK 16.7 MB
+apksigner verify --print-certs:
+  Signer #1 certificate DN: CN=PyGS Test, OU=Game, O=PyGS, L=Beijing, ST=Beijing, C=CN
+  SHA-256: 50193644e93079843de571609866a6a10f2d9909c82ef1b8500e7b40d0e95281
+```
+
+`find_apk()` 会跳过 `*-unsigned.apk`：签名没生效时 Gradle 会写这个文件，拷出去看着像成功、却装不上。
+
 
 ### 测试
 
 ```powershell
-py -3.10 tools/android_spike/smoke_android_build.py   # 49 项：解包 → 保护 → payload → private.tar → 清单/Gradle
-py -3.10 tools/android_spike/check_android_ui.py      # 22 项：第三个 tab + 设置页（offscreen，不碰用户配置）
+py -3.10 tools/android_spike/smoke_android_build.py   # 61 项：解包 → 保护 → payload → private.tar → 清单/Gradle/签名
+py -3.10 tools/android_spike/check_android_ui.py      # 27 项：「安卓应用」tab + 设置页（offscreen，不碰用户配置）
 py -3.10 tools/android_spike/smoke_engine.py          # 16 项：真机路径的引擎回归
 py -3.10 tools/android_spike/project_scan.py tools/android_spike/app
 ```
 
 ### 还没做
 
-1. **release 签名**：目前只出 `assembleDebug`（可安装，debug 证书）。release 需要
-   keystore + `apksigner`，以及一个「签名」设置页；
-2. **AAB**：`assembleRelease` 换成 `bundleRelease` 即可，但要先有签名；
-3. **按工程裁剪 ABI**：现在只发 arm64-v8a（手机够用，模拟器 x86_64 不行）；
-4. **扩展包**：往 `site-packages` 加库后需要重打 `libpybundle.so`（见上一节）；
-5. **首次构建的网络**：Gradle 发行版 + AGP + androidx 约 250 MB，需要联网（有系统代理会自动重试）。
+1. **AAB**：`assembleRelease` 换成 `bundleRelease` 即可（签名已具备，还没有上传到 Play 的渠道）；
+2. **按工程裁剪 ABI**：现在只发 arm64-v8a（手机够用，模拟器 x86_64 不行）；
+3. **扩展包**：往 `site-packages` 加库后需要重打 `libpybundle.so`（见上一节）。
+
+### 第一次构建要下载什么
+
+| 东西 | 体积 | 能不能免掉 |
+|---|---|---|
+| Gradle 发行版（8.14.3-bin） | ~130 MB | **能**：设置里选一个已装的 Gradle 8.11+（Android Studio 自带的也在它的 `gradle` 目录里） |
+| AGP + androidx 依赖（Google Maven） | ~150 MB | 不能，第一次要联网，之后缓存在 `%LOCALAPPDATA%\PygameStudio\android\gradle` |
+
+Gradle 的缓存目录永远是编辑器自己的：不碰用户的 `~/.gradle`，避免和 Android Studio 互相干扰。
 

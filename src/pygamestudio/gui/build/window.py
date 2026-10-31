@@ -24,7 +24,7 @@ class BuildWindowBody(QTabWidget):
     def _set_widget(self):
         self.addTab(self._desktop_app_build_window, T.tr('build.desktop_app', 'Desktop App'))
         self.addTab(self._web_app_build_window, T.tr('build.web_app', 'Web App'))
-        self.addTab(self._android_app_build_window, T.tr('build.android_app', 'Android APK'))
+        self.addTab(self._android_app_build_window, T.tr('build.android_app', 'Android App'))
     
     def _set_signal(self):
         T.add_observer(self)
@@ -56,7 +56,7 @@ class BuildWindowBody(QTabWidget):
     def retranslate(self):
         self.setTabText(0, T.tr('build.desktop_app', 'Desktop App'))
         self.setTabText(1, T.tr('build.web_app', 'Web App'))
-        self.setTabText(2, T.tr('build.android_app', 'Android APK'))
+        self.setTabText(2, T.tr('build.android_app', 'Android App'))
 
     def get_ready_for_project(self):
         self._desktop_app_build_window.get_ready_for_project()

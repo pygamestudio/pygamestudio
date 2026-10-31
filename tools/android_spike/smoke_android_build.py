@@ -14,6 +14,7 @@ Run with the editor's interpreter (PySide6 + pygame available)::
 
     py -3.10 tools/android_spike/smoke_android_build.py
 """
+import os
 import shutil
 import sys
 import tarfile
@@ -152,8 +153,39 @@ def main():
         check('app name in res_initial too', '<string name="app_name">Smoke Game</string>' in pristine_strings)
         check('local.properties points at the SDK', 'sdk.dir=C:/fake/sdk' in local)
         check('startup style survives', 'KivySupportCutout' in strings)
+        check('no signing config for a debug build', 'signingConfigs' not in build_gradle)
 
-        print('6) second run is idempotent')
+        print('6) release signing')
+        android_dist.prepare_dist(
+            runtime_dir, dist_dir,
+            app_name='Smoke Game', package=PACKAGE,
+            version_code=VERSION_CODE, version_name=VERSION_NAME,
+            sdk_dir='C:/fake/sdk',
+            icon=SPIKE_ICON, presplash=SPIKE_SPLASH,
+            signing={'keystore': 'C:/keys/game.jks', 'alias': 'game'})
+        signed_gradle = (dist_dir / 'build.gradle').read_text(encoding='utf-8')
+        check('signingConfigs added', 'signingConfigs {' in signed_gradle)
+        check('release uses the signing config',
+              'signingConfig signingConfigs.release' in signed_gradle)
+        check('passwords are read from the environment',
+              'PYGS_KEYSTORE_PASSWORD' in signed_gradle
+              and "storePassword '" not in signed_gradle)
+        environment = android_dist.signing_environment(
+            {'keystore': 'C:/keys/game.jks', 'alias': 'game'},
+            {'store_password': 's3cret', 'key_password': ''})
+        check('env carries the keystore', environment['PYGS_KEYSTORE'] == 'C:/keys/game.jks')
+        check('env carries the alias', environment['PYGS_KEY_ALIAS'] == 'game')
+        check('an empty key password falls back to the store one',
+              environment['PYGS_KEY_PASSWORD'] == 's3cret')
+        check('release task name', android_dist.RELEASE_TASK == 'assembleRelease')
+        gradle_dir = temp / 'gradle-8.14.3'
+        (gradle_dir / 'bin').mkdir(parents=True, exist_ok=True)
+        gradle_exe = gradle_dir / 'bin' / ('gradle.bat' if os.name == 'nt' else 'gradle')
+        gradle_exe.write_text('')
+        check('an installed gradle wins over the wrapper',
+              android_dist.gradle_executable(dist_dir, gradle_dir) == gradle_exe)
+
+        print('7) second run is idempotent')
         android_dist.prepare_dist(
             runtime_dir, dist_dir,
             app_name='Smoke Game', package=PACKAGE,
@@ -164,10 +196,11 @@ def main():
         build_gradle = (dist_dir / 'build.gradle').read_text(encoding='utf-8')
         manifest = (dist_dir / 'src' / 'main' / 'AndroidManifest.xml').read_text(encoding='utf-8')
         check('one applicationId only', build_gradle.count('applicationId') == 1)
+        check('no stale signing config', 'signingConfigs' not in build_gradle)
         check('orientation follows the second run',
               'android:screenOrientation="portrait"' in manifest)
 
-        print('7) a build without an icon starts from the pack again')
+        print('8) a build without an icon starts from the pack again')
         pristine_icon = (runtime_dir / 'src' / 'res_initial' / 'mipmap-xxxhdpi' / 'icon.png').read_bytes()
         pristine_splash = (runtime_dir / 'src' / 'res_initial' / 'drawable' / 'presplash.jpg').read_bytes()
         android_dist.prepare_dist(
@@ -180,7 +213,7 @@ def main():
         check('icon is the pack default again', shipped_icon == pristine_icon)
         check('splash is the pack default again', shipped_splash == pristine_splash)
 
-        print('8) error translation')
+        print('9) error translation')
         check('old JDK is explained',
               android_dist.translate_error('Unsupported class file major version 61')
               == 'android.error_java_too_old')

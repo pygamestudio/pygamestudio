@@ -28,9 +28,9 @@ from xml.sax.saxutils import escape as xml_escape
 
 from pygamestudio.common.utils.android_runtime import COMPILE_SDK, MIN_SDK
 
-#: APK signing / packaging tasks. Only the debug task is exposed for now: it
-#: produces an installable APK with the debug key Android's tooling generates.
+#: Gradle tasks of the two build types.
 DEBUG_TASK = 'assembleDebug'
+RELEASE_TASK = 'assembleRelease'
 
 #: Manifest written for every build. Based on what p4a's SDL2 bootstrap renders
 #: (and what ran on the device in spike 3b), with the values a game build needs
@@ -218,7 +218,7 @@ def _write_manifest(dist_dir, version_code, version_name, orientation, min_sdk,
 
 
 def _patch_build_gradle(dist_dir, package, version_code, version_name,
-                        compile_sdk, min_sdk):
+                        compile_sdk, min_sdk, signing=None):
     """Rewrite the app identity of the pack's Gradle project, in place."""
     target = dist_dir / 'build.gradle'
     if not target.is_file():
@@ -253,8 +253,87 @@ def _patch_build_gradle(dist_dir, package, version_code, version_name,
                             f"defaultConfig {{\n        applicationId '{package}'",
                             1)
 
+    if signing:
+        text = _add_signing_config(text)
+
     target.write_text(text, encoding='utf-8')
     return target
+
+
+def _add_signing_config(text):
+    """Sign release builds with the user's keystore.
+
+    The block reads environment variables instead of literals on purpose: the
+    passwords never end up in ``build.gradle`` (which the build writes into the
+    work folder), only in the environment of the Gradle process. The pack's
+    ``buildTypes`` already has an empty ``release { }`` to fill in.
+    """
+    release_block = re.compile(r'release\s*\{\s*\}')
+    if not release_block.search(text):
+        raise AndroidBuildError('build.gradle has no empty release block to sign',
+                                'android.error_pack_layout')
+    text = release_block.sub('release {\n            signingConfig signingConfigs.release\n        }',
+                             text, count=1)
+
+    signing_configs = (
+        'signingConfigs {\n'
+        '        release {\n'
+        '            storeFile file(System.getenv("PYGS_KEYSTORE"))\n'
+        '            keyAlias System.getenv("PYGS_KEY_ALIAS")\n'
+        '            storePassword System.getenv("PYGS_KEYSTORE_PASSWORD")\n'
+        '            keyPassword System.getenv("PYGS_KEY_PASSWORD")\n'
+        '        }\n'
+        '    }\n\n    '
+    )
+    return text.replace('buildTypes {', signing_configs + 'buildTypes {', 1)
+
+
+def signing_environment(signing, config=None):
+    """Environment variables Gradle reads the signing data from."""
+    if not signing:
+        return {}
+    config = config or {}
+    return {
+        'PYGS_KEYSTORE': Path(signing.get('keystore', '')).as_posix(),
+        'PYGS_KEY_ALIAS': str(signing.get('alias', '')),
+        'PYGS_KEYSTORE_PASSWORD': str(config.get('store_password') or ''),
+        'PYGS_KEY_PASSWORD': str(config.get('key_password') or ''
+                                  or config.get('store_password') or ''),
+    }
+
+
+def create_keystore(jdk, path, alias, password, common_name='Pygame Studio Game'):
+    """Create a self-signed release key with the JDK's ``keytool``.
+
+    The passwords reach keytool through the environment (``:env``), so they are
+    not visible in the process list. Everything else is a normal, valid release
+    key: 2048-bit RSA, ten thousand days.
+    """
+    system = platform.system()
+    keytool = Path(jdk) / 'bin' / ('keytool.exe' if system == 'Windows' else 'keytool')
+    if not keytool.is_file():
+        raise AndroidBuildError(f'keytool not found in {jdk}', 'android.error_java_too_old')
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    environment = dict(os.environ)
+    environment['PYGS_STORE_PASSWORD'] = str(password)
+    environment['PYGS_KEY_PASSWORD'] = str(password)
+    command = [str(keytool), '-genkeypair', '-v',
+               '-keystore', str(path), '-alias', str(alias),
+               '-keyalg', 'RSA', '-keysize', '2048', '-validity', '10000',
+               '-storepass:env', 'PYGS_STORE_PASSWORD',
+               '-keypass:env', 'PYGS_KEY_PASSWORD',
+               '-dname', f'CN={common_name}, O=PygameStudio, C=CN']
+    completed = subprocess.run(command, stdout=subprocess.PIPE,
+                               stderr=subprocess.STDOUT, text=True,
+                               encoding='utf-8', errors='replace',
+                               env=environment, timeout=180,
+                               creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+    if completed.returncode != 0:
+        raise AndroidBuildError(completed.stdout or 'keytool failed',
+                                'android.error_keystore')
+    return path
 
 
 def _write_local_properties(dist_dir, sdk_dir):
@@ -296,7 +375,7 @@ def prepare_dist(runtime_dir, dist_dir, *, app_name, package, version_code=1,
                  version_name='1.0.0', orientation=DEFAULT_ORIENTATION,
                  min_sdk=MIN_SDK, compile_sdk=COMPILE_SDK,
                  sdk_dir='', icon='', presplash='', adaptive=True,
-                 on_progress=None):
+                 signing=None, on_progress=None):
     """Lay the pack out as a buildable project and inject the app's identity.
 
     :return: summary dict (paths of the files that were rewritten)
@@ -326,7 +405,7 @@ def prepare_dist(runtime_dir, dist_dir, *, app_name, package, version_code=1,
                                min_sdk, compile_sdk)
     report(70)
     gradle = _patch_build_gradle(dist_dir, package, version_code, version_name,
-                                 compile_sdk, min_sdk)
+                                 compile_sdk, min_sdk, signing=signing)
     _patch_gradle_wrapper(dist_dir)
     _patch_gradle_properties(dist_dir)
     local_properties = _write_local_properties(dist_dir, sdk_dir) if sdk_dir else None
@@ -346,8 +425,21 @@ def write_payload(payload_dir, target, numeric_version=1, min_sdk=MIN_SDK):
                                             min_sdk=min_sdk)
 
 
-def gradle_executable(dist_dir):
-    """``gradlew`` of the work folder, made executable on POSIX."""
+def gradle_executable(dist_dir, gradle_dir=''):
+    """The Gradle to run: the user's installation, else the pack's wrapper.
+
+    ``gradle_dir`` is the folder of an unpacked Gradle (the one with ``bin/``),
+    e.g. the copy Android Studio ships. Gradle 8.11 or newer is required by the
+    Android Gradle Plugin of the pack; a wrong version is reported by Gradle
+    itself, with a clear message.
+    """
+    if gradle_dir:
+        folder = Path(gradle_dir)
+        name = 'gradle.bat' if platform.system() == 'Windows' else 'gradle'
+        executable = folder / 'bin' / name
+        if executable.is_file():
+            return executable
+
     dist_dir = Path(dist_dir)
     if platform.system() == 'Windows':
         return dist_dir / 'gradlew.bat'
@@ -360,7 +452,7 @@ def gradle_executable(dist_dir):
     return launcher
 
 
-def gradle_environment(jdk, sdk, gradle_home, proxy=None):
+def gradle_environment(jdk, sdk, gradle_home, proxy=None, extra_environment=None):
     """Environment for a Gradle run: the user's JDK/SDK and a private cache."""
     environment = dict(os.environ)
     environment['JAVA_HOME'] = str(jdk)
@@ -371,6 +463,8 @@ def gradle_environment(jdk, sdk, gradle_home, proxy=None):
     environment['PYTHONUTF8'] = '1'
     # A stale JAVA_TOOL_OPTIONS from the user's shell can break the Gradle JVM.
     environment.pop('JAVA_TOOL_OPTIONS', None)
+    for key, value in (extra_environment or {}).items():
+        environment[key] = str(value)
 
     # Java ignores the system proxy, so a machine that reaches the internet
     # through one (the common Clash/v2ray setup) would time out on the very
@@ -445,13 +539,14 @@ def use_proxy(dist_dir, proxy):
 
 
 def run_gradle(dist_dir, jdk, sdk, gradle_home, task=DEBUG_TASK,
-               on_line=None, on_progress=None, stop_check=None, proxy=None):
+               on_line=None, on_progress=None, stop_check=None, proxy=None,
+               gradle_dir='', extra_environment=None):
     """Run a Gradle task in the work folder and stream its output.
 
     :return: the process exit code (0 on success)
     """
     dist_dir = Path(dist_dir)
-    launcher = gradle_executable(dist_dir)
+    launcher = gradle_executable(dist_dir, gradle_dir)
     if not launcher.is_file():
         raise AndroidBuildError(f'gradlew is missing from {dist_dir}',
                                 'android.error_pack_layout')
@@ -459,7 +554,8 @@ def run_gradle(dist_dir, jdk, sdk, gradle_home, task=DEBUG_TASK,
     command = [str(launcher), '--console=plain', task]
     process = subprocess.Popen(command,
                                cwd=str(dist_dir),
-                               env=gradle_environment(jdk, sdk, gradle_home, proxy),
+                               env=gradle_environment(jdk, sdk, gradle_home, proxy,
+                                                      extra_environment),
                                stdout=subprocess.PIPE,
                                stderr=subprocess.STDOUT,
                                text=True, encoding='utf-8', errors='replace',
@@ -487,11 +583,18 @@ def run_gradle(dist_dir, jdk, sdk, gradle_home, task=DEBUG_TASK,
 
 
 def find_apk(dist_dir):
-    """The APK the task produced (newest one, since the folder is reused)."""
+    """The APK the task produced (newest one, since the folder is reused).
+
+    ``*-unsigned.apk`` is skipped: Gradle writes it when a release build has no
+    working signing config, and copying that to the output folder would look
+    like a success while the file cannot be installed.
+    """
     outputs = Path(dist_dir) / 'build' / 'outputs' / 'apk'
     if not outputs.is_dir():
         return None
-    candidates = sorted(outputs.rglob('*.apk'), key=lambda path: path.stat().st_mtime,
+    candidates = sorted((path for path in outputs.rglob('*.apk')
+                         if '-unsigned' not in path.name),
+                        key=lambda path: path.stat().st_mtime,
                         reverse=True)
     return candidates[0] if candidates else None
 

@@ -41,7 +41,11 @@ VERSION.json                               版本 / 路径 / 包清单 / sha256
    改 `build.gradle`（namespace、applicationId、versionCode/Name、SDK 版本，
    并删掉包里钉死的 `buildToolsVersion`）和 `local.properties`；
 5. 写 `src/main/assets/private.tar`（工程 + 引擎，`.py` 不编译）；
-6. 用 `gradlew assembleDebug` 打包，把 APK 拷到 `<输出目录>/build/Android/<应用名>.apk`。
+6. 用 `gradlew assembleDebug` / `assembleRelease` 打包，把 APK 拷到 `<输出目录>/build/Android/<应用名>.apk`。
+
+构建类型在 tab 里选：**调试**用 Android 的调试证书，**发布**用你选的 keystore
+（密码只在构建时通过环境变量传给 Gradle，不写进任何文件；「新建...」会用 JDK 自带的
+`keytool` 现场生成一个）。Gradle 本身可以预装——设置页里选好路径就不会再下载发行版。
 
 Gradle 的缓存放在 `.../android/gradle/`，所以同一个工程第二次构建只需几秒。
 

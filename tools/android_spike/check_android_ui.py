@@ -69,8 +69,17 @@ def main():
     check('version name default', config['version_name'] == '1.0.0')
     check('version code default', str(config['version_code']) == '1')
     check('orientation default', config['orientation'] == 'landscape', config['orientation'])
+    check('build type default', config['build_type'] == 'debug', config['build_type'])
     check('five orientation choices', window._orientation_combobox.count() == 5)
-    check('environment line filled', window._environment_label.text() != '')
+    check('signing fields disabled for debug', not window._keystore_lineedit.isEnabled())
+    check('keystore creator exists', window._keystore_create_button.text() != '')
+    window._build_type_combobox.setCurrentIndex(window._build_type_combobox.findData('release'))
+    window._update_signing_enabled()
+    check('signing fields enabled for release', window._keystore_lineedit.isEnabled())
+    check('keystore creator enabled for release',
+          window._keystore_create_button.isEnabled())
+    window._build_type_combobox.setCurrentIndex(window._build_type_combobox.findData('debug'))
+    window._update_signing_enabled()
     window.retranslate()
     check('retranslate keeps the orientation pick',
           window._orientation_combobox.currentData() == 'landscape')
@@ -79,8 +88,8 @@ def main():
     body = BuildWindowBody(manager)
     check('three tabs', body.count() == 3, body.count())
     check('desktop tab first', body.tabText(0) != '')
-    check('android tab last', 'Android' in body.tabText(2) or body.tabText(2) != '',
-          body.tabText(2))
+    check('android tab named Android App',
+          body.tabText(2) in ('Android App', '安卓应用'), body.tabText(2))
     body.get_ready_for_project()
     check('project data reaches every tab', body.count() == 3)
     body.retranslate()
@@ -92,12 +101,15 @@ def main():
           settings._list_widget.count())
     check('android page is in the stack', settings._main_stacked_widget.count() == 3)
     check('jdk field filled', settings._android_jdk_lineedit.text() != ''
-          or settings._android_status_label.text() != '')
-    check('pack described', settings._android_pack_value_label.text() != '-',
-          settings._android_pack_value_label.text())
-    check('status explains the toolchain', settings._android_status_label.text() != '')
+          or settings._android_sdk_lineedit.text() != '')
+    check('permission list keeps its width',
+          settings._list_widget.minimumWidth() == 170
+          == settings._list_widget.maximumWidth(),
+          settings._list_widget.minimumWidth())
+    check('no runtime pack row', not hasattr(settings, '_android_pack_label'))
+    check('gradle field exists', hasattr(settings, '_android_gradle_lineedit'))
     settings.retranslate()
-    check('status survives retranslate', settings._android_status_label.text() != '')
+    check('labels survive retranslate', settings._android_jdk_label.text() != '')
 
     app.processEvents()
 

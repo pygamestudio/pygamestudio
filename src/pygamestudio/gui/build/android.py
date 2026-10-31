@@ -4,10 +4,9 @@ The compile-once part (Python, pygame-ce, pymunk, SDL2, the Java bootstrap)
 ships inside the editor as the frozen runtime pack, so this tab only has to:
 
 * unpack the pack (once, into the user cache),
-* check the machine has a JDK and an Android SDK,
 * protect the project the same way the desktop/web builds do,
 * stage the engine and write ``assets/private.tar``,
-* run Gradle and copy the APK next to the project.
+* run Gradle (debug, or release with the user's keystore) and copy the APK out.
 
 The work folder lives in the cache on purpose: Gradle keeps its incremental
 state there, so the second build of a project takes seconds instead of minutes.
@@ -28,6 +27,7 @@ from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.common.utils import android_runtime
 from pygamestudio.common.utils.config import (get_editor_config,
                                               get_project_config,
+                                              update_editor_config,
                                               update_project_config)
 from pygamestudio.gui.build import android_dist
 from pygamestudio.gui.build import protection
@@ -43,6 +43,11 @@ ORIENTATION_CHOICES = (
     ('sensor_landscape', 'build.orientation_sensor_landscape'),
     ('sensor_portrait', 'build.orientation_sensor_portrait'),
     ('full_sensor', 'build.orientation_full_sensor'),
+)
+#: Build type picker: value for Gradle -> translation key.
+BUILD_TYPES = (
+    ('debug', 'build.android_debug'),
+    ('release', 'build.android_release'),
 )
 
 
@@ -83,7 +88,20 @@ class AndroidAppBuildWindow(QScrollArea):
         self._version_code_lineedit = QLineEdit()
         self._orientation_label = QLabel()
         self._orientation_combobox = QComboBox()
-        self._environment_label = QLabel()
+        self._build_type_label = QLabel()
+        self._build_type_combobox = QComboBox()
+        # Signing (release builds): the two secrets stay on this machine, the
+        # keystore path and the alias belong to the project.
+        self._keystore_label = QLabel()
+        self._keystore_lineedit = QLineEdit()
+        self._keystore_browse_button = QPushButton()
+        self._keystore_create_button = QPushButton()
+        self._key_alias_label = QLabel()
+        self._key_alias_lineedit = QLineEdit()
+        self._store_password_label = QLabel()
+        self._store_password_lineedit = QLineEdit()
+        self._key_password_label = QLabel()
+        self._key_password_lineedit = QLineEdit()
         self._progress_bar = QProgressBar()
         self._build_button = QPushButton()
         self._open_output_dir_button = QPushButton()
@@ -118,13 +136,25 @@ class AndroidAppBuildWindow(QScrollArea):
         self._version_name_lineedit.setPlaceholderText('1.0.0')
         self._version_code_lineedit.setPlaceholderText('1')
         self._orientation_label.setText(T.tr('build.android_orientation', 'Screen Orientation'))
+        self._build_type_label.setText(T.tr('build.android_build_type', 'Build Type'))
+        self._keystore_label.setText(T.tr('build.android_keystore', 'Keystore'))
+        self._keystore_lineedit.setPlaceholderText(T.tr(
+            'build.android_keystore_placeholder', 'Select the signing key (.jks/.keystore)'))
+        self._keystore_browse_button.setIcon(QIcon(':/images/browse.png'))
+        self._keystore_create_button.setText(T.tr('build.android_keystore_new', 'New...'))
+        self._key_alias_label.setText(T.tr('build.android_key_alias', 'Key Alias'))
+        self._store_password_label.setText(T.tr('build.android_store_password', 'Keystore Password'))
+        self._key_password_label.setText(T.tr('build.android_key_password', 'Key Password'))
+        for field in (self._store_password_lineedit, self._key_password_lineedit):
+            field.setEchoMode(QLineEdit.EchoMode.Password)
         self._set_orientation_texts()
-        self._environment_label.setWordWrap(True)
+        self._set_build_type_texts()
         self._progress_bar.setRange(0, 100)
         self._progress_bar.setValue(0)
         self._build_button.setText(T.tr('build.build', 'Build'))
         self._open_output_dir_button.setText(T.tr('build.open_output_dir', 'Open Output Dir'))
         self._update_button_widths()
+        self._update_signing_enabled()
 
     def _set_signal(self):
         self._app_name_lineedit.editingFinished.connect(self._on_app_name_edited)
@@ -135,6 +165,13 @@ class AndroidAppBuildWindow(QScrollArea):
         self._version_name_lineedit.editingFinished.connect(self._on_version_name_edited)
         self._version_code_lineedit.editingFinished.connect(self._on_version_code_edited)
         self._orientation_combobox.activated.connect(self._on_orientation_activated)
+        self._build_type_combobox.activated.connect(self._on_build_type_activated)
+        self._keystore_browse_button.clicked.connect(self._browse_keystore)
+        self._keystore_create_button.clicked.connect(self._create_keystore)
+        self._keystore_lineedit.editingFinished.connect(self._on_signing_edited)
+        self._key_alias_lineedit.editingFinished.connect(self._on_signing_edited)
+        self._store_password_lineedit.editingFinished.connect(self._on_signing_edited)
+        self._key_password_lineedit.editingFinished.connect(self._on_signing_edited)
         self._build_button.clicked.connect(self._build)
         self._open_output_dir_button.clicked.connect(self._open_output_dir)
 
@@ -157,9 +194,22 @@ class AndroidAppBuildWindow(QScrollArea):
         version_layout.addWidget(self._version_name_lineedit, 2)
         version_layout.addWidget(self._version_code_label)
         version_layout.addWidget(self._version_code_lineedit, 1)
-        version_layout.addSpacing(10)
-        version_layout.addWidget(self._orientation_label)
-        version_layout.addWidget(self._orientation_combobox, 2)
+        orientation_layout = QHBoxLayout()
+        orientation_layout.addWidget(self._orientation_combobox, 1)
+        orientation_layout.addSpacing(10)
+        orientation_layout.addWidget(self._build_type_label)
+        orientation_layout.addWidget(self._build_type_combobox, 1)
+        keystore_layout = QHBoxLayout()
+        keystore_layout.addWidget(self._keystore_lineedit)
+        keystore_layout.addSpacing(5)
+        keystore_layout.addWidget(self._keystore_browse_button)
+        keystore_layout.addWidget(self._keystore_create_button)
+        signing_layout = QHBoxLayout()
+        signing_layout.addWidget(self._key_alias_lineedit, 2)
+        signing_layout.addWidget(self._store_password_label)
+        signing_layout.addWidget(self._store_password_lineedit, 2)
+        signing_layout.addWidget(self._key_password_label)
+        signing_layout.addWidget(self._key_password_lineedit, 2)
         button_layout = QHBoxLayout()
         button_layout.addWidget(self._build_button)
         button_layout.addSpacing(1)
@@ -168,7 +218,7 @@ class AndroidAppBuildWindow(QScrollArea):
 
         layout = QGridLayout(self._central_widget)
         layout.setHorizontalSpacing(10)
-        layout.setVerticalSpacing(10)
+        layout.setVerticalSpacing(8)
         layout.addWidget(self._app_name_label, 0, 0)
         layout.addWidget(self._app_name_lineedit, 0, 1)
         layout.addWidget(self._app_icon_label, 1, 0)
@@ -179,9 +229,14 @@ class AndroidAppBuildWindow(QScrollArea):
         layout.addWidget(self._package_lineedit, 3, 1)
         layout.addWidget(self._version_name_label, 4, 0)
         layout.addLayout(version_layout, 4, 1)
-        layout.addWidget(self._environment_label, 5, 0, 1, 2)
-        layout.addWidget(self._progress_bar, 6, 0, 1, 2)
-        layout.addLayout(button_layout, 7, 0, 1, 2)
+        layout.addWidget(self._orientation_label, 5, 0)
+        layout.addLayout(orientation_layout, 5, 1)
+        layout.addWidget(self._keystore_label, 6, 0)
+        layout.addLayout(keystore_layout, 6, 1)
+        layout.addWidget(self._key_alias_label, 7, 0)
+        layout.addLayout(signing_layout, 7, 1)
+        layout.addWidget(self._progress_bar, 8, 0, 1, 2)
+        layout.addLayout(button_layout, 9, 0, 1, 2)
         layout.setColumnStretch(1, 1)
         layout.setContentsMargins(5, 5, 5, 0)
 
@@ -195,6 +250,25 @@ class AndroidAppBuildWindow(QScrollArea):
         self._orientation_combobox.setCurrentIndex(index if index >= 0 else 0)
         self._orientation_combobox.blockSignals(False)
 
+    def _set_build_type_texts(self):
+        selected = self._build_type_combobox.currentData() or 'debug'
+        self._build_type_combobox.blockSignals(True)
+        self._build_type_combobox.clear()
+        for value, key in BUILD_TYPES:
+            self._build_type_combobox.addItem(T.tr(key, value.title()), value)
+        index = self._build_type_combobox.findData(selected)
+        self._build_type_combobox.setCurrentIndex(index if index >= 0 else 0)
+        self._build_type_combobox.blockSignals(False)
+
+    def _update_signing_enabled(self):
+        """Signing only matters for a release build (debug uses its own key)."""
+        is_release = self.get_build_type() == 'release'
+        for widget in (self._keystore_lineedit, self._keystore_browse_button,
+                       self._keystore_create_button,
+                       self._key_alias_lineedit, self._store_password_lineedit,
+                       self._key_password_lineedit):
+            widget.setEnabled(is_release)
+
     def _update_button_widths(self):
         width = max(self._build_button.sizeHint().width(),
                     self._open_output_dir_button.sizeHint().width())
@@ -205,6 +279,7 @@ class AndroidAppBuildWindow(QScrollArea):
     def get_ready_for_project(self):
         project_config = get_project_config()
         build_config = project_config.get('build') or {}
+        editor_config = get_editor_config()
 
         self._app_name_lineedit.setText(str(build_config.get('app_name') or ''))
         self._app_icon_lineedit.setText(str(build_config.get('app_icon') or ''))
@@ -217,34 +292,14 @@ class AndroidAppBuildWindow(QScrollArea):
         orientation = str(build_config.get('android_orientation') or '')
         index = self._orientation_combobox.findData(orientation)
         self._orientation_combobox.setCurrentIndex(index if index >= 0 else 0)
-        self._update_environment()
+        index = self._build_type_combobox.findData(str(build_config.get('android_build_type') or 'debug'))
+        self._build_type_combobox.setCurrentIndex(index if index >= 0 else 0)
 
-    def _update_environment(self):
-        """Show, in one line, whether this machine can package an APK."""
-        try:
-            metadata = android_runtime.find_pack()['metadata']
-        except android_runtime.AndroidRuntimeError as error:
-            self._environment_label.setText(T.tr(
-                'build.android_pack_missing',
-                'The Android runtime is missing from the editor: {}').format(error.detail))
-            self._environment_label.setStyleSheet('QLabel { color: #c0392b; }')
-            return
-
-        config = get_editor_config()
-        toolchain = android_runtime.check_toolchain(config.get('android_jdk') or '',
-                                                    config.get('android_sdk') or '')
-        if toolchain['ok']:
-            text = T.tr('build.android_ready',
-                        'Ready: {}\nJDK {} - Android SDK build-tools {} (API {})').format(
-                android_runtime.describe(metadata), toolchain['java'],
-                toolchain['build_tools'], toolchain['compile_sdk'])
-            self._environment_label.setStyleSheet('QLabel { color: #3fa34d; }')
-        else:
-            text = T.tr('build.android_toolchain_problem',
-                        'Missing build tools - open Editor Settings > Android Build:\n{}').format(
-                '\n'.join(T.tr(key, key) for key in toolchain['problems']))
-            self._environment_label.setStyleSheet('QLabel { color: #d68910; }')
-        self._environment_label.setText(text)
+        self._keystore_lineedit.setText(str(build_config.get('android_keystore') or ''))
+        self._key_alias_lineedit.setText(str(build_config.get('android_key_alias') or ''))
+        self._store_password_lineedit.setText(str(editor_config.get('android_store_password') or ''))
+        self._key_password_lineedit.setText(str(editor_config.get('android_key_password') or ''))
+        self._update_signing_enabled()
 
     # --------------------------------------------------------------- edits
     def _browse_app_icon(self):
@@ -280,7 +335,6 @@ class AndroidAppBuildWindow(QScrollArea):
     def _on_package_edited(self):
         package = self._package_lineedit.text().strip()
         if package and not is_valid_package(package):
-            # Keep the text so the user can fix it, but say why it is refused.
             Logger.warning(T.tr('build.android_package_invalid',
                                 'A package name must be two or more lowercase segments, e.g. org.pygamestudio.mygame'))
             return
@@ -299,10 +353,77 @@ class AndroidAppBuildWindow(QScrollArea):
         update_project_config('build.android_orientation',
                               str(self._orientation_combobox.currentData() or ''))
 
+    def _on_build_type_activated(self, index):
+        update_project_config('build.android_build_type', self.get_build_type())
+        self._update_signing_enabled()
+
+    def get_build_type(self):
+        """``debug`` or ``release``."""
+        return str(self._build_type_combobox.currentData() or 'debug')
+
+    def _browse_keystore(self):
+        start = self._keystore_lineedit.text().strip() or self._game_manager.get_project_path()
+        keystore_path, _ = QFileDialog.getOpenFileName(
+            self, T.tr('build.android_select_keystore', 'Select the keystore'),
+            start, 'Keystore (*.jks *.keystore *.p12)')
+        if keystore_path:
+            self._keystore_lineedit.setText(Path(keystore_path).as_posix())
+            self._on_signing_edited()
+
+    def _create_keystore(self):
+        """Create a self-signed release key with the JDK's keytool."""
+        title = T.tr('build.android_keystore_new_title', 'Create a signing key')
+        output_dir = (self._output_dir_lineedit.text().strip()
+                      or self._game_manager.get_project_path())
+        app_name = self._app_name_lineedit.text().strip() or 'game'
+        default = Path(output_dir) / f'{app_name}-release.jks'
+        path, _ = QFileDialog.getSaveFileName(self, title, default.as_posix(),
+                                              'Keystore (*.jks)')
+        if not path:
+            return
+
+        alias, accepted = QInputDialog.getText(
+            self, title, T.tr('build.android_key_alias', 'Key Alias'), text='release')
+        if not accepted or not alias.strip():
+            return
+        password, accepted = QInputDialog.getText(
+            self, title, T.tr('build.android_store_password', 'Keystore Password'),
+            QLineEdit.EchoMode.Password)
+        if not accepted or not password:
+            return
+
+        try:
+            config = get_editor_config()
+            toolchain = android_runtime.check_toolchain(config.get('android_jdk') or '',
+                                                        config.get('android_sdk') or '')
+            android_dist.create_keystore(toolchain.get('jdk') or '', path,
+                                         alias.strip(), password, common_name=app_name)
+        except Exception as error:                        # noqa: BLE001 - report in the console
+            Logger.error(T.tr('build.android_keystore_create_failed',
+                              'Could not create the signing key: {}').format(error))
+            return
+
+        self._keystore_lineedit.setText(Path(path).as_posix())
+        self._key_alias_lineedit.setText(alias.strip())
+        self._store_password_lineedit.setText(password)
+        self._key_password_lineedit.setText(password)
+        self._on_signing_edited()
+        Logger.info(T.tr('build.android_keystore_created',
+                         'Signing key created: {}').format(Path(path).as_posix()))
+
+    def _on_signing_edited(self):
+        """Keystore/alias belong to the project, the passwords to this machine."""
+        update_project_config('build.android_keystore',
+                              self._keystore_lineedit.text().strip())
+        update_project_config('build.android_key_alias',
+                              self._key_alias_lineedit.text().strip())
+        update_editor_config('android_store_password', self._store_password_lineedit.text())
+        update_editor_config('android_key_password', self._key_password_lineedit.text())
+
     # --------------------------------------------------------------- build
     def get_build_config(self):
-        config = get_editor_config()
         output_dir = self._output_dir_lineedit.text().strip()
+        editor_config = get_editor_config()
         return {
             'project_path': self._game_manager.get_project_path(),
             'output_dir': output_dir,
@@ -312,8 +433,14 @@ class AndroidAppBuildWindow(QScrollArea):
             'orientation': str(self._orientation_combobox.currentData() or ''),
             'version_name': self._version_name_lineedit.text().strip() or '1.0.0',
             'version_code': self._version_code_lineedit.text().strip() or '1',
-            'jdk': str(config.get('android_jdk') or ''),
-            'sdk': str(config.get('android_sdk') or ''),
+            'build_type': self.get_build_type(),
+            'keystore': self._keystore_lineedit.text().strip(),
+            'key_alias': self._key_alias_lineedit.text().strip(),
+            'store_password': self._store_password_lineedit.text(),
+            'key_password': self._key_password_lineedit.text(),
+            'jdk': str(editor_config.get('android_jdk') or ''),
+            'sdk': str(editor_config.get('android_sdk') or ''),
+            'gradle': str(editor_config.get('android_gradle') or ''),
         }
 
     def _check_before_build(self):
@@ -349,22 +476,24 @@ class AndroidAppBuildWindow(QScrollArea):
                                       'A package name must be two or more lowercase segments, e.g. org.pygamestudio.mygame'))
             return False
 
+        if self.get_build_type() == 'release':
+            keystore = self._keystore_lineedit.text().strip()
+            if not keystore or not Path(keystore).is_file():
+                QMessageBox.critical(self, T.tr('message_box.critical_title', 'Error'),
+                                     T.tr('build.android_keystore_missing',
+                                          'A release build needs a keystore: choose the .jks file first'))
+                return False
+            if not self._key_alias_lineedit.text().strip():
+                QMessageBox.critical(self, T.tr('message_box.critical_title', 'Error'),
+                                     T.tr('build.android_alias_missing', 'Please enter the key alias'))
+                return False
+
         try:
             android_runtime.find_pack()
         except android_runtime.AndroidRuntimeError as error:
             QMessageBox.critical(self, T.tr('message_box.critical_title', 'Error'),
                                  T.tr('build.android_pack_missing',
                                       'The Android runtime is missing from the editor: {}').format(error.detail))
-            return False
-
-        config = get_editor_config()
-        toolchain = android_runtime.check_toolchain(config.get('android_jdk') or '',
-                                                    config.get('android_sdk') or '')
-        if not toolchain['ok']:
-            QMessageBox.critical(self, T.tr('message_box.critical_title', 'Error'),
-                                 T.tr('build.android_toolchain_problem',
-                                      'Missing build tools - open Editor Settings > Android Build:\n{}').format(
-                                     '\n'.join(T.tr(key, key) for key in toolchain['problems'])))
             return False
         return True
 
@@ -441,14 +570,20 @@ class AndroidAppBuildWindow(QScrollArea):
         self._version_name_label.setText(T.tr('build.android_version_name', 'Version Name'))
         self._version_code_label.setText(T.tr('build.android_version_code', 'Version Code'))
         self._orientation_label.setText(T.tr('build.android_orientation', 'Screen Orientation'))
+        self._build_type_label.setText(T.tr('build.android_build_type', 'Build Type'))
+        self._keystore_label.setText(T.tr('build.android_keystore', 'Keystore'))
+        self._keystore_create_button.setText(T.tr('build.android_keystore_new', 'New...'))
+        self._key_alias_label.setText(T.tr('build.android_key_alias', 'Key Alias'))
+        self._store_password_label.setText(T.tr('build.android_store_password', 'Keystore Password'))
+        self._key_password_label.setText(T.tr('build.android_key_password', 'Key Password'))
         self._set_orientation_texts()
+        self._set_build_type_texts()
         self._build_button.setText(T.tr('build.build', 'Build') if not self._is_building
                                    else T.tr('build.stop', 'Stop'))
         self._open_output_dir_button.setText(T.tr('build.open_output_dir', 'Open Output Dir'))
-        self._update_environment()
+        self._update_signing_enabled()
 
     def enterEvent(self, event):
-        self._update_environment()
         self.setCursor(Qt.CursorShape.ArrowCursor)
         return super().enterEvent(event)
 
@@ -496,6 +631,7 @@ class AndroidBuildThread(QThread):
             output_dir = Path(config.get('output_dir')) / Path(*OUTPUT_SUBDIR)
             output_dir.mkdir(parents=True, exist_ok=True)
             app_name = str(config.get('app_name') or '').strip() or 'game'
+            is_release = str(config.get('build_type') or 'debug') == 'release'
 
             Logger.info(T.tr('build.android_start', 'Packaging the APK...'))
             runtime_dir = android_runtime.ensure_unpacked(self._emit(0, 20))
@@ -522,9 +658,19 @@ class AndroidBuildThread(QThread):
                 self._finish_stopped()
                 return
 
+            signing = None
+            if is_release:
+                signing = {'keystore': config.get('keystore') or '',
+                           'alias': config.get('key_alias') or ''}
+                if not signing['keystore'] or not signing['alias']:
+                    raise android_dist.AndroidBuildError(
+                        T.tr('build.android_keystore_missing',
+                             'A release build needs a keystore: choose the .jks file first'),
+                        'android.error_keystore')
+
             dist_dir = android_runtime.cache_root() / 'dist'
             Logger.info(T.tr('build.android_assets', 'Writing icon, splash and manifest...'))
-            summary = android_dist.prepare_dist(
+            android_dist.prepare_dist(
                 runtime_dir, dist_dir,
                 app_name=app_name,
                 package=config.get('package') or default_package(app_name),
@@ -536,6 +682,7 @@ class AndroidBuildThread(QThread):
                 sdk_dir=toolchain['sdk'],
                 icon=config.get('app_icon') or '',
                 presplash=config.get('app_icon') or '',
+                signing=signing,
                 on_progress=self._emit(35, 70))
 
             Logger.info(T.tr('build.android_payload_tar', 'Writing assets/private.tar...'))
@@ -553,13 +700,19 @@ class AndroidBuildThread(QThread):
 
             Logger.info(T.tr('build.android_gradle',
                              'Running Gradle (the first build downloads its dependencies)...'))
+            task = android_dist.RELEASE_TASK if is_release else android_dist.DEBUG_TASK
             codes = []
-            gradle_home = android_runtime.cache_root() / 'gradle'
+            gradle_home = android_runtime.default_gradle_home()
+            gradle_dir = config.get('gradle') or ''
+            secrets_env = android_dist.signing_environment(signing, config)
             code = android_dist.run_gradle(
                 dist_dir, toolchain['jdk'], toolchain['sdk'], gradle_home,
+                task=task,
                 on_line=lambda line: self._on_gradle_line(line, codes),
                 on_progress=self._emit(75, 95),
-                stop_check=self._check_stop)
+                stop_check=self._check_stop,
+                gradle_dir=gradle_dir,
+                extra_environment=secrets_env)
 
             # A machine behind a proxy (the usual Clash/v2ray setup) reaches the
             # internet in the browser but not from Java, which has no system
@@ -574,12 +727,15 @@ class AndroidBuildThread(QThread):
                     codes.clear()
                     code = android_dist.run_gradle(
                         dist_dir, toolchain['jdk'], toolchain['sdk'], gradle_home,
+                        task=task,
                         on_line=lambda line: self._on_gradle_line(line, codes),
                         on_progress=self._emit(75, 95),
                         stop_check=self._check_stop,
+                        gradle_dir=gradle_dir,
+                        extra_environment=secrets_env,
                         proxy=proxy)
 
-            if self._check_stop():
+            if self._stop_requested:
                 self._finish_stopped()
                 return
             if code != 0:
@@ -596,7 +752,8 @@ class AndroidBuildThread(QThread):
                          'Gradle finished but no APK was produced.'),
                     'android.error_apk_missing')
 
-            target = output_dir / f'{self._safe_file_name(app_name)}.apk'
+            suffix = '-release' if is_release else ''
+            target = output_dir / f'{self._safe_file_name(app_name)}{suffix}.apk'
             shutil.copy2(apk, target)
             self.apk_path = target
             self.progress_signal.emit(100)

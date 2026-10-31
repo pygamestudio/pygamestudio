@@ -66,6 +66,7 @@ COLORS_XML = '''<?xml version="1.0" encoding="utf-8"?>
 
 
 def load_image(path, what):
+    path = Path(path)
     if BACKEND == 'PySide6':
         image = QImage(path.as_posix())
         if image.isNull():
@@ -133,6 +134,7 @@ def flatten(image, background):
 
 
 def save_png(image, path):
+    path = Path(path)
     if BACKEND == 'PySide6':
         image.save(path.as_posix(), 'PNG')
     else:
@@ -140,6 +142,7 @@ def save_png(image, path):
 
 
 def save_jpeg(image, path, quality):
+    path = Path(path)
     if BACKEND == 'PySide6':
         ok = image.save(path.as_posix(), 'JPEG', quality)
     else:

@@ -4,5 +4,6 @@
     "theme": "dark",
     "code_editor_font_size": 10,
     "android_jdk": "",
-    "android_sdk": ""
+    "android_sdk": "",
+    "android_gradle": ""
 }
