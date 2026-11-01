@@ -4,6 +4,16 @@ from PySide6.QtWidgets import *
 
 
 class SuffixSpinBox(QDoubleSpinBox):
+    """Spin box that keeps a small unit suffix (X / Y / W / H / ° ...) on the
+    right edge until the pointer enters it, when the step buttons take over.
+
+    The buttons are hidden through the ``spinButtons`` style property instead
+    of ``ButtonSymbols.NoButtons``: since PySide6 6.12 a styled spin box in the
+    ``NoButtons`` state gets a one pixel wide internal line edit, so the value
+    was not painted at all until a repaint triggered by the pointer entering
+    the widget.
+    """
+
     def __init__(self):
         super().__init__()
         self._suffix = ''
@@ -16,7 +26,6 @@ class SuffixSpinBox(QDoubleSpinBox):
         self._set_layout()
 
     def _set_widget(self):
-        self.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
         self._suffix_label.setText(self._suffix)
         self._suffix_label.setStyleSheet("""
             QLabel {
@@ -26,6 +35,7 @@ class SuffixSpinBox(QDoubleSpinBox):
                 font-family: Times New Roman;
             }
         """)
+        self._set_buttons_visible(False)
 
     def _set_layout(self):
         main_layout = QHBoxLayout(self)
@@ -33,18 +43,31 @@ class SuffixSpinBox(QDoubleSpinBox):
         main_layout.addStretch(1)
         main_layout.addWidget(self._suffix_label)
 
+    def _set_buttons_visible(self, visible):
+        state = 'on' if visible else 'off'
+        if self.property('spinButtons') != state:
+            self.setProperty('spinButtons', state)
+            style = self.style()
+            style.unpolish(self)
+            style.polish(self)
+        # setButtonSymbols() re-runs the edit field geometry pass, so the space
+        # reserved for the buttons follows the stylesheet straight away.
+        self.setButtonSymbols(QSpinBox.ButtonSymbols.UpDownArrows if visible
+                              else QSpinBox.ButtonSymbols.PlusMinus)
+        self.update()
+
     def set_suffix(self, suffix):
         self._suffix = suffix
         self._suffix_label.setText(self._suffix)
 
     def enterEvent(self, event):
         self._suffix_label.setText('')
-        self.setButtonSymbols(QSpinBox.ButtonSymbols.UpDownArrows)
+        self._set_buttons_visible(True)
         return super().enterEvent(event)
-    
+
     def leaveEvent(self, event):
         self._suffix_label.setText(self._suffix)
-        self.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
+        self._set_buttons_visible(False)
         return super().leaveEvent(event)
 
 

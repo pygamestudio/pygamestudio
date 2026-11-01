@@ -4,15 +4,20 @@ from PySide6.QtWidgets import *
 from pygamestudio.gui.base.window import WindowBase
 from pygamestudio.gui.build.desktop import DesktopAppBuildWindow
 from pygamestudio.gui.build.web import WebAppBuildWindow
+from pygamestudio.gui.build.android import AndroidAppBuildWindow
 from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.common.utils.config import update_project_config
 
 
 class BuildWindowBody(QTabWidget):
+    #: Emitted when the visible page changes, so the window can follow its height.
+    height_hint_changed = Signal()
+
     def __init__(self, game_manager):
         super().__init__()
         self._desktop_app_build_window = DesktopAppBuildWindow(game_manager)
         self._web_app_build_window = WebAppBuildWindow(game_manager)
+        self._android_app_build_window = AndroidAppBuildWindow(game_manager)
         self._set_up()
 
     def _set_up(self):
@@ -22,37 +27,47 @@ class BuildWindowBody(QTabWidget):
     def _set_widget(self):
         self.addTab(self._desktop_app_build_window, T.tr('build.desktop_app', 'Desktop App'))
         self.addTab(self._web_app_build_window, T.tr('build.web_app', 'Web App'))
+        self.addTab(self._android_app_build_window, T.tr('build.android_app', 'Android App'))
     
     def _set_signal(self):
         T.add_observer(self)
+        self.currentChanged.connect(lambda _index: self.height_hint_changed.emit())
         # The app name and icon are one setting for both targets
         # (build.app_name / build.app_icon): an edit in either tab is saved at
         # once and mirrored to the other tab, so it survives closing the editor
         # and a build started from the other tab.
         self._desktop_app_build_window.app_icon_changed_signal.connect(self._on_app_icon_changed)
         self._web_app_build_window.app_icon_changed_signal.connect(self._on_app_icon_changed)
+        self._android_app_build_window.app_icon_changed_signal.connect(self._on_app_icon_changed)
         self._desktop_app_build_window.app_name_changed_signal.connect(self._on_app_name_changed)
         self._web_app_build_window.app_name_changed_signal.connect(self._on_app_name_changed)
+        self._android_app_build_window.app_name_changed_signal.connect(self._on_app_name_changed)
+        self._android_app_build_window.layout_changed_signal.connect(self.height_hint_changed.emit)
 
     def _on_app_icon_changed(self, icon_path):
         """Store the pick in project.pygs and show it in both tabs."""
         update_project_config('build.app_icon', icon_path)
-        for build_window in (self._desktop_app_build_window, self._web_app_build_window):
+        for build_window in (self._desktop_app_build_window, self._web_app_build_window,
+                             self._android_app_build_window):
             build_window.set_app_icon(icon_path)
 
     def _on_app_name_changed(self, app_name):
         """Store the name in project.pygs and show it in both tabs."""
         update_project_config('build.app_name', app_name)
-        for build_window in (self._desktop_app_build_window, self._web_app_build_window):
+        for build_window in (self._desktop_app_build_window, self._web_app_build_window,
+                             self._android_app_build_window):
             build_window.set_app_name(app_name)
 
     def retranslate(self):
         self.setTabText(0, T.tr('build.desktop_app', 'Desktop App'))
         self.setTabText(1, T.tr('build.web_app', 'Web App'))
+        self.setTabText(2, T.tr('build.android_app', 'Android App'))
 
     def get_ready_for_project(self):
         self._desktop_app_build_window.get_ready_for_project()
         self._web_app_build_window.get_ready_for_project()
+        self._android_app_build_window.get_ready_for_project()
+        self.height_hint_changed.emit()
 
     def enterEvent(self, event):
         self.setCursor(Qt.CursorShape.ArrowCursor)
@@ -71,15 +86,55 @@ class BuildWindow(WindowBase):
         self._set_object_name()
 
     def _set_widget(self):
-        self.resize(700, 260)
+        self.resize(720, 330)
         self.set_window_body(self._build_window_body)
         self.window_title.set_title_name(T.tr('build.build', 'Build'))
     
     def _set_signal(self):
         T.add_observer(self)
+        self._build_window_body.height_hint_changed.connect(self._fit_height)
 
     def _set_object_name(self):
         self.setObjectName('build')
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._fit_height()
+
+    def _fit_height(self):
+        """Match the window size to the page that is visible.
+
+        The three tabs have very different amounts of content - the Android one
+        has signing fields - so a fixed height left the desktop and web tabs full
+        of empty space. The height follows the page hint (and the width grows
+        when a page cannot fit in the current one), capped to the screen.
+        """
+        if self.isMaximized():
+            return
+        page = self._build_window_body.currentWidget()
+        if page is None:
+            return
+
+        inner = page.widget() if isinstance(page, QScrollArea) else page
+        frame = 2 * (page.frameWidth() if isinstance(page, QScrollArea) else 0)
+        if inner is not None:
+            content = inner.sizeHint().height() + frame
+            width_needed = inner.sizeHint().width() + frame
+        else:
+            content = page.sizeHint().height()
+            width_needed = 0
+
+        tab_bar = self._build_window_body.tabBar().sizeHint().height()
+        title = self.window_title.sizeHint().height()
+        target_height = title + tab_bar + content + 30      # margins + frame
+        target_width = max(self.width(), width_needed + 30)
+
+        screen = QApplication.primaryScreen()
+        if screen is not None:
+            available = screen.availableGeometry()
+            target_height = min(target_height, int(available.height() * 0.9))
+            target_width = min(target_width, int(available.width() * 0.9))
+        self.resize(int(target_width), max(240, int(target_height)))
 
     def retranslate(self):
         self.window_title.set_title_name(T.tr('build.build', 'Build'))

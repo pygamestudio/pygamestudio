@@ -8,7 +8,7 @@ Each module groups the tools of one area of the editor:
 ``objects``  creating/updating/deleting/duplicating/moving/selecting objects
 ``runtime``  running and stopping the game, reading the console
 ``panels``   block editor, image editor, tile map editor, audio editor
-``build``    packaging the project into a desktop app
+``build``    packaging the project into a desktop app, a web bundle or an Android APK
 
 See ``CAPABILITIES.md`` for the full map of editor features to tools.
 """

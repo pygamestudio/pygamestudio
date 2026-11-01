@@ -23,11 +23,27 @@ __PYGS_TOY_SDK_SCRIPT__
     #app { min-height: 100vh; display: flex; flex-direction: column; align-items: center;
            justify-content: center; gap: 14px; padding: 24px; box-sizing: border-box; }
     h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: .3px; }
-    canvas#canvas { background: #000; max-width: 100%; height: auto; border-radius: 6px;
-                    box-shadow: 0 10px 40px rgba(0, 0, 0, .55); outline: none; }
+    /* While the runtime loads the page shows title + splash + progress bar;
+       once the game runs only the canvas is left on screen. The canvas is
+       hidden with visibility (not display) and taken out of the flow, so it
+       keeps a real element box the whole time - SDL reads that box to map
+       mouse and touch positions, and a 0x0 one would divide by zero. */
+    canvas#canvas { position: absolute; visibility: hidden;
+                    background: #000; max-width: none; height: auto;
+                    border-radius: 6px; box-shadow: 0 10px 40px rgba(0, 0, 0, .55);
+                    outline: none; }
+    body.running canvas#canvas { position: static; visibility: visible;
+                                 border-radius: 0; box-shadow: none; }
+    /* Once the game runs nothing else is on the page, so it may use the whole
+       window - that is what makes "stretch to screen" actually stretch. The
+       page never scrolls: a canvas that ends up bigger than the window (fit
+       width / fit height on the "wrong" screen) is cropped, like on a phone. */
+    body.running { overflow: hidden; }
+    body.running #app { padding: 0; }
+    #splash { max-width: min(70vw, 400px); max-height: 40vh; border-radius: 8px; }
+    body.running #splash, body.running h1#title, body.running #loader { display: none; }
     #loader { display: flex; flex-direction: column; align-items: center; gap: 8px;
-              width: min(320px, 80vw); }
-    #loader-track { width: 100%; height: 4px; border-radius: 2px; background: #2a2c33; overflow: hidden; }
+              width: min(320px, 80vw); }    #loader-track { width: 100%; height: 4px; border-radius: 2px; background: #2a2c33; overflow: hidden; }
     #loader-bar { width: 4%; height: 100%; border-radius: 2px; background: #4f8cff;
                   transition: width .25s ease; }
     #loader-text { font-size: 12.5px; color: #a9adb8; text-align: center; }
@@ -37,7 +53,8 @@ __PYGS_TOY_SDK_SCRIPT__
 </head>
 <body>
 <div id="app">
-    <h1>__PYGS_TITLE__</h1>
+    <h1 id="title">__PYGS_TITLE__</h1>
+    __PYGS_SPLASH_TAG__
     <canvas id="canvas" width="__PYGS_CANVAS_WIDTH__" height="__PYGS_CANVAS_HEIGHT__" tabindex="0"></canvas>
     <div id="loader">
         <div id="loader-track"><div id="loader-bar"></div></div>
@@ -45,6 +62,118 @@ __PYGS_TOY_SDK_SCRIPT__
     </div>
     <pre id="error"></pre>
 </div>
+
+<script>
+// -- Page stages --------------------------------------------------------
+// Two stages, driven from here so the page is right even when the Pyodide
+// module cannot load (offline, blocked CDN):
+//
+//   loading  title + splash + progress bar, vertical, centred. No canvas yet.
+//   running  the canvas only - everything else is removed from the layout.
+//
+// The canvas is scaled through CSS width/height and never with object-fit:
+// the element box has to match the picture pixel for pixel, because SDL maps
+// mouse and touch positions with getBoundingClientRect(). Its drawing buffer
+// (the width/height attributes) never changes, so a window resize is free.
+(function () {
+    const CANVAS_WIDTH = __PYGS_CANVAS_WIDTH__;
+    const CANVAS_HEIGHT = __PYGS_CANVAS_HEIGHT__;
+    const CANVAS_FIT = "__PYGS_WEB_FIT__";
+    // Width of the wordmark printed on the splash, measured by the build from
+    // presplash_logo.png itself (see WebAppBuilder._measure_splash_text).
+    const SPLASH_BAR_RATIO = __PYGS_SPLASH_BAR_RATIO__;
+    const appElement = document.getElementById("app");
+    const canvasElement = document.getElementById("canvas");
+
+    // The bar under the splash is as wide as the "Pygame Studio" wordmark, so
+    // the two read as one lockup at every screen size.
+    function fitSplashBar() {
+        const splash = document.getElementById("splash");
+        const loader = document.getElementById("loader");
+        if (!splash || !loader) {
+            return;
+        }
+        const width = splash.getBoundingClientRect().width;
+        if (width > 0) {
+            loader.style.width = Math.round(width * SPLASH_BAR_RATIO) + "px";
+        }
+    }
+
+    function isShown(element) {
+        if (!element) {
+            return false;
+        }
+        const styles = getComputedStyle(element);
+        return styles.display !== "none" && styles.visibility !== "hidden";
+    }
+
+    function applyCanvasFit() {
+        if (!isShown(canvasElement)) {
+            return;                     // still loading: nothing to fit yet
+        }
+        const styles = getComputedStyle(appElement);
+        const gap = parseFloat(styles.rowGap) || 0;
+        const paddingX = (parseFloat(styles.paddingLeft) || 0)
+            + (parseFloat(styles.paddingRight) || 0);
+        const paddingY = (parseFloat(styles.paddingTop) || 0)
+            + (parseFloat(styles.paddingBottom) || 0);
+        // Whatever the canvas shares the column with (nothing, once running),
+        // plus one gap between every pair of visible items.
+        let usedHeight = 0;
+        let visibleCount = 0;
+        for (const child of appElement.children) {
+            if (child === canvasElement || !isShown(child)) {
+                continue;
+            }
+            usedHeight += child.offsetHeight;
+            visibleCount += 1;
+        }
+        visibleCount += 1;              // the canvas itself
+        const availableWidth = Math.max(64, appElement.clientWidth - paddingX);
+        const availableHeight = Math.max(64, window.innerHeight - paddingY
+            - usedHeight - gap * (visibleCount - 1));
+        let width = CANVAS_WIDTH;
+        let height = CANVAS_HEIGHT;
+        // "none" (and any unknown value): the canvas keeps its own size - it is
+        // only centred on the page, nothing is scaled.
+        if (CANVAS_FIT === "fixed_width") {
+            // The width exactly fills the page, the height follows the aspect
+            // (bars above/below, or cropped - see body.running overflow).
+            const scale = availableWidth / CANVAS_WIDTH;
+            width = Math.round(availableWidth);
+            height = Math.round(CANVAS_HEIGHT * scale);
+        } else if (CANVAS_FIT === "fixed_height") {
+            // The height exactly fills the page, the width follows the aspect.
+            const scale = availableHeight / CANVAS_HEIGHT;
+            width = Math.round(CANVAS_WIDTH * scale);
+            height = Math.round(availableHeight);
+        } else if (CANVAS_FIT === "exact_fit") {
+            width = Math.round(availableWidth);
+            height = Math.round(availableHeight);
+        }
+        canvasElement.style.width = width + "px";
+        canvasElement.style.height = height + "px";
+    }
+
+    window.applyCanvasFit = applyCanvasFit;
+    window.fitSplashBar = fitSplashBar;
+    // The boot calls this right before the game loop starts: drop the title,
+    // the splash and the bar, show the canvas, and size it to the whole page.
+    window.showGameCanvas = function () {
+        document.body.classList.add("running");
+        applyCanvasFit();
+    };
+    window.addEventListener("resize", function () {
+        fitSplashBar();
+        applyCanvasFit();
+    });
+    fitSplashBar();
+    const splashImage = document.getElementById("splash");
+    if (splashImage && !splashImage.complete) {
+        splashImage.addEventListener("load", fitSplashBar);
+    }
+})();
+</script>
 
 <script type="module">
 import { loadPyodide } from "__PYGS_PYODIDE_URL____PYGS_PYODIDE_ENTRY__";
@@ -132,7 +261,11 @@ try {
     // button, no extra click.
     globalThis.__pygsProgress = setProgress;
     globalThis.__pygsGameStarted = () => {
-        loaderElement.style.display = "none";
+        // The page switches from "loading" to "running": title, splash and bar
+        // go away, the canvas appears and takes the whole window.
+        if (window.showGameCanvas) {
+            window.showGameCanvas();
+        }
     };
     await pyodide.runPythonAsync(bootSource);
 } catch (error) {

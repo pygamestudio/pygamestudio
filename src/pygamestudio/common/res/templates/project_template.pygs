@@ -1,8 +1,13 @@
 {   
     "caption": "",
-    "screen_width": 800,
-    "screen_height": 600,
-    "screen_size": [800, 600],
+    "screen_width": 1280,
+    "screen_height": 720,
+    "screen_size": [1280, 720],
+    "screen_scaled": true,
+    "screen_scale_mode": "show_all",
+    "screen_scale_filter": "nearest",
+    "desktop_display_mode": "window",
+    "web_scale_mode": "show_all",
     "asset": {
         "current_scene": "",
         "sort_type": 1
@@ -10,6 +15,10 @@
     "build": {
         "app_name": "",
         "app_icon": "",
-        "output_dir": ""
+        "output_dir": "",
+        "android_package": "",
+        "android_version_name": "1.0.0",
+        "android_version_code": 1,
+        "android_orientation": "landscape"
     }
 }

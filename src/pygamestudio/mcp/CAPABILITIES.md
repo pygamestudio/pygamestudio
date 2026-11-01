@@ -14,7 +14,8 @@ not exposed (with the reason). Tool names are the MCP tool names.
 | Capability | Editor entry point | MCP |
 | --- | --- | --- |
 | Read project name/folder/screen size/counts | Project Settings, window title | `get_project_info` |
-| Change project settings (`project.pygs`: caption, screen size, start scene, build section) | Project Settings window | `update_project_config` |
+| Change project settings (`project.pygs`: caption, screen size, start scene, display fit, build section) | Project Settings window | `update_project_config` |
+| Display fit of the built game - each platform has its own value: phones `screen_scale_mode` (`fixed_width` default, `fixed_height`, `exact_fit`, `none` = canvas 1:1), desktop `desktop_display_mode` (`window` default = 1:1 window, or `fixed_width` / `fixed_height` / `exact_fit`, which open full screen), web `web_scale_mode` (`none` default = canvas at its own size and centred, `fixed_width`, `fixed_height`, `exact_fit`). Plus `screen_scale_filter` (`nearest` default / `smooth`) and `screen_scaled` (`false` = no phone scaling at all). A value the pickers retired (`show_all`, `no_border`, `integer`) is refused with the mode that replaced it; old projects that still store one are mapped by the engine itself | Project Settings > Game Screen | `get_project_config`, `update_project_config` |
 | Project list: create / open / import / rename / delete | Dashboard window | **no** - the dashboard runs before the editor exists; the server attaches to an open project |
 | Editor preferences (language, theme) | Editor Settings window | `get_editor_settings`, `update_editor_settings` |
 
@@ -40,7 +41,7 @@ not exposed (with the reason). Tool names are the MCP tool names.
 | Save scene / Save As | File > Save Scene (Ctrl+S) / Save As (Ctrl+Shift+S) | `save_scene` (with optional path; required when the scene has no file yet) |
 | List scenes, mark the loaded/start scene | Asset panel | `list_scenes` |
 | Unsaved-changes state | window title `*unsaved` | `editor_status`, `get_current_scene` |
-| **Autosave of agent edits**: a tool call that changes the scene writes it to its `.scene` file right away (a build and a game run read the files on disk, not the editor's memory); edits the user made himself stay unsaved until he saves. `start_build` / `start_web_build` also flush those before packaging | - | all mutating tools, `start_build`, `start_web_build` |
+| **Autosave of agent edits**: a tool call that changes the scene writes it to its `.scene` file right away (a build and a game run read the files on disk, not the editor's memory); edits the user made himself stay unsaved until he saves. `start_build` / `start_web_build` / `start_android_build` also flush those before packaging | - | all mutating tools, `start_build`, `start_web_build`, `start_android_build` |
 | Scene content overview | Scene panel / Hierarchy | `get_scene_tree` |
 
 ## 4. Objects (Hierarchy + Inspector)
@@ -113,7 +114,7 @@ finger. An input box or slider under the finger still handles the press itself
 
 | Capability | Editor entry point | MCP |
 | --- | --- | --- |
-| Run the project (saves the scene — a scene with no file must be saved first — starts `main.py`; the game of an earlier run is stopped first, `stop_running: false` starts an additional instance). A game started here is a **test run**: the editor closes that window again once the agent stops calling tools (about 25 s of idle), while a game the user started himself keeps running | Project > Run (Ctrl+R) | `run_project` |
+| Run the project (saves the scene — a scene with no file must be saved first — starts `main.py`; the game of an earlier run is stopped first, `stop_running: false` starts an additional instance). A game started here is a **test run**: the editor closes that window again once the agent stops calling tools (about 25 s of idle), while a game the user started himself keeps running. The preview also closes itself on **Esc** (only the editor preview — a built game keeps Esc for the game), which is how a full screen preview is left | Project > Run (Ctrl+R) | `run_project` |
 | Stop running game processes (also used to close the agent's test window right away) | (editor keeps them alive until exit) | `stop_project` |
 | Runtime status (pids, whether a process is an agent test run, console length) | Console | `get_runtime_status` |
 | Look at the running game window (the live view with script movement, physics and animations; Windows only - falls back to the editor scene view when the window cannot be captured: game not running, window minimized, macOS/Linux) | game window | `capture_game_window` (PNG), `analyze_image` with `"source": "game"` (text) |
@@ -133,8 +134,8 @@ finger. An input box or slider under the finger still handles the press itself
 
 ## 8. Building
 
-The Build window has two tabs: **Desktop App** (PyInstaller executable for the
-current operating system) and **Web App** (a folder with `index.html` +
+The Build window has three tabs: **Desktop App** (PyInstaller executable for
+the current operating system), **Web App** (a folder with `index.html` +
 `game.zip` that plays the game in a browser through Pyodide and pygame-ce - the
 browser itself plays all audio (any format it supports: MP3/OGG/WAV/...), the
 loop is paced by the display's animation frame (smooth scrolling; a hidden tab
@@ -142,7 +143,14 @@ pauses the game) and sound begins with the first click/tap/key because of the
 browser autoplay rule. A project that uses physics also gets pymunk's Pyodide
 wheel next to the page, so nothing is fetched from PyPI at runtime; the
 project code/assets are protected like in the desktop build, the result lands
-in `<output dir>/build/Web` and the installed engine is never modified).
+in `<output dir>/build/Web` and the installed engine is never modified) and
+**Android App** (an APK built with the JDK + Android SDK picked in Editor
+Settings > Android Build: no Gradle, no AGP, nothing downloaded - the editor
+fills a dist from the runtime pack it ships and runs aapt2 -> javac -> d8 ->
+zipalign -> apksigner in a few seconds; the APK is copied to
+`<output dir>/build/Android/<app name>-debug.apk` or `-release.apk`, and a
+release build signs with the project keystore + alias, the passwords coming
+from the editor settings).
 
 Each tab has its own **publishing platform** pick (dropdown at the bottom
 right). Desktop: `build.platform` - none or TapTap (the TapTap PC SDK is added
@@ -160,11 +168,13 @@ stops with a message instead of shipping a mixed folder.
 
 | Capability | Editor entry point | MCP |
 | --- | --- | --- |
-| Read build settings (desktop values + `build.web`, publishing platforms, running state, progress, last web bundle) | Build window | `get_build_settings` (`web_platform` = the web pick) |
+| Read build settings (desktop values + `build.web` + the Android values, publishing platforms, running state, progress, last web bundle, APK path, JDK/SDK state) | Build window | `get_build_settings` (`web_platform` = the web pick, `android_toolchain` = what the APK build needs) |
 | Start a desktop build (PyInstaller executable) | Build window (Ctrl+B) > Desktop App > Build | `start_build` (`platform`: `""` / `"taptap"`) |
 | Start a web build (browser bundle; clears the previous one) | Build window (Ctrl+B) > Web App > Build | `start_web_build` (`platform`: `""` / `"bilibili_toy"`) |
+| Start an Android build (APK; debug or release) | Build window (Ctrl+B) > Android App > Build | `start_android_build` (`build_type`: `"debug"` / `"release"`; `orientation`: `"sensor_landscape"` / `"sensor_portrait"` — the two flipping picks, the retired `landscape` / `portrait` / `full_sensor` are mapped; plus `version_name`, `version_code`, `package`, `app_name`, `app_icon`, `output_dir`) |
 | Stop a build (whichever tab is building) | Build window > Stop | `stop_build` |
-| Open the desktop output / the web bundle folder | Build window > Open Output Dir | `open_output_dir` (`target`: `"desktop"` / `"web"`) |
+| Open the desktop output / the web bundle / the APK folder | Build window > Open Output Dir | `open_output_dir` (`target`: `"desktop"` / `"web"` / `"android"`) |
+| Create a release signing key | Android App tab > New... | **no** - it asks for a password, use the window |
 | Run the built app / preview the web build | Run Game / Run in Browser buttons | **no** - buttons only |
 
 

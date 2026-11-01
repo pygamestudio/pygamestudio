@@ -64,6 +64,38 @@ def get_system_lang():
     return 'en'
 
 
+def is_android() -> bool:
+    """True when the process runs inside a python-for-android build.
+
+    p4a's bootstrap exports ``ANDROID_ARGUMENT`` / ``ANDROID_PRIVATE`` before the
+    app starts and no desktop sets them, so this works without importing a
+    platform module (and without Qt). ``sys.platform`` is not reliable there: a
+    p4a build reports ``linux``.
+    """
+    return bool(os.environ.get('ANDROID_ARGUMENT') or os.environ.get('ANDROID_PRIVATE'))
+
+def is_web() -> bool:
+    """True when the process runs in a browser (Pyodide / Emscripten).
+
+    Needed because a web build is neither a phone nor a desktop: the page owns
+    the window and scales the canvas with CSS, so the engine must not ask for a
+    full screen window there (browsers answer that request with their own
+    fullscreen mode on the first click).
+    """
+    return sys.platform == 'emscripten'
+
+
+def is_preview() -> bool:
+    """True when the editor started this process as a preview run.
+
+    The editor exports ``PYGAMESTUDIO_PREVIEW=1`` for the game it starts from
+    the Run button (or the agent's run_project), so the engine can offer an
+    ``Esc`` exit: a full screen preview has no window to click away, and only a
+    preview may close itself like that - a game shipped to players never
+    listens for it.
+    """
+    return os.environ.get('PYGAMESTUDIO_PREVIEW') == '1'
+
 def get_lan_ip() -> str:
     """The LAN address of this machine ('' when it cannot be found).
 

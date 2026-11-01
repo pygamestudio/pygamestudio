@@ -33,7 +33,7 @@ class GridGraphicsView(QGraphicsView):
         self._set_layout()
 
     def _set_widget(self):
-        self.scale(0.6, 0.6)
+        self.scale(0.47, 0.47)
         self.setScene(self._scene)
         self._center()
 

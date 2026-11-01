@@ -9,6 +9,7 @@ from pygamestudio.game.core.collision import shape_to_polygon
 from pygamestudio.gui.scene.gizmo import MoveGizmo
 from pygamestudio.gui.scene.guide import resolve_drag, union_rect
 from pygamestudio.common.utils.config import get_project_config
+from pygamestudio.common.utils.constant import DEFAULT_SCREEN_SIZE
 
 
 class PygameScreen(QWidget):
@@ -35,8 +36,8 @@ class PygameScreen(QWidget):
         super().__init__()
         self._game_manager = game_manager
         self._scene = scene
-        self._screen_width = 800
-        self._screen_height = 600
+        self._screen_width = DEFAULT_SCREEN_SIZE[0]
+        self._screen_height = DEFAULT_SCREEN_SIZE[1]
         self._workspace_margin = self._WORKSPACE_MARGIN
         self._consuming_press = False
         self._object_images = {}   # object uuid -> QImage (baked surface)
@@ -144,8 +145,8 @@ class PygameScreen(QWidget):
         self._is_ctrl_pressed = False
         self._consuming_press = False
         self._object_images = {}
-        self._screen_width = 800
-        self._screen_height = 600
+        self._screen_width = DEFAULT_SCREEN_SIZE[0]
+        self._screen_height = DEFAULT_SCREEN_SIZE[1]
         self.setFixedSize(self._screen_width + 2 * self._workspace_margin,
                           self._screen_height + 2 * self._workspace_margin)
 

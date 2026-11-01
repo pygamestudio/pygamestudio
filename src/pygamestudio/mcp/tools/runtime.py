@@ -20,6 +20,9 @@ _LEVEL_NAMES = {'INFO': 'info', 'ERROR': 'error', 'WARNING': 'warning'}
     'editor console - read it with get_console_logs. A game started here is a '
     'test run: the editor closes that window again once you stop calling tools '
     '(about 25 s of idle), while a game the user started himself keeps running. '
+    'The preview window also closes itself when the player presses Esc (only the '
+    'editor preview does that - a built game keeps Esc for the game), which is '
+    'how a full screen preview is left. '
     'Use stop_project to close it earlier.',
     {
         'type': 'object',

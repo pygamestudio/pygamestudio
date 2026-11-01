@@ -53,6 +53,7 @@ from pygamestudio.common.utils import qr
 from pygamestudio.common.utils.config import (get_project_config,
                                               save_project_config,
                                               update_project_config)
+from pygamestudio.common.utils.constant import DEFAULT_SCREEN_SIZE
 from pygamestudio.common.utils.path import RES_PATH
 from pygamestudio.common.utils.system import get_lan_ip
 
@@ -77,7 +78,21 @@ BUNDLE_STAGING_SUFFIX = '.building'
 #: once the archive is written); same name the desktop build uses.
 PROTECTED_WORK_DIR_NAME = '_protected'
 #: Fallback canvas size when a project has none (the editor's own default).
-DEFAULT_CANVAS_SIZE = (800, 600)
+DEFAULT_CANVAS_SIZE = DEFAULT_SCREEN_SIZE
+#: Default page fit: the canvas is shown at its own size, only centred on the
+#: page - no scaling at all (the same meaning the picker calls "no scaling").
+DEFAULT_WEB_FIT = 'none'
+#: Web fit values written by older builds that the page now reads differently
+#: (the picker no longer offers them): the retired letterbox fill and the
+#: whole-number scale both become the 1:1 default.
+RETIRED_WEB_FIT_MODES = {'show_all': DEFAULT_WEB_FIT, 'integer': DEFAULT_WEB_FIT}
+#: Splash image shown while the page loads, before the canvas appears.
+SPLASH_IMAGE_NAME = 'presplash_logo.png'
+#: Progress bar width used when the splash cannot be measured.
+SPLASH_BAR_RATIO_FALLBACK = 0.9
+#: Values written by the project settings' "Web Canvas Fit" picker and honoured
+#: by the page script (see web_index_template.html).
+WEB_FIT_MODES = ('none', 'fixed_width', 'fixed_height', 'exact_fit')
 #: Largest page icon edge; bigger images are scaled down before saving.
 FAVICON_MAX_SIZE = 256
 #: Name of the engine package inside the bundle and in the zip archive.
@@ -115,7 +130,8 @@ _ENGINE_EXTRA_FILES = ('gui/__init__.py', 'gui/console/__init__.py', 'gui/consol
 #: project; the TapTap SDK binaries are Windows desktop data). The physics
 #: wheels and the self-hosted Pyodide runtime ship NEXT TO the bundle, never
 #: inside the archive.
-_ENGINE_RES_SKIP = ('fonts', 'qss', 'templates', 'audios', 'wheels', 'pyodide', 'sdk')
+_ENGINE_RES_SKIP = ('fonts', 'qss', 'templates', 'audios', 'wheels', 'pyodide', 'sdk',
+                    'android')
 #: Folder in ``common/res`` holding the Pyodide wheels of the engine.
 WHEELS_DIR_NAME = 'wheels'
 #: Boot template placeholder holding the pymunk install source ('' = none).
@@ -1055,6 +1071,9 @@ class WebAppBuilder:
         # without that folder the page falls back to the CDN.
         pyodide_url = (build_config.get('pyodide_url') or '').strip()
         self._bundle_pyodide = False
+        #: Width of the progress bar relative to the splash (measured when the
+        #: splash is written, see _measure_splash_text).
+        self._splash_bar_ratio = SPLASH_BAR_RATIO_FALLBACK
         #: Loader file the page imports; the bundled copy ships as .js (see
         #: _rename_runtime_modules) so every static server serves it with a
         #: JavaScript MIME type.
@@ -1124,11 +1143,12 @@ class WebAppBuilder:
         self._check_stopped()
 
         favicon_links = self._write_favicon(bundle_dir)
+        splash_tag = self._write_splash(bundle_dir)
         self._prepare_runtime(bundle_dir)
         self._progress(90)
 
         canvas_size = self._read_canvas_size()
-        (bundle_dir / 'index.html').write_text(self._render_index(index_template, favicon_links, canvas_size, archive_name), encoding=_SOURCE_ENCODING)
+        (bundle_dir / 'index.html').write_text(self._render_index(index_template, favicon_links, canvas_size, archive_name, splash_tag), encoding=_SOURCE_ENCODING)
         if self._is_toy:
             self._apply_toy_package(bundle_dir)
         self._progress(95)
@@ -1318,6 +1338,74 @@ class WebAppBuilder:
         icon_type = 'image/x-icon' if favicon_name.endswith('.ico') else 'image/png'
         return '<link rel="icon" type="{}" href="{}">'.format(icon_type, favicon_name)
 
+    def _write_splash(self, bundle_dir):
+        """Bundle the splash shown before the game starts; return its <img> tag.
+
+        The page shows title, splash and loading bar while Pyodide boots, then
+        swaps all three for the canvas. The picture ships with the engine, so
+        every web build has one; without it the page simply has no splash.
+        """
+        source = RES_PATH / 'images' / SPLASH_IMAGE_NAME
+        if not source.exists():
+            Logger.warning(T.tr('build.web_splash_missing', 'The page splash image is missing: {}').format(source.as_posix()))
+            return ''
+        shutil.copyfile(source, bundle_dir / SPLASH_IMAGE_NAME)
+        # The progress bar is made exactly as wide as the wordmark under the
+        # logo, so it reads as part of the picture instead of a stray stripe.
+        self._splash_bar_ratio = self._measure_splash_text(source)
+        return '<img id="splash" src="{}" alt="">'.format(SPLASH_IMAGE_NAME)
+
+    @staticmethod
+    def _measure_splash_text(image_path, width_limit=200):
+        """Width of the wordmark on the splash, as a fraction of the image.
+
+        Measured from the picture itself (rows with ink are grouped into bands;
+        the wordmark is the last one, under the logo) so replacing
+        ``presplash_logo.png`` needs no code change. The scan runs on a
+        downscaled copy - a ratio is all that is needed and it keeps a 400x348
+        image from costing a second of build time.
+        """
+        image = QImage(str(image_path))
+        if image.isNull() or image.width() < 8 or image.height() < 8:
+            return SPLASH_BAR_RATIO_FALLBACK
+        if image.width() > width_limit:
+            image = image.scaledToWidth(width_limit, Qt.TransformationMode.SmoothTransformation)
+        width, height = image.width(), image.height()
+        background = image.pixelColor(1, 1)
+
+        def is_ink(x, y):
+            color = image.pixelColor(x, y)
+            if color.alpha() < 40:
+                return False
+            return (abs(color.red() - background.red())
+                    + abs(color.green() - background.green())
+                    + abs(color.blue() - background.blue())) > 60
+
+        bands = []
+        start = None
+        for y in range(height):
+            row_has_ink = any(is_ink(x, y) for x in range(width))
+            if row_has_ink and start is None:
+                start = y
+            elif not row_has_ink and start is not None:
+                bands.append((start, y - 1))
+                start = None
+        if start is not None:
+            bands.append((start, height - 1))
+        if not bands:
+            return SPLASH_BAR_RATIO_FALLBACK
+
+        top, bottom = bands[-1]
+        left, right = width, -1
+        for y in range(top, bottom + 1):
+            for x in range(width):
+                if is_ink(x, y):
+                    left = min(left, x)
+                    right = max(right, x)
+        if right < left:
+            return SPLASH_BAR_RATIO_FALLBACK
+        return (right - left + 1) / float(width)
+
     def _read_canvas_size(self):
         """The canvas size of the project, so the page is right before starting."""
         try:
@@ -1330,12 +1418,28 @@ class WebAppBuilder:
             Logger.warning('Failed to read the screen size from project.pygs: {}'.format(e))
         return DEFAULT_CANVAS_SIZE
 
-    def _render_index(self, template, favicon_links, canvas_size, archive_name='game.zip'):
+    def _read_web_fit(self):
+        """How the page should scale the canvas (project settings > Web Canvas Fit)."""
+        try:
+            project_config = json.loads(assets.read_text(self._project_path / 'project.pygs'))
+            mode = str(project_config.get('web_scale_mode') or DEFAULT_WEB_FIT)
+            if mode in WEB_FIT_MODES:
+                return mode
+            if mode in RETIRED_WEB_FIT_MODES:
+                return RETIRED_WEB_FIT_MODES[mode]
+        except Exception as e:
+            Logger.warning('Failed to read the web fit mode from project.pygs: {}'.format(e))
+        return DEFAULT_WEB_FIT
+
+    def _render_index(self, template, favicon_links, canvas_size, archive_name='game.zip', splash_tag=''):
         return (template
                 .replace('__PYGS_TITLE__', html.escape(self._page_title))
                 .replace('__PYGS_FAVICON_LINK__', favicon_links)
+                .replace('__PYGS_SPLASH_TAG__', splash_tag)
+                .replace('__PYGS_SPLASH_BAR_RATIO__', '{:.3f}'.format(self._splash_bar_ratio))
                 .replace('__PYGS_CANVAS_WIDTH__', str(canvas_size[0]))
                 .replace('__PYGS_CANVAS_HEIGHT__', str(canvas_size[1]))
+                .replace('__PYGS_WEB_FIT__', self._read_web_fit())
                 .replace('__PYGS_GAME_ARCHIVE__', archive_name)
                 .replace('__PYGS_TOY_SDK_SCRIPT__', TOY_SDK_SCRIPT if self._is_toy else '')
                 .replace('__PYGS_PYODIDE_URL__', self._pyodide_url)

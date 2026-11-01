@@ -66,7 +66,9 @@ def get_project_info(args):
 @tool(
     'get_project_config',
     'Read project.pygs (the project settings: caption, screen size, start '
-    'scene, app name/icon/output dir and publishing platform).',
+    'scene, display fit (`screen_scale_mode`, `desktop_display_mode`, '
+    '`web_scale_mode`, `screen_scale_filter`, `screen_scaled`), app '
+    'name/icon/output dir and publishing platform).',
     {
         'type': 'object',
         'properties': {},
@@ -84,6 +86,20 @@ def get_project_config_tool(args):
     'Change project settings in project.pygs. Keys may be dotted, e.g. '
     '"screen_width", "caption", "build.app_name", "build.platform" '
     '("" = 无平台, "taptap" = TapTap) and "asset.current_scene". '
+    'Display fit (each platform has its own): "screen_scale_mode" for phones - '
+    '"fixed_width" (default), "fixed_height", "exact_fit" or "none" '
+    '(draw the canvas 1:1, no adaptation); "desktop_display_mode" - "window" '
+    '(default, exact size) or one of those scaling modes, which opens full screen; '
+    '"web_scale_mode" - "none" (default, the canvas at its own size, centred), '
+    '"fixed_width", "fixed_height", "exact_fit". '
+    '"screen_scale_filter" is "nearest" (default) or "smooth"; '
+    '"screen_scaled" (bool) turns the phone scaling off entirely. '
+    'Android packaging: "build.android_package", "build.android_version_name", '
+    '"build.android_version_code", "build.android_orientation" (sensor_landscape, '
+    'sensor_portrait), '
+    '"build.android_build_type" (debug/release), "build.android_keystore" and '
+    '"build.android_key_alias" (the passwords are editor settings, not project '
+    'settings). '
     'Changes are saved immediately (and are NOT part of the undo stack).',
     {
         'type': 'object',
@@ -115,6 +131,8 @@ def update_project_config(args):
         target[parts[-1]] = value
         applied[key] = value
     _validate_screen_size(config)
+    _validate_display_fit(config)
+    _validate_android_build(config)
     save_project_config(config)
 
     # The open editor widgets (settings panel, scene view size) follow along.
@@ -135,6 +153,90 @@ def _validate_screen_size(config):
                 raise ToolError('{} must be an integer.'.format(key))
             if config[key] < 1:
                 raise ToolError('{} must be positive.'.format(key))
+
+
+def _validate_display_fit(config):
+    """Only the fit modes the editor offers, per platform.
+
+    Read from the settings window so this list cannot drift from the pickers.
+    A value the pickers no longer offer is refused with the mode that replaced
+    it: the engine keeps reading old projects by mapping them (see
+    ``api.core.game.normalize_*_fit``), but a NEW value should be a current one.
+    """
+    from pygamestudio.api.core.game import RETIRED_DESKTOP_FITS, RETIRED_MOBILE_FITS
+    from pygamestudio.gui.build.web import RETIRED_WEB_FIT_MODES
+    from pygamestudio.gui.settings.project import ProjectSettingsBody
+
+    retired = {
+        'screen_scale_mode': RETIRED_MOBILE_FITS,
+        'desktop_display_mode': RETIRED_DESKTOP_FITS,
+        'web_scale_mode': RETIRED_WEB_FIT_MODES,
+    }
+    allowed = {
+        'screen_scale_mode': ({value for value, _k, _f in ProjectSettingsBody.SCREEN_FIT_MODES},
+                              'use "fixed_width" to fill the width'),
+        'desktop_display_mode': ({value for value, _k, _f in ProjectSettingsBody.DESKTOP_FIT_MODES},
+                                 'use "window" for a windowed game'),
+        'web_scale_mode': ({value for value, _k, _f in ProjectSettingsBody.WEB_FIT_MODES},
+                           'use "none" for the canvas at its own size'),
+    }
+    for key, (values, hint) in allowed.items():
+        if key not in config:
+            continue
+        value = str(config[key])
+        if value not in values:
+            replacement = retired[key].get(value)
+            if replacement:
+                raise ToolError('{} = "{}" is retired; use "{}".'
+                                .format(key, value, replacement))
+            raise ToolError('{} = "{}" is not a fit mode; use one of {} ({}).'
+                            .format(key, value, ', '.join(sorted(values)), hint))
+        config[key] = value
+
+    if 'screen_scale_filter' in config:
+        filter_value = str(config['screen_scale_filter'])
+        if filter_value not in ('nearest', 'smooth'):
+            raise ToolError('screen_scale_filter must be "nearest" or "smooth".')
+        config['screen_scale_filter'] = filter_value
+    if 'screen_scaled' in config:
+        config['screen_scaled'] = bool(config['screen_scaled'])
+
+
+def _validate_android_build(config):
+    """The Android picks the build window offers."""
+    from pygamestudio.gui.build import android_dist
+
+    build_config = config.get('build')
+    if not isinstance(build_config, dict):
+        return
+    if 'android_build_type' in build_config:
+        build_type = str(build_config['android_build_type'])
+        if build_type not in ('debug', 'release'):
+            raise ToolError('build.android_build_type must be "debug" or "release".')
+        build_config['android_build_type'] = build_type
+    if 'android_orientation' in build_config:
+        orientation = str(build_config['android_orientation'])
+        if orientation not in android_dist.ORIENTATIONS:
+            replacement = android_dist.RETIRED_ORIENTATIONS.get(orientation)
+            if replacement:
+                raise ToolError('build.android_orientation = "{}" is retired; use "{}".'
+                                .format(orientation, replacement))
+            raise ToolError('build.android_orientation must be one of {}.'
+                            .format(', '.join(android_dist.ORIENTATIONS)))
+        build_config['android_orientation'] = orientation
+    if 'android_package' in build_config:
+        package = str(build_config['android_package'])
+        if package and not android_dist.is_valid_package(package):
+            raise ToolError('build.android_package must be two or more lowercase '
+                            'segments, e.g. org.pygamestudio.mygame.')
+    if 'android_version_code' in build_config:
+        try:
+            code = int(build_config['android_version_code'])
+        except (TypeError, ValueError):
+            raise ToolError('build.android_version_code must be an integer.')
+        if code < 1:
+            raise ToolError('build.android_version_code must be positive.')
+        build_config['android_version_code'] = code
 
 
 @tool(

@@ -11,9 +11,9 @@ import copy
 import html
 import json
 
-from PySide6.QtCore import QEvent, QRectF, Qt, Signal
-from PySide6.QtGui import (QColor, QPainter, QPen, QTextCharFormat, QTextCursor,
-                           QTextDocument, QTextDocumentFragment)
+from PySide6.QtCore import QEvent, QRectF, Qt, QTimer, QUrl, Signal
+from PySide6.QtGui import (QColor, QDesktopServices, QPainter, QPen, QTextCharFormat,
+                           QTextCursor, QTextDocument, QTextDocumentFragment)
 from PySide6.QtWidgets import *
 
 from pygamestudio.common.i18n.translator import Translator as T
@@ -43,15 +43,36 @@ class AgentTranscript(QTextBrowser):
     switched here.
     """
 
+    #: Pixels from the end that still count as "the view is at the bottom".
+    #: One line or so - the end is also reached by scrolling almost all the
+    #: way down, the user does not have to hit the last pixel.
+    BOTTOM_SLACK = 24
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._theme = 'dark'
         #: Every message ever written (kind, payload...). The color of a block
         #: lives in its inline HTML, so a theme switch re-renders this log.
         self._entries = []
+        #: Document position where the live (streaming) text starts, None when
+        #: nothing is streaming.
+        self._stream_position = None
+        #: Positions of the thinking blocks the user opened (click on the
+        #: header toggles them, the answer stays readable when they are closed).
+        self._expanded_thinking = set()
+        #: True while the view follows the end of the conversation. Qt lays text
+        #: out lazily, so the scrollbar range grows a moment AFTER the text was
+        #: added - a plain "is the scrollbar at the end?" check would drop the
+        #: follow on the first fragment. The state is kept here instead and
+        #: re-applied when the range changes (see _on_range_changed).
+        self._follow_tail = True
         self.setObjectName('agentTranscript')
-        self.setOpenExternalLinks(False)
+        self.setOpenLinks(False)          # links are handled in _on_anchor_clicked
+        self.anchorClicked.connect(self._on_anchor_clicked)
         self.setReadOnly(True)
+        scrollbar = self.verticalScrollBar()
+        scrollbar.valueChanged.connect(self._on_scrolled)
+        scrollbar.rangeChanged.connect(self._on_range_changed)
 
     # ----------------------------------------------------------------- theme
     def apply_theme(self, is_dark: bool):
@@ -70,6 +91,9 @@ class AgentTranscript(QTextBrowser):
     def clear(self):
         """Empty the transcript, log included."""
         self._entries.clear()
+        self._stream_position = None
+        self._expanded_thinking.clear()
+        self._follow_tail = True
         super().clear()
 
     def entries(self) -> list:
@@ -90,21 +114,80 @@ class AgentTranscript(QTextBrowser):
         scroll_value = scrollbar.value()
         entries = list(self._entries)
         self._entries = []
+        self._stream_position = None
         super().clear()
-        for entry in entries:
+        for position, entry in enumerate(entries):
             self._entries.append(entry)
-            self._render(entry)
+            self._render(entry, position)
         scrollbar.setValue(min(scroll_value, scrollbar.maximum()))
 
     def _colors(self):
         return COLORS[self._theme]
 
+    def _small_point_size(self):
+        """A little smaller than the transcript font (thinking text)."""
+        size = self.font().pointSizeF()
+        if size <= 0:
+            size = self.document().defaultFont().pointSizeF()
+        if size <= 0:
+            return 9.0
+        return max(6.5, size - 1.5)
+
     # -------------------------------------------------------------- content
+    def _on_scrolled(self, value):
+        """The scrollbar moved - the user decided where the view should be.
+
+        Anywhere near the end (one line is enough) counts as "follow the new
+        text"; scrolling further up stops the auto scroll until the view is
+        brought back down.
+        """
+        scrollbar = self.verticalScrollBar()
+        slack = max(self.BOTTOM_SLACK, self.fontMetrics().height())
+        self._follow_tail = value >= scrollbar.maximum() - slack
+
+    def _on_range_changed(self, minimum, maximum):
+        """The document height changed (Qt lays the text out lazily).
+
+        While following, the view is put back on the end - without this the
+        scrollbar stays where it was when the text was inserted and the next
+        fragment would look like the user had scrolled away.
+        """
+        if self._follow_tail:
+            self.verticalScrollBar().setValue(maximum)
+
     def _scroll_to_end(self):
         scrollbar = self.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
 
-    def _append_html(self, block: str, blank_lines: int = 0):
+    @staticmethod
+    def _plain_block(cursor):
+        """Detach the block the cursor sits on from a markdown list.
+
+        ``insertBlock`` copies the format of the block it leaves, and an answer
+        that ends in a list leaves the cursor inside a list item - every block
+        appended afterwards would show up as one more bullet of that answer.
+        Only the list membership and its indent are dropped: the rest of the
+        format (the paragraph spacing) has to stay, because ``insertHtml``
+        merges into the block and a full reset would throw the spacing away.
+        """
+        cursor.setCharFormat(QTextCharFormat())
+        text_list = cursor.block().textList()
+        if text_list is not None:
+            text_list.remove(cursor.block())
+        block_format = cursor.blockFormat()
+        if block_format.indent() or block_format.leftMargin() or block_format.rightMargin():
+            block_format.setIndent(0)
+            block_format.setLeftMargin(0)
+            block_format.setRightMargin(0)
+            cursor.setBlockFormat(block_format)
+
+    @classmethod
+    def _break_block(cls, cursor):
+        """Move to a fresh paragraph, outside of any markdown list."""
+        cursor.insertBlock()
+        cls._plain_block(cursor)
+
+    def _append_html(self, block: str, blank_lines: int = 0, force: bool = False):
         """Append one rich-text block, always starting on a fresh line.
 
         A markdown answer ends inside its own block, so inserting the next
@@ -112,17 +195,29 @@ class AgentTranscript(QTextBrowser):
         keeps every message on its own line (and lets the margins apply).
         ``blank_lines`` adds empty lines above the block, which is how a new
         user prompt is kept apart from the answer before it.
+
+        The view only jumps to the new block when it was already following the
+        end (or when ``force`` says so, which is what the user's own message
+        does); a reader who scrolled up is never dragged along.
         """
+        follow = force or self._follow_tail
         cursor = self.textCursor()
         cursor.movePosition(QTextCursor.MoveOperation.End)
         if cursor.block().text():
-            cursor.insertBlock()
+            self._break_block(cursor)
+        else:
+            # Already on an empty block (a leftover of the previous answer):
+            # it must not stay inside the answer's list either.
+            self._plain_block(cursor)
         if blank_lines and not self.document().isEmpty():
             for _ in range(blank_lines):
-                cursor.insertBlock()
+                self._break_block(cursor)
         cursor.insertHtml(block)
-        self.setTextCursor(cursor)
-        self._scroll_to_end()
+        if follow:
+            # Moving the text cursor scrolls the view (QTextBrowser keeps the
+            # cursor visible), so it is only touched while following the tail.
+            self.setTextCursor(cursor)
+            self._scroll_to_end()
 
     def add_user(self, text):
         self._add(('user', text))
@@ -149,13 +244,89 @@ class AgentTranscript(QTextBrowser):
     def add_tool_result(self, name, ok, text):
         self._add(('tool_result', name, ok, text))
 
+    def add_thinking(self, text, duration=0.0):
+        """Log the reasoning of a model step as a collapsible block.
+
+        Same idea as the Copilot panel: while the model thinks the text streams
+        in, then it folds into one muted line that can be clicked open again -
+        the answer stays in view instead of being pushed away by a wall of
+        thinking.
+        """
+        text = (text or '').strip()
+        if not text:
+            return
+        self._add(('thinking', text, float(duration or 0.0)))
+
+    # ------------------------------------------------------------ streaming
+    def begin_stream(self):
+        """Start the block streamed text is written into.
+
+        While the model answers, the fragments are inserted as plain text (no
+        markdown pass per fragment, no full re-render); ``end_stream`` removes
+        the block again so the finished answer can be added as markdown.
+        """
+        if self._stream_position is not None:
+            return
+        cursor = self.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        if cursor.block().text():
+            self._break_block(cursor)
+        else:
+            self._plain_block(cursor)
+        self._stream_position = cursor.position()
+        if self._follow_tail:
+            self.setTextCursor(cursor)
+
+    def append_stream(self, text, reasoning=False):
+        """Write one streamed fragment (reasoning is small, muted and italic)."""
+        if not text:
+            return
+        if self._stream_position is None:
+            self.begin_stream()
+        colors = self._colors()
+        fmt = QTextCharFormat()
+        fmt.setForeground(QColor(colors['muted'] if reasoning else colors['assistant']))
+        if reasoning:
+            fmt.setFontItalic(True)
+            fmt.setFontPointSize(self._small_point_size())
+        follow = self._follow_tail
+        cursor = QTextCursor(self.document())
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        cursor.insertText(text, fmt)
+        if follow:
+            # Following the answer, unless the user scrolled up to read
+            # something - then the view stays exactly where they put it, and
+            # the cursor is not moved either (that would scroll it back).
+            self.setTextCursor(cursor)
+            self._scroll_to_end()
+
+    def end_stream(self):
+        """Drop the live block (the final answer is added as markdown)."""
+        if self._stream_position is None:
+            return
+        document = self.document()
+        # The document may have been rebuilt or cleared in the meantime (a
+        # theme switch, a new conversation): a stale position must never be
+        # handed to Qt, it would warn "Position out of range".
+        position = max(0, min(self._stream_position, document.characterCount() - 1))
+        self._stream_position = None
+        cursor = QTextCursor(document)
+        cursor.setPosition(position)
+        cursor.movePosition(QTextCursor.MoveOperation.End,
+                            QTextCursor.MoveMode.KeepAnchor)
+        cursor.removeSelectedText()
+
     # ------------------------------------------------------------ rendering
     def _add(self, entry):
         """Log one entry and draw it with the current colors."""
+        # A pending live block is dropped first: the finished answer arrives as
+        # its own entry, so streamed text is never shown twice.
+        if self._stream_position is not None:
+            self.end_stream()
         self._entries.append(entry)
-        self._render(entry)
+        self._render(entry, len(self._entries) - 1)
 
-    def _render(self, entry):
+    def _render(self, entry, position=0):
         """Draw one logged entry (used for new messages and for re-renders)."""
         kind = entry[0]
         if kind == 'user':
@@ -166,6 +337,8 @@ class AgentTranscript(QTextBrowser):
             self._render_note(entry[1])
         elif kind == 'error':
             self._render_error(entry[1])
+        elif kind == 'thinking':
+            self._render_thinking(entry, position)
         elif kind == 'tool_call':
             self._render_tool_call(entry[1], entry[2])
         elif kind == 'tool_result':
@@ -174,25 +347,29 @@ class AgentTranscript(QTextBrowser):
     def _render_user(self, text):
         c = self._colors()
         body = html.escape(text).replace('\n', '<br>')
-        # Two empty lines separate a new prompt from the answer above it.
+        # Two empty lines separate a new prompt from the answer above it. The
+        # view always shows it: the user just sent this.
         self._append_html(
             f'<p style="margin:0 0 4px 0;color:{c["user"]};"><b>&gt; {body}</b></p>',
-            blank_lines=2)
+            blank_lines=2, force=True)
 
     def _render_assistant(self, text):
         text = (text or '').strip()
         if not text:
             return
+        follow = self._follow_tail
         cursor = self.textCursor()
         cursor.movePosition(QTextCursor.MoveOperation.End)
-        cursor.insertBlock()
+        self._break_block(cursor)
         char_format = QTextCharFormat()
         char_format.setForeground(QColor(self._colors()['assistant']))
         cursor.setCharFormat(char_format)
         document = QTextDocument()
         document.setMarkdown(text)
         cursor.insertFragment(QTextDocumentFragment(document))
-        self._scroll_to_end()
+        if follow:
+            self.setTextCursor(cursor)
+            self._scroll_to_end()
 
     def _render_note(self, text):
         c = self._colors()
@@ -203,6 +380,56 @@ class AgentTranscript(QTextBrowser):
         c = self._colors()
         body = html.escape(text).replace('\n', '<br>')
         self._append_html(f'<p style="margin:6px 0;color:{c["error"]};"><b>{body}</b></p>')
+
+    def _render_thinking(self, entry, position):
+        """One folded reasoning block: a muted line, the text only when open."""
+        c = self._colors()
+        text = entry[1] or ''
+        duration = 0.0
+        if len(entry) > 2:
+            try:
+                duration = float(entry[2])
+            except (TypeError, ValueError):
+                duration = 0.0
+        opened = position in self._expanded_thinking
+        if opened:
+            label = T.tr('agent.thinking_hide', 'Thoughts (click to hide)')
+        elif duration >= 0.5:
+            label = T.tr('agent.thinking_done',
+                         'Thought for {} s (click to show)').format('{:.1f}'.format(duration))
+        else:
+            label = T.tr('agent.thinking_short', 'Thoughts (click to show)')
+        arrow = '\u25be' if opened else '\u25b8'
+        small = self._small_point_size()
+        block = (f'<p style="margin:2px 0;color:{c["muted"]};font-size:{small:.1f}pt;">'
+                 f'<a href="think:{position}" style="color:{c["muted"]};'
+                 f'text-decoration:none;">{arrow} {html.escape(label)}</a></p>')
+        if opened:
+            body = html.escape(text).replace('\n', '<br>')
+            block += (f'<div style="margin:0 0 4px 0;color:{c["muted"]};'
+                      f'font-size:{small:.1f}pt;">{body}</div>')
+        self._append_html(block)
+
+    def _on_anchor_clicked(self, url):
+        """Open/close a thinking block; other links go to the browser."""
+        target = url.toString()
+        if target.startswith('think:'):
+            try:
+                position = int(target.split(':', 1)[1])
+            except ValueError:
+                return
+            if position in self._expanded_thinking:
+                self._expanded_thinking.discard(position)
+            else:
+                self._expanded_thinking.add(position)
+            # Rebuilding replaces the whole document, which must not happen
+            # inside Qt's own click handling (the cursor it is still using
+            # would point outside the new, shorter document and Qt warns
+            # "QTextCursor::setPosition: Position ... out of range").
+            QTimer.singleShot(0, self._rebuild)
+            return
+        if target:
+            QDesktopServices.openUrl(QUrl(target))
 
     def _render_tool_call(self, name, arguments):
         c = self._colors()

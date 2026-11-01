@@ -1,9 +1,11 @@
 import secrets
+from pathlib import Path
 
 from PySide6.QtCore import *
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import *
 from pygamestudio.common.utils.config import *
-from pygamestudio.gui.base.window import WindowBase
+from pygamestudio.gui.base.window import CenteredListWidget, WindowBase
 from pygamestudio.common.utils.theme import set_editor_theme
 from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.gui.console.logger import Logger
@@ -19,7 +21,7 @@ class EditorSettingsBody(QWidget):
     def __init__(self, game_manager):
         super().__init__()
         self._game_manager = game_manager
-        self._list_widget = QListWidget()
+        self._list_widget = CenteredListWidget()
         self._main_stacked_widget = QStackedWidget()
 
         self._general_stacked_widget = QWidget()
@@ -38,6 +40,17 @@ class EditorSettingsBody(QWidget):
         self._mcp_token_lineedit = QLineEdit()
         self._mcp_token_button = QPushButton()
         self._mcp_status_label = QLabel()
+
+        # Android build page: where the machine's JDK and Android SDK live.
+        # The APK builder reads these paths; nothing else is configurable because
+        # the build needs no other tool (no Gradle, no AGP, no NDK).
+        self._android_stacked_widget = QWidget()
+        self._android_jdk_label = QLabel()
+        self._android_jdk_lineedit = QLineEdit()
+        self._android_jdk_browse_button = QPushButton()
+        self._android_sdk_label = QLabel()
+        self._android_sdk_lineedit = QLineEdit()
+        self._android_sdk_browse_button = QPushButton()
 
         self._lang_dict = {
             'en': 'English',
@@ -58,13 +71,20 @@ class EditorSettingsBody(QWidget):
     def _set_widget(self):
         self._set_general_stacked_widget()
         self._set_mcp_stacked_widget()
+        self._set_android_stacked_widget()
 
-        self._list_widget.setMaximumWidth(200)
+        self._list_widget.setFixedWidth(170)
         self._list_widget.addItems([T.tr('settings.general', 'General'),
-                                    T.tr('settings.mcp_server', 'MCP Server')])
+                                    T.tr('settings.mcp_server', 'MCP Server'),
+                                    T.tr('settings.android_build', 'Android Build')])
         self._list_widget.setCurrentItem(self._list_widget.item(0))
+        # The stacked pages must not decide the width of the whole dialog (a
+        # long line edit hint used to squeeze the list down to a few pixels).
+        self._main_stacked_widget.setSizePolicy(QSizePolicy.Policy.Ignored,
+                                                QSizePolicy.Policy.Preferred)
         self._main_stacked_widget.addWidget(self._general_stacked_widget)
         self._main_stacked_widget.addWidget(self._mcp_stacked_widget)
+        self._main_stacked_widget.addWidget(self._android_stacked_widget)
 
     def _set_signal(self):
         self._list_widget.clicked.connect(self._change_stacked_widget)
@@ -73,6 +93,10 @@ class EditorSettingsBody(QWidget):
         self._mcp_enabled_checkbox.toggled.connect(self._toggle_mcp_server)
         self._mcp_port_spinbox.valueChanged.connect(self._on_mcp_port_changed)
         self._mcp_token_button.clicked.connect(self._copy_mcp_token)
+        self._android_jdk_browse_button.clicked.connect(self._browse_android_jdk)
+        self._android_sdk_browse_button.clicked.connect(self._browse_android_sdk)
+        self._android_jdk_lineedit.editingFinished.connect(self._on_android_path_edited)
+        self._android_sdk_lineedit.editingFinished.connect(self._on_android_path_edited)
         T.add_observer(self)
 
     def _set_layout(self):
@@ -93,6 +117,17 @@ class EditorSettingsBody(QWidget):
         mcp_layout.addWidget(self._mcp_status_label, 3, 0, 1, 3)
         mcp_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         mcp_layout.setColumnStretch(1, 1)
+
+        android_layout = QGridLayout(self._android_stacked_widget)
+        android_layout.addWidget(self._android_jdk_label, 0, 0, 1, 1)
+        android_layout.addWidget(self._android_jdk_lineedit, 0, 1, 1, 1)
+        android_layout.addWidget(self._android_jdk_browse_button, 0, 2, 1, 1)
+        android_layout.addWidget(self._android_sdk_label, 1, 0, 1, 1)
+        android_layout.addWidget(self._android_sdk_lineedit, 1, 1, 1, 1)
+        android_layout.addWidget(self._android_sdk_browse_button, 1, 2, 1, 1)
+        android_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        android_layout.setColumnStretch(1, 1)
+        android_layout.setRowStretch(2, 1)
 
         main_h_layout = QHBoxLayout(self)
         main_h_layout.addWidget(self._list_widget)
@@ -150,6 +185,50 @@ class EditorSettingsBody(QWidget):
         self._mcp_token_button.setText(T.tr('settings.mcp_copy', 'Copy'))
         self._mcp_enabled_checkbox.setChecked(bool(editor_config.get('mcp_enabled')))
         self._update_mcp_status()
+
+    def _set_android_stacked_widget(self):
+        """Fill the Android page: the two toolchain paths, nothing else."""
+        editor_config = get_editor_config()
+        self._android_jdk_label.setText(T.tr('settings.android_jdk', 'JDK'))
+        self._android_jdk_browse_button.setIcon(QIcon(':/images/browse.png'))
+        self._android_sdk_label.setText(T.tr('settings.android_sdk', 'Android SDK'))
+        self._android_sdk_browse_button.setIcon(QIcon(':/images/browse.png'))
+        self._set_android_placeholders()
+
+        # What is stored is what the build uses: an empty field is an empty
+        # field, and packaging then reports "pick the folder" instead of
+        # quietly going off to look for a JDK somewhere on the machine.
+        self._android_jdk_lineedit.setText(str(editor_config.get('android_jdk') or ''))
+        self._android_sdk_lineedit.setText(str(editor_config.get('android_sdk') or ''))
+
+    def _set_android_placeholders(self):
+        """Ask for the folder; nothing is filled in behind the user's back."""
+        self._android_jdk_lineedit.setPlaceholderText(
+            T.tr('settings.android_jdk_placeholder', 'Folder of a JDK 17 or newer'))
+        self._android_sdk_lineedit.setPlaceholderText(
+            T.tr('settings.android_sdk_placeholder',
+                 'Folder that contains platforms/ and build-tools/'))
+
+    def _browse_android_jdk(self):
+        start = self._android_jdk_lineedit.text().strip() or get_editor_data_dir().as_posix()
+        jdk_dir = QFileDialog.getExistingDirectory(
+            self, T.tr('settings.android_choose_jdk', 'Select the JDK folder'), start)
+        if jdk_dir:
+            self._android_jdk_lineedit.setText(Path(jdk_dir).as_posix())
+            update_editor_config('android_jdk', Path(jdk_dir).as_posix())
+
+    def _browse_android_sdk(self):
+        start = self._android_sdk_lineedit.text().strip() or get_editor_data_dir().as_posix()
+        sdk_dir = QFileDialog.getExistingDirectory(
+            self, T.tr('settings.android_choose_sdk', 'Select the Android SDK folder'), start)
+        if sdk_dir:
+            self._android_sdk_lineedit.setText(Path(sdk_dir).as_posix())
+            update_editor_config('android_sdk', Path(sdk_dir).as_posix())
+
+    def _on_android_path_edited(self):
+        """A typed path is stored as soon as the field loses focus."""
+        update_editor_config('android_jdk', self._android_jdk_lineedit.text().strip())
+        update_editor_config('android_sdk', self._android_sdk_lineedit.text().strip())
 
     def _ensure_mcp_token(self, editor_config=None) -> str:
         """The token clients must send - created once and stored in the config.
@@ -233,7 +312,8 @@ class EditorSettingsBody(QWidget):
     def retranslate(self):
         self._list_widget.clear()
         self._list_widget.addItems([T.tr('settings.general', 'General'),
-                                    T.tr('settings.mcp_server', 'MCP Server')])
+                                    T.tr('settings.mcp_server', 'MCP Server'),
+                                    T.tr('settings.android_build', 'Android Build')])
         self._language_label.setText(T.tr('settings.language', 'Language'))
         self._theme_label.setText(T.tr('settings.theme', 'Theme'))
         self._mcp_enabled_checkbox.setText(T.tr('settings.mcp_enabled', 'Enable MCP server'))
@@ -241,6 +321,10 @@ class EditorSettingsBody(QWidget):
         self._mcp_token_label.setText(T.tr('settings.mcp_token', 'Token'))
         self._mcp_token_button.setText(T.tr('settings.mcp_copy', 'Copy'))
         self._update_mcp_status()
+
+        self._android_jdk_label.setText(T.tr('settings.android_jdk', 'JDK'))
+        self._android_sdk_label.setText(T.tr('settings.android_sdk', 'Android SDK'))
+        self._set_android_placeholders()
 
         self._theme_dict = {
             'dark': T.tr('theme.dark', 'Dark'),

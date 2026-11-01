@@ -1,0 +1,128 @@
+{
+    "5f1b0e2c-1111-4a11-9c11-000000000001": {
+        "object": {
+            "name": "Canvas",
+            "type": "CANVAS",
+            "uuid": "5f1b0e2c-1111-4a11-9c11-000000000001",
+            "x": 0,
+            "y": 0,
+            "pos": [0, 0],
+            "width": 960,
+            "height": 540,
+            "size": [960, 540],
+            "scale_x": 1,
+            "scale_y": 1,
+            "scale": [1, 1],
+            "angle": 0,
+            "color": [26, 28, 36, 255],
+            "visible": true
+        },
+        "children": [
+            {
+                "5f1b0e2c-1111-4a11-9c11-000000000002": {
+                    "object": {
+                        "name": "Title",
+                        "type": "TEXT",
+                        "uuid": "5f1b0e2c-1111-4a11-9c11-000000000002",
+                        "x": 48,
+                        "y": 36,
+                        "pos": [48, 36],
+                        "width": 864,
+                        "height": 54,
+                        "size": [864, 54],
+                        "scale_x": 1,
+                        "scale_y": 1,
+                        "scale": [1, 1],
+                        "angle": 0,
+                        "color": [235, 240, 250, 255],
+                        "visible": true,
+                        "text": "PyGS engine on Android",
+                        "font_size": 36,
+                        "font_path": "",
+                        "text_align": "left",
+                        "text_valign": "middle"
+                    },
+                    "children": []
+                }
+            },
+            {
+                "5f1b0e2c-1111-4a11-9c11-000000000003": {
+                    "object": {
+                        "name": "Hint",
+                        "type": "TEXT",
+                        "uuid": "5f1b0e2c-1111-4a11-9c11-000000000003",
+                        "x": 48,
+                        "y": 486,
+                        "pos": [48, 486],
+                        "width": 864,
+                        "height": 33,
+                        "size": [864, 33],
+                        "scale_x": 1,
+                        "scale_y": 1,
+                        "scale": [1, 1],
+                        "angle": 0,
+                        "color": [150, 160, 180, 255],
+                        "visible": true,
+                        "text": "drag the square  /  tap the pad",
+                        "font_size": 22,
+                        "font_path": "",
+                        "text_align": "left",
+                        "text_valign": "middle"
+                    },
+                    "children": []
+                }
+            },
+            {
+                "5f1b0e2c-1111-4a11-9c11-000000000004": {
+                    "object": {
+                        "name": "Pad",
+                        "type": "RECT",
+                        "uuid": "5f1b0e2c-1111-4a11-9c11-000000000004",
+                        "x": 525,
+                        "y": 128,
+                        "pos": [525, 128],
+                        "width": 360,
+                        "height": 360,
+                        "size": [360, 360],
+                        "scale_x": 1,
+                        "scale_y": 1,
+                        "scale": [1, 1],
+                        "angle": 0,
+                        "color": [58, 84, 128, 255],
+                        "visible": true,
+                        "border_top_left_radius": 18,
+                        "border_top_right_radius": 18,
+                        "border_bottom_left_radius": 18,
+                        "border_bottom_right_radius": 18,
+                        "script_path": "./scripts/pad.py"
+                    },
+                    "children": []
+                }
+            },
+            {
+                "5f1b0e2c-1111-4a11-9c11-000000000005": {
+                    "object": {
+                        "name": "Box",
+                        "type": "IMAGE",
+                        "uuid": "5f1b0e2c-1111-4a11-9c11-000000000005",
+                        "x": 142,
+                        "y": 188,
+                        "pos": [142, 188],
+                        "width": 150,
+                        "height": 150,
+                        "size": [150, 150],
+                        "scale_x": 1,
+                        "scale_y": 1,
+                        "scale": [1, 1],
+                        "angle": 0,
+                        "color": [255, 255, 255, 255],
+                        "visible": true,
+                        "image_path": "./assets/box.png",
+                        "script_path": "./scripts/drag.py"
+                    },
+                    "children": []
+                }
+            }
+        ]
+    }
+}

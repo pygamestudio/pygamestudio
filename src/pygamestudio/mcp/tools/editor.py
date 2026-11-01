@@ -3,6 +3,7 @@
 
 import sys
 
+from pygamestudio.common.utils.constant import DEFAULT_SCREEN_SIZE
 from pygamestudio.mcp.bridge import bridge
 from pygamestudio.mcp.registry import ToolError, register_resource, tool
 from pygamestudio.mcp.tools.context import (
@@ -185,8 +186,8 @@ def _canvas_size():
     """Canvas size of the open scene (the default capture region)."""
     manager_ = manager()
     canvas = manager_.get_object(manager_.canvas_object_uuid) if manager_.canvas_object_uuid else None
-    return (int(canvas.width) if canvas is not None else 800,
-            int(canvas.height) if canvas is not None else 600)
+    return (int(canvas.width) if canvas is not None else DEFAULT_SCREEN_SIZE[0],
+            int(canvas.height) if canvas is not None else DEFAULT_SCREEN_SIZE[1])
 
 
 def _render_scene_view_image(x, y, width, height, scale=1.0):

@@ -440,9 +440,28 @@ class WindowBase(QWidget):
         self._start_global_pos = None
 
 
+class CenteredItemDelegate(QStyledItemDelegate):
+    """Draws the text of a list entry centered."""
+
+    def initStyleOption(self, option, index):
+        super().initStyleOption(option, index)
+        option.displayAlignment = Qt.AlignmentFlag.AlignCenter
+
+
+class CenteredListWidget(QListWidget):
+    """The page list on the left of the settings dialogs, text centered.
+
+    A delegate does the centering, so the entries stay centered when the
+    language switch re-adds them (the item flags are not touched).
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setItemDelegate(CenteredItemDelegate(self))
+
+
 class DetachButton(QPushButton):
     """Icon-only button that toggles a panel between its tab and its own window.
-
     Docked panels show ``detatch.png`` (the click pops the panel out into a
     standalone window), detached ones show ``attach.png`` (the click puts it
     back into its tab). The tooltip follows the editor language.
