@@ -80,7 +80,16 @@ READ_ONLY_TOOLS = {
 
 
 class LlmError(Exception):
-    """A request to the model failed (network, HTTP status, bad payload)."""
+    """A request to the model failed (network, HTTP status, bad payload).
+
+    ``status`` is the HTTP status when the failure came from the server, which
+    lets the caller tell "this provider does not do streaming" (worth a retry
+    without ``stream``) from "wrong key" or "no network" (a retry is pointless).
+    """
+
+    def __init__(self, message, status=None):
+        super().__init__(message)
+        self.status = status
 
 
 # --------------------------------------------------------------------- settings
@@ -196,11 +205,78 @@ def _post_json(url, payload, headers, timeout):
             return json.loads(response.read().decode('utf-8'))
     except urllib.error.HTTPError as e:
         detail = e.read().decode('utf-8', errors='replace')[:400]
-        raise LlmError('HTTP {} from {}: {}'.format(e.code, url, detail))
+        raise LlmError('HTTP {} from {}: {}'.format(e.code, url, detail), e.code)
     except urllib.error.URLError as e:
         raise LlmError('Cannot reach {}: {}'.format(url, e))
     except ValueError as e:
         raise LlmError('The model answered with invalid JSON: {}'.format(e))
+
+
+def _post_stream(url, payload, headers, timeout, on_event):
+    """POST with ``stream: true`` and call ``on_event`` for every chunk.
+
+    Both shapes are understood: the OpenAI-compatible SSE stream (``data:``
+    lines, closed by ``[DONE]``) and Ollama's NDJSON (one JSON object per line).
+    Anything unparsable is skipped - a provider's heartbeat comment must not end
+    the stream.
+
+    Many proxies and some "OpenAI compatible" servers ignore ``stream`` and
+    answer with a single JSON document instead; that answer is turned into
+    one event, so the caller does not have to care which happened (it also
+    saves a second request).
+    """
+    body = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+    request = urllib.request.Request(
+        url, data=body, method='POST',
+        headers={'Content-Type': 'application/json',
+                 'Accept': 'text/event-stream',
+                 'User-Agent': 'pygamestudio-agent',
+                 **headers})
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            content_type = (response.headers.get('Content-Type') or '').lower()
+            if 'event-stream' not in content_type and 'ndjson' not in content_type:
+                _emit_whole_answer(response.read().decode('utf-8', 'replace'), on_event)
+                return
+            for raw in response:
+                line = raw.decode('utf-8', 'replace').strip()
+                if not line or line.startswith(':'):
+                    continue
+                if line.startswith('data:'):
+                    line = line[5:].strip()
+                if not line:
+                    continue
+                if line == '[DONE]':
+                    break
+                try:
+                    on_event(json.loads(line))
+                except ValueError:
+                    continue
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode('utf-8', errors='replace')[:400]
+        raise LlmError('HTTP {} from {}: {}'.format(e.code, url, detail), e.code)
+    except urllib.error.URLError as e:
+        raise LlmError('Cannot reach {}: {}'.format(url, e))
+    except OSError as e:
+        raise LlmError('The stream from {} broke: {}'.format(url, e))
+
+
+def _emit_whole_answer(text, on_event):
+    """Feed one non-streamed JSON answer through the streaming callback."""
+    try:
+        data = json.loads(text) if text.strip() else None
+    except ValueError:
+        raise LlmError('The model answered with invalid JSON: {}'.format(text[:200]))
+    if not isinstance(data, dict):
+        raise LlmError('The model answered with an unexpected body: {}'.format(text[:200]))
+    choices = data.get('choices') or []
+    if choices:
+        # OpenAI shape - re-wrap the message as one final delta.
+        message = choices[0].get('message') or choices[0].get('delta') or {}
+        on_event({'choices': [{'delta': message}]})
+    else:
+        # Ollama shape (``message``) or an error object.
+        on_event(data)
 
 
 def _normalize_tool_calls(raw_calls):
@@ -245,8 +321,16 @@ def _ollama_messages(messages):
     return converted
 
 
-def chat_completion(settings, messages, tools):
-    """One blocking request to the model. Returns {'content', 'tool_calls'}."""
+def chat_completion(settings, messages, tools, on_delta=None):
+    """One request to the model. Returns {'content', 'tool_calls'}.
+
+    ``on_delta(kind, text)`` turns the request into a streaming one: every
+    fragment is reported as it arrives (``kind`` is ``'reasoning'`` for a
+    reasoning model's thinking or ``'content'`` for the answer), so the panel
+    can show progress instead of a frozen "Working..." line. Without it the
+    call stays a single blocking request - the fallback for providers that do
+    not stream.
+    """
     provider = (settings.get('provider') or PROVIDER_OPENAI).lower()
     base_url = (settings.get('base_url') or '').rstrip('/')
     model = (settings.get('model') or '').strip()
@@ -256,9 +340,12 @@ def chat_completion(settings, messages, tools):
         raise LlmError('No model configured: set the model name in the agent settings.')
 
     if provider == PROVIDER_OLLAMA:
-        payload = {'model': model, 'messages': _ollama_messages(messages), 'stream': False}
+        payload = {'model': model, 'messages': _ollama_messages(messages),
+                   'stream': bool(on_delta)}
         if tools:
             payload['tools'] = tools
+        if on_delta is not None:
+            return _stream_ollama(base_url + '/api/chat', payload, on_delta)
         data = _post_json(base_url + '/api/chat', payload, {}, REQUEST_TIMEOUT)
         message = data.get('message') or {}
         return {'content': message.get('content') or '',
@@ -271,14 +358,98 @@ def chat_completion(settings, messages, tools):
     if tools:
         payload['tools'] = tools
         payload['tool_choice'] = 'auto'
-    data = _post_json(base_url + '/chat/completions', payload,
-                      {'Authorization': 'Bearer ' + api_key}, REQUEST_TIMEOUT)
+    headers = {'Authorization': 'Bearer ' + api_key}
+    if on_delta is not None:
+        payload['stream'] = True
+        try:
+            return _stream_openai(base_url + '/chat/completions', payload, headers, on_delta)
+        except LlmError as error:
+            # A provider/proxy that refuses ``stream`` (HTTP 400/404/415/5xx):
+            # ask again without it instead of failing the turn. A wrong key or
+            # a dead network would fail the same way, so those are not retried.
+            if error.status is None or error.status in (401, 403):
+                raise
+            payload.pop('stream', None)
+    data = _post_json(base_url + '/chat/completions', payload, headers, REQUEST_TIMEOUT)
     choices = data.get('choices') or []
     if not choices:
         raise LlmError('The model returned no choices: {}'.format(str(data)[:200]))
     message = choices[0].get('message') or {}
     return {'content': message.get('content') or '',
             'tool_calls': _normalize_tool_calls(message.get('tool_calls'))}
+
+
+def _stream_openai(url, payload, headers, on_delta):
+    """OpenAI-compatible SSE stream -> {'content', 'tool_calls'}."""
+    content = []
+    partial = {}
+    order = []
+
+    def slot_for(key):
+        slot = partial.get(key)
+        if slot is None:
+            slot = {'id': '', 'name': '', 'arguments': []}
+            partial[key] = slot
+            order.append(key)
+        return slot
+
+    def handle(chunk):
+        choices = chunk.get('choices') or []
+        if not choices:
+            return
+        delta = choices[0].get('delta') or {}
+        reasoning = delta.get('reasoning_content') or delta.get('reasoning')
+        if reasoning:
+            on_delta('reasoning', reasoning)
+        text = delta.get('content')
+        if text:
+            content.append(text)
+            on_delta('content', text)
+        for position, fragment in enumerate(delta.get('tool_calls') or []):
+            # Streamed fragments carry ``index``; a provider that answers in one
+            # piece (or a proxy ignoring ``stream``) sends whole calls, so the
+            # id - or the position in the list - tells the calls apart.
+            key = fragment.get('index')
+            if key is None:
+                key = fragment.get('id') or position
+            slot = slot_for(key)
+            if fragment.get('id'):
+                slot['id'] = fragment['id']
+            function = fragment.get('function') or {}
+            if function.get('name'):
+                slot['name'] += function['name']
+            if function.get('arguments'):
+                slot['arguments'].append(function['arguments'])
+
+    _post_stream(url, payload, headers, REQUEST_TIMEOUT, handle)
+    calls = []
+    for number, key in enumerate(order, start=1):
+        slot = partial[key]
+        calls.append({'id': slot['id'] or 'call_{}'.format(number),
+                      'function': {'name': slot['name'],
+                                   'arguments': ''.join(slot['arguments'])}})
+    return {'content': ''.join(content), 'tool_calls': _normalize_tool_calls(calls)}
+
+
+def _stream_ollama(url, payload, on_delta):
+    """Ollama NDJSON stream -> {'content', 'tool_calls'}."""
+    content = []
+    calls = []
+
+    def handle(chunk):
+        message = chunk.get('message') or {}
+        if message.get('content'):
+            content.append(message['content'])
+            on_delta('content', message['content'])
+        for call in message.get('tool_calls') or []:
+            function = call.get('function') or {}
+            calls.append({'function': {'name': function.get('name'),
+                                       'arguments': function.get('arguments')}})
+        if chunk.get('error'):
+            raise LlmError('Ollama: {}'.format(chunk['error']))
+
+    _post_stream(url, payload, {}, REQUEST_TIMEOUT, handle)
+    return {'content': ''.join(content), 'tool_calls': _normalize_tool_calls(calls)}
 
 
 # ----------------------------------------------------------------------- session
@@ -288,6 +459,7 @@ class AgentSession(QObject):
     Signals (all delivered on the main thread):
 
     ``message_added``      (role, text)          - user / assistant / note text
+    ``stream_delta``       (kind, text)          - live fragment ('reasoning' / 'content')
     ``tool_started``       (name, arguments)     - a tool is about to run
     ``tool_finished``      (name, ok, summary)   - a tool finished
     ``status_changed``     (text, busy)          - status line + busy flag
@@ -297,6 +469,7 @@ class AgentSession(QObject):
     """
 
     message_added = Signal(str, str)
+    stream_delta = Signal(str, str)
     tool_started = Signal(str, dict)
     tool_finished = Signal(str, bool, str)
     status_changed = Signal(str, bool)
@@ -479,7 +652,12 @@ class AgentSession(QObject):
 
         def worker():
             try:
-                answer = chat_completion(settings, messages, tools)
+                # Streaming: the panel shows the thinking and the answer as they
+                # arrive instead of a frozen status line. The signal is emitted
+                # from this thread and delivered queued, so the fragments are
+                # handled on the main thread.
+                answer = chat_completion(settings, messages, tools,
+                                         on_delta=self.stream_delta.emit)
                 if not self._cancel:
                     self._on_model_answer.emit(answer)
             except LlmError as e:

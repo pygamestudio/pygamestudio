@@ -35,6 +35,8 @@ sys.path.insert(0, str(REPO_ROOT / 'src'))
 
 from PySide6.QtWidgets import QApplication                        # noqa: E402
 from PySide6.QtWidgets import QLineEdit                           # noqa: E402
+from PySide6.QtWidgets import QStyleOptionViewItem                # noqa: E402
+from PySide6.QtCore import Qt                                     # noqa: E402
 
 from pygamestudio.common.res import resources_rc                   # noqa: E402,F401 - registers :/images
 from pygamestudio.gui.build.android import AndroidAppBuildWindow, is_valid_package  # noqa: E402
@@ -229,6 +231,12 @@ def main():
     check('three settings pages', settings._list_widget.count() == 3,
           settings._list_widget.count())
     check('android page is in the stack', settings._main_stacked_widget.count() == 3)
+    _option = QStyleOptionViewItem()
+    settings._list_widget.itemDelegate().initStyleOption(
+        _option, settings._list_widget.model().index(0, 0))
+    check('the page list text is centered in the editor settings',
+          _option.displayAlignment & Qt.AlignmentFlag.AlignHCenter,
+          str(_option.displayAlignment))
     check('an empty path stays empty in the field',
           settings._android_jdk_lineedit.text() == ''
           and settings._android_sdk_lineedit.text() == '',
@@ -249,6 +257,12 @@ def main():
     print('4) display fit settings')
     project_settings = ProjectSettingsBody(manager)
     project_settings.get_ready_for_project()
+    _option = QStyleOptionViewItem()
+    project_settings._list_widget.itemDelegate().initStyleOption(
+        _option, project_settings._list_widget.model().index(0, 0))
+    check('the page list text is centered in the project settings',
+          _option.displayAlignment & Qt.AlignmentFlag.AlignHCenter,
+          str(_option.displayAlignment))
     check('mobile fit picker offers no "no fit"',
           project_settings._screen_fit_combobox.count() == 6
           and project_settings._screen_fit_combobox.findData('none') == -1,

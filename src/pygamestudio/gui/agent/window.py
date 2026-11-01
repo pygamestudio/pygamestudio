@@ -61,6 +61,11 @@ class AgentWindow(DetachablePanel, QWidget):
         self._current_session_id = ''
         self._session_created_at = 0.0
         self._project_path = ''
+        # Reasoning text of the running step: streamed small and muted into the
+        # transcript, then folded into one clickable line when the answer (or a
+        # tool call) starts.
+        self._reasoning_text = ''
+        self._reasoning_started = 0.0
 
         self._setup()
         self._set_signal()
@@ -140,7 +145,8 @@ class AgentWindow(DetachablePanel, QWidget):
         self._continue_bar.cancelled.connect(self._on_continue_cancelled)
 
         self._session.message_added.connect(self._on_message_added)
-        self._session.tool_started.connect(self._transcript.add_tool_call)
+        self._session.stream_delta.connect(self._on_stream_delta)
+        self._session.tool_started.connect(self._on_tool_started)
         self._session.tool_finished.connect(self._on_tool_finished)
         self._session.status_changed.connect(self._on_status_changed)
         self._session.confirmation_needed.connect(self._on_confirmation_needed)
@@ -351,6 +357,9 @@ class AgentWindow(DetachablePanel, QWidget):
         self._session.send(self._composer.take_text())
 
     def _on_message_added(self, role, text):
+        # Reasoning that produced no visible answer yet is folded first, so the
+        # thinking line ends up above the message it belongs to.
+        self._commit_reasoning()
         if role == 'user':
             self._transcript.add_user(text)
         elif role == 'assistant':
@@ -358,8 +367,48 @@ class AgentWindow(DetachablePanel, QWidget):
         else:
             self._transcript.add_note(text)
 
+    def _on_tool_started(self, name, arguments):
+        self._commit_reasoning()
+        self._transcript.add_tool_call(name, arguments)
+
     def _on_tool_finished(self, name, ok, text):
         self._transcript.add_tool_result(name, ok, text)
+
+    def _on_stream_delta(self, kind, text):
+        """A fragment of the model's answer or of its thinking arrived.
+
+        The thinking streams into the transcript in small muted text (like the
+        editor's own Copilot panel) and is folded into one line as soon as the
+        answer starts - a long chain of thought never pushes the answer away,
+        and the status line stays stable instead of flickering.
+        """
+        if not self._session.is_busy():
+            # A stopped turn keeps its socket open for a moment: late
+            # fragments must not grow the transcript after the Stop button.
+            return
+        if kind == 'reasoning':
+            if not self._reasoning_text:
+                self._reasoning_started = time.time()
+            self._reasoning_text += text
+            self._transcript.append_stream(text, reasoning=True)
+            return
+        self._commit_reasoning()
+        self._transcript.append_stream(text)
+
+    def _commit_reasoning(self):
+        """Fold the streamed thinking into a collapsed block."""
+        text = self._reasoning_text.strip()
+        if not text:
+            self._reasoning_text = ''
+            self._reasoning_started = 0.0
+            return
+        duration = 0.0
+        if self._reasoning_started:
+            duration = max(0.0, time.time() - self._reasoning_started)
+        self._reasoning_text = ''
+        self._reasoning_started = 0.0
+        self._transcript.end_stream()
+        self._transcript.add_thinking(text, duration)
 
     def _on_status_changed(self, text, busy):
         if busy and not text:
@@ -409,6 +458,11 @@ class AgentWindow(DetachablePanel, QWidget):
         self._session.approve(allowed)
 
     def _on_finished(self, error_text):
+        # Thinking that never produced an answer is still worth keeping, folded.
+        self._commit_reasoning()
+        # A cancelled turn leaves a half-written live block: drop it, the
+        # conversation keeps only what was really said.
+        self._transcript.end_stream()
         if error_text:
             self._transcript.add_error(error_text)
         self._confirm_bar.clear()

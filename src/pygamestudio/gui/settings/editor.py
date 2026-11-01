@@ -5,7 +5,7 @@ from PySide6.QtCore import *
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import *
 from pygamestudio.common.utils.config import *
-from pygamestudio.gui.base.window import WindowBase
+from pygamestudio.gui.base.window import CenteredListWidget, WindowBase
 from pygamestudio.common.utils.theme import set_editor_theme
 from pygamestudio.common.i18n.translator import Translator as T
 from pygamestudio.gui.console.logger import Logger
@@ -21,7 +21,7 @@ class EditorSettingsBody(QWidget):
     def __init__(self, game_manager):
         super().__init__()
         self._game_manager = game_manager
-        self._list_widget = QListWidget()
+        self._list_widget = CenteredListWidget()
         self._main_stacked_widget = QStackedWidget()
 
         self._general_stacked_widget = QWidget()
