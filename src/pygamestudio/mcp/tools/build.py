@@ -402,10 +402,10 @@ def start_web_build(args):
             'version_code': {'type': 'integer', 'minimum': 1,
                              'description': 'Version code the store compares (1, 2, ...).'},
             'orientation': {'type': 'string',
-                            'enum': ['landscape', 'portrait', 'sensor_landscape',
-                                     'sensor_portrait', 'full_sensor'],
-                            'description': 'Screen orientation. sensor_* follow the device, '
-                                           'full_sensor flips with it.'},
+                            'enum': ['sensor_landscape', 'sensor_portrait'],
+                            'description': 'Screen orientation: sensor_landscape (landscape, '
+                                           'flips 180 degrees with the device) or '
+                                           'sensor_portrait.'},
         },
         'additionalProperties': False,
     },
@@ -425,9 +425,8 @@ def start_android_build(args):
     if build_type is not None and build_type not in _ANDROID_BUILD_TYPES:
         raise ToolError('build_type must be "debug" or "release".')
     orientation = args.get('orientation')
-    if orientation is not None and orientation not in android_dist.ORIENTATIONS:
-        raise ToolError('Unknown orientation "{}" - use one of {}.'
-                        .format(orientation, ', '.join(android_dist.ORIENTATIONS)))
+    if orientation is not None:
+        orientation = android_dist.normalize_orientation(orientation)
 
     output_dir = (args.get('output_dir') or '').strip()
     if output_dir:

@@ -36,12 +36,12 @@ from pygamestudio.gui.console.logger import Logger
 #: Output sub folder of the tab (``<output>/build/Android``).
 OUTPUT_SUBDIR = ('build', 'Android')
 #: Orientation picker: value stored in project.pygs -> translation key.
+#: Only the two flipping picks: a game is designed for one orientation, and
+#: flipping the device to the other one would only change the aspect ratio
+#: (bars, crops or distortion), never the layout.
 ORIENTATION_CHOICES = (
-    ('landscape', 'build.orientation_landscape'),
-    ('portrait', 'build.orientation_portrait'),
     ('sensor_landscape', 'build.orientation_sensor_landscape'),
     ('sensor_portrait', 'build.orientation_sensor_portrait'),
-    ('full_sensor', 'build.orientation_full_sensor'),
 )
 #: Build type picker: value for Gradle -> translation key.
 BUILD_TYPES = (
@@ -238,27 +238,49 @@ class AndroidAppBuildWindow(QScrollArea):
                 layout.addWidget(widget, 1 if index == 0 else 0)
             return row
 
-        def version_row():
+        def field_group(label, widget, stretch=1):
+            """A label and its field as one unit of a combined row."""
+            group = QWidget()
+            group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+            layout = QHBoxLayout(group)
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.setSpacing(8)
+            layout.addWidget(label)
+            layout.addWidget(widget, stretch)
+            return group
+
+        def combined_row(*groups):
+            """Several label+field units on one line (the page stays compact)."""
             row = QWidget()
             row.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
             layout = QHBoxLayout(row)
             layout.setContentsMargins(0, 0, 0, 0)
-            layout.setSpacing(6)
-            layout.addWidget(self._version_name_lineedit, 2)
-            layout.addWidget(self._version_code_label)
-            layout.addWidget(self._version_code_lineedit, 1)
+            layout.setSpacing(14)
+            for group in groups:
+                layout.addWidget(group, 1)
             return row
 
         # Same grid as the desktop and web tabs; only the spacing is tuned so a
-        # label never sits against its field.
+        # label never sits against its field. Package/version and the signing
+        # fields share a line each, so the page needs fewer rows (the window
+        # follows the page height, see BuildWindow._fit_height).
         self._icon_row = row_with(self._app_icon_lineedit, self._app_icon_browse_button)
         self._output_row = row_with(self._output_dir_lineedit, self._output_dir_browse_button)
         self._keystore_row = row_with(self._keystore_lineedit, self._keystore_browse_button,
                                       self._keystore_create_button)
+        self._package_row = combined_row(
+            field_group(self._package_label, self._package_lineedit, 2),
+            field_group(self._version_name_label, self._version_name_lineedit, 2),
+            field_group(self._version_code_label, self._version_code_lineedit, 1))
+        self._mode_row = combined_row(
+            field_group(self._orientation_label, self._orientation_combobox),
+            field_group(self._build_type_label, self._build_type_combobox))
+        self._signing_fields_row = combined_row(
+            field_group(self._key_alias_label, self._key_alias_lineedit),
+            field_group(self._store_password_label, self._store_password_lineedit),
+            field_group(self._key_password_label, self._key_password_lineedit))
         self._signing_rows = (self._keystore_label, self._keystore_row,
-                              self._key_alias_label, self._key_alias_lineedit,
-                              self._store_password_label, self._store_password_lineedit,
-                              self._key_password_label, self._key_password_lineedit)
+                              self._signing_fields_row)
 
         button_layout = QHBoxLayout()
         button_layout.addWidget(self._build_button)
@@ -280,24 +302,13 @@ class AndroidAppBuildWindow(QScrollArea):
         layout.addWidget(self._icon_row, 1, 1)
         layout.addWidget(self._output_dir_label, 2, 0)
         layout.addWidget(self._output_row, 2, 1)
-        layout.addWidget(self._package_label, 3, 0)
-        layout.addWidget(self._package_lineedit, 3, 1)
-        layout.addWidget(self._version_name_label, 4, 0)
-        layout.addWidget(version_row(), 4, 1)
-        layout.addWidget(self._orientation_label, 5, 0)
-        layout.addWidget(self._orientation_combobox, 5, 1)
-        layout.addWidget(self._build_type_label, 6, 0)
-        layout.addWidget(self._build_type_combobox, 6, 1)
-        layout.addWidget(self._keystore_label, 7, 0)
-        layout.addWidget(self._keystore_row, 7, 1)
-        layout.addWidget(self._key_alias_label, 8, 0)
-        layout.addWidget(self._key_alias_lineedit, 8, 1)
-        layout.addWidget(self._store_password_label, 9, 0)
-        layout.addWidget(self._store_password_lineedit, 9, 1)
-        layout.addWidget(self._key_password_label, 10, 0)
-        layout.addWidget(self._key_password_lineedit, 10, 1)
-        layout.addWidget(self._progress_bar, 11, 0, 1, 2)
-        layout.addLayout(button_layout, 12, 0, 1, 2)
+        layout.addWidget(self._mode_row, 3, 0, 1, 2)
+        layout.addWidget(self._package_row, 4, 0, 1, 2)
+        layout.addWidget(self._keystore_label, 5, 0)
+        layout.addWidget(self._keystore_row, 5, 1)
+        layout.addWidget(self._signing_fields_row, 6, 0, 1, 2)
+        layout.addWidget(self._progress_bar, 7, 0, 1, 2)
+        layout.addLayout(button_layout, 8, 0, 1, 2)
         # Exactly the desktop/web layout: a plain grid, no stretch row of its
         # own. A window taller than the page then shares the spare height
         # between the rows (what those two tabs do) instead of collecting it
@@ -398,7 +409,7 @@ class AndroidAppBuildWindow(QScrollArea):
             self._package_lineedit.setText(default_package(self._app_name_lineedit.text()))
         self._version_name_lineedit.setText(str(build_config.get('android_version_name') or '1.0.0'))
         self._version_code_lineedit.setText(str(build_config.get('android_version_code') or 1))
-        orientation = str(build_config.get('android_orientation') or '')
+        orientation = android_dist.normalize_orientation(build_config.get('android_orientation'))
         index = self._orientation_combobox.findData(orientation)
         self._orientation_combobox.setCurrentIndex(index if index >= 0 else 0)
         index = self._build_type_combobox.findData(str(build_config.get('android_build_type') or 'debug'))

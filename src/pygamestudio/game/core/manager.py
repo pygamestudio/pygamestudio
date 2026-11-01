@@ -1543,6 +1543,11 @@ class GameManager(QObject):
             process_env.append('PYTHONIOENCODING=utf-8')
             process_env.append('PYTHONUTF8=1')
             process_env.append('PYTHONUNBUFFERED=1')
+            # Preview marker: a game the editor starts lets the player press Esc
+            # to close it (a built game never does, see Game.run). A full
+            # screen preview would otherwise have no window to click away and
+            # could only be killed from the task manager.
+            process_env.append('PYGAMESTUDIO_PREVIEW=1')
             process.setEnvironment(process_env)
 
             process.start(sys.executable, [str(Path(self._project_path) / 'main.py')])

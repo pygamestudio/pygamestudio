@@ -106,12 +106,27 @@ PAYLOAD_ENV_FILE = 'p4a_env_vars.txt'
 #: Written into the payload so the device can import ``_applibs`` (the folder
 #: p4a's own packaging code adds); a dist without it still runs, but keeping it
 #: makes the payload identical to one p4a would have built.
-SITECUSTOMIZE_SOURCE = '''import os.path
+#:
+#: It also fixes the project ROOT for the whole process. p4a starts ``main.py``
+#: with a relative ``sys.argv[0]`` and a working directory that is not the app
+#: folder, so the runtime's own fallback (``get_project_path``) cannot resolve
+#: it - and a protected build's decryption import hook then never runs, which
+#: turns ``import <a project module>`` at the top of main.py into
+#: "source code string cannot contain null bytes". ``sitecustomize`` is imported
+#: by CPython at start-up, before main.py, so the root (and with it
+#: ``resources.cache``) is known from the very first import.
+SITECUSTOMIZE_SOURCE = '''import os
+import os.path
 import sys
 
 # p4a puts the unpacked native helpers here; the folder may be empty, in which
 # case the entry stays in sys.path without breaking anything.
 sys.path.append(os.path.join(os.path.dirname(__file__), '_applibs'))
+
+# The folder this file lives in IS the project root (main.py, project.pygs and
+# resources.cache sit next to it). Set it unless the caller already did.
+_project_root = os.path.dirname(os.path.abspath(__file__))
+os.environ.setdefault('PROJECT_PATH', _project_root)
 '''
 
 

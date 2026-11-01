@@ -77,14 +77,14 @@ def main():
     app = QApplication.instance() or QApplication([])      # noqa: F841 - QImage in the builder
 
     print('1) a project that chose a fit mode')
-    project = make_project({'web_scale_mode': 'show_all'})
-    bundle, page = build(project, 'out-show-all')
+    project = make_project({'web_scale_mode': 'fixed_width'})
+    bundle, page = build(project, 'out-fit-width')
 
     check('every template placeholder is replaced',
           not re.findall(r'__PYGS_[A-Z_]+__', page),
           re.findall(r'__PYGS_[A-Z_]+__', page))
     check('the fit mode comes from the project',
-          'const CANVAS_FIT = "show_all";' in page,
+          'const CANVAS_FIT = "fixed_width";' in page,
           re.search(r'const CANVAS_FIT = "\w+";', page).group(0))
     check('the splash is bundled next to the page',
           (bundle / 'presplash_logo.png').is_file())
@@ -114,16 +114,29 @@ def main():
     print('3) a project without a fit mode')
     project = make_project({})
     _bundle, page = build(project, 'out-default')
-    check('the page falls back to letterbox',
+    check('the page falls back to the original canvas size',
           f'const CANVAS_FIT = "{DEFAULT_WEB_FIT}";' in page,
           re.search(r'const CANVAS_FIT = "\w+";', page).group(0))
+    check('that default really is "none"', DEFAULT_WEB_FIT == 'none')
 
-    print('4) a project that still stores the retired "none"')
-    project = make_project({'web_scale_mode': 'none'})
+    print('4) a project that still stores the retired "show_all"')
+    project = make_project({'web_scale_mode': 'show_all'})
     _bundle, page = build(project, 'out-retired')
-    check('a retired no-fit is read as letterbox',
-          'const CANVAS_FIT = "show_all";' in page,
+    check('a retired letterbox pick is read as the original size',
+          'const CANVAS_FIT = "none";' in page,
           re.search(r'const CANVAS_FIT = "\w+";', page).group(0))
+
+    print('5) fit width and fit height are offered too')
+    for mode in ('fixed_width', 'fixed_height'):
+        project = make_project({'web_scale_mode': mode})
+        _bundle, page = build(project, 'out-' + mode.replace('_', '-'))
+        check(f'the page gets "{mode}" from the project',
+              f'const CANVAS_FIT = "{mode}";' in page,
+              re.search(r'const CANVAS_FIT = "\w+";', page).group(0))
+        check(f'the page implements "{mode}"',
+              f'CANVAS_FIT === "{mode}"' in page)
+    check('the page never scrolls while the game runs',
+          'body.running { overflow: hidden; }' in page)
 
     app.processEvents()
 

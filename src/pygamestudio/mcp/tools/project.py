@@ -66,7 +66,9 @@ def get_project_info(args):
 @tool(
     'get_project_config',
     'Read project.pygs (the project settings: caption, screen size, start '
-    'scene, app name/icon/output dir and publishing platform).',
+    'scene, display fit (`screen_scale_mode`, `desktop_display_mode`, '
+    '`web_scale_mode`, `screen_scale_filter`, `screen_scaled`), app '
+    'name/icon/output dir and publishing platform).',
     {
         'type': 'object',
         'properties': {},
@@ -85,15 +87,16 @@ def get_project_config_tool(args):
     '"screen_width", "caption", "build.app_name", "build.platform" '
     '("" = 无平台, "taptap" = TapTap) and "asset.current_scene". '
     'Display fit (each platform has its own): "screen_scale_mode" for phones - '
-    '"show_all" (letterbox, default), "no_border", "fixed_width", '
-    '"fixed_height", "exact_fit", "integer"; "desktop_display_mode" - "window" '
-    '(default) or one of those modes, which opens full screen; '
-    '"web_scale_mode" - "show_all" (default), "exact_fit", "integer". '
+    '"fixed_width" (default), "fixed_height", "exact_fit" or "none" '
+    '(draw the canvas 1:1, no adaptation); "desktop_display_mode" - "window" '
+    '(default, exact size) or one of those scaling modes, which opens full screen; '
+    '"web_scale_mode" - "none" (default, the canvas at its own size, centred), '
+    '"fixed_width", "fixed_height", "exact_fit". '
     '"screen_scale_filter" is "nearest" (default) or "smooth"; '
     '"screen_scaled" (bool) turns the phone scaling off entirely. '
     'Android packaging: "build.android_package", "build.android_version_name", '
-    '"build.android_version_code", "build.android_orientation" (landscape, '
-    'portrait, sensor_landscape, sensor_portrait, full_sensor), '
+    '"build.android_version_code", "build.android_orientation" (sensor_landscape, '
+    'sensor_portrait), '
     '"build.android_build_type" (debug/release), "build.android_keystore" and '
     '"build.android_key_alias" (the passwords are editor settings, not project '
     'settings). '
@@ -155,24 +158,37 @@ def _validate_screen_size(config):
 def _validate_display_fit(config):
     """Only the fit modes the editor offers, per platform.
 
-    Read from the settings window so this list cannot drift from the pickers;
-    the retired "no fit" is refused with the value that replaced it.
+    Read from the settings window so this list cannot drift from the pickers.
+    A value the pickers no longer offer is refused with the mode that replaced
+    it: the engine keeps reading old projects by mapping them (see
+    ``api.core.game.normalize_*_fit``), but a NEW value should be a current one.
     """
+    from pygamestudio.api.core.game import RETIRED_DESKTOP_FITS, RETIRED_MOBILE_FITS
+    from pygamestudio.gui.build.web import RETIRED_WEB_FIT_MODES
     from pygamestudio.gui.settings.project import ProjectSettingsBody
 
+    retired = {
+        'screen_scale_mode': RETIRED_MOBILE_FITS,
+        'desktop_display_mode': RETIRED_DESKTOP_FITS,
+        'web_scale_mode': RETIRED_WEB_FIT_MODES,
+    }
     allowed = {
         'screen_scale_mode': ({value for value, _k, _f in ProjectSettingsBody.SCREEN_FIT_MODES},
-                              'a phone always scales - use "show_all"'),
+                              'use "fixed_width" to fill the width'),
         'desktop_display_mode': ({value for value, _k, _f in ProjectSettingsBody.DESKTOP_FIT_MODES},
                                  'use "window" for a windowed game'),
         'web_scale_mode': ({value for value, _k, _f in ProjectSettingsBody.WEB_FIT_MODES},
-                           'use "show_all" for the default page fit'),
+                           'use "none" for the canvas at its own size'),
     }
     for key, (values, hint) in allowed.items():
         if key not in config:
             continue
         value = str(config[key])
         if value not in values:
+            replacement = retired[key].get(value)
+            if replacement:
+                raise ToolError('{} = "{}" is retired; use "{}".'
+                                .format(key, value, replacement))
             raise ToolError('{} = "{}" is not a fit mode; use one of {} ({}).'
                             .format(key, value, ', '.join(sorted(values)), hint))
         config[key] = value
@@ -201,6 +217,10 @@ def _validate_android_build(config):
     if 'android_orientation' in build_config:
         orientation = str(build_config['android_orientation'])
         if orientation not in android_dist.ORIENTATIONS:
+            replacement = android_dist.RETIRED_ORIENTATIONS.get(orientation)
+            if replacement:
+                raise ToolError('build.android_orientation = "{}" is retired; use "{}".'
+                                .format(orientation, replacement))
             raise ToolError('build.android_orientation must be one of {}.'
                             .format(', '.join(android_dist.ORIENTATIONS)))
         build_config['android_orientation'] = orientation

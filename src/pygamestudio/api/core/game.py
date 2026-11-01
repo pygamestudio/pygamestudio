@@ -9,7 +9,43 @@ from pygamestudio.api.core.debug import _draw_debug_info
 from pygamestudio.common.i18n.translator import Translator as T
 # is_android() / is_web() are part of the script API (`studio.is_android()`):
 # a game can show touch controls on a phone and a keyboard hint in a browser.
-from pygamestudio.common.utils.system import is_android, is_web
+from pygamestudio.common.utils.system import is_android, is_preview, is_web
+
+#: Fit modes the project settings offer for a phone build (``screen_scale_mode``).
+#: ``none`` is "no adaptation": the canvas is drawn 1:1.
+MOBILE_FIT_MODES = ('fixed_width', 'fixed_height', 'exact_fit', 'none')
+#: Fit used when a project has nothing stored.
+DEFAULT_MOBILE_FIT = 'fixed_width'
+#: Values older projects still store (the picker no longer offers them) -> the
+#: mode that replaces them: a retired whole-number scale was 1:1 in practice,
+#: and a retired letterbox fill is "fit the width".
+RETIRED_MOBILE_FITS = {'show_all': 'fixed_width', 'no_border': 'fixed_width',
+                       'integer': 'none'}
+#: Desktop: the window (exact size, the default) or full screen with one of the
+#: scaling modes - "no adaptation" makes no sense on a full screen.
+DESKTOP_FIT_MODES = ('window', 'fixed_width', 'fixed_height', 'exact_fit')
+DEFAULT_DESKTOP_FIT = 'window'
+#: Retired desktop picks -> what replaces them. Old letterboxed full screens
+#: keep their look on a normal (wider than the canvas) desktop screen; a
+#: whole-number scale was 1:1 often enough to become the window.
+RETIRED_DESKTOP_FITS = {'none': 'window', 'show_all': 'fixed_height',
+                        'no_border': 'fixed_width', 'integer': 'window'}
+
+
+def normalize_mobile_fit(value):
+    """A stored ``screen_scale_mode`` -> one of ``MOBILE_FIT_MODES``."""
+    value = str(value or '')
+    if value in MOBILE_FIT_MODES:
+        return value
+    return RETIRED_MOBILE_FITS.get(value, DEFAULT_MOBILE_FIT)
+
+
+def normalize_desktop_fit(value):
+    """A stored ``desktop_display_mode`` -> one of ``DESKTOP_FIT_MODES``."""
+    value = str(value or '')
+    if value in DESKTOP_FIT_MODES:
+        return value
+    return RETIRED_DESKTOP_FITS.get(value, DEFAULT_DESKTOP_FIT)
 
 
 class Game:
@@ -34,10 +70,13 @@ class Game:
         self._present_window = None
         self._present_surface = None
         self._surface_size = None
-        self._scale_mode = 'show_all'
+        self._scale_mode = DEFAULT_MOBILE_FIT
         self._smooth_scale = True
         self._project_path = ""
         self._running = False
+        #: Esc closes the game - only true for a run started by the editor
+        #: (see is_preview in common/utils/system.py and the KEYDOWN branch).
+        self._esc_quits = is_preview()
         # Frame statistics, kept up to date by run() (see get_delta_time(),
         # get_elapsed_time() and get_frame_count()).
         self._delta_time = 0.0
@@ -98,22 +137,20 @@ class Game:
         self._clock = pygame.time.Clock()
 
     #: How the canvas is fitted into the device screen (``screen_scale_mode``).
-    #: A project that does not choose - and one that still stores the retired
-    #: ``none`` - gets ``show_all``: a phone screen is never the canvas size, so
-    #: "no fit" could only ever put the game in a corner.
+    #: The picker offers ``MOBILE_FIT_MODES``; a project that stores nothing
+    #: gets ``fixed_width``, and the values the picker no longer offers are
+    #: mapped by :func:`normalize_mobile_fit` before the mode is used.
     #:
-    #: ``show_all``      contain - the whole canvas is visible, the spare edges
-    #:                   are letterboxed. Default.
-    #: ``no_border``     cover - the canvas fills the screen and the overflow is
-    #:                   cropped: no bars, but content near the edge can be cut.
-    #: ``fixed_width``   the width always fills, the height follows the aspect:
-    #:                   spare room appears above and below.
-    #: ``fixed_height``  the height always fills, the width follows the aspect.
+    #: ``fixed_width``   the width exactly fills, the height follows the aspect:
+    #:                   spare room becomes bars, overflow is cropped. Default.
+    #: ``fixed_height``  the height exactly fills, the width follows the aspect.
     #: ``exact_fit``     stretch to the screen, ignoring the aspect.
     #: ``integer``       the largest whole multiple that still fits, so pixels
     #:                   stay crisp (pixel art); bars on the remaining edges.
-    #: ``none``          draw 1:1 into the top-left corner. Only read from old
-    #:                   projects (see _create_display) and used by the tests.
+    #: ``none``          no adaptation at all: the canvas is drawn 1:1.
+    #: ``show_all`` / ``no_border`` / ``integer``: retired picker entries, still
+    #:                   rendered the way they always were (old projects and
+    #:                   the geometry tests).
     SCALE_MODES = ('none', 'show_all', 'no_border', 'fixed_width',
                    'fixed_height', 'exact_fit', 'integer')
 
@@ -141,13 +178,11 @@ class Game:
         """
         project_config = project_config or {}
         canvas_w, canvas_h = int(canvas_size[0]), int(canvas_size[1])
-        # "No fit" is not offered any more for phones: a canvas that does not
-        # match the screen would just sit in the corner, so an old project that
-        # stored it gets the letterboxed default instead.
-        requested = str(project_config.get('screen_scale_mode') or 'show_all')
-        if requested in ('none', ''):
-            requested = 'show_all'
-        self._scale_mode = requested if requested in self.SCALE_MODES else 'show_all'
+        # A phone screen is never the canvas size, so the default scales the
+        # canvas instead of leaving it in a corner; retired values are mapped
+        # to the mode that replaced them (see MOBILE_FIT_MODES).
+        requested = normalize_mobile_fit(project_config.get('screen_scale_mode'))
+        self._scale_mode = requested if requested in self.SCALE_MODES else DEFAULT_MOBILE_FIT
         # Nearest-neighbour by default: bilinear scaling of a full 800x600 frame
         # costs ~140 ms/frame on an Android emulator, which is 6 fps on its own.
         self._smooth_scale = str(project_config.get('screen_scale_filter') or 'nearest') == 'smooth'
@@ -156,13 +191,10 @@ class Game:
         self._present_rect = None
 
         on_device = is_android()
-        # 'none' on the desktop means the window: there is no separate "do not
-        # adapt" choice any more.
-        desktop_mode = str(project_config.get('desktop_display_mode') or 'window')
-        if desktop_mode == 'none':
-            desktop_mode = 'window'
+        # 'window' is the desktop default: the window is the canvas at 1:1.
+        desktop_mode = normalize_desktop_fit(project_config.get('desktop_display_mode'))
         desktop_fullscreen = (not on_device and not is_web()
-                              and desktop_mode in self.SCALE_MODES)
+                              and desktop_mode != 'window')
         device_scaled = on_device and project_config.get('screen_scaled', True)
 
         if not desktop_fullscreen and not device_scaled:
@@ -361,7 +393,10 @@ class Game:
         Game._instance = self
         self._init_game()
         self._running = True
-
+        if self._esc_quits:
+            # The editor console shows this line: a preview (especially a full
+            # screen one) has no window border, so say how to leave it.
+            print(T.tr('api.preview_esc_hint', 'Preview run: press Esc to quit.'), flush=True)
         self.on_start()
 
         while self._running:
@@ -388,6 +423,13 @@ class Game:
 
                 # ---------- Keyboard Event ----------
                 elif event.type == pygame.KEYDOWN:
+                    # A preview run closes on Esc: a full screen preview has no
+                    # window border to click away, and the editor started this
+                    # process, so leaving is safe. A built game never does this
+                    # (is_preview() is False there) - Esc belongs to the game.
+                    if self._esc_quits and event.key == pygame.K_ESCAPE:
+                        self._running = False
+                        continue
                     # A focused input box consumes the key (typing control keys).
                     if not scene_loader.handle_key_down(event.key, event.mod,
                                                         getattr(event, 'unicode', '')):

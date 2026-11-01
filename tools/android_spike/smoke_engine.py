@@ -254,15 +254,30 @@ for mode, (expected, why) in CASES.items():
 print('fit modes', len(CASES))
 
 game = studio.Game()
-game._create_display((800, 600), {{'screen_scale_mode': 'show_all'}})
+game._create_display((800, 600), {{}})
+assert game._scale_mode == 'fixed_width', game._scale_mode
 assert game._screen.get_size() == (800, 600), game._screen.get_size()
 assert game._screen is not game._display, 'the canvas must be its own surface'
 assert game._present_rect is not None, 'no present rectangle'
+
+# A project that still stores a retired pick keeps working: it reads as the
+# mode that replaced it, never as "no adaptation".
+retired_fit = studio.Game()
+retired_fit._create_display((800, 600), {{'screen_scale_mode': 'show_all'}})
+assert retired_fit._scale_mode == 'fixed_width', retired_fit._scale_mode
+
+# "No adaptation": the canvas is drawn 1:1 in the corner of the screen.
+raw = studio.Game()
+raw._create_display((800, 600), {{'screen_scale_mode': 'none'}})
+assert raw._scale_mode == 'none', raw._scale_mode
+assert tuple(raw._present_rect) == (0, 0, 800, 600), tuple(raw._present_rect)
+assert raw._to_canvas((400, 300)) == (400, 300), 'no adaptation must map 1:1'
+
 # a window pixel in the middle of the canvas maps back to the canvas middle
-centre = (game._present_rect.centerx, game._present_rect.centery)
-assert game._to_canvas(centre) == (400, 300), game._to_canvas(centre)
-print('device path', game._screen.get_size(), pygame.display.get_window_size(),
-      tuple(game._present_rect))
+centre = (retired_fit._present_rect.centerx, retired_fit._present_rect.centery)
+assert retired_fit._to_canvas(centre) == (400, 300), retired_fit._to_canvas(centre)
+print('device path', raw._screen.get_size(), pygame.display.get_window_size(),
+      tuple(raw._present_rect))
 
 plain = studio.Game()
 plain._create_display((800, 600), {{'screen_scaled': False}})
@@ -314,7 +329,7 @@ retired._create_display((800, 600), {{'desktop_display_mode': 'none'}})
 assert retired._screen is retired._display, 'a retired no-fit must stay a window'
 print('retired none', pygame.display.get_window_size())
 
-for mode in ('show_all', 'exact_fit', 'integer'):
+for mode in ('fixed_width', 'fixed_height', 'exact_fit'):
     game = studio.Game()
     game._create_display((800, 600), {{'desktop_display_mode': mode}})
     screen_size = pygame.display.get_window_size()
@@ -329,6 +344,12 @@ for mode in ('show_all', 'exact_fit', 'integer'):
     assert game._to_canvas(game._present_rect.center) == (400, 300), \\
         (mode, game._to_canvas(game._present_rect.center))
     game._present()
+
+# A retired desktop pick reads as the mode that replaced it (a letterboxed full
+# screen keeps its look: a normal desktop is wider than a 4:3 canvas).
+retired_pick = studio.Game()
+retired_pick._create_display((800, 600), {{'desktop_display_mode': 'show_all'}})
+assert retired_pick._scale_mode == 'fixed_height', retired_pick._scale_mode
 print('fullscreen', pygame.display.get_window_size())
 '''
         environment = dict(os.environ, SDL_VIDEODRIVER='dummy', SDL_AUDIODRIVER='dummy')
@@ -380,6 +401,70 @@ print('browser', pygame.display.get_window_size())
                                  env=environment, capture_output=True, text=True)
         if process.returncode != 0:
             raise AssertionError(f'the browser display path failed\n{process.stdout}\n'
+                                 f'{process.stderr}')
+        return ' '.join(process.stdout.split())
+
+    def preview_escape():
+        """Esc closes an editor preview - and only an editor preview.
+
+        The editor exports ``PYGAMESTUDIO_PREVIEW=1`` for the game it starts, so
+        a full screen preview (no window border to click away) can be left with
+        Esc. A game started any other way keeps Esc for its own use.
+        """
+        import subprocess
+        code = f'''
+import sys
+sys.path.insert(0, {str(project_dir)!r})
+import pygame
+pygame.init()
+import pygamestudio as studio
+
+assert studio.Game()._esc_quits is False, 'a plain run must not quit on Esc'
+
+keys = []
+class Plain(studio.Game):
+    updates = 0
+    def on_start(self):
+        pygame.event.post(pygame.event.Event(
+            pygame.KEYDOWN, {{'key': pygame.K_ESCAPE, 'mod': 0, 'unicode': '',
+                             'scancode': 0, 'window': None}}))
+    def on_key_down(self, key, mod, unicode, scancode, window=None):
+        keys.append(key)
+    def on_update(self, dt):
+        Plain.updates += 1
+        if Plain.updates > 2:
+            studio.quit()
+
+Plain().run()
+assert keys == [pygame.K_ESCAPE], ('Esc must reach the game', keys)
+
+import os
+os.environ['PYGAMESTUDIO_PREVIEW'] = '1'
+class Preview(studio.Game):
+    updates = 0
+    def on_start(self):
+        pygame.event.post(pygame.event.Event(
+            pygame.KEYDOWN, {{'key': pygame.K_ESCAPE, 'mod': 0, 'unicode': '',
+                             'scancode': 0, 'window': None}}))
+    def on_update(self, dt):
+        Preview.updates += 1
+        if Preview.updates > 3:
+            raise AssertionError('Esc did not stop the preview')
+
+preview = Preview()
+assert preview._esc_quits is True, 'the preview marker was not picked up'
+preview.run()               # returns at once: Esc closed it
+assert Preview.updates <= 1, Preview.updates
+print('preview quits on Esc, plain run keeps it')
+'''
+        environment = dict(os.environ, SDL_VIDEODRIVER='dummy', SDL_AUDIODRIVER='dummy')
+        environment.pop('PYGAMESTUDIO_PREVIEW', None)
+        for name in ('ANDROID_ARGUMENT', 'ANDROID_PRIVATE', 'ANDROID_APP_PATH'):
+            environment.pop(name, None)
+        process = subprocess.run([sys.executable, '-c', code], cwd=str(project_dir),
+                                 env=environment, capture_output=True, text=True)
+        if process.returncode != 0:
+            raise AssertionError(f'the preview Esc path failed\n{process.stdout}\n'
                                  f'{process.stderr}')
         return ' '.join(process.stdout.split())
 
@@ -560,6 +645,7 @@ print('browser', pygame.display.get_window_size())
     checks.run('scaled display', scaled_display)
     checks.run('desktop full screen', desktop_fullscreen)
     checks.run('browser display', browser_display)
+    checks.run('preview Esc', preview_escape)
     checks.run('pointer scaling', pointer_scaling)
     checks.run('project imports', project_imports)
     checks.run('entry point on the real path', run_entry_point)

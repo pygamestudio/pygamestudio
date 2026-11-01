@@ -2,6 +2,7 @@ import uuid
 import pygame
 from pygamestudio.game.object.type import *
 from pygamestudio.game.object.base import ObjectBase
+from pygamestudio.common.utils.constant import DEFAULT_SCREEN_SIZE
 
 
 class ObjectCanvas(ObjectBase):
@@ -19,9 +20,11 @@ class ObjectCanvas(ObjectBase):
             'x': 0,
             'y': 0,
             'pos': (0, 0),
-            'width': 800, 
-            'height': 600,
-            'size': (800, 600),
+            # A new scene's canvas matches the size a new project is created
+            # with (see DEFAULT_SCREEN_SIZE), not a stale 4:3 pair.
+            'width': DEFAULT_SCREEN_SIZE[0],
+            'height': DEFAULT_SCREEN_SIZE[1],
+            'size': DEFAULT_SCREEN_SIZE,
             'scale_x': 1,
             'scale_y': 1,
             'scale': (1, 1),

@@ -53,6 +53,7 @@ from pygamestudio.common.utils import qr
 from pygamestudio.common.utils.config import (get_project_config,
                                               save_project_config,
                                               update_project_config)
+from pygamestudio.common.utils.constant import DEFAULT_SCREEN_SIZE
 from pygamestudio.common.utils.path import RES_PATH
 from pygamestudio.common.utils.system import get_lan_ip
 
@@ -77,20 +78,21 @@ BUNDLE_STAGING_SUFFIX = '.building'
 #: once the archive is written); same name the desktop build uses.
 PROTECTED_WORK_DIR_NAME = '_protected'
 #: Fallback canvas size when a project has none (the editor's own default).
-DEFAULT_CANVAS_SIZE = (800, 600)
-#: Default page fit: like the phone, the page keeps the whole canvas visible
-#: and letterboxes the spare space. "No fit" is not offered any more.
-DEFAULT_WEB_FIT = 'show_all'
-#: Web fit values written by older builds that the page now reads as the
-#: default (the picker no longer offers them).
-RETIRED_WEB_FIT_MODES = {'none': DEFAULT_WEB_FIT}
+DEFAULT_CANVAS_SIZE = DEFAULT_SCREEN_SIZE
+#: Default page fit: the canvas is shown at its own size, only centred on the
+#: page - no scaling at all (the same meaning the picker calls "no scaling").
+DEFAULT_WEB_FIT = 'none'
+#: Web fit values written by older builds that the page now reads differently
+#: (the picker no longer offers them): the retired letterbox fill and the
+#: whole-number scale both become the 1:1 default.
+RETIRED_WEB_FIT_MODES = {'show_all': DEFAULT_WEB_FIT, 'integer': DEFAULT_WEB_FIT}
 #: Splash image shown while the page loads, before the canvas appears.
 SPLASH_IMAGE_NAME = 'presplash_logo.png'
 #: Progress bar width used when the splash cannot be measured.
 SPLASH_BAR_RATIO_FALLBACK = 0.9
 #: Values written by the project settings' "Web Canvas Fit" picker and honoured
 #: by the page script (see web_index_template.html).
-WEB_FIT_MODES = ('show_all', 'exact_fit', 'integer')
+WEB_FIT_MODES = ('none', 'fixed_width', 'fixed_height', 'exact_fit')
 #: Largest page icon edge; bigger images are scaled down before saving.
 FAVICON_MAX_SIZE = 256
 #: Name of the engine package inside the bundle and in the zip archive.

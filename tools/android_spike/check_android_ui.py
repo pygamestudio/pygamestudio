@@ -80,9 +80,33 @@ def main():
     check('invalid package refused', not is_valid_package('My Game'))
     check('version name default', config['version_name'] == '1.0.0')
     check('version code default', str(config['version_code']) == '1')
-    check('orientation default', config['orientation'] == 'landscape', config['orientation'])
+    check('orientation default', config['orientation'] == 'sensor_landscape',
+          config['orientation'])
     check('build type default', config['build_type'] == 'debug', config['build_type'])
-    check('five orientation choices', window._orientation_combobox.count() == 5)
+    check('two orientation choices', window._orientation_combobox.count() == 2,
+          [window._orientation_combobox.itemText(i)
+           for i in range(window._orientation_combobox.count())])
+    check('the picks are the two flipping ones',
+          {window._orientation_combobox.itemData(i)
+           for i in range(window._orientation_combobox.count())}
+          == {'sensor_landscape', 'sensor_portrait'})
+    check('the labels dropped "(可翻转)"',
+          all('可翻转' not in window._orientation_combobox.itemText(i)
+              for i in range(window._orientation_combobox.count())))
+    check('package, version name and version code share one row',
+          window._package_row.isAncestorOf(window._package_lineedit)
+          and window._package_row.isAncestorOf(window._version_name_lineedit)
+          and window._package_row.isAncestorOf(window._version_code_lineedit))
+    check('orientation and build type share one row',
+          window._mode_row.isAncestorOf(window._orientation_combobox)
+          and window._mode_row.isAncestorOf(window._build_type_combobox))
+    check('key alias and both passwords share one row',
+          window._signing_fields_row.isAncestorOf(window._key_alias_lineedit)
+          and window._signing_fields_row.isAncestorOf(window._store_password_lineedit)
+          and window._signing_fields_row.isAncestorOf(window._key_password_lineedit))
+    check('the grouped rows hide together with the signing fields',
+          window._signing_fields_row in window._signing_rows
+          and window._keystore_row in window._signing_rows)
     check('signing rows hidden for debug', window._keystore_label.isHidden()
           and window._keystore_row.isHidden())
     check('keystore creator exists', window._keystore_create_button.text() != '')
@@ -94,7 +118,7 @@ def main():
     window._update_signing_enabled()
     window.retranslate()
     check('retranslate keeps the orientation pick',
-          window._orientation_combobox.currentData() == 'landscape')
+          window._orientation_combobox.currentData() == 'sensor_landscape')
 
     print('1a) the publishing-platform picker')
     platform_combo = window._platform_combobox
@@ -263,43 +287,66 @@ def main():
     check('the page list text is centered in the project settings',
           _option.displayAlignment & Qt.AlignmentFlag.AlignHCenter,
           str(_option.displayAlignment))
-    check('mobile fit picker offers no "no fit"',
-          project_settings._screen_fit_combobox.count() == 6
-          and project_settings._screen_fit_combobox.findData('none') == -1,
-          project_settings._screen_fit_combobox.count())
-    check('desktop picker = windowed + the modes, no "no fit"',
-          project_settings._desktop_display_combobox.count() == 7
+    check('mobile fit picker = width/height/stretch/1:1',
+          project_settings._screen_fit_combobox.count() == 4
+          and [project_settings._screen_fit_combobox.itemData(i)
+               for i in range(4)]
+          == ['fixed_width', 'fixed_height', 'exact_fit', 'none'],
+          [project_settings._screen_fit_combobox.itemData(i)
+           for i in range(project_settings._screen_fit_combobox.count())])
+    check('the retired "fill screen" and "integer scale" are gone',
+          project_settings._screen_fit_combobox.findData('no_border') == -1
+          and project_settings._desktop_display_combobox.findData('no_border') == -1
+          and project_settings._web_fit_combobox.findData('no_border') == -1
+          and project_settings._screen_fit_combobox.findData('integer') == -1
+          and project_settings._desktop_display_combobox.findData('integer') == -1
+          and project_settings._web_fit_combobox.findData('integer') == -1)
+    check('desktop picker = windowed + the three scaling modes',
+          project_settings._desktop_display_combobox.count() == 4
+          and project_settings._desktop_display_combobox.findData('window') == 0
           and project_settings._desktop_display_combobox.findData('none') == -1,
           project_settings._desktop_display_combobox.count())
-    check('web picker = the three page modes, no "no fit"',
-          project_settings._web_fit_combobox.count() == 3
-          and project_settings._web_fit_combobox.findData('none') == -1,
-          project_settings._web_fit_combobox.count())
-    check('mobile defaults to letterboxed',
-          project_settings._screen_fit_combobox.currentData() == 'show_all',
+    check('web picker = original size + the three scaling modes',
+          project_settings._web_fit_combobox.count() == 4
+          and project_settings._web_fit_combobox.findData('none') == 0
+          and project_settings._web_fit_combobox.findData('fixed_width') > 0
+          and project_settings._web_fit_combobox.findData('fixed_height') > 0
+          and project_settings._web_fit_combobox.findData('show_all') == -1,
+          [project_settings._web_fit_combobox.itemData(i)
+           for i in range(project_settings._web_fit_combobox.count())])
+    check('mobile defaults to fitting the width',
+          project_settings._screen_fit_combobox.currentData() == 'fixed_width',
           project_settings._screen_fit_combobox.currentData())
-    check('desktop defaults to windowed',
+    check('desktop defaults to the exact-size window',
           project_settings._desktop_display_combobox.currentData() == 'window',
           project_settings._desktop_display_combobox.currentData())
-    check('web defaults to letterboxed',
-          project_settings._web_fit_combobox.currentData() == 'show_all',
+    check('web defaults to the original canvas size',
+          project_settings._web_fit_combobox.currentData() == 'none',
           project_settings._web_fit_combobox.currentData())
+    check('the desktop scaling modes are labelled full screen',
+          all('full screen' in project_settings._desktop_display_combobox.itemText(i)
+               for i in range(1, project_settings._desktop_display_combobox.count())),
+          [project_settings._desktop_display_combobox.itemText(i)
+           for i in range(project_settings._desktop_display_combobox.count())])
+    check('the windowed pick is labelled "no scaling"',
+          'no scaling' in project_settings._desktop_display_combobox.itemText(0).lower(),
+          project_settings._desktop_display_combobox.itemText(0))
 
     project_settings._desktop_display_combobox.setCurrentIndex(
         project_settings._desktop_display_combobox.findData('exact_fit'))
     project_settings._web_fit_combobox.setCurrentIndex(
-        project_settings._web_fit_combobox.findData('integer'))
+        project_settings._web_fit_combobox.findData('fixed_height'))
     stored = json.loads((PROJECT_DIR / 'project.pygs').read_text(encoding='utf-8'))
     check('desktop mode written to project.pygs',
           stored.get('desktop_display_mode') == 'exact_fit',
           stored.get('desktop_display_mode'))
     check('web mode written to project.pygs',
-          stored.get('web_scale_mode') == 'integer', stored.get('web_scale_mode'))
+          stored.get('web_scale_mode') == 'fixed_height', stored.get('web_scale_mode'))
 
     project_settings.retranslate()
     check('pickers keep their value across a language switch',
           project_settings._desktop_display_combobox.currentData() == 'exact_fit'
-          and project_settings._web_fit_combobox.currentData() == 'integer')
+          and project_settings._web_fit_combobox.currentData() == 'fixed_height')
     check('desktop labels are translated',
           project_settings._desktop_display_combobox.itemText(0) != '')
     check('web labels are translated',

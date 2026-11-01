@@ -105,16 +105,30 @@ STRINGS_TEMPLATE = '''<?xml version="1.0" encoding="utf-8"?>
 #: from the image's corners).
 DEFAULT_SPLASH_COLOR = '#1e1e1e'
 
-#: Project setting -> ``android:screenOrientation`` value.
+#: Project setting -> ``android:screenOrientation`` value. Only the two
+#: "flipping" picks are offered: a game is designed for one orientation, and
+#: letting the device flip to the other one (portrait <-> landscape) only makes
+#: every fit mode produce bars, crops or distortion.
 ORIENTATIONS = {
-    'landscape': 'landscape',
-    'portrait': 'portrait',
     'sensor_landscape': 'sensorLandscape',
     'sensor_portrait': 'sensorPortrait',
-    'full_sensor': 'fullSensor',
+}
+#: Picks of older builds -> the entry that replaces them.
+RETIRED_ORIENTATIONS = {
+    'landscape': 'sensor_landscape',
+    'portrait': 'sensor_portrait',
+    'full_sensor': 'sensor_landscape',
 }
 #: Pick used when the project has no orientation (or an unknown value).
-DEFAULT_ORIENTATION = 'landscape'
+DEFAULT_ORIENTATION = 'sensor_landscape'
+
+
+def normalize_orientation(value):
+    """A stored orientation value -> one of ``ORIENTATIONS``."""
+    value = str(value or '')
+    if value in ORIENTATIONS:
+        return value
+    return RETIRED_ORIENTATIONS.get(value, DEFAULT_ORIENTATION)
 
 
 class AndroidBuildError(RuntimeError):
@@ -175,7 +189,7 @@ def _write_manifest(dist_dir, package, version_code, version_name, orientation,
         package=str(package),
         version_code=int(version_code),
         version_name=str(version_name),
-        orientation=ORIENTATIONS.get(orientation, ORIENTATIONS[DEFAULT_ORIENTATION]),
+        orientation=ORIENTATIONS[normalize_orientation(orientation)],
         min_sdk=int(min_sdk),
         compile_sdk=int(compile_sdk))
     target = Path(dist_dir) / 'src' / 'main' / 'AndroidManifest.xml'

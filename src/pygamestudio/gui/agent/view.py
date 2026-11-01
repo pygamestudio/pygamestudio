@@ -159,6 +159,34 @@ class AgentTranscript(QTextBrowser):
         scrollbar = self.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
 
+    @staticmethod
+    def _plain_block(cursor):
+        """Detach the block the cursor sits on from a markdown list.
+
+        ``insertBlock`` copies the format of the block it leaves, and an answer
+        that ends in a list leaves the cursor inside a list item - every block
+        appended afterwards would show up as one more bullet of that answer.
+        Only the list membership and its indent are dropped: the rest of the
+        format (the paragraph spacing) has to stay, because ``insertHtml``
+        merges into the block and a full reset would throw the spacing away.
+        """
+        cursor.setCharFormat(QTextCharFormat())
+        text_list = cursor.block().textList()
+        if text_list is not None:
+            text_list.remove(cursor.block())
+        block_format = cursor.blockFormat()
+        if block_format.indent() or block_format.leftMargin() or block_format.rightMargin():
+            block_format.setIndent(0)
+            block_format.setLeftMargin(0)
+            block_format.setRightMargin(0)
+            cursor.setBlockFormat(block_format)
+
+    @classmethod
+    def _break_block(cls, cursor):
+        """Move to a fresh paragraph, outside of any markdown list."""
+        cursor.insertBlock()
+        cls._plain_block(cursor)
+
     def _append_html(self, block: str, blank_lines: int = 0, force: bool = False):
         """Append one rich-text block, always starting on a fresh line.
 
@@ -176,10 +204,14 @@ class AgentTranscript(QTextBrowser):
         cursor = self.textCursor()
         cursor.movePosition(QTextCursor.MoveOperation.End)
         if cursor.block().text():
-            cursor.insertBlock()
+            self._break_block(cursor)
+        else:
+            # Already on an empty block (a leftover of the previous answer):
+            # it must not stay inside the answer's list either.
+            self._plain_block(cursor)
         if blank_lines and not self.document().isEmpty():
             for _ in range(blank_lines):
-                cursor.insertBlock()
+                self._break_block(cursor)
         cursor.insertHtml(block)
         if follow:
             # Moving the text cursor scrolls the view (QTextBrowser keeps the
@@ -238,7 +270,9 @@ class AgentTranscript(QTextBrowser):
         cursor = self.textCursor()
         cursor.movePosition(QTextCursor.MoveOperation.End)
         if cursor.block().text():
-            cursor.insertBlock()
+            self._break_block(cursor)
+        else:
+            self._plain_block(cursor)
         self._stream_position = cursor.position()
         if self._follow_tail:
             self.setTextCursor(cursor)
@@ -326,7 +360,7 @@ class AgentTranscript(QTextBrowser):
         follow = self._follow_tail
         cursor = self.textCursor()
         cursor.movePosition(QTextCursor.MoveOperation.End)
-        cursor.insertBlock()
+        self._break_block(cursor)
         char_format = QTextCharFormat()
         char_format.setForeground(QColor(self._colors()['assistant']))
         cursor.setCharFormat(char_format)

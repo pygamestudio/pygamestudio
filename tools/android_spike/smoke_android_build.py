@@ -17,6 +17,7 @@ The APK itself is built by ``smoke_android_apk.py`` (it needs a real SDK).
 """
 import os
 import shutil
+import subprocess
 import sys
 import tarfile
 import tempfile
@@ -73,6 +74,10 @@ def main():
         print('2) protected project')
         payload_root = temp / 'payload'
         project = copy_project(temp / 'project')
+        # A top-level module the game imports from main.py (the reported crash:
+        # "source code string cannot contain null bytes").
+        (project / 'probe_module.py').write_text(
+            'PROJECT_MODULE_RAN = True\n', encoding='utf-8')
         prepared = protection.prepare(project, payload_root)
         payload_dir = prepared['project_dir']
         check('project.pygs is encrypted',
@@ -134,6 +139,66 @@ def main():
               not any('__pycache__' in name for name in members))
         print(f'   private.tar: {tar_summary["files"]} files, {tar_summary["bytes"]} B')
 
+        print('4b) the device finds the project root before main.py runs')
+        with tarfile.open(private_tar, 'r:*') as archive:
+            sitecustomize = archive.extractfile('sitecustomize.py').read().decode('utf-8')
+        check('the payload sitecustomize pins PROJECT_PATH',
+              'PROJECT_PATH' in sitecustomize and 'dirname' in sitecustomize,
+              sitecustomize.strip().splitlines()[-1][:80])
+
+        device_dir = temp / 'device'
+        with tarfile.open(private_tar, 'r:*') as archive:
+            archive.extractall(device_dir)
+
+        # A p4a start: bare argv[0], a foreign working directory, no
+        # PROJECT_PATH - the decryption hook needs the root from sitecustomize.
+        probe = ("import os, sys\n"
+                 "sys.argv[0] = 'main.py'\n"
+                 "import pygamestudio\n"
+                 "from pygamestudio.common.utils.path import get_project_path\n"
+                 "from pygamestudio.common.utils import assets\n"
+                 "print('ROOT=' + get_project_path())\n"
+                 "print('KEY=' + str(assets.get_key() is not None))\n"
+                 "import probe_module\n"
+                 "print('MODULE=' + str(probe_module.PROJECT_MODULE_RAN))\n")
+        environment = {key: value for key, value in os.environ.items()
+                       if key not in ('PROJECT_PATH', '__PYGAMESTUDIO_PROJECT_PATH')}
+        environment.update({'PYTHONPATH': device_dir.as_posix(),
+                            'ANDROID_ARGUMENT': device_dir.as_posix(),
+                            'SDL_VIDEODRIVER': 'dummy',
+                            'PYTHONIOENCODING': 'utf-8'})
+        output = subprocess.run([sys.executable, '-c', probe], cwd=str(temp),
+                                env=environment, capture_output=True, text=True)
+
+        def resolved_root(text):
+            """The ROOT= line of the probe, as an absolute Path ('' if absent)."""
+            for line in text.splitlines():
+                if line.startswith('ROOT='):
+                    return Path(line[5:]).resolve()
+            return Path('')
+
+        check('sitecustomize sets the root on a device-like start',
+              resolved_root(output.stdout) == device_dir.resolve(),
+              output.stdout.strip().replace('\n', ' | ')[:110])
+        check('the build key is found through that root',
+              'KEY=True' in output.stdout, output.stdout.strip()[-60:])
+        check('an encrypted project module imports on the device',
+              'MODULE=True' in output.stdout,
+              (output.stdout + output.stderr).strip()[-90:])
+
+        # The runtime keeps a second net for a payload without sitecustomize:
+        # the p4a export alone has to resolve the root too.
+        sitecustomize_file = device_dir / 'sitecustomize.py'
+        sitecustomize_file.rename(device_dir / 'sitecustomize.py.off')
+        output = subprocess.run([sys.executable, '-c', probe], cwd=str(temp),
+                                env=environment, capture_output=True, text=True)
+        check('without sitecustomize the p4a export still resolves the root',
+              resolved_root(output.stdout) == device_dir.resolve()
+              and 'KEY=True' in output.stdout and 'MODULE=True' in output.stdout,
+              output.stdout.strip().replace('\n', ' | ')[:110])
+        sitecustomize_file = device_dir / 'sitecustomize.py.off'
+        sitecustomize_file.rename(device_dir / 'sitecustomize.py')
+
         print('5) app identity')
         manifest = (dist_dir / 'src' / 'main' / 'AndroidManifest.xml').read_text(encoding='utf-8')
         strings = (dist_dir / 'src' / 'main' / 'res' / 'values' / 'strings.xml').read_text(encoding='utf-8')
@@ -142,7 +207,8 @@ def main():
         check('manifest version',
               f'android:versionCode="{VERSION_CODE}"' in manifest
               and f'android:versionName="{VERSION_NAME}"' in manifest)
-        check('manifest orientation', 'android:screenOrientation="landscape"' in manifest)
+        check('manifest orientation (a legacy pick maps to the flipping one)',
+              'android:screenOrientation="sensorLandscape"' in manifest)
         check('manifest labels the app', 'android:label="@string/app_name"' in manifest)
         check('manifest min/target sdk',
               'android:minSdkVersion="24"' in manifest
@@ -165,7 +231,7 @@ def main():
         strings = (dist_dir / 'src' / 'main' / 'res' / 'values' / 'strings.xml').read_text(encoding='utf-8')
         check('one package attribute only', manifest.count('package="') == 1)
         check('orientation follows the second run',
-              'android:screenOrientation="portrait"' in manifest)
+              'android:screenOrientation="sensorPortrait"' in manifest)
         check('strings not duplicated', strings.count('app_name') == 1)
 
         print('7) a build without an icon starts from the pack again')

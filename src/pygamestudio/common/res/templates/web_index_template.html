@@ -35,7 +35,10 @@ __PYGS_TOY_SDK_SCRIPT__
     body.running canvas#canvas { position: static; visibility: visible;
                                  border-radius: 0; box-shadow: none; }
     /* Once the game runs nothing else is on the page, so it may use the whole
-       window - that is what makes "stretch to screen" actually stretch. */
+       window - that is what makes "stretch to screen" actually stretch. The
+       page never scrolls: a canvas that ends up bigger than the window (fit
+       width / fit height on the "wrong" screen) is cropped, like on a phone. */
+    body.running { overflow: hidden; }
     body.running #app { padding: 0; }
     #splash { max-width: min(70vw, 400px); max-height: 40vh; border-radius: 8px; }
     body.running #splash, body.running h1#title, body.running #loader { display: none; }
@@ -131,19 +134,22 @@ __PYGS_TOY_SDK_SCRIPT__
             - usedHeight - gap * (visibleCount - 1));
         let width = CANVAS_WIDTH;
         let height = CANVAS_HEIGHT;
-        if (CANVAS_FIT === "show_all") {
-            const scale = Math.min(availableWidth / CANVAS_WIDTH,
-                                   availableHeight / CANVAS_HEIGHT);
-            width = Math.round(CANVAS_WIDTH * scale);
+        // "none" (and any unknown value): the canvas keeps its own size - it is
+        // only centred on the page, nothing is scaled.
+        if (CANVAS_FIT === "fixed_width") {
+            // The width exactly fills the page, the height follows the aspect
+            // (bars above/below, or cropped - see body.running overflow).
+            const scale = availableWidth / CANVAS_WIDTH;
+            width = Math.round(availableWidth);
             height = Math.round(CANVAS_HEIGHT * scale);
+        } else if (CANVAS_FIT === "fixed_height") {
+            // The height exactly fills the page, the width follows the aspect.
+            const scale = availableHeight / CANVAS_HEIGHT;
+            width = Math.round(CANVAS_WIDTH * scale);
+            height = Math.round(availableHeight);
         } else if (CANVAS_FIT === "exact_fit") {
             width = Math.round(availableWidth);
             height = Math.round(availableHeight);
-        } else if (CANVAS_FIT === "integer") {
-            const scale = Math.max(1, Math.floor(Math.min(availableWidth / CANVAS_WIDTH,
-                                                         availableHeight / CANVAS_HEIGHT)));
-            width = CANVAS_WIDTH * scale;
-            height = CANVAS_HEIGHT * scale;
         }
         canvasElement.style.width = width + "px";
         canvasElement.style.height = height + "px";
