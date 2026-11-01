@@ -7,8 +7,9 @@
     <img src="https://static.pepy.tech/personalized-badge/pygamestudio?period=total&units=international_system&left_color=grey&right_color=blue&left_text=Downloads" />
     <img src="https://img.shields.io/pypi/v/pygamestudio.svg?maxAge=86400">
     <img src="https://img.shields.io/badge/python-3-red.svg" />
-    <img src="https://img.shields.io/badge/WebApp-supported-turquoise.svg" />
     <img src="https://img.shields.io/badge/DesktopApp-supported-indigo .svg" />
+    <img src="https://img.shields.io/badge/WebApp-supported-turquoise.svg" />
+    <img src="https://img.shields.io/badge/AndroidApp-supported-teal.svg" />
     <img src="https://img.shields.io/badge/Buy Me a Coffee-KoFi-yellow.svg" />
     <br>
     <br>
@@ -50,13 +51,13 @@ pygs
 # 依赖库
 | 库名称 | 要求版本 |
 |-----|-----|
-| pygame-ce | >=2.5.6 |
-| PySide6 | >=6.10.0 | 
-| platformdirs | >=3.5.1 | 
-| numpy | >=1.26.0 | 
-| pyinstaller | >=6.18.0 |
-| soundfile | >=0.13.1 |
-| pymunk | >=7.3.0 |
+| pygame-ce | >=2.5.8 |
+| PySide6 | >=6.12.0 | 
+| platformdirs | >=4.12.4 | 
+| numpy | >=2.2.6 | 
+| pyinstaller | >=6.22.3 |
+| soundfile | >=0.14.0 |
+| pymunk | >=7.3.1 |
 
 <br>
 
