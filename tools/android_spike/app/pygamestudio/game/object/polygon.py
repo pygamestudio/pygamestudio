@@ -1,0 +1,155 @@
+import math
+import uuid
+import pygame
+from pygamestudio.game.object.type import *
+from pygamestudio.game.object.base import ObjectBase
+
+
+class ObjectPolygon(ObjectBase):
+    """A polygon object rendered as a filled shape from a list of vertices.
+
+    The vertices in ``points`` are scene (canvas) coordinates, so a vertex at
+    (0, 0) sits at the canvas origin — exactly like ObjectLine's endpoints.
+    The object's x/y (the surface top-left) and width/height are derived from
+    the vertex bounding box: x/y/pos = the min vertex, width/height = the
+    vertex extent. At least 3 points are required to draw; the shape is then
+    scaled / rotated / alpha-blended like the other objects.
+    """
+
+    def __init__(self, game_manager, object_data={}, is_for_api=False):
+        super().__init__(game_manager, object_data, is_for_api)
+        self._is_initialized = False
+
+        if hasattr(self, 'icon'):
+            self.icon = ':/images/polygon.png'
+
+        common_properties = {
+            'name': 'Polygon',
+            'type': OBJECT_POLYGON,
+            'uuid': str(uuid.uuid4()),
+            'x': 0,
+            'y': 0,
+            'pos': (0, 0),
+            'width': 60,
+            'height': 60,
+            'size': (60, 60),
+            'scale_x': 1,
+            'scale_y': 1,
+            'scale': (1, 1),
+            'angle': 0,
+            'color': (255, 255, 255, 255),
+            'visible': True,
+            'points': [(24, 0), (48, 20), (39, 48), (9, 48), (0, 20)],
+        }
+
+        for key, value in common_properties.items():
+            setattr(self, key, object_data.get(key, value))
+
+        self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
+        self._is_initialized = True
+
+        self._start()
+
+    def get_points(self):
+        """Return the polygon's vertex list (scene/canvas coordinates)."""
+        return self.points
+
+    def set_points(self, points):
+        """Set the polygon's vertices (scene coordinates), e.g.
+        [(0, 0), (100, 0), (50, 80)] — a vertex at (0, 0) sits at the canvas
+        origin."""
+        self.points = points
+
+    def _get_points_bounds(self):
+        """Return (min_x, min_y, max_x, max_y) of the vertices, or None when
+        the polygon has no vertices."""
+        if not self.points:
+            return None
+        xs = [point[0] for point in self.points]
+        ys = [point[1] for point in self.points]
+        return (min(xs), min(ys), max(xs), max(ys))
+
+    def _update_bounding_box(self):
+        """Derive position and size from the vertex bounding box.
+
+        x/y/pos = the min vertex (the surface's top-left in scene coords) and
+        width/height = the vertex extent, exactly like ObjectLine derives its
+        box from its endpoints.
+        """
+        bounds = self._get_points_bounds()
+        if bounds is None:
+            return
+        min_x, min_y, max_x, max_y = bounds
+        width = max(max_x - min_x, 1)
+        height = max(max_y - min_y, 1)
+        super().__setattr__('x', min_x)
+        super().__setattr__('y', min_y)
+        super().__setattr__('pos', (min_x, min_y))
+        super().__setattr__('width', width)
+        super().__setattr__('height', height)
+        super().__setattr__('size', (width, height))
+
+    def _update_surface(self):
+        self._update_bounding_box()
+
+        self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
+        if len(self.points) >= 3:
+            min_x, min_y, _, _ = self._get_points_bounds()
+            normalized_points = [(point[0] - min_x, point[1] - min_y) for point in self.points]
+            pygame.draw.polygon(self.surface, self.color[0:3], normalized_points)
+
+        scaled_surface = self._apply_scale(self.surface)
+        rotated_surface = pygame.transform.rotate(scaled_surface, self.angle)
+        self.surface = self._apply_alpha(rotated_surface)
+
+        super()._update_surface()
+
+    def __setattr__(self, name, value):
+        """Mirror ObjectLine: moving the object translates every vertex.
+
+        x/y/pos are derived from the vertices in _update_bounding_box(), so a
+        pos write shifts all vertices by the same delta and the box follows on
+        the next surface update.
+        """
+        if not hasattr(self, '_is_initialized') or not self._is_initialized:
+            super().__setattr__(name, value)
+            return
+
+        if name == 'pos':
+            # Recompute the current box first so the delta stays correct even
+            # when no redraw happened since the last change.
+            self._update_bounding_box()
+            dx = value[0] - self.x
+            dy = value[1] - self.y
+            super().__setattr__('points', [(point[0] + dx, point[1] + dy) for point in self.points])
+            # x/y/pos/size follow the vertices: publish them RIGHT AWAY. A
+            # pure move never rebuilds the surface (the scene view skips that
+            # to keep drags smooth) and the move gizmo computes every step
+            # from obj.x - a stale box made the polygon lag one step behind
+            # the cursor, so the drag stuttered and the gizmo detached.
+            self._update_bounding_box()
+        elif name == 'points':
+            super().__setattr__('points', value)
+            self._update_bounding_box()
+        else:
+            super().__setattr__(name, value)
+
+    def _set_world_rect(self, world_x, world_y):
+        """Move the polygon so its world rectangle starts at (world_x, world_y).
+
+        x/y are recomputed from the vertices on every surface update, so a
+        plain x/y write would be undone - the vertices have to shift (that is
+        what the ``pos`` setter does). The requested rectangle is the world box
+        of the ROTATED surface, so the centre is what gets matched.
+        """
+        rad = math.radians(self.angle)
+        width = abs(self.width * self.scale_x)
+        height = abs(self.height * self.scale_y)
+        rotated_w = abs(width * math.cos(rad)) + abs(height * math.sin(rad))
+        rotated_h = abs(width * math.sin(rad)) + abs(height * math.cos(rad))
+        center_x = world_x + rotated_w / 2.0
+        center_y = world_y + rotated_h / 2.0
+        self.pos = (center_x - width / 2.0, center_y - height / 2.0)
+        # x/y/size come from the vertices, so refresh them right away instead
+        # of waiting for the next surface update.
+        self._update_bounding_box()

@@ -1,0 +1,186 @@
+import math
+import uuid
+import pygame
+from pygamestudio.game.object.type import *
+from pygamestudio.game.object.base import ObjectBase
+
+
+class ObjectLine(ObjectBase):
+    def __init__(self, game_manager, object_data={}, is_for_api=False):
+        super().__init__(game_manager, object_data, is_for_api)
+        self._is_initialized = False
+
+        if hasattr(self, 'icon'):
+            self.icon = ':/images/line.png'
+
+        common_properties = {
+            'name': 'Line',
+            'type': OBJECT_LINE,
+            'uuid': str(uuid.uuid4()),
+            'x': 0,
+            'y': 0,
+            'pos': (0, 0),
+            'width': 100, 
+            'height': 100,
+            'size': (100, 100),
+            'scale_x': 1,
+            'scale_y': 1,
+            'scale': (1, 1),
+            'angle': 0,
+            'color': (255, 255, 255, 255),
+            'visible': True,
+            'thickness': 2,
+            'start_x': 0,
+            'start_y': 0,
+            'start_point': (0, 0),
+            'end_x': 100,
+            'end_y': 100,
+            'end_point': (100, 100)
+        }
+
+        for key, value in common_properties.items():
+            setattr(self, key, object_data.get(key, value))
+        
+        self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
+        self._is_initialized = True
+
+        self._start()
+
+    def get_thickness(self) -> int:
+        return self.thickness
+
+    def get_start_x(self) -> int:
+        return self.start_x
+    
+    def get_start_y(self) -> int:
+        return self.start_y
+    
+    def get_start_point(self) -> tuple:
+        return self.start_point
+    
+    def get_end_x(self) -> int:
+        return self.end_x
+    
+    def get_end_y(self) -> int:
+        return self.end_y
+
+    def get_end_point(self) -> tuple:
+        return self.end_point
+
+    def get_length(self) -> float:
+        """Length of the line (distance between its two endpoints)."""
+        return math.hypot(self.end_x - self.start_x, self.end_y - self.start_y)
+    
+    def set_thickness(self, thickness:int):
+        self.thickness = thickness
+
+    def set_start_x(self, start_x:int):
+        self.start_x = start_x
+
+    def set_start_y(self, start_y:int):
+        self.start_y = start_y
+
+    def set_start_point(self, start_x:int, start_y:int):
+        self.start_point = (start_x, start_y)
+
+    def set_end_x(self, end_x:int):
+        self.end_x = end_x
+
+    def set_end_y(self, end_y:int):
+        self.end_y = end_y
+
+    def set_end_point(self, end_x:int, end_y:int):
+        self.end_point = (end_x, end_y)
+
+    def set_points(self, start_point: tuple, end_point: tuple):
+        """Set both endpoints at once, e.g. set_points((0, 0), (100, 50))."""
+        self.start_point = start_point
+        self.end_point = end_point
+
+    def _update_bounding_box(self):
+        x = min(self.start_x, self.end_x)
+        y = min(self.start_y, self.end_y)
+        w = abs(self.end_x - self.start_x) + self.thickness
+        h = abs(self.end_y - self.start_y) + self.thickness
+
+        super().__setattr__('x', x)
+        super().__setattr__('y', y)
+        super().__setattr__('pos', (x, y))
+        super().__setattr__('width', w)
+        super().__setattr__('height', h)
+        super().__setattr__('size', (w, h))
+
+    def _update_surface(self):
+        self._update_bounding_box()
+
+        self.surface = pygame.Surface(self.size, pygame.SRCALPHA)
+        pygame.draw.line(self.surface, self.color[0:3], (0, 0), (self.surface.width-self.thickness, self.surface.height-self.thickness), width=self.thickness)
+        
+        scaled_surface = self._apply_scale(self.surface)
+        rotated_surface = pygame.transform.rotate(scaled_surface, self.angle)
+        self.surface = self._apply_alpha(rotated_surface)
+
+        super()._update_surface()
+
+    def __setattr__(self, name, value):
+        if not hasattr(self, '_is_initialized') or not self._is_initialized:
+            super().__setattr__(name, value)
+            return
+
+        if name =='pos':
+            # attrs like x, y, pos will be updated in _update_bounding_box()
+            # Recompute the current box first so the delta stays correct even
+            # when no redraw happened since the last change.
+            self._update_bounding_box()
+            dx = value[0] - self.x
+            dy = value[1] - self.y
+
+            new_start_x = self.start_x + dx
+            new_start_y = self.start_y + dy
+            new_end_x = self.end_x + dx
+            new_end_y = self.end_y + dy
+
+            self.start_point = (new_start_x, new_start_y)
+            self.end_point = (new_end_x, new_end_y)
+
+            # x/y/pos/size follow the endpoints: publish them RIGHT AWAY. A
+            # pure move never rebuilds the surface (the scene view skips that
+            # to keep drags smooth) and the move gizmo computes every step
+            # from obj.x - a stale box made the line lag one step behind the
+            # cursor, so the drag stuttered and the gizmo detached.
+            self._update_bounding_box()
+
+        elif name == 'start_point':
+            super().__setattr__('start_x', value[0])
+            super().__setattr__('start_y', value[1])
+            super().__setattr__('start_point', value)
+            self._update_bounding_box()
+
+        elif name == 'end_point':
+            super().__setattr__('end_x', value[0])
+            super().__setattr__('end_y', value[1])
+            super().__setattr__('end_point', value)
+            self._update_bounding_box()
+
+        else:
+            super().__setattr__(name, value)
+
+    def _set_world_rect(self, world_x, world_y):
+        """Move the line so its world rectangle starts at (world_x, world_y).
+
+        x/y are recomputed from the endpoints on every surface update, so a
+        plain x/y write would be undone - the endpoints have to shift (that is
+        what the ``pos`` setter does). The requested rectangle is the world box
+        of the ROTATED surface, so the centre is what gets matched.
+        """
+        rad = math.radians(self.angle)
+        width = abs(self.width * self.scale_x)
+        height = abs(self.height * self.scale_y)
+        rotated_w = abs(width * math.cos(rad)) + abs(height * math.sin(rad))
+        rotated_h = abs(width * math.sin(rad)) + abs(height * math.cos(rad))
+        center_x = world_x + rotated_w / 2.0
+        center_y = world_y + rotated_h / 2.0
+        self.pos = (center_x - width / 2.0, center_y - height / 2.0)
+        # x/y/size come from the endpoints, so refresh them right away instead
+        # of waiting for the next surface update.
+        self._update_bounding_box()
